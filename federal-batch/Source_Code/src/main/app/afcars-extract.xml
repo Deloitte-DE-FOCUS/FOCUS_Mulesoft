@@ -1,0 +1,1353 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+    <!-- <http:listener-config name="HTTP_Listener_Configuration" host="${http.host}" port="${http.port}" doc:name="HTTP Listener Configuration"/>
+    <sftp:connector name="SFTP" validateConnections="true" doc:name="SFTP"/>
+    <sftp:connector name="SFTP-1" validateConnections="true"
+	 	doc:name="SFTP">
+		<reconnect count="5" />
+	</sftp:connector>
+     <sfdc:config name="Salesforce__Basic_Authentication_dev"
+		username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}"
+		url="${sfdc.url}" disableSessionInvalidation="true"
+		doc:name="Salesforce: Basic Authentication">
+		<reconnect frequency="10000" count="6" />
+	</sfdc:config> 
+	
+	
+	<spring:beans>
+		<spring:import resource="classpath:/loggingframework.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/errorhandling.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/queryframework.xml" />
+	</spring:beans> -->
+	
+<!-- 	<configuration doc:name="Configuration">
+    	<expression-language>
+     	   <global-functions file = "GlobalUtilityFunctions.mvel">
+				def isValidNumber(textNumber) { org.mule.util.NumberUtils.isNumber(textNumber) }
+           </global-functions> 
+    	</expression-language>
+    </configuration>  -->
+	
+	<!-- <validation:config name="Validation_Configuration" doc:name="Validation Configuration">
+        <validation:exception-factory class="gov.delaware.validation.DelawareValidationExceptionFactory"/>
+    </validation:config>
+    <validation:config name="Validation_Configuration1" doc:name="Validation Configuration"/>
+     -->
+    
+   <!--  <sfdc:config name="Salesforce__Basic_Authentication_dev"
+		username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}"
+		url="${sfdc.url}" disableSessionInvalidation="true"
+		doc:name="Salesforce: Basic Authentication">
+		<reconnect frequency="10000" count="6" />
+	</sfdc:config>  -->
+	
+    
+    <flow name="afcars-extractFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/afcars" doc:name="HTTP"/>
+           <http:basic-security-filter realm="mule-realm"/> 
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String : Consume Stream"/>
+        <async doc:name="Async">
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="AFCARS_CallLOVflow" doc:name="AFCARS_CallLOVflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <logger message="AFCARS Adoption Extract Invoked !! #[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message : Get Adjusted Date" >
+        	<dw:input-payload mimeType="application/json" doc:sample="nytd_request.json"></dw:input-payload>
+            <dw:set-variable variableName="extractInfo"><![CDATA[%dw 1.0
+%output application/java
+%var TypeOfFile = {
+	"Corrected" : "C",
+	"Regular" : "R",
+	"Subsequent" : "S",
+	"Test" : "T"
+}
+---
+{
+	"ParentId" : payload.Id,
+	"DateRun" : now as :date as :string {format:"yyyyMMdd"},
+	"FederalFiscalYear": payload.Federal_Fiscal_Year__c as :number default "",
+	"ReportStartDate": ( ( payload.Service_Start_Date__c ) when (payload.Service_Start_Date__c != null) otherwise (payload.Report_Start__c ) ) ,
+	"ReportEndDate":( ( payload.Service_End_Date__c ) when (payload.Service_End_Date__c != null) otherwise (payload.Report_End__c ) ) ,
+	"ReportPeriod" : "A" when (payload.Reporting_Period__c == "Oct 1 - Mar 31") otherwise ("B" when (payload.Reporting_Period__c == "Apr 1 - Sep 30") otherwise ""),
+	"TypeOfSubmission" :  flowVars.LOVReturned[("TYPE_OF_FILE-" ++ (payload.Type_of_File__c default ""))][0] default "",
+	"SubmissionDate" : (now >> "America/New_York") as :string {format : "yyMMdd"},
+	"SubmissionTime" : (now >> "America/New_York") as :string {format : "HHmm"},
+	"EncryptPID":payload.Encrypt_PID__c 	,
+	"RunForPID":payload.Run_for_PID__c default "No"
+}]]></dw:set-variable>
+
+        </dw:transform-message>
+            <set-variable variableName="InterfaceName" value="AFCARSAdoption" doc:name="Variable : Set Interface Name" doc:description="Set Interface Name"/>
+
+            <enricher doc:name="Message Enricher " doc:description="Get Transitional Living Services Records in a flow variable">
+            	<flow-ref name="afcars-extract-get-ChildrenInvolved-Sub_Flow" doc:name="afcars-extract-get-ChildrenInvolved-Sub_Flow"/>
+            <enrich source="#[payload]" target="#[flowVars.ChildrenInvolved]"/>
+
+            </enricher>
+            <flow-ref name="afcars-extract-get-medicaid-applicable-Sub_Flow" doc:name="afcars-extract-get-medicaid-applicable-Sub_Flow"/>
+
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="afcars-extract-adoption-person-involved-records-Sub_Flow" doc:name="afcars-extract-adoption-person-involved-records-Sub_Flow"/>
+            <enrich source="#[sessionVars.PreChild]" target="#[flowVars.PreChild]"/>
+            <enrich source="#[sessionVars.PostChild]" target="#[flowVars.PostChild]"/>
+            <enrich source="#[sessionVars.AdoptiveParent1]" target="#[flowVars.AdoptiveParent1]"/>
+            <enrich source="#[sessionVars.AdoptiveParent2]" target="#[flowVars.AdoptiveParent2]"/>
+            <enrich source="#[sessionVars.FormerAdoptiveParent1]" target="#[flowVars.FormerAdoptiveParent1]"/>
+            <enrich source="#[sessionVars.FormerAdoptiveParent2]" target="#[flowVars.FormerAdoptiveParent2]"/>
+            <enrich source="#[sessionVars.BioParent1]" target="#[flowVars.BioParent1]"/>
+            <enrich source="#[sessionVars.BioParent2]" target="#[flowVars.BioParent2]"/>
+        </enricher>
+        <flow-ref name="afcars-extract-Case-Info-Sub_Flow" doc:name="afcars-extract-Case-Info-Sub_Flow"/>
+        <flow-ref name="afcars-extract-PreAdoptiveChild-records-Sub_Flow" doc:name="afcars-extract-PreAdoptiveChild-records-Sub_Flow"/>
+            <dw:transform-message doc:name="Transform Message AFCARS Elements">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var passwordMap = {
+	"0" : "Z",
+    "1" : "V",
+	"2" : "T",
+	"3" : "P",
+	"4" : "M",
+	"5" : "K",
+	"6" : "J",
+	"7" : "H",
+	"8" : "E",
+	"9" : "A"
+}
+%var ethnicityMap = {
+	"Hispanic or Latino" : "1",
+	"Not Hispanic or Latino" : "2",
+	"Unable to Determine" : "3",
+	"Abandoned" : "3",
+	"Declined" : "3"			
+}
+
+%var ChildPlacedFrom = {
+	"Within State" : "1",
+	"Within State or Tribal Service Area":"1",
+	"Another State or Tribal Service Area":"2",
+	"Another State" : "2",
+	"Another Country" : "3"		
+}
+
+%var ChildPlacedBy = {
+	"Public Agency" : "1",
+	"Private Agency" : "2",
+	"Tribal Agency" : "3",
+	"Independent person" : "4"			
+}
+
+%var Gender = {
+	"Male" : "1",
+	"Female" : "2"
+}
+
+%var FamilyStructure = {	
+	"Married Couple" : "1",
+	"Married Same Sex Couple" : "1",
+	"Married but Individually Adopting or Obtaining Legal Guardianship" : "1",
+	"Unmarried Couple" : "2",
+	"Unmarried Same Sex Couple" : "2",
+	"Single Female" : "3",
+	"Single Male" : "4",
+	"Blank" : "0"
+}
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+(flowVars.ChildrenInvolved filter (flowVars.CourtOrderRecords[$.CourtOrderID][0].RelatedCaseName != null ) ) map {
+	PID:flowVars.PreAdoptiveRecords[$.PersonID][0].PID,
+	CaseID:flowVars.CourtOrderRecords[$.CourtOrderID][0].RelatedCaseName,
+	TitleIVEAgencyOrState:p('TitleIVEAgencyOrState'),
+	ReportPeriodEndingDate:flowVars.extractInfo.ReportEndDate as :date as :string {format:"yyyyMM"},
+	RecordNumber: ( ( pad("0",( 12 - ( sizeOf (( 999999999999 - (flowVars.PreAdoptiveRecords[$.PersonID][0].PID as :number)) as :string ) ))) ++ (999999999999 - (flowVars.PreAdoptiveRecords[$.PersonID][0].PID as :number)) ) splitBy "") reduce ((val,acc = "") -> acc ++ (flowVars.LOVReturned[ ("ENCRYPTION_MAPPING-" ++ val)][0] default "")) when (flowVars.extractInfo.EncryptPID == true ) otherwise ( flowVars.PreAdoptiveRecords[$.PersonID][0].PID as :number as :string {format:"000000000000"}),
+	TitleIVEAgencyInvolvement: "1",
+	ChildsDateofBirth:flowVars.PreAdoptiveRecords[$.PersonID][0].BirthDate as :date as :string {format:"yyyyMM"},
+	Sex:(flowVars.LOVReturned[ ("AFCARS_GENDER-" ++ flowVars.PreAdoptiveRecords[$.PersonID][0].Gender)][0] default ""),
+	Race_AmericanIndianorAlaskaNative:"1" when ((flowVars.PreAdoptiveRecords[$.PersonID][0].PrimaryRace default "" contains "American Indian or Alaskan Native") or (flowVars.PreAdoptiveRecords[$.PersonID][0].SecondaryRace default "" contains "American Indian or Alaskan Native")) otherwise "0",
+	Race_Asian:"1" when ((flowVars.PreAdoptiveRecords[$.PersonID][0].PrimaryRace default "" contains "Asian") or (flowVars.PreAdoptiveRecords[$.PersonID][0].SecondaryRace default "" contains "Asian")) otherwise "0",
+	Race_BlackOrAfricanAmerican:"1" when ((flowVars.PreAdoptiveRecords[$.PersonID][0].PrimaryRace default "" contains "Black or African American") or (flowVars.PreAdoptiveRecords[$.PersonID][0].SecondaryRace default "" contains "Black or African American")) otherwise "0",
+	Race_NativeHawaiianOrOtherPacificIslander:"1" when ((flowVars.PreAdoptiveRecords[$.PersonID][0].PrimaryRace default "" contains "Native Hawaiian or Other Pacific Islander") or (flowVars.PreAdoptiveRecords[$.PersonID][0].SecondaryRace default "" contains "Native Hawaiian or Other Pacific Islander")) otherwise "0",
+	Race_White:"1" when ((flowVars.PreAdoptiveRecords[$.PersonID][0].PrimaryRace default "" contains "White") or (flowVars.PreAdoptiveRecords[$.PersonID][0].SecondaryRace default "" contains "White")) otherwise "0",
+	Race_UnableToDetermine:"1" when (flowVars.PreAdoptiveRecords[$.PersonID][0].PrimaryRace default "" contains "Unable to Determine")  otherwise "0", //or (flowVars.PreAdoptiveRecords[$.PersonID][0].SecondaryRace default "" contains "Unable to Determine"))
+	HispanicOrLatinoEthnicity:(flowVars.LOVReturned[ ("AFCARS_FOSTER_ETHNICITY-" ++ flowVars.PreAdoptiveRecords[$.PersonID][0].Ethnicity)][0] default ""),
+	SpecialNeedsDetermined:"1" when (flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == 'Yes') otherwise ( "2" when (flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == 'No') otherwise ""),
+	PrimaryFactorOrConditionForSpecialNeeds:"0" when (flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == 'No') 
+						otherwise ( "1" when ((flowVars.CourtOrderRecords[$.CourtOrderID][0].Racial == 'Primary') ) 
+							otherwise ( "2" when ((flowVars.CourtOrderRecords[$.CourtOrderID][0].ChildsAge == 'Primary') ) 
+								otherwise ("3" when ((flowVars.CourtOrderRecords[$.CourtOrderID][0].Sibling == 'Primary') ) 
+									otherwise ("4" when ((flowVars.CourtOrderRecords[$.CourtOrderID][0].MedicalMentalPhysycalEmotionCondition == 'Primary') ) 
+										otherwise ( "5" when ((flowVars.CourtOrderRecords[$.CourtOrderID][0].OtherCondition == 'Primary') ) 
+											otherwise ""
+										)
+									)
+								)
+							)
+						),
+	TypeOfDisability_MentalCondition:"1" when ( ((flowVars.CourtOrderRecords[$.CourtOrderID][0].MentalCondition == 'Yes') or (flowVars.CourtOrderRecords[$.CourtOrderID][0].MentalCondition == 'Primary') or (flowVars.CourtOrderRecords[$.CourtOrderID][0].MentalCondition == 'Secondary')) and ((flowVars.CourtOrderRecords[$.CourtOrderID][0].MedicalMentalPhysycalEmotionCondition == 'Primary')) ) 
+						otherwise ( "0" when (flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == "Yes" or flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == 'No') otherwise "" ),
+												
+	TypeOfDisability_VisuallyOrHearingImpaired:"1" when ((flowVars.CourtOrderRecords[$.CourtOrderID][0].VisualCondition == 'Yes') and ((flowVars.CourtOrderRecords[$.CourtOrderID][0].MedicalMentalPhysycalEmotionCondition == 'Primary') ))  
+						otherwise ( "0" when (flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == "Yes" or flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == 'No') otherwise "" )  	,
+						
+	TypeOfDisability_PhysicallyDisabled:"1" when ( ((flowVars.CourtOrderRecords[$.CourtOrderID][0].PhysicalCondition == 'Yes') or (flowVars.CourtOrderRecords[$.CourtOrderID][0].PhysicalCondition == 'Primary') or (flowVars.CourtOrderRecords[$.CourtOrderID][0].PhysicalCondition == 'Secondary')) and ((flowVars.CourtOrderRecords[$.CourtOrderID][0].MedicalMentalPhysycalEmotionCondition == 'Primary') ) ) 
+						otherwise ( "0" when (flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == "Yes" or flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == 'No') otherwise "" )  	,
+						
+	TypeOfDisability_EmotionallyDisturbed:"1" when ( ( (flowVars.CourtOrderRecords[$.CourtOrderID][0].EmotionalCondition == 'Yes') or (flowVars.CourtOrderRecords[$.CourtOrderID][0].EmotionalCondition == 'Primary') or (flowVars.CourtOrderRecords[$.CourtOrderID][0].EmotionalCondition == 'Secondary')) and ((flowVars.CourtOrderRecords[$.CourtOrderID][0].MedicalMentalPhysycalEmotionCondition == 'Primary') ) ) 
+						otherwise ( "0" when (flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == "Yes" or flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == 'No') otherwise "" )  	,
+
+	TypeOfDisability_OtherMedicallyDiagnosedCondition: "1" when ( ( (flowVars.CourtOrderRecords[$.CourtOrderID][0].OtherMedicallyDiagnosedCondition == 'Yes') or (flowVars.CourtOrderRecords[$.CourtOrderID][0].OtherMedicallyDiagnosedCondition == 'Primary') or (flowVars.CourtOrderRecords[$.CourtOrderID][0].OtherMedicallyDiagnosedCondition == 'Secondary') or  (flowVars.CourtOrderRecords[$.CourtOrderID][0].Medical_Condition == 'Primary')  ) and ((flowVars.CourtOrderRecords[$.CourtOrderID][0].MedicalMentalPhysycalEmotionCondition == 'Primary') )) 
+						otherwise ( "0" when (flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == "Yes" or flowVars.CourtOrderRecords[$.CourtOrderID][0].SpecialNeeds == 'No') otherwise "" ),
+												
+	MothersYearOfBirth:( flowVars.BioParent1[$.PersonID][0].DOB when (flowVars.BioParent1[$.PersonID][0].Gender == "Female") 
+						otherwise ( flowVars.FormerAdoptiveParent1[$.PersonID][0].DOB when (flowVars.FormerAdoptiveParent1[$.PersonID][0].Gender == "Female") 
+							otherwise (flowVars.BioParent2[$.PersonID][0].DOB when (flowVars.BioParent2[$.PersonID][0].Gender == "Female") 
+								otherwise ( flowVars.FormerAdoptiveParent2[$.PersonID][0].DOB when (flowVars.FormerAdoptiveParent2[$.PersonID][0].Gender == "Female" ) 
+									otherwise (flowVars.BioParent1[$.PersonID][0].DOB when (flowVars.BioParent1[$.PersonID][0].DOB != null ) 
+										otherwise (flowVars.FormerAdoptiveParent1[$.PersonID][0].DOB when ( flowVars.FormerAdoptiveParent1[$.PersonID][0].DOB != null ) otherwise " ")))))) as :date as :string {format:"yyyy"} default "",
+	FathersYearOfBirth:( flowVars.BioParent1[$.PersonID][0].DOB when (flowVars.BioParent1[$.PersonID][0].Gender == "Male") 
+						otherwise ( flowVars.FormerAdoptiveParent1[$.PersonID][0].DOB when (flowVars.FormerAdoptiveParent1[$.PersonID][0].Gender == "Male") 
+							otherwise (flowVars.BioParent2[$.PersonID][0].DOB when (flowVars.BioParent2[$.PersonID][0].Gender == "Male") 
+								otherwise ( flowVars.FormerAdoptiveParent2[$.PersonID][0].DOB when (flowVars.FormerAdoptiveParent2[$.PersonID][0].Gender == "Male" ) 
+									otherwise (flowVars.BioParent1[$.PersonID][0].DOB when (flowVars.BioParent1[$.PersonID][0].DOB != null ) 
+										otherwise (flowVars.FormerAdoptiveParent1[$.PersonID][0].DOB when ( flowVars.FormerAdoptiveParent1[$.PersonID][0].DOB != null ) otherwise " ")))))) as :date as :string {format:"yyyy"} default "",
+	WasTheMotherMarriedAtTheTimeOfTheChildsBirth: ("1" when ($.MotherMarriedAtTime == "Yes") otherwise ( "2" when ($.MotherMarriedAtTime == "No") otherwise "3")) when (($.MotherMarriedAtTime default "") != "") otherwise "",
+	DateOfMothersTerminationOfParentalRights:( flowVars.BioParent1[$.PersonID][0].TPR when (flowVars.BioParent1[$.PersonID][0].Gender == "Female") 
+						otherwise ( flowVars.FormerAdoptiveParent1[$.PersonID][0].TPR when (flowVars.FormerAdoptiveParent1[$.PersonID][0].Gender == "Female") 
+							otherwise (flowVars.BioParent2[$.PersonID][0].TPR when (flowVars.BioParent2[$.PersonID][0].Gender == "Female") 
+								otherwise ( flowVars.FormerAdoptiveParent2[$.PersonID][0].TPR when (flowVars.FormerAdoptiveParent2[$.PersonID][0].Gender == "Female" ) 
+									otherwise (flowVars.BioParent1[$.PersonID][0].TPR when (flowVars.BioParent1[$.PersonID][0].TPR != null ) 
+										otherwise (flowVars.FormerAdoptiveParent1[$.PersonID][0].TPR when ( flowVars.FormerAdoptiveParent1[$.PersonID][0].TPR != null ) otherwise " ")
+													)
+												)
+											)
+										)
+									) as :date as :string {format:"yyyyMMdd"}  default "",
+	DateOfFathersTerminationOfParentalRights:( flowVars.BioParent1[$.PersonID][0].TPR when (flowVars.BioParent1[$.PersonID][0].Gender == "Male") 
+						otherwise ( flowVars.FormerAdoptiveParent1[$.PersonID][0].TPR when (flowVars.FormerAdoptiveParent1[$.PersonID][0].Gender == "Male") 
+							otherwise (flowVars.BioParent2[$.PersonID][0].TPR when (flowVars.BioParent2[$.PersonID][0].Gender == "Male") 
+								otherwise ( flowVars.FormerAdoptiveParent2[$.PersonID][0].TPR when (flowVars.FormerAdoptiveParent2[$.PersonID][0].Gender == "Male" ) 
+									otherwise (flowVars.BioParent1[$.PersonID][0].TPR when (flowVars.BioParent1[$.PersonID][0].TPR != null ) 
+										otherwise (flowVars.FormerAdoptiveParent1[$.PersonID][0].TPR when ( flowVars.FormerAdoptiveParent1[$.PersonID][0].TPR != null ) otherwise " ")
+													)
+												)
+											)
+										)
+									) as :date as :string {format:"yyyyMMdd"} default "",
+	DateAdoptionWasFinalized:$.DateAdoptionFinalized as :date as :string {format :"yyyyMMdd"},
+	AdoptiveParentsFamilyStructure:(flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default ""),
+	
+	YearOfBirthAdoptiveMother:( (flowVars.AdoptiveParent1[$.PersonID][0].DOB when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Female") ) 
+								otherwise (flowVars.AdoptiveParent2[$.PersonID][0].DOB when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Female") ) 
+									otherwise (flowVars.AdoptiveParent1[$.PersonID][0].DOB when ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) otherwise "" ) ) ) when (
+									(flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "4" 
+									) otherwise "" ) as :date as :string {format:"yyyy"} default "",
+										
+	YearOfBirthAdoptiveFather:((flowVars.AdoptiveParent1[$.PersonID][0].DOB when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Male") and (not ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) )
+								otherwise (flowVars.AdoptiveParent2[$.PersonID][0].DOB when (flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Male" ) 
+									otherwise ( flowVars.AdoptiveParent2[$.PersonID][0].DOB when ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) otherwise "" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "3" ) otherwise "" ) as :date as :string {format:"yyyy"} default "",
+	
+	RaceAdoptiveMotherAmericanIndianorAlaskaNative:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Female") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "American Indian or Alaskan Native") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "American Indian or Alaskan Native")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Female" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "American Indian or Alaskan Native") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "American Indian or Alaskan Native")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "American Indian or Alaskan Native") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "American Indian or Alaskan Native")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "4" )  otherwise "" ,
+	
+	RaceAdoptiveMotherAsian:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Female") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Asian") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Asian")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Female" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "Asian") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "Asian")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Asian") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Asian")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "4" )  otherwise "" ,
+	
+	RaceAdoptiveMotherBlackOrAfricanAmerican:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Female") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Black or African American") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Black or African American")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Female" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "Black or African American") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "Black or African American")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Black or African American") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Black or African American")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "4" )  otherwise "" ,
+	
+	RaceAdoptiveMotherNativeHawaiianOrOtherPacificIslander:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Female") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Native Hawaiian or Other Pacific Islander") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Native Hawaiian or Other Pacific Islander")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Female" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "Native Hawaiian or Other Pacific Islander") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "Native Hawaiian or Other Pacific Islander")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Native Hawaiian or Other Pacific Islander") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Native Hawaiian or Other Pacific Islander")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "4" )  otherwise "" ,
+	
+	RaceAdoptiveMotherWhite:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Female") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "White") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "White")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Female" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "White") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "White")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "White") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "White")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "4" )  otherwise "" ,
+	
+	RaceAdoptiveMotherUnableToDetermine:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Female") and (flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Unable to Determine") ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Female" ) and (flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "Unable to Determine") )  
+									otherwise ( "1" when ( (flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Unable to Determine") and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "4" )  otherwise "" ,
+	
+	HispanicOrLatinoEthnicityAdoptiveMother:(( (flowVars.LOVReturned[ ("AFCARS_FOSTER_ETHNICITY-" ++ flowVars.AdoptiveParent1[$.PersonID][0].Ethnicity)][0] default "") when (flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Female") 
+								otherwise ( (flowVars.LOVReturned[ ("AFCARS_FOSTER_ETHNICITY-" ++ flowVars.AdoptiveParent2[$.PersonID][0].Ethnicity)][0] default "") when (flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Female" ) 
+									otherwise (flowVars.LOVReturned[ ("AFCARS_FOSTER_ETHNICITY-" ++ flowVars.AdoptiveParent1[$.PersonID][0].Ethnicity)][0] default "") ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "4" ) otherwise "" ),	
+	
+	RaceAdoptiveFatherAmericanIndianOrAlaskaNative:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Male") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "American Indian or Alaskan Native") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "American Indian or Alaskan Native")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Male" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "American Indian or Alaskan Native") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "American Indian or Alaskan Native")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "American Indian or Alaskan Native") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "American Indian or Alaskan Native")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "3" )  otherwise "" ,
+	
+	RaceAdoptiveFatherAsian:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Male") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Asian") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Asian")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Male" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "Asian") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "Asian")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Asian") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Asian")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "3" )  otherwise "" ,	
+
+	RaceAdoptiveFatherBlackOrAfricanAmerican:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Male") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Black or African American") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Black or African American")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Male" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "Black or African American") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "Black or African American")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Black or African American") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Black or African American")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "3" )  otherwise "" ,
+	
+	RaceAdoptiveFatherNativeHawaiianOrOtherPacificIslander:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Male") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Native Hawaiian or Other Pacific Islander") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Native Hawaiian or Other Pacific Islander")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Male" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "Native Hawaiian or Other Pacific Islander") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "Native Hawaiian or Other Pacific Islander")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Native Hawaiian or Other Pacific Islander") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "Native Hawaiian or Other Pacific Islander")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "3" )  otherwise "" ,	
+
+	RaceAdoptiveFatherWhite:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Male") and ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default ""  contains "White") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "White")) ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Male" ) and ((flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "White") or (flowVars.AdoptiveParent2[$.PersonID][0].RaceSecondary default "" contains "White")) )  
+									otherwise ( "1" when ( ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "White") or (flowVars.AdoptiveParent1[$.PersonID][0].RaceSecondary default "" contains "White")) and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "3" )  otherwise "" ,	
+
+	RaceAdoptiveFatherUnableToDetermine:( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Male") and (flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Unable to Determine") ) 
+								otherwise ("1" when ((flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Male" ) and (flowVars.AdoptiveParent2[$.PersonID][0].RacePrimary default "" contains "Unable to Determine") )  
+									otherwise ( "1" when ((flowVars.AdoptiveParent1[$.PersonID][0].RacePrimary default "" contains "Unable to Determine") and ( (($.AdoptiveParentFamilyStructure default "") == "Married Same Sex Couple") or (($.AdoptiveParentFamilyStructure default "") == "Unmarried Same Sex Couple") ) ) otherwise "0" ) ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "3" )  otherwise "" ,	
+
+	HispanicOrLatinoEthnicityAdoptiveFather:(( (flowVars.LOVReturned[ ("AFCARS_FOSTER_ETHNICITY-" ++ flowVars.AdoptiveParent1[$.PersonID][0].Ethnicity)][0] default "") when (flowVars.AdoptiveParent1[$.PersonID][0].Gender == "Male") 
+								otherwise ((flowVars.LOVReturned[ ("AFCARS_FOSTER_ETHNICITY-" ++ flowVars.AdoptiveParent2[$.PersonID][0].Ethnicity)][0] default "") when (flowVars.AdoptiveParent2[$.PersonID][0].Gender == "Male" ) 
+									otherwise (flowVars.LOVReturned[ ("AFCARS_FOSTER_ETHNICITY-" ++ flowVars.AdoptiveParent1[$.PersonID][0].Ethnicity)][0] default "") ) ) when ((flowVars.LOVReturned[ ("AFCARS_FAMILY_STRUCTURE-" ++ $.AdoptiveParentFamilyStructure)][0] default "") != "3" ) otherwise "" ),
+	
+	RelationshipStepparent:"1" when ($.AdoptiveParentRealtionship == "Stepparent") otherwise "0",
+	RelationshipOtherRelative:"1" when (($.AdoptiveParentRealtionship == "Paternal Grandparent(s)") or ($.AdoptiveParentRealtionship == "Maternal Grandparent(s)") or ($.AdoptiveParentRealtionship == "Other Paternal Relative(s)") or ($.AdoptiveParentRealtionship == "	Other Maternal Relative(s)") or ($.AdoptiveParentRealtionship == "Siblings") or ($.AdoptiveParentRealtionship == "Foster Parent - Relative") or ($.AdoptiveParentRealtionship == "Foster Parent - Non-relative")) otherwise "0",
+	RelationshipFosterParent:"1" when (($.AdoptiveParentRealtionship == "Foster parent(s)") or ($.AdoptiveParentRealtionship == "Foster Parent - Relative") or ($.AdoptiveParentRealtionship == "Foster Parent - Non-relative")) otherwise "0",
+	RelationshipOtherNonRelative:"1" when (($.AdoptiveParentRealtionship == "Kin") or ($.AdoptiveParentRealtionship == "Non-relatives")) otherwise "0",
+	ChildWasPlacedFrom: "1",
+	ChildWasPlacedBy:(flowVars.LOVReturned[ ("AFCARS_CHILD_PLACED_BY-" ++ $.ChildPlacedBy)][0] default ""),
+	IsTheChildReceivingMonthlySubsidy:"1" when ((flowVars.MedicaidApplicable contains $.CourtOrderID) ) otherwise '2',
+	MonthlyAmount:$.WhatisMontlyIncome as :number as :string {format:"00000"} default "00000",
+	AdoptionAssistanceIVE:"1" when ($.IsChildRecievingIVEAssistance == 'Yes') otherwise '2',
+	CourtOrderID: $.CourtOrderID
+} ]]></dw:set-payload>
+            </dw:transform-message>
+            <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Record Count" doc:description="Set Record Count in variable">
+                <add-message-property key="RecordCount" value="#[payload.size()]"/>
+            </message-properties-transformer>
+            
+<!--         <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var a = [{Special_Education__c : "Yes","a" : "aA"},{Special_Education__c : "No","a" : "aA"}]
+%function filter2(arr,ele,cr) (arr filter ($[ele] == cr))
+-
+(sizeOf (filter2(a,"Special_Education__c","Yes")))]]></dw:set-payload>
+        </dw:transform-message> -->
+        <choice doc:name="Choice">
+            <when expression="#[payload.size() == 0 ]">
+                                <dw:transform-message doc:name="Transform Message : Prepare Response">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.extractInfo.ParentId,
+		"Attachment_Generated__c": false as :boolean,
+		"Failure_Reason__c": "No Records qualified for the Extract. "
+
+}]]]></dw:set-payload>
+                </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Extract__c" doc:name="Salesforce : Update Extract Record" doc:description="Updated Extract record to notify user">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <set-variable variableName="filename_afcars" value="#['AFCARSADOPTION_' + server.dateTime.format(&quot;yyyyMMddHHmmss&quot;)]" doc:name="Variable : Filename of the Extract File"/>
+                
+
+                <dw:transform-message doc:name="Transform Message Header and Exceptions" metadata:id="59445e44-8f01-4b32-a15e-094faf2ec1d8">
+                    <dw:set-variable variableName="Header"><![CDATA[%dw 1.0
+%output text/plain schemaPath = "HeaderFFD.ffd"
+---
+[{
+	RecordCount:flowVars.RecordCount as :number as :string {format:"00000000"},
+	ReportingEndDate:flowVars.extractInfo.ReportEndDate as :date as :string {format:"yyyyMM"},
+	LessOne:flowVars.LessOne as :number as :string {format:"00000000"} default "00000000",
+	AgeOne:flowVars.AgeOne as :number as :string {format:"00000000"} default "00000000",
+	AgeTwo:flowVars.AgeTwo as :number as :string {format:"00000000"} default "00000000",
+	AgeThree:flowVars.AgeThree as :number as :string {format:"00000000"} default "00000000",
+	AgeFour:flowVars.AgeFour as :number as :string {format:"00000000"} default "00000000",
+	AgeFive:flowVars.AgeFive as :number as :string {format:"00000000"} default "00000000",
+	AgeSix:flowVars.AgeSix as :number as :string {format:"00000000"} default "00000000",
+	AgeSeven:flowVars.AgeSeven as :number as :string {format:"00000000"} default "00000000",
+	AgeEight:flowVars.AgeEight as :number as :string {format:"00000000"} default "00000000",
+	AgeNine:flowVars.AgeNine as :number as :string {format:"00000000"} default "00000000",
+	AgeTen:flowVars.AgeTen as :number as :string {format:"00000000"} default "00000000",
+	AgeEleven:flowVars.AgeEleven as :number as :string {format:"00000000"} default "00000000",
+	AgeTwelve:flowVars.AgeTwelve as :number as :string {format:"00000000"} default "00000000",
+	AgeThirteen:flowVars.AgeThirteen as :number as :string {format:"00000000"} default "00000000",
+	AgeFourteen:flowVars.AgeFourteen as :number as :string {format:"00000000"} default "00000000",
+	AgeFifteen:flowVars.AgeFifteen as :number as :string {format:"00000000"} default "00000000",
+	AgeSixteen:flowVars.AgeSixteen as :number as :string {format:"00000000"} default "00000000",
+	AgeSeventeen:flowVars.AgeSeventeen as :number as :string {format:"00000000"} default "00000000",
+	AgeEighteen:flowVars.AgeEighteen as :number as :string {format:"00000000"} default "00000000",
+	AgeAbove:flowVars.AgeAbove as :number as :string {format:"00000000"} default "00000000"		
+}]]]></dw:set-variable>
+                    <dw:set-variable variableName="Exceptions"><![CDATA[%dw 1.0
+%output application/csv header= false , escape="<", separator="!"
+---
+payload map {
+	( Error_AmericanIndianorAlaskaNative:( $.PID ++ "," ++ $.CaseID ++ ",Race is 'America Indian or Alaska Native' and Ehtnicity is 'Unable to Determine'" ++ "\n") ) when ( ($.Race_AmericanIndianorAlaskaNative == "1") and ($.HispanicOrLatinoEthnicity == "3")) ,
+	( Error_Asian:( $.PID ++ "," ++ $.CaseID ++ ",Race is 'Asian' and Ehtnicity is 'Unable to Determine'" ++ "\n") ) when ( ($.Race_Asian == "1") and ($.HispanicOrLatinoEthnicity == "3") ) ,
+	( Error_BlackOrAfricanAmerican:($.PID ++ "," ++ $.CaseID ++ ",Race is 'Black or African American' and Ehtnicity is 'Unable to Determine'" ++ "\n")) when ( ($.Race_BlackOrAfricanAmerican == "1") and ($.HispanicOrLatinoEthnicity == "3") ) ,
+	( Error_NativeHawaiianOrOtherPacificIslander:($.PID ++ "," ++  $.CaseID ++ ",Race is 'Native Hawaiian or Other Pacific Islander' and Ehtnicity is 'Unable to Determine'" ++ "\n"))  when ( ($.Race_NativeHawaiianOrOtherPacificIslander == "1") and ($.HispanicOrLatinoEthnicity == "3") ) ,
+	( Error_White:($.PID ++ "," ++ $.CaseID ++ ",Race is 'White' and Ehtnicity is 'Unable to Determine'" ++ "\n")) when (($.Race_White == '1') and ($.HispanicOrLatinoEthnicity == "3") ) ,
+	( Error_UnableToDetermine:($.PID ++ "," ++ $.CaseID ++ ",Race is 'Unable to Determine' and Ehtnicity is either 'Hispanic or Latino' or 'Not hispanic or Lationo'" ++ "\n")) when (($.Race_UnableToDetermine == "1") and (($.HispanicOrLatinoEthnicity == "2") or ($.HispanicOrLatinoEthnicity == "1"))) ,
+	( Error_HispanicOrLatinoEthnicity:($.PID ++ "," ++ $.CaseID ++ ",Ehtnicity is 'Unable to Determine' and Race is NOT 'Unable to Determine'" ++ "\n")) when (($.HispanicOrLatinoEthnicity == "3") and ($.Race_UnableToDetermine != "1")) ,
+	( Error_SpecialNeedsDetermined:($.PID ++ "," ++ $.CaseID ++ ",Has the title IV-E agency determined that the child has special needs? (Determination has not been completed/finalized in the Assistance/Subsidy Case)" ++ "\n") ) when ($.SpecialNeedsDetermined == '') ,
+	( Error_PrimaryFactorOrConditionForSpecialNeeds:($.PID ++ "," ++ $.CaseID ++ ",Primary Factor or Condition for Special Needs (Determination has not been completed/finalized in the Assistance/Subsidy Case)" ++ "\n") ) when ($.SpecialNeedsDetermined == '') ,
+	( Error_TypeOfDisability_MentalCondition:($.PID ++ "," ++ $.CaseID ++ ",Type of Disability-Mental Condition (Determination has not been completed/finalized in the Assistance/Subsidy Case" ++ "\n") ) when ($.TypeOfDisability_MentalCondition == '') ,
+	( Error_TypeOfDisability_VisuallyOrHearingImpaired:($.PID ++ "," ++ $.CaseID ++ ",Type of Disability-Visually or Hearing Impaired (Determination has not been completed/finalized in the Assistance/Subsidy Case)" ++ "\n") ) when ($.TypeOfDisability_VisuallyOrHearingImpaired == '' ),
+	( Error_TypeOfDisability_PhysicallyDisabled:( $.PID ++ "," ++ $.CaseID ++ ",Type of Disability-Physically Disabled (Determination has not been completed/finalized in the Assistance/Subsidy Case)" ) ++ "\n" ) when ($.TypeOfDisability_PhysicallyDisabled == '' ),
+	( Error_TypeOfDisability_EmotionallyDisturbed:($.PID ++ "," ++ $.CaseID ++ ",Type of Disability-Emotionally Disturbed (Determination has not been completed/finalized in the Assistance/Subsidy Case)" ) ++ "\n" ) when ($.TypeOfDisability_EmotionallyDisturbed == '' ),
+	( Error_TypeOfDisability_OtherMedicallyDiagnosedCondition:($.PID ++ "," ++ $.CaseID ++ ",Type of Disability-Other medically diagnosed condition (Determination has not been completed/finalized in the Assistance/Subsidy Case)" ++ "\n" ) ) when ($.TypeOfDisability_OtherMedicallyDiagnosedCondition == '' ),
+	( Error_DateOfMothersTerminationOfParentalRights:($.PID ++ "," ++ $.CaseID ++ ",Date of Mother's termination of parental rights (no value found)" ++ "\n")) when ($.DateOfMothersTerminationOfParentalRights == ''),
+	( Error_DateOfFathersTerminationOfParentalRights:($.PID ++ "," ++ $.CaseID ++ ",Date of Father's termination of parental rights (no value found)" ++ "\n")) when ($.DateOfFathersTerminationOfParentalRights == ''),
+    ( Error_MothersTerminationOfParentalRights:($.PID ++ "," ++ $.CaseID ++ ",Mother's TPR is not the same as Father's TPR" ++ "\n")) when ($.DateOfMothersTerminationOfParentalRights != $.DateOfFathersTerminationOfParentalRights ),
+	( Error_DateAdoptionWasFinalized:($.PID ++ "," ++ $.CaseID ++ ",Date Adoption was finalized (no value found)" ++ "\n" )) when ($.DateAdoptionWasFinalized == ''),
+	( Error_RaceAdoptiveMotherUnableToDetermine:($.PID ++ "," ++ $.CaseID ++ ", Race [Adoptive mother] - Unable to Determine (Ethnicity is 'Unable to Determine' and Race is NOT 'Unable to Determine')" ++ "\n" )) when ($.RaceAdoptiveMotherUnableToDetermine == '1' and ( ($.HispanicOrLatinoEthnicityAdoptiveMother == '1') or ($.HispanicOrLatinoEthnicityAdoptiveMother == '2' ))) ,
+	( Error_HispanicOrLatinoEthnicityAdoptiveMother:($.PID ++ "," ++ $.CaseID ++ ", Hispanic or Latino Ethnicity [Adoptive mother] (Ethnicity is 'Unable to Determine' and Race is NOT 'Unable to Determine')" ++ "\n")) when ($.RaceAdoptiveMotherUnableToDetermine == '1' and ( ($.HispanicOrLatinoEthnicityAdoptiveMother == '1') or ($.HispanicOrLatinoEthnicityAdoptiveMother == '2' ))),
+	( Error_RaceAdoptiveFatherUnableToDetermine:($.PID ++ "," ++ $.CaseID ++ ", Race [Adoptive mother] - Unable to Determine (Ethnicity is 'Unable to Determine' and Race is NOT 'Unable to Determine')"	)) when ($.RaceAdoptiveFatherUnableToDetermine == '1' and ( ($.HispanicOrLatinoEthnicityAdoptiveMother == '1') or ($.HispanicOrLatinoEthnicityAdoptiveMother == '2' ))) ,
+	( Error_HispanicOrLatinoEthnicityAdoptiveFather:($.PID ++ "," ++ $.CaseID ++ ",Hispanic or Latino ethnicity [Adoptive father] (Ethnicity is 'Unable to Determine' and Race is NOT 'Unable to Determine')" ++ "\n")) when ($.RaceAdoptiveMotherUnableToDetermine == '1' and ( ($.HispanicOrLatinoEthnicityAdoptiveFather == '1') or ($.HispanicOrLatinoEthnicityAdoptiveFather == '2' ))),
+	( Error_IsTheChildReceivingMonthlySubsidy:($.PID ++ "," ++ $.CaseID ++ ",If 'Medicaid Applicable' is Yes on Case Agreement, then the field 'Is Child Receiving a Monthly Subsidy?' should be Yes on Court Order=>Person Involved when Monthly Amount is greater than 0" ++ "\n")) when ((flowVars.MedicaidApplicable contains $.CourtOrderID) and ((($.IsTheChildReceivingMonthlySubsidy == '1') and (($.MonthlyAmount as :number == 0) or ($.MonthlyAmount == "00000" ))) or (($.IsTheChildReceivingMonthlySubsidy == '2') and (($.MonthlyAmount as :number > 0)) )) )
+}]]></dw:set-variable>
+                </dw:transform-message>
+                    <enricher   doc:name="Message Enricher">
+                        <flow-ref name="afcars-extract-createFile-Sub_Flow" doc:name="afcars-extract-createFile-Sub_Flow"/>
+                        <enrich source="#[payload]" target="#[flowVars.AttachmentResult]"/>
+                        <enrich source="#[flowVars.AFCARSMainFile]" target="#[flowVars.MainFile]"/>
+                    </enricher>
+                <enricher   doc:name="Message Enricher">
+                    <flow-ref name="afcars-extract-exeption-Sub_Flow" doc:name="afcars-extract-exeption-Sub_Flow"/>
+                        <enrich source="#[payload]" target="#[flowVars.ExceptionsResult]"/>
+                        <enrich source="#[flowVars.AFCARSExceptionFile]" target="#[flowVars.ExceptionFile]"/>
+                </enricher>
+
+                <dw:transform-message doc:name="Transform Message : Prepare Response">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.extractInfo.ParentId,
+		"Attachment_Generated__c": (true as :boolean ) when ( flowVars.MainFile[0].Success == true or flowVars.ExceptionFile[0].Success == true) otherwise (false as :boolean),
+		"Failure_Reason__c": flowVars.MainFile[0].Failure ++ ( ("\n" ++ flowVars.ExceptionFile[0].Failure) when (flowVars.ExceptionFile[0].Failure != "") otherwise "") default ""
+
+}]]]></dw:set-payload>
+                </dw:transform-message>
+                    
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Extract__c" doc:name="Salesforce : Update Extract Record" doc:description="Update Extract Record to notify user about the Outcome">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                           
+                
+            </otherwise>
+        </choice>
+        </async>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": true,
+	"FailureReason": ""
+}]]></dw:set-payload>
+            <dw:set-variable variableName="ResponseFlag"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	Flag:true
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="extractInfo"/>
+				<delete-message-property key="InterfaceName"/>
+				<delete-message-property key="RecordCount"/>
+				<delete-message-property key="MedicaidApplicable"/>
+				<delete-message-property key="AdoptiveParent2"/>
+				<delete-message-property key="AdoptiveParent1"/>
+				<delete-message-property key="FormerAdoptiveParent1"/>
+				<delete-message-property key="FormerAdoptiveParent2"/>
+				<delete-message-property key="BioParent1"/>
+				<delete-message-property key="BioParent2"/>
+				<delete-message-property key="PostChild"/>
+				<delete-message-property key="PreChild"/>
+				<delete-message-property key="CourtOrderRecords"/>
+				<delete-message-property key="PreAdoptiveRecords"/>
+				<delete-message-property key="LessOne"/>
+				<delete-message-property key="AgeOne"/>
+				
+				<delete-message-property key="AgeTwo"/>
+				<delete-message-property key="AgeThree"/>
+				<delete-message-property key="AgeFour"/>
+				<delete-message-property key="AgeFive"/>
+				<delete-message-property key="AgeSix"/>
+				<delete-message-property key="AgeSeven"/>
+				<delete-message-property key="AgeEight"/>
+				
+				<delete-message-property key="AgeNine"/>
+				<delete-message-property key="AgeTen"/>
+				<delete-message-property key="AgeEleven"/>
+				<delete-message-property key="AgeTwelve"/>
+				<delete-message-property key="AgeThirteen"/>
+				<delete-message-property key="AgeFourteen"/>
+				<delete-message-property key="AgeFifteen"/>
+				
+				<delete-message-property key="AgeSixteen"/>
+				<delete-message-property key="AgeSeventeen"/>
+				<delete-message-property key="AgeEighteen"/>
+				<delete-message-property key="AgeAbove"/>
+				<delete-message-property key="AFCARSMainFile"/>
+				<delete-message-property key="Exceptions"/>
+				<delete-message-property key="Header"/>	
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+			
+			<delete-message-property key="AdoptiveParent2"/>
+				<delete-message-property key="AdoptiveParent1"/>
+				<delete-message-property key="FormerAdoptiveParent1"/>
+				<delete-message-property key="FormerAdoptiveParent2"/>
+				<delete-message-property key="BioParent1"/>
+				<delete-message-property key="BioParent2"/>
+				<delete-message-property key="PostChild"/>
+				<delete-message-property key="PreChild"/>
+				<delete-message-property key="uniqueRecCount"/>
+				<delete-message-property key="totalRecCount"/>
+				<delete-message-property key="totalErrorCount"/>
+				<delete-message-property key="totalSuccCount"/>
+				<delete-message-property key="errorDetails"/>
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="recStatus"/>
+				<delete-message-property key="totalSkipCount"/>
+				<delete-message-property key="TransAttachment"/>	
+			</message-properties-transformer>
+        <exception-strategy ref="Federal-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+
+
+    </flow>
+
+    <sub-flow name="afcars-extract-createFile-Sub_Flow">
+            
+                <dw:transform-message  doc:name="Transform Message : Generate File" metadata:id="2687dc9a-7195-4b68-9ba3-69e4dadcdd91">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath = "FinalFFD.ffd"
+---
+payload map {
+	TitleIVEAgencyOrState:$.TitleIVEAgencyOrState,
+	ReportPeriodEndingDate:$.ReportPeriodEndingDate,
+	RecordNumber:$.RecordNumber,
+	TitleIVEAgencyInvolvement:$.TitleIVEAgencyInvolvement,
+	ChildsDateofBirth:$.ChildsDateofBirth,
+	Sex:$.Sex,
+	Race_AmericanIndianorAlaskaNative:$.Race_AmericanIndianorAlaskaNative,
+	Race_Asian:$.Race_Asian,
+	Race_BlackOrAfricanAmerican:$.Race_BlackOrAfricanAmerican,
+	Race_NativeHawaiianOrOtherPacificIslander:$.Race_NativeHawaiianOrOtherPacificIslander,
+	Race_White:$.Race_White,
+	Race_UnableToDetermine:$.Race_UnableToDetermine,
+	HispanicOrLatinoEthnicity:$.HispanicOrLatinoEthnicity,
+	SpecialNeedsDetermined:$.SpecialNeedsDetermined,
+	PrimaryFactorOrConditionForSpecialNeeds:$.PrimaryFactorOrConditionForSpecialNeeds,
+	TypeOfDisability_MentalCondition:$.TypeOfDisability_MentalCondition,
+	TypeOfDisability_VisuallyOrHearingImpaired:$.TypeOfDisability_VisuallyOrHearingImpaired,
+	TypeOfDisability_PhysicallyDisabled:$.TypeOfDisability_PhysicallyDisabled,
+	TypeOfDisability_EmotionallyDisturbed:$.TypeOfDisability_EmotionallyDisturbed,
+	TypeOfDisability_OtherMedicallyDiagnosedCondition:$.TypeOfDisability_OtherMedicallyDiagnosedCondition,
+	MothersYearOfBirth:$.MothersYearOfBirth,
+	FathersYearOfBirth:$.FathersYearOfBirth,
+	WasTheMotherMarriedAtTheTimeOfTheChildsBirth:$.WasTheMotherMarriedAtTheTimeOfTheChildsBirth,
+	DateOfMothersTerminationOfParentalRights:$.DateOfMothersTerminationOfParentalRights,
+	DateOfFathersTerminationOfParentalRights:$.DateOfFathersTerminationOfParentalRights,
+	DateAdoptionWasFinalized:$.DateAdoptionWasFinalized,
+	AdoptiveParentsFamilyStructure:$.AdoptiveParentsFamilyStructure,
+	YearOfBirthAdoptiveMother:$.YearOfBirthAdoptiveMother,
+	YearOfBirthAdoptiveFather:$.YearOfBirthAdoptiveFather,
+	RaceAdoptiveMotherAmericanIndianorAlaskaNative:$.RaceAdoptiveMotherAmericanIndianorAlaskaNative,
+	RaceAdoptiveMotherAsian:$.RaceAdoptiveMotherAsian,
+	RaceAdoptiveMotherBlackOrAfricanAmerican:$.RaceAdoptiveMotherBlackOrAfricanAmerican,
+	RaceAdoptiveMotherNativeHawaiianOrOtherPacificIslander:$.RaceAdoptiveMotherNativeHawaiianOrOtherPacificIslander,
+	RaceAdoptiveMotherWhite:$.RaceAdoptiveMotherWhite,
+	RaceAdoptiveMotherUnableToDetermine:$.RaceAdoptiveMotherUnableToDetermine,
+	HispanicOrLatinoEthnicityAdoptiveMother:$.HispanicOrLatinoEthnicityAdoptiveMother,
+	RaceAdoptiveFatherAmericanIndianOrAlaskaNative:$.RaceAdoptiveFatherAmericanIndianOrAlaskaNative,
+	RaceAdoptiveFatherAsian:$.RaceAdoptiveFatherAsian,
+	RaceAdoptiveFatherBlackOrAfricanAmerican:$.RaceAdoptiveFatherBlackOrAfricanAmerican,
+	RaceAdoptiveFatherNativeHawaiianOrOtherPacificIslander:$.RaceAdoptiveFatherNativeHawaiianOrOtherPacificIslander,
+	RaceAdoptiveFatherWhite:$.RaceAdoptiveFatherWhite,
+	RaceAdoptiveFatherUnableToDetermine:$.RaceAdoptiveFatherUnableToDetermine,
+	HispanicOrLatinoEthnicityAdoptiveFather:$.HispanicOrLatinoEthnicityAdoptiveFather,
+	RelationshipStepparent:$.RelationshipStepparent,
+	RelationshipOtherRelative:$.RelationshipOtherRelative,
+	RelationshipFosterParent:$.RelationshipFosterParent,
+	RelationshipOtherNonRelative:$.RelationshipOtherNonRelative,
+	ChildWasPlacedFrom:$.ChildWasPlacedFrom,
+	ChildWasPlacedBy:$.ChildWasPlacedBy,
+	IsTheChildReceivingMonthlySubsidy:$.IsTheChildReceivingMonthlySubsidy,
+	MonthlyAmount:$.MonthlyAmount,
+	AdoptionassistanceIVE:$.AdoptionAssistanceIVE
+}]]></dw:set-payload>
+                </dw:transform-message>
+        <object-to-string-transformer mimeType="text/plain" doc:name="Object to String : Consume Stream"/>
+        <enricher source="#[payload]" target="#[flowVars.Header]" doc:name="Message Enricher">
+            <flow-ref name="afcars-extractSub_Flow" doc:name="afcars-extractSub_Flow"/>
+        </enricher>
+        <set-payload value="#[('$' + '\n' + flowVars.Header + '\n' + payload)]" doc:name="Set Payload with File content"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.extractInfo.RunForPID != 'No' and  flowVars.extractInfo.RunForPID != '']">
+                <logger level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Split payload into lines"/>
+                <dw:transform-message doc:name="Transform Message : Remove blank lines">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) > "0")) joinBy "\n"]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+
+                <string-to-byte-array-transformer doc:name="String to Byte Array"/>
+        <message-properties-transformer doc:name="Message Properties : Store File Data" overwrite="true" scope="invocation">
+            <add-message-property key="FileData" value="#[payload]"/>
+        </message-properties-transformer>
+
+                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+	ParentId: flowVars.extractInfo.ParentId, 
+	Name: "AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".txt" ,
+	Description: 'Afcars Extract',
+	Body: flowVars.FileData
+	}
+] ]]></dw:set-payload>
+                </dw:transform-message>
+         <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach Main File">
+              <sfdc:objects ref="#[payload]"/>
+         </sfdc:create>-->
+		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : "AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".txt",
+             Title : "AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".txt",
+             VersionData : flowVars.FileData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.extractInfo.ParentId
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+
+        <dw:transform-message doc:name="Transform Message : Create Payload for SFDC Update">
+            <dw:set-variable variableName="AFCARSMainFile"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Success:$.success,
+	Failure:"Federal Report File could not be attached." when $.success == false otherwise ""
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="After Attachment FFD : #[payload]" level="INFO" doc:name="Logger"/>
+            
+    </sub-flow>
+    <sub-flow name="afcars-extractSub_Flow">
+        <set-payload value="#[flowVars.Header]" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+    </sub-flow>
+    <sub-flow name="afcars-extract-exeption-Sub_Flow">
+        <logger level="INFO" doc:name="Logger"/>
+        <set-variable variableName="Exceptions" value="#[&quot;Pre-Adoptive Client PID,Permanency Case ID,Error Message\n&quot; + flowVars.Exceptions]" doc:name="Variable : Store Exception details"/>
+        <set-variable variableName="Exceptions" value="#[flowVars.Exceptions.split(&quot;!&quot;)]" doc:name="Variable : Split and store Exception details"/>
+        <dw:transform-message doc:name="Transform Message : Remove blank lines" metadata:id="a24d7875-4a5f-481e-a0ea-49835a019ac9">
+            <dw:input-payload/>
+            <dw:set-variable variableName="Exceptions"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.Exceptions filter (((sizeOf $) as :string ) > "0")) joinBy ""]]></dw:set-variable>
+        </dw:transform-message>
+        <set-payload value="#[flowVars.Exceptions.split(&quot;\n&quot;)]" doc:name="Split Payload into lines"/>
+        <dw:transform-message doc:name="Transform Message : Remove Blank lines">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) > "1")) joinBy "\n"]]></dw:set-payload>
+        </dw:transform-message>
+        <set-payload value="#[payload.replaceAll(&quot;&lt;&quot;,&quot;&quot;)]" doc:name="Set Payload : Remove unwanted characters"/>
+        <string-to-byte-array-transformer doc:name="String to Byte Array"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Exception Filename">
+            <add-message-property key="ExceptionsName" value="#['ExceptionLog_AFCARSADOPTION_' + server.dateTime.format(&quot;yyyyMMddHHmmss&quot;)]"/>
+            <add-message-property key="Exceptions" value="#[payload]"/>
+        </message-properties-transformer>
+        <logger message="#[flowVars.Exceptions]" level="INFO" doc:name="Logger"/>
+        <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+	ParentId: flowVars.extractInfo.ParentId, 
+	Name: "ExceptionLog_AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,	
+	Description: 'Afcars Extract',
+	Body: flowVars.Exceptions
+	}
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach CSV">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>-->
+		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : "ExceptionLog_AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,
+             Title : "ExceptionLog_AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,
+             VersionData : flowVars.Exceptions
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.extractInfo.ParentId 
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+        <dw:transform-message doc:name="Transform Message : Create Payload for SFDC update">
+            <dw:set-variable variableName="AFCARSExceptionFile"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Success:$.success,
+	Failure:"Exception Report File could not be generated." when $.success == false otherwise ""
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="After Attachment CSV : #[payload]" level="INFO" doc:name="Logger"/>
+
+    </sub-flow>
+    
+    <sub-flow name="afcars-extract-adoption-person-involved-records-Sub_Flow">
+        <foreach collection="#[flowVars.ChildrenInvolved]" doc:name="For Each : Iterate over 150 records at a time" batchSize="150">
+            <dw:transform-message doc:name="Transform Message : Get Comma Separated Person Id List">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.PersonID ++ "'")) joinBy ","]]></dw:set-payload>
+
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Id,PID__c,Adoption_Information__r.Name,Gender__c,Race_Primary__c,Ethnicity__c,TPR_Date__c,Date_of_Birth__c,Date_of_Death__c,Adoption_Information__r.Person_ID__c,Role__c,Adoption_Information__r.Person_Type__r.Person_PID__c  from DEL_Persons_Involved__c where RecordType.DeveloperName='Adoptive_Person' And Adoption_Information__r.Person_Type__r.Person__c  in (#[payload]) and Adoption_Information__r.Person_Type__r.RecordType.DeveloperName='Client'  and Adoption_Information__r.Adoption_Information_Status__c ='Completed'  Order By Adoption_Information__r.Name, Role__c asc" doc:name="Salesforce : Query Person Involved"/>
+            <dw:transform-message doc:name="Transform Person Involved Data">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	PersonInvolvedID:$.Id,
+	AdoptionCase:$.Adoption_Information__r.Name,
+	PID:$.PID__c,
+	Gender:$.Gender__c,
+	Role:$.Role__c,
+	RacePrimary:$.Race_Primary__c,
+	RaceSecondary:$.Race_Secondary__c,
+	Ethnicity:$.Ethnicity__c,
+	TPR:$.TPR_Date__c when ($.TPR_Date__c != null) otherwise ($.Date_of_Death__c),
+	DOB:$.Date_of_Birth__c,
+	DateofDeath:$.Date_of_Death__c	,
+	PersonID:$.Adoption_Information__r.Person_ID__c,
+	ChildPID:$.Adoption_Information__r.Person_Type__r.Person_PID__c
+	} ]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message : Get Child and parent related data">
+                <dw:set-variable variableName="PreChild"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Role == 'Pre-Adoptive Child') map {
+	PersonInvolvedID:$.PersonInvolvedID,
+	AdoptionCase:$.AdoptionCase,
+	PID:$.PID,
+	Gender:$.Gender,
+	Role:$.Role,
+	RacePrimary:$.RacePrimary,
+	Ethnicity:$.Ethnicity,
+	TPR:$.TPR,
+	DOB:$.DOB,
+	DateofDeath:$.Date_of_Death__c	,
+	PersonID:$.PersonID	
+} ]]></dw:set-variable> 
+                <dw:set-variable variableName="PostChild"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Role == 'Post-Adoptive Child') map {
+	PersonInvolvedID:$.PersonInvolvedID,
+	AdoptionCase:$.AdoptionCase,
+	PID:$.PID,
+	Gender:$.Gender,
+	Role:$.Role,
+	RacePrimary:$.RacePrimary,
+	Ethnicity:$.Ethnicity,
+	TPR:$.TPR,
+	DOB:$.DOB,
+	DateofDeath:$.Date_of_Death__c	,
+	PersonID:$.PersonID	,
+	ChildPID:$.ChildPID
+} ]]></dw:set-variable>
+                <dw:set-variable variableName="BioParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ( $.Role=='Biological Parent 1' ) map {
+	PersonInvolvedID:$.PersonInvolvedID,
+	AdoptionCase:$.AdoptionCase,
+	PID:$.PID,
+	Gender:$.Gender,
+	Role:$.Role,
+	RacePrimary:$.RacePrimary,
+	Ethnicity:$.Ethnicity,
+	TPR:$.TPR,
+	DOB:$.DOB,
+	DateofDeath:$.Date_of_Death__c	,
+	PersonID:$.PersonID	,
+	ChildPID:$.ChildPID
+} ]]></dw:set-variable>
+                <dw:set-variable variableName="BioParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Role=='Biological Parent 2') map {
+	PersonInvolvedID:$.PersonInvolvedID,
+	AdoptionCase:$.AdoptionCase,
+	PID:$.PID,
+	Gender:$.Gender,
+	Role:$.Role,
+	RacePrimary:$.RacePrimary,
+	Ethnicity:$.Ethnicity,
+	TPR:$.TPR,
+	DOB:$.DOB,
+	DateofDeath:$.Date_of_Death__c	,
+	PersonID:$.PersonID,
+	ChildPID:$.ChildPID
+	
+} ]]></dw:set-variable>
+                <dw:set-variable variableName="FormerAdoptiveParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Role=='Former Adoptive Parent 1') map {
+	PersonInvolvedID:$.PersonInvolvedID,
+	AdoptionCase:$.AdoptionCase,
+	PID:$.PID,
+	Gender:$.Gender,
+	Role:$.Role,
+	RacePrimary:$.RacePrimary,
+	Ethnicity:$.Ethnicity,
+	TPR:$.TPR,
+	DOB:$.DOB,
+	DateofDeath:$.Date_of_Death__c	,
+	PersonID:$.PersonID,
+	ChildPID:$.ChildPID
+	
+}  ]]></dw:set-variable>
+                <dw:set-variable variableName="FormerAdoptiveParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Role=='Former Adoptive Parent 2') map {
+	PersonInvolvedID:$.PersonInvolvedID,
+	AdoptionCase:$.AdoptionCase,
+	PID:$.PID,
+	Gender:$.Gender,
+	Role:$.Role,
+	RacePrimary:$.RacePrimary,
+	Ethnicity:$.Ethnicity,
+	TPR:$.TPR,
+	DOB:$.DOB,
+	DateofDeath:$.Date_of_Death__c	,
+	PersonID:$.PersonID,
+	ChildPID:$.ChildPID
+} ]]></dw:set-variable>
+                <dw:set-variable variableName="AdoptiveParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Role=='Adoptive Parent 1') map {
+	PersonInvolvedID:$.PersonInvolvedID,
+	AdoptionCase:$.AdoptionCase,
+	PID:$.PID,
+	Gender:$.Gender,
+	Role:$.Role,
+	RacePrimary:$.RacePrimary,
+	Ethnicity:$.Ethnicity,
+	TPR:$.TPR,
+	DOB:$.DOB,
+	DateofDeath:$.Date_of_Death__c	,
+	PersonID:$.PersonID,
+	ChildPID:$.ChildPID
+	
+}  ]]></dw:set-variable>
+                <dw:set-variable variableName="AdoptiveParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Role=='Adoptive Parent 2') map {
+	PersonInvolvedID:$.PersonInvolvedID,
+	AdoptionCase:$.AdoptionCase,
+	PID:$.PID,
+	Gender:$.Gender,
+	Role:$.Role,
+	RacePrimary:$.RacePrimary,
+	Ethnicity:$.Ethnicity,
+	TPR:$.TPR,
+	DOB:$.DOB,
+	DateofDeath:$.DateofDeath	,
+	PersonID:$.PersonID,
+	ChildPID:$.ChildPID
+	
+	
+}  ]]></dw:set-variable>
+ 
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message : Add child and parent related data">
+                <dw:set-session-variable variableName="AdoptiveParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+((sessionVars.AdoptiveParent1 default []) ++ ((flowVars.AdoptiveParent1 ) default [])) 
+]]></dw:set-session-variable>
+                <dw:set-session-variable variableName="AdoptiveParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+((sessionVars.AdoptiveParent2 default []) ++ ((flowVars.AdoptiveParent2 ) default [])) ]]></dw:set-session-variable>
+                <dw:set-session-variable variableName="FormerAdoptiveParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+((sessionVars.FormerAdoptiveParent1 default []) ++ ((flowVars.FormerAdoptiveParent1 ) default [])) ]]></dw:set-session-variable>
+                <dw:set-session-variable variableName="FormerAdoptiveParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+((sessionVars.FormerAdoptiveParent2 default []) ++ ((flowVars.FormerAdoptiveParent2 ) default [])) ]]></dw:set-session-variable>
+                <dw:set-session-variable variableName="BioParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+((sessionVars.BioParent1 default []) ++ ((flowVars.BioParent1 ) default [])) ]]></dw:set-session-variable>
+                <dw:set-session-variable variableName="BioParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+((sessionVars.BioParent2 default []) ++ ((flowVars.BioParent2 ) default [])) ]]></dw:set-session-variable>
+                <dw:set-session-variable variableName="PostChild"><![CDATA[%dw 1.0
+%output application/java
+---
+((sessionVars.PostChild default []) ++ ((flowVars.PostChild ) default [])) ]]></dw:set-session-variable>
+                <dw:set-session-variable variableName="PreChild"><![CDATA[%dw 1.0
+%output application/java
+---
+((sessionVars.PreChild default []) ++ ((flowVars.PreChild ) default [])) ]]></dw:set-session-variable>
+            </dw:transform-message>
+
+            <!-- <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+payload map {
+	Pre_PersonInvolvedID:$[0].PersonInvolvedID default "" ,
+	Pre_AdoptionCase:$[0].AdoptionCase default "" ,
+	Pre_PID:$[0].PID default "" ,
+	Pre_Gender:$[0].Gender default "" ,
+	Pre_Role:$[0].Role default "" ,
+	Pre_RacePrimary:$[0].Race_Primary default "" ,
+	Pre_Ethnicity:$[0].Ethnicity default "" ,
+	Pre_TPR:$[0].TPR default "" ,
+	Pre_DOB:$[0].DOB default "" ,
+	Pre_PersonID:$[0].PersonID default "" ,
+	Post_PersonInvolvedID:$[1].PersonInvolvedID default "" ,
+	Post_AdoptionCase:$[1].AdoptionCase default "" ,
+	Post_PID:$[1].PID default "" ,
+	Post_Gender:$[1].Gender default "" ,
+	Post_Role:$[1].Role default "" ,
+	Post_RacePrimary:$[1].Race_Primary default "" ,
+	Post_Ethnicity:$[1].Ethnicity default "" ,
+	Post_TPR:$[1].TPR default "" ,
+	Post_DOB:$[1].DOB default "" ,
+	Post_PersonID:$[1].PersonID default "" ,
+	Bio1_PersonInvolvedID:$[2].PersonInvolvedID default "" ,
+	Bio1_AdoptionCase:$[2].AdoptionCase default "" ,
+	Bio1_PID:$[2].PID default "" ,
+	Bio1_Gender:$[2].Gender default "" ,
+	Bio1_Role:$[2].Role default "" ,
+	Bio1_RacePrimary:$[2].Race_Primary default "" ,
+	Bio1_Ethnicity:$[2].Ethnicity default "" ,
+	Bio1_TPR:$[2].TPR default "" ,
+	Bio1_DOB:$[2].DOB default "" ,
+	Bio1_PersonID:$[2].PersonID default "" ,
+	Bio2_PersonInvolvedID:$[3].PersonInvolvedID default "" ,
+	Bio2_AdoptionCase:$[3].AdoptionCase default "" ,
+	Bio2_PID:$[3].PID default "" ,
+	Bio2_Gender:$[3].Gender default "" ,
+	Bio2_Role:$[3].Role default "" ,
+	Bio2_RacePrimary:$[3].Race_Primary default "" ,
+	Bio2_Ethnicity:$[3].Ethnicity default "" ,
+	Bio2_TPR:$[3].TPR default "" ,
+	Bio2_DOB:$[3].DOB default "" ,
+	Bio2_PersonID:$[3].PersonID default "" ,
+	Adopt1_PersonInvolvedID:$[6].PersonInvolvedID default "" ,
+	Adopt1_AdoptionCase:$[6].AdoptionCase default "" ,
+	Adopt1_PID:$[6].PID default "" ,
+	Adopt1_Gender:$[6].Gender default "" ,
+	Adopt1_Role:$[6].Role default "" ,
+	Adopt1_RacePrimary:$[6].Race_Primary default "" ,
+	Adopt1_Ethnicity:$[6].Ethnicity default "" ,
+	Adopt1_TPR:$[6].TPR default "" ,
+	Adopt1_DOB:$[6].DOB default "" ,
+	Adopt1_PersonID:$[6].PersonID default "" ,
+	Adopt2_PersonInvolvedID:$[7].PersonInvolvedID default "" ,
+	Adopt2_AdoptionCase:$[7].AdoptionCase default "" ,
+	Adopt2_PID:$[7].PID default "" ,
+	Adopt2_Gender:$[7].Gender default "" ,
+	Adopt2_Role:$[7].Role default "" ,
+	Adopt2_RacePrimary:$[7].Race_Primary default "" ,
+	Adopt2_Ethnicity:$[7].Ethnicity default "" ,
+	Adopt2_TPR:$[7].TPR default "" ,
+	Adopt2_DOB:$[7].DOB default "" ,
+	Adopt2_PersonID:$[7].PersonID default ""
+	} groupBy $.Pre_PersonID]]></dw:set-payload>
+            </dw:transform-message> -->
+           <!--  <dw:transform-message doc:name="Transform Message : Get Persons">
+                <dw:set-variable variableName="TotalPost"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.TotalPost default []) + (flowVars.PostChild map {($)} groupBy $.PersonID)]]></dw:set-variable>
+                <dw:set-variable variableName="TotalPre"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.TotalPre default []) ++ (flowVars.PreChild default [])]]></dw:set-variable>
+                <dw:set-variable variableName="TotalBio1"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.TotalBio1 default []) ++ ( flowVars.BioParent1 default [])]]></dw:set-variable>
+                <dw:set-variable variableName="TotalBio2"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.TotalBio2 default []) ++ ( flowVars.BioParent2 default [])]]></dw:set-variable>
+                <dw:set-variable variableName="TotalAdoptive1"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.TotalAdoptive1 default []) ++ ( flowVars.AdoptiveParent1 default [])]]></dw:set-variable>
+                <dw:set-variable variableName="TotalAdoptive2"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.TotalAdoptive2 default []) ++ ( flowVars.AdoptiveParent2 default [])]]></dw:set-variable>
+
+
+            </dw:transform-message> -->
+        </foreach>
+        <dw:transform-message doc:name="Transform Message : Group child and parent related data">
+            <dw:set-session-variable variableName="AdoptiveParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.AdoptiveParent1 groupBy $.PersonID default []]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="FormerAdoptiveParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.FormerAdoptiveParent1 groupBy $.PersonID default []]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="AdoptiveParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.AdoptiveParent2 groupBy $.PersonID default []]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="FormerAdoptiveParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.FormerAdoptiveParent2 groupBy $.PersonID default []]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="BioParent1"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.BioParent1 groupBy $.PersonID default []]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="BioParent2"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.BioParent2 groupBy $.PersonID default []]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="PreChild"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.PreChild groupBy $.PersonID default []]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="PostChild"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.PostChild groupBy $.PersonID default []]]></dw:set-session-variable>
+        </dw:transform-message>
+
+    </sub-flow>
+    <sub-flow name="afcars-extract-Case-Info-Sub_Flow">
+        <foreach collection="#[flowVars.ChildrenInvolved]" doc:name="For Each : Iterate over 150 records at a time" batchSize="150">
+            <dw:transform-message doc:name="Transform Message : Get Comma Separated Person Id List">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.CourtOrderID ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Id,Name,Court_Order_ID_Guardianship__c,Does_Child_have_Special_Needs__c,Child_s_Age__c, Sibling_Group_Membership__c, Racial_Original_Background__c, Medical_Condition__c,Medical_Mental_Physical_Emotional_Cond__c,Mental_Condition__c,Emotionally_Disturbed__c,Physically_Disabled__c,Visually_Hearing_Impaired__c,Other_Medically_Diagnosed_Condition__c,Related_Case__c,Related_Case__r.Name,Related_Case_Worker__c, Other_Guardianship__c from DEL_Case__c where RecordType.DeveloperName='DFS_Adoption_Subsidy_Case'and Court_Order_ID_Guardianship__c in (#[payload]) " doc:name="Salesforce : Get Case Details"/>
+            <dw:transform-message doc:name="Transform Court Order Details">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	CaseID:$.Name,
+	CourtOrderID:$.Id,
+	Guardianship:$.Court_Order_ID_Guardianship__c,
+	SpecialNeeds:$.Does_Child_have_Special_Needs__c,
+	ChildsAge:$.Child_s_Age__c, 
+	Sibling:$.Sibling_Group_Membership__c,
+	Racial:$.Racial_Original_Background__c,
+    Medical_Condition:$.Medical_Condition__c,
+	MedicalMentalPhysycalEmotionCondition:$.Medical_Mental_Physical_Emotional_Cond__c,
+	MentalCondition:$.Mental_Condition__c,
+	EmotionalCondition:$.Emotionally_Disturbed__c,
+	PhysicalCondition:$.Physically_Disabled__c,
+	VisualCondition:$.Visually_Hearing_Impaired__c,
+	OtherCondition:$.Other_Guardianship__c,
+	OtherMedicallyDiagnosedCondition:$.Other_Medically_Diagnosed_Condition__c,
+	RelatedCase:$.Related_Case__c,
+	RelatedCaseName:$.Related_Case__r.Name,
+	RelatedCaseWorker:$.Related_Case_Worker__c
+} ]]></dw:set-payload>
+            </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Add and group Court Order records">
+                <dw:set-variable variableName="CourtOrderRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.CourtOrderRecords default {}) ++ ((payload groupBy $.Guardianship) default [])]]></dw:set-variable>
+
+
+            </dw:transform-message> 
+        </foreach>
+
+    </sub-flow>
+    <sub-flow name="afcars-extract-get-medicaid-applicable-Sub_Flow">
+        <foreach collection="#[flowVars.ChildrenInvolved]" batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="Transform Message : Get Comma Separated Person Id List">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.CourtOrderID ++ "'")) joinBy "," ]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="select Related_Court_order_ID__c, Medicaid_Applicable__c from DEL_Case_Agreement__c where Related_Court_order_ID__c in (#[payload]) and ((Medicaid_Applicable__c = 'Yes') or (Montly_Amount__c > 0))" doc:name="Salesforce Get Case Agreement Details"/>
+            <dw:transform-message doc:name="Transform Message : MedicaidApplicable">
+                <dw:set-variable variableName="MedicaidApplicable"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.MedicaidApplicable default []) ++ (payload map $.Related_Court_order_ID__c default []))
+]]></dw:set-variable>
+             </dw:transform-message>
+             <!-- <dw:transform-message doc:name="Transform Message : MedicaidApplicable">
+                <dw:set-variable variableName="ChildrenInvolved"><![CDATA[%dw 1.0
+%output application/java
+
+flowVars.MedicaidApplicable default [] ++ payload default []
+]]></dw:set-variable>
+            </dw:transform-message>  -->
+        </foreach>
+    </sub-flow>
+    <sub-flow name="afcars-extract-get-ChildrenInvolved-Sub_Flow">
+        
+        <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Id,Case__c,Order_Type__c,Completed_Date__c,Court_Order_Status__c, (Select Id,Name__c,PID__c,Ethnicity__c,Gender__c,Primary_Race__c,Secondary_Race__c,State_Agency_Involvment__c,Role__c,Child_Placed_by__c,Child_Placed_from__c,Adoptive_Parents_Family_Structure__c,Adoptive_Parents_Relationship_to_Child__c,              Was_Mom_Married_at_Time_of_Child_Birth__c,Is_Child_Receiving_a_Monthly_Subsidy__c,What_is_the_Monthly_Amount__c,Is_Child_Receiving_IV_E_Assistance__c,Date_Adoption_was_Finalized__c from Children_Involved__r where RecordType.DeveloperName='Adoption_Hearing_Child' LIMIT 1              )  From DEL_Court_Order__c where Court_Order_Status__c='Completed' and RecordType.DeveloperName='Final_Order_of_Adoption' and Court_Decision__c='Decree Signed' and Completed_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] and Completed_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] " doc:name="Salesforce : Get Children from Court Order"/>
+
+        <dw:transform-message doc:name="Transform Message : Get Records">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	CourtOrderID:$.Id,
+	CaseID:$.Case__c,
+	OrderType:$.Order_Type__c,
+	DateOfDecision:$.Completed_Date__c,
+	CourtOrderStatus:$.Court_Order_Status__c,
+	ChildInvolvedId:$.Children_Involved__r[0].Id default "",
+	PersonID:$.Children_Involved__r[0].Name__c default "",
+	PID:$.Children_Involved__r[0].PID__c default "",
+	Ethnicity:$.Children_Involved__r[0].Ethnicity__c default "",
+	Gender:$.Children_Involved__r[0].Gender__c default "",
+	PrimaryRace:$.Children_Involved__r[0].Primary_Race__c default "",
+	SecondaryRace:$.Children_Involved__r[0].Secondary_Race__c default "",
+	StateAgencyInvolvment:$.Children_Involved__r[0].State_Agency_Involvment__c default "",
+	Role:$.Children_Involved__r[0].Role__c default "",
+	ChildPlacedBy:$.Children_Involved__r[0].Child_Placed_by__c default "",
+	ChildPlacedFrom:$.Children_Involved__r[0].Child_Placed_from__c default "",
+	AdoptiveParentFamilyStructure:$.Children_Involved__r[0].Adoptive_Parents_Family_Structure__c default "",
+	AdoptiveParentRealtionship:$.Children_Involved__r[0].Adoptive_Parents_Relationship_to_Child__c default "",
+	MotherMarriedAtTime:$.Children_Involved__r[0].Was_Mom_Married_at_Time_of_Child_Birth__c default "",
+	IsChildRecievingMonthlySubsidy:$.Children_Involved__r[0].Is_Child_Receiving_a_Monthly_Subsidy__c default "",
+	WhatisMontlyIncome:$.Children_Involved__r[0].What_is_the_Monthly_Amount__c default 0,
+	IsChildRecievingIVEAssistance:$.Children_Involved__r[0].Is_Child_Receiving_IV_E_Assistance__c default "",
+	DateAdoptionFinalized:$.Children_Involved__r[0].Date_Adoption_was_Finalized__c default ""
+	}]]></dw:set-payload>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.extractInfo.RunForPID != 'No' and  flowVars.extractInfo.RunForPID != '']">
+                <dw:transform-message doc:name="Transform Message : Filter person">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.PersonID == flowVars.extractInfo.RunForPID) map {
+	($)
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <logger message="AFCARS Adoption Run for PID #[flowVars.extractInfo.RunForPID]" level="INFO" doc:name="Logger"/>
+
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger" message="#[payload]"/>
+            </otherwise>
+        </choice>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Store record count">
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+        </message-properties-transformer>
+        
+    </sub-flow>
+
+   
+    <sub-flow name="afcars-extract-PreAdoptiveChild-records-Sub_Flow">
+        <foreach collection="#[dw(&quot;flowVars.ChildrenInvolved filter ( (flowVars.CourtOrderRecords[$.CourtOrderID][0].RelatedCaseName) != null)  &quot;)]" doc:name="For Each : Iterate over 150 records at a time" batchSize="150">
+            <dw:transform-message doc:name="Transform Message : Get Comma Separated Person Id List">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.PersonID ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Id,DEL_PID__c,DEL_Gender__c,Birthdate,DEL_Race_Primary__c,DEL_Race_Secondary__c,DEL_Ethnicity__c from Contact where Id in (#[payload])" doc:name="Salesforce : Query Person details"/>
+            <dw:transform-message doc:name="Transform Person Details">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	PersonID:$.Id,
+	PID:$.DEL_PID__c,
+	Gender:$.DEL_Gender__c,
+	BirthDate:$.Birthdate,
+	PrimaryRace:$.DEL_Race_Primary__c,
+	SecondaryRace:$.DEL_Race_Secondary__c,
+	Ethnicity:$.DEL_Ethnicity__c,
+	Age: abs ( ((flowVars.extractInfo.ReportEndDate as :date) - $.Birthdate).years ) default "0"
+	} ]]></dw:set-payload>
+
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message : Add Pre adoptive records">
+                <dw:set-variable variableName="PreAdoptiveRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.PreAdoptiveRecords default {}) ++ ((payload groupBy $.PersonID) default [])
+]]></dw:set-variable>
+            </dw:transform-message>
+            <foreach collection="#[payload]" doc:name="For Each : Iterate over each record">
+
+                <message-properties-transformer scope="invocation" doc:name="Message Properties : Calculate Age Summary" doc:description="Message Properties : Calculate Age Summary of the Clients in the Report">
+                    <add-message-property key="LessOne" value="#[payload.Age == 0 ? (flowVars.LessOne != null ?flowVars.LessOne + 1:1) :flowVars.LessOne]"/>
+                    <add-message-property key="AgeOne" value="#[payload.Age == 1 ? (flowVars.AgeOne != null ?flowVars.AgeOne + 1:1) :flowVars.AgeOne]"/>
+                    <add-message-property key="AgeTwo" value="#[payload.Age == 2 ? (flowVars.AgeTwo != null ?flowVars.AgeTwo + 1:1) :flowVars.AgeTwo]"/>
+                    <add-message-property key="AgeThree" value="#[payload.Age == 3 ? (flowVars.AgeThree != null ?flowVars.AgeThree + 1:1) :flowVars.AgeThree]"/>
+                    <add-message-property key="AgeFour" value="#[payload.Age == 4 ? (flowVars.AgeFour != null ?flowVars.AgeFour + 1:1) :flowVars.AgeFour]"/>
+                    <add-message-property key="AgeFive" value="#[payload.Age == 5 ? (flowVars.AgeFive != null ?flowVars.AgeFive + 1:1) :flowVars.AgeFive]"/>
+                    <add-message-property key="AgeSix" value="#[payload.Age == 6 ? (flowVars.AgeSix != null ?flowVars.AgeSix + 1:1) :flowVars.AgeSix]"/>
+                    <add-message-property key="AgeSeven" value="#[payload.Age == 7 ? (flowVars.AgeSeven != null ?flowVars.AgeSeven + 1:1) :flowVars.AgeSeven]"/>
+                    <add-message-property key="AgeEight" value="#[payload.Age == 8 ? (flowVars.AgeEight != null ?flowVars.AgeEight + 1:1) :flowVars.AgeEight]"/>
+                    <add-message-property key="AgeNine" value="#[payload.Age == 9 ? (flowVars.AgeNine != null ?flowVars.AgeNine + 1:1) :flowVars.AgeNine]"/>
+                    <add-message-property key="AgeTen" value="#[payload.Age == 10 ? (flowVars.AgeTen != null ?flowVars.AgeTen + 1:1) :flowVars.AgeTen]"/>
+                    <add-message-property key="AgeEleven" value="#[payload.Age == 11 ? (flowVars.AgeEleven != null ?flowVars.AgeEleven + 1:1) :flowVars.AgeEleven]"/>
+                    <add-message-property key="AgeTwelve" value="#[payload.Age == 12 ? (flowVars.AgeTwelve != null ?flowVars.AgeTwelve + 1:1) :flowVars.AgeTwelve]"/>
+                    <add-message-property key="AgeThirteen" value="#[payload.Age == 13 ? (flowVars.AgeThirteen != null ?flowVars.AgeThirteen + 1:1) :flowVars.AgeThirteen]"/>
+                    <add-message-property key="AgeFourteen" value="#[payload.Age == 14 ? (flowVars.AgeFourteen != null ?flowVars.AgeFourteen + 1:1) :flowVars.AgeFourteen]"/>
+                    <add-message-property key="AgeFifteen" value="#[payload.Age == 15 ? (flowVars.AgeFifteen != null ?flowVars.AgeFifteen + 1:1) :flowVars.AgeFifteen]"/>
+                    <add-message-property key="AgeSixteen" value="#[payload.Age == 16 ? (flowVars.AgeSixteen != null ?flowVars.AgeSixteen + 1:1) :flowVars.AgeSixteen]"/>
+                    <add-message-property key="AgeSeventeen" value="#[payload.Age == 17 ? (flowVars.AgeSeventeen != null ?flowVars.AgeSeventeen + 1:1) :flowVars.AgeSeventeen]"/>
+                    <add-message-property key="AgeEighteen" value="#[payload.Age == 18 ? (flowVars.AgeEighteen != null ?flowVars.AgeEighteen+ 1:1) :flowVars.AgeEighteen]"/>
+                    <add-message-property key="AgeAbove" value="#[payload.Age > 18 ? (flowVars.AgeAbove != null ?flowVars.AgeAbove + 1:1) :flowVars.AgeAbove]"/>
+                </message-properties-transformer>
+
+            </foreach>
+
+            <!-- <dw:transform-message doc:name="Transform Message : Get Persons">
+                <dw:set-variable variableName="PreAdoptiveRecords"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.PreAdoptiveRecords default []) ++ (payload default [])]]></dw:set-variable>
+
+            </dw:transform-message> -->
+        </foreach>
+    </sub-flow>
+	
+    <sub-flow name="AFCARS_CallLOVflow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'TYPE_OF_FILE','ENCRYPTION_MAPPING','AFCARS_FOSTER_ETHNICITY','AFCARS_CHILD_PLACED_FROM','AFCARS_CHILD_PLACED_BY','AFCARS_GENDER','AFCARS_FAMILY_STRUCTURE'&quot;}" mimeType="application/json" doc:name="Set Payload With Required LOV Attributes" doc:description="Set Payload With Required LOV Attributes"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+                        
+</mule>

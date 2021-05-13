@@ -1,0 +1,16 @@
+form: FIXEDWIDTH
+name: 'STPVWarrantData'
+values: 
+- { name: 'OISVendorId', usage: M, type: String, length: 6}
+- { name: 'Filler1', usage: M, type: String, length: 2 }
+- { name: 'VendorName', usage: M, type: String, length: 26 }
+- { name: 'Street1', usage: M, type: String, length: 25 }
+- { name: 'Street2', usage: M, type: String, length: 27 }
+- { name: 'Street3', usage: M, type: String, length: 22 }
+- { name: 'ECCode', usage: M, type: String, length: 2 }
+- { name: 'Filler2', usage: M, type: String, length: 3 }
+- { name: 'Amount', usage: M, type: String, length: 9 }
+- { name: 'Filler3', usage: M, type: String, length: 1 }
+- { name: 'Activity', usage: M, type: String, length: 1 }
+- { name: 'Filler4', usage: M, type: String, length: 2 }
+- { name: 'EffectiveDate', usage: M, type: String, length: 10 }

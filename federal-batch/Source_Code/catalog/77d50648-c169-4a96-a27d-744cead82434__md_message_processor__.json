@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "FinalArray_AfcarsFoster"
+        }
+    },
+    "id": "77d50648-c169-4a96-a27d-744cead82434",
+    "version": "5.2.0.0"
+}

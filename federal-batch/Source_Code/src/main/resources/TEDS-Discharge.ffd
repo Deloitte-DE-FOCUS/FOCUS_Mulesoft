@@ -1,0 +1,43 @@
+form: FIXEDWIDTH
+name: 'TEDS-Discharge'
+values: 
+- { name: 'SystemTransactionType', usage: M, type: String, length: 1 }
+- { name: 'StateCode', usage: M, type: String, length: 2 }
+- { name: 'ReportingDate', usage: M, type: String, length: 6 }
+- { name: 'StateProviderIdentifierAtDischarge', usage: M, type: String, length: 15 }
+- { name: 'PIDAtDischarge', usage: M, type: String, length: 15 }
+- { name: 'CodependentCollateralAtDischarge', usage: M, type: String, length: 1 }
+- { name: 'ServiceTypeAtDischarge', usage: M, type: String, length: 2 }
+- { name: 'DateofLastContact', usage: M, type: String, length: 8 }
+- { name: 'DischargeDate', usage: M, type: String, length: 8 }
+- { name: 'DischargeReason', usage: M, type: String, length: 2 }
+- { name: 'StateProviderIdentifierAtAdmission', usage: M, type: String, length: 15 }
+- { name: 'PIDAtAdmission', usage: M, type: String, length: 15 }
+- { name: 'CodependentCollateralAtAdmission', usage: M, type: String, length: 1 }
+- { name: 'ClientTransactionTypeAtAdmission', usage: M, type: String, length: 1 }
+- { name: 'AdmissionDate', usage: M, type: String, length: 8 }
+- { name: 'ServiceTypeAtAdmission', usage: M, type: String, length: 2 }
+- { name: 'DateofBirth', usage: M, type: String, length: 8 }
+- { name: 'Gender', usage: M, type: String, length: 1 }
+- { name: 'Race', usage: M, type: String, length: 2 }
+- { name: 'Ethnicity', usage: M, type: String, length: 2 }
+- { name: 'SAProblemPrimary', usage: M, type: String, length: 2 }
+- { name: 'SAProblemSecondary', usage: M, type: String, length: 2 }
+- { name: 'SAProblemTertiary', usage: M, type: String, length: 2 }
+- { name: 'FreqOfUsePrimary', usage: M, type: String, length: 2 }
+- { name: 'FreqOfUseSecondary', usage: M, type: String, length: 2 }
+- { name: 'FreqOfUseTertiary', usage: M, type: String, length: 2 }
+- { name: 'LivingArrangements', usage: M, type: String, length: 2 }
+- { name: 'EmploymentStatus', usage: M, type: String, length: 2 }
+- { name: 'DetailedNotInLaborForce', usage: M, type: String, length: 2 }
+- { name: 'Arrestin30daysPriorToDischarge', usage: M, type: String, length: 2 }
+- { name: 'AttendenceInSelfHelpGroups', usage: M, type: String, length: 2 }
+- { name: 'ClientTransactionTypeAtDischarge', usage: M, type: String, length: 1 }
+- { name: 'DiagnosticCodeSetIdentifier', usage: M, type: String, length: 1 }
+- { name: 'MHDiagnosisOne', usage: M, type: String, length: 8 }
+- { name: 'MHDiagnosisTwo', usage: M, type: String, length: 8 }
+- { name: 'MHDiagnosisThree', usage: M, type: String, length: 8 }
+- { name: 'SMISEDStatus', usage: M, type: String, length: 1 }
+- { name: 'SchoolAttendenceStatus', usage: M, type: String, length: 1 }
+- { name: 'Education', usage: M, type: String, length: 2 }
+- { name: 'CGASGAFScore', usage: M, type: String, length: 3 }

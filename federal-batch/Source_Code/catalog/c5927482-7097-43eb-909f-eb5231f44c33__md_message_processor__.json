@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "NYTD_REQUEST"
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "c5927482-7097-43eb-909f-eb5231f44c33",
+    "version": "5.2.0.0"
+}
