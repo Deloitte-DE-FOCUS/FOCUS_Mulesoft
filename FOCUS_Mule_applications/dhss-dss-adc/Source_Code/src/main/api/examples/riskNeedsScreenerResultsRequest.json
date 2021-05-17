@@ -1,0 +1,11 @@
+{ 
+"SubjectExternalID":"12345",
+"OffenderAssessmentID": "12345",
+"AssessmentTitle": "Risk-Needs Screener",
+"AssessmentType": "Initial Assessment",
+"AssessmentCreatedDate": "02/23/2019",
+"AssessmentDateCompleted": "06/18/2019",
+"OverallRiskLevel": "LOW",
+"CriminogenicNeed": "VIOLENCE",
+"ProtectiveFactor":  "EDUCATION" 
+}

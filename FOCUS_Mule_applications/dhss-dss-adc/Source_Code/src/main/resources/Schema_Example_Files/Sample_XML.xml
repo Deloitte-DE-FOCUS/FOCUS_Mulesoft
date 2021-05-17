@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='windows-1252'?>
+ <root>
+   <record>
+     <LicenseNumber>a1240</LicenseNumber>
+     <name>4-H Lilly</name>
+     <level>0</level>
+     <acf801>0</acf801>
+     <export_date>8/28/2016 6:00:45 AM</export_date>
+     <Id>12345as</Id>
+     <ErrorCode>ABC-100</ErrorCode>
+     <ErrorDesc>Invalid Id</ErrorDesc>  
+   </record>
+   <record>
+     <LicenseNumber>b120</LicenseNumber>
+     <name>4-H CAPITAL GREEN</name>
+     <level>0</level>
+     <acf801>0</acf801>
+     <export_date>8/28/2016 6:00:45 AM</export_date>     
+     <Id>12345aas</Id>
+     <ErrorCode>ABC-100</ErrorCode>
+     <ErrorDesc>Invalid Id</ErrorDesc> 
+   </record>
+   <record>
+     <LicenseNumber>c120</LicenseNumber>
+     <name>GREEN</name>
+     <level>5</level>
+     <acf801>0</acf801>
+     <export_date>8/28/2016 6:00:45 AM</export_date>     
+     <Id>12345dfss</Id>
+     <ErrorCode>ABC-100</ErrorCode>
+     <ErrorDesc>Invalid Id</ErrorDesc> 
+   </record>
+ </root>

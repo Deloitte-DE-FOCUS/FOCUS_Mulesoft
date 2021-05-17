@@ -1,0 +1,5 @@
+form: FIXEDWIDTH
+name: 'MMIS'
+values: 
+- { name: 'MCI', usage: M, type: String, length: 10 }
+- { name: 'PID', usage: M, type: String, length: 8 }

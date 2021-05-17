@@ -1,0 +1,43 @@
+{
+	"OffenseInformation": [{
+
+			"SentenceExternalId": "3464",
+			"OffenseExternalId": "34262",
+			"OffenseLegalCodeExternalId": "1244",
+			"OffenseTitle": "",
+			"OffenseCode": "",
+			"DomesticViolence": "Y",
+			"Qualifier": "ATTEMPT",
+			"Enhancement": "Firearm",
+			"ArrestDate": "2015-02-20T18:25:43.511Z",
+			"ArrestingAgency": "",
+			"ConvictionDate": "2016-02-20T18:25:43.511Z",
+			"ConvictionOffense": "",
+			"DispositionDate": "2015-02-17T18:25:43.511Z",
+			"DispositionType": "Sustained",
+			"RecordDisposition": ""
+
+		},
+		{
+
+			"SentenceExternalId": "3465",
+			"OffenseExternalId": "34263",
+			"OffenseLegalCodeExternalId": "1243",
+			"OffenseTitle": "",
+			"OffenseCode": "",
+			"DomesticViolence": "Y",
+			"Qualifier": "ATTEMPT",
+			"Enhancement": "Firearm",
+			"ArrestDate": "2014-01-20T18:25:43.211Z",
+			"ArrestingAgency": "",
+			"ConvictionDate": "2015-01-20T18:25:43.521Z",
+			"ConvictionOffense": "",
+			"DispositionDate": "2013-01-17T18:25:43.513Z",
+			"DispositionType": "Sustained",
+			"RecordDisposition": ""
+
+		}
+	],
+	"ErrorDescription": "",
+	"ErrorCode": ""
+}

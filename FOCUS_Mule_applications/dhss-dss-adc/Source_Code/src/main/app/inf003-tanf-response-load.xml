@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+
+	<spring:beans>
+		<spring:bean id="TANF_Response_Load_Object_Store"
+			class="org.mule.util.store.SimpleMemoryObjectStore"></spring:bean>
+		<spring:bean id="TANF_Response_Load_Error_Object_Store"
+			class="org.mule.util.store.SimpleMemoryObjectStore"></spring:bean>
+	</spring:beans>
+	<spring:beans>
+         <spring:import resource="classpath:/queryframework.xml" /> 
+   	</spring:beans>
+	<objectstore:config name="TANF_Response_Load_Object_Store__Connector"
+		doc:name="ObjectStore: Connector" objectStore-ref="TANF_Response_Load_Object_Store" />
+	<objectstore:config name="TANF_Response_Load_Error_Object_Store__Connector"
+		doc:name="ObjectStore: Connector" objectStore-ref="TANF_Response_Load_Error_Object_Store" />
+	<!-- <sfdc:config name="Salesforce__Basic_Authentication_local" username="${sfdc.username}" 
+		password="${sfdc.password}" securityToken="${sfdc.token}" url="${sfdc.url}" 
+		disableSessionInvalidation="true" doc:name="Salesforce: Basic Authentication"> 
+		<reconnect count="5"/> </sfdc:config> -->
+	<!-- <spring:beans> <spring:import resource="classpath:/loggingframework.xml" 
+		/> </spring:beans> <spring:beans> <spring:import resource="classpath:/errorhandling.xml" 
+		/> </spring:beans> -->
+
+	<sftp:connector name="SFTP-1" validateConnections="true"
+		doc:name="SFTP" duplicateHandling="addSeqNo">
+		<reconnect count="5" />
+	</sftp:connector>
+	<sftp:connector name="SFTP" validateConnections="true"
+		doc:name="SFTP">
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+	<!-- <sftp:connector name="SFTP-No-DeleteConnector" validateConnections="true" 
+		autoDelete="false" doc:name="SFTP" > <spring:property name="serviceOverrides"> 
+		<spring:map> <spring:entry key="requester.factory" value="gov.delaware.requester.CustomSftpMessageRequesterFactory" 
+		/> </spring:map> </spring:property> <reconnect count="5" /> </sftp:connector> -->
+
+	<validation:config name="Validation_Configuration"
+		doc:name="Validation Configuration">
+		<validation:exception-factory
+			class="gov.delaware.validation.DelawareValidationExceptionFactory" />
+	</validation:config>
+	<validation:config name="Validation_Configuration1"
+		doc:name="Validation Configuration" />
+	<configuration doc:name="Configuration">
+		<expression-language>
+			<global-functions file="GlobalUtilityFunctions.mvel">
+				def isValidNumber(textNumber) {
+				org.mule.util.NumberUtils.isNumber(textNumber) }
+			</global-functions>
+		</expression-language>
+	</configuration>
+	<flow name="inf003-tanf-response-loadFlow" processingStrategy="synchronous">
+		<poll doc:name="Poll"
+			doc:description="Poll runs every 3rd Day of Month at 1:15 PM, Poller run's in EST timezone ">
+			<schedulers:cron-scheduler expression="0 15 13 3 1/1 ? *"
+				timeZone="US/Eastern" />
+			<set-payload value="INF003" doc:name="Set Payload to Interface ID"
+				doc:description="Payload is set it interface ID so that the Flow will trigger and later this ID will be used in the Logging and Exception handling framework" />
+		</poll>
+		<set-variable variableName="InterfaceID" value="#[payload]"
+			doc:name="FV: Set Interface ID"
+			doc:description="Flowvars is set it interface ID recieved from payload so that the Flow will trigger and later this ID will be used in the Logging and Exception Handling Framework" />
+		<!-- <mulerequester:request resource="sftp://${sftp.tpl.carrier.username}:Temp123456@${sftp.tpl.carrier.host}:${sftp.tpl.carrier.port}${sftp.path.tplcarrier.transaction}?connector=SFTP-1&amp;myfilename=${sftp.tplcarrier.load.filename}" 
+			timeout="120000" doc:name="Mule Requester"/> -->
+		<mulerequester:request
+			resource="sftp://${sftp.TANFResponseLoad.transaction.username}:${sftp.TANFResponseLoad.transaction.password}@${sftp.TANFResponseLoad.transaction.host}:${sftp.TANFResponseLoad.transaction.port}${sftp.TANFResponseLoad.transaction.path}?connector=SFTP&amp;myfilename=${sftp.TANFResponseLoad.transaction.filename}"
+			timeout="120000" doc:name="Mule Requester: Retrieve TANF Response Load File"
+			doc:description="Mule Requester: Retrieve TANF Response Load File, looks for the file which is passed it, if found Returns the File Content otherwise null is returned." />
+		<validation:is-not-null message="No File Found"
+			exceptionClass="java.lang.Exception" value="#[payload]"
+			doc:name="Validation : Validate Not Null Payload"
+			doc:description="Validation : if File is not found then Null is returned, this component validates for Not null, if Null is returned then Exception will be thrown."
+			config-ref="Validation_Configuration1" />
+		<object-to-string-transformer doc:name="Object to String : Consume Payload"
+			doc:description="Consume Payload and assign CSV mime type " mimeType="application/csv" />
+		<set-payload
+			value="#[payload.replace(&quot;\&quot;&quot;,&quot;\\\&quot;&quot;)]"
+			doc:name="Set Payload : Replacing the double quote with slash" />
+		<set-session-variable variableName="TransAttachment"
+			value="#[payload]" doc:name="Set TransAttachment"
+			doc:description="Creating TransAttachment for the Logging framework, this is backup of the file to Stored in Salesforce Interface Dashboard" />
+		<!--<sftp:outbound-endpoint exchange-pattern="one-way"
+			connector-ref="SFTP-1"
+			outputPattern="${sftp.TANFResponseLoad.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].${sftp.TANFResponseLoad.archive.fileextension}"
+			host="${sftp.TANFResponseLoad.archive.host}" port="${sftp.TANFResponseLoad.archive.port}"
+			path="${sftp.TANFResponseLoad.archive.path}" user="${sftp.TANFResponseLoad.archive.username}"
+			password="${sftp.TANFResponseLoad.archive.password}" responseTimeout="10000"
+			doc:name="SFTP : Archive File" duplicateHandling="overwrite"
+			doc:description="SFTP Archive operation, This operation creates a copy of the Load File recieved in the configured SFTP location" />-->
+		<enricher doc:name="Message Enricher : Invoke Logging Framework"
+			doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+			<flow-ref name="TANF_Response_Load_LogInProgressTransaction_Sub_Flow"
+				doc:name="TANF_Response_Load_LogInProgressTransaction_Sub_Flow" />
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+		</enricher>
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Delete Trans Attachment"
+			doc:description="Deleting TransAttachment, so that a attachment does not get created again in the next Logging operation">
+			<delete-message-property key="TransAttachment" />
+		</message-properties-transformer>
+		<dw:transform-message doc:name="Transform Message : Parse PSV data"
+			doc:description="This transformation converts the Pipe Separated Data into a List of Map">
+			<dw:input-payload mimeType="application/csv">
+				<dw:reader-property name="header" value="false" />
+				<dw:reader-property name="separator" value="|" />
+			</dw:input-payload>
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+		</dw:transform-message>
+		<choice doc:name="Choice : Check for Records">
+			<when expression="#[payload.size() &gt; 0]">
+				<enricher doc:name="Message Enricher" doc:description="Call LOV Query subflow.">
+                    			<flow-ref name="LOVQuery" doc:name="LOVQuery"/>
+                    			<enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+		                </enricher>
+				<set-variable variableName="HeaderRecord" value="#[payload[0]]"
+					doc:name="Variable : Header Record" doc:description="Store header line of the file" />
+				<choice doc:name="Choice : Check for Detail Level Records">
+					<when expression="#[payload.size() &gt; 0]">
+						<dw:transform-message doc:name="Transform : get Detail Level Records"
+							doc:description="This Transformation retrieves Only Detail Level records by removing the Header">
+							<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[1..-1]]]></dw:set-payload>
+						</dw:transform-message>
+						<enricher
+							source="#[dw('{ &quot;Id&quot; : payload.Id, &quot;DeveloperName&quot; : payload.DeveloperName }')]"
+							target="#[flowVars.RecordTypeDetailsTANF]" doc:name="Recieve TANF Record Type details"
+							doc:description="Recieve TANF Record Type details from the underlying SFDC Query operation and store it in a variable so that the payload is not disturbed">
+							<sfdc:query-single config-ref="Salesforce__Basic_Authentication"
+								query="select Id,DeveloperName from RecordType where name = 'TANF Eligibility'"
+								doc:name="Salesforce : Query TANF RecordType ID"
+								doc:description="Get TANF Record Type ID and Developer name from SFDC Query operation upon RecordType object, this ID and developer Name will be used later in the other  SFDC operations.
+Developer Name will be used in External ID" />
+						</enricher>
+						<message-properties-transformer
+							scope="session" doc:name="Set Required Properties to be used for the Load"
+							doc:description="Set and Initialize Count variables used during the load">
+							<add-message-property key="totalSuccCount"
+								value="#[0]" />
+							<add-message-property key="totalRecCount"
+								value="#[payload.size()]" />
+							<add-message-property key="totalErrorCount"
+								value="#[0]" />
+							<add-message-property key="uniqueRecCount"
+								value="#[0]" />
+						</message-properties-transformer>
+						<dw:transform-message doc:name="Transform Message : Exract MCI ID List"
+							doc:description="This Transformation extracts all Valid and unique MCI numbers">
+							<dw:set-variable variableName="MCIList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (($.column_0 != null) and ($.column_0 != "") and (isValidNumber(trim $.column_0)) ) distinctBy ((trim $.column_0) as :number as :string) map ((trim $.column_0) as :number as :string)]]></dw:set-variable>
+						</dw:transform-message>
+						<foreach collection="#[flowVars.MCIList]" batchSize="250"
+							doc:name="For Each"
+							doc:description="Considering the maximum size of MCI as 10, The Batch Size is 250">
+							<remove-variable variableName="rootMessage"
+								doc:name="Variable : Remove Root variable"
+								doc:description="Remove Root variable to avoid unnecessary Serialization" />
+							<dw:transform-message doc:name="Get payload from Mule Message"
+								doc:description="This Transformation retrives the actual Payload enveloped between Mule Message">
+								<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+							</dw:transform-message>
+							<dw:transform-message doc:name="Prepare MCI List Salesforce Query"
+								doc:description="This Transformation creates a Command Separated List of MCI number to be used in Salesforce Query">
+								<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ ++ "'") ) joinBy "," ]]></dw:set-payload>
+							</dw:transform-message>
+							<enricher source="#[ dw('flowVars.MCIMap default {} ++ payload')]"
+								target="#[flowVars.MCIMap]" doc:name="Message Enricher"
+								doc:description="Invoke Salesforce and Transformation in message enricher so that it does not disturb the payload">
+								<processor-chain doc:name="Processor Chain">
+									<!-- <logger message="select id,Person__r.DEL_PID__c from DEL_DOL_Request__c 
+										where Person__r.DEL_PID__c IN (#[payload]) and ( Submission_End__c = Null 
+										or Submission_End__c &gt;= #[dw(' (now &gt;&gt; |+00:00|) as :string {format 
+										: &quot;yyyy-MM-dd&quot;} ') ])" level="INFO" doc:name="Logger"/> -->
+									<sfdc:query config-ref="Salesforce__Basic_Authentication"
+										query="select Id,Person__r.DEL_MCI__c from DEL_Person_Type__c where Person__r.DEL_MCI__c IN (#[payload]) and RecordType.Name = 'Client'"
+										doc:name="Salesforce : Query Person Type ID"
+										doc:description="Query Person Type Id from the Person Type Object using MCI" />
+									<dw:transform-message
+										doc:name="Get MCI Mappings With MCI as Key and Person Type ID as Value"
+										doc:description="Get a Lookup or Map From the Consumer Iterator by executing a Lambda over all the elements of the Iterator cretes Lookup with MCI as Key and Salesforce Person Type ID as Value">
+										<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload reduce ((val, acc = {}) -> acc ++ (( { (val.Person__r.DEL_MCI__c as :string)  : (val.Id) } )))]]></dw:set-payload>
+									</dw:transform-message>
+									<!-- <logger message="Payload" level="INFO" doc:name="Logger"/> -->
+								</processor-chain>
+							</enricher>
+						</foreach>
+						<dw:transform-message
+							doc:name="Transform Message : Create error report for records having Missing and Invalid fields"
+							doc:description="This Transformation creates a Error Report for all Invalid records which have Missing Field or Incorrect Format of data
+This step also takes care of Business Rule 2 &quot;If MCI for an incoming record does NOT match in FOCUS, an error will be logged.&quot;
+This step also takes care of Business Rule 5 &quot;Exception Report in FOCUS for the TANF Load file will include the following fields at a minimum to aid business resolve data issues with the partner  PID, MCI, Error Message.&quot;
+This will be added to Error Attachment after some processing">
+							<dw:set-variable variableName="InvalidRecords"><![CDATA[%dw 1.0
+%output application/csv separator=",", header=false,quoteValues=true
+---
+payload filter (($.column_0 == null or $.column_0 == "")
+or (not ( isValidNumber((trim $.column_0)) ))
+or (flowVars.MCIMap[((trim $.column_0) as :number as :string)] == null)
+or ($.column_1 == null or $.column_1 == ""  )
+or ($.column_2 == null or $.column_2 == "" )
+or (($.column_2 != null) and isInvalidDate($.column_2,"MM/dd/yyyy") )
+or (($.column_3 == null) or ($.column_3 == ""))
+or ( ($.column_3 != null) and (isInvalidDate($.column_3 ++ "01","yyyyMMdd")))
+
+or ( ($.column_4 != null) and (isInvalidDate($.column_4,"MM/dd/yyyy")))
+or ( ($.column_5 != null) and (isInvalidDate($.column_5,"MM/dd/yyyy")))
+or ($.column_6 == null or $.column_6 == "")
+or ($.column_8 == null or $.column_8 == "")
+or ( ($.column_11 != null) and (isInvalidDate($.column_11,"MM/dd/yyyy")))
+) 
+ map {
+	"MCI" : $.column_0,
+	"ChildName" : $.column_1,
+	"EffectiveDate" : $.column_2,
+	"PaymentMonth" : $.column_3,
+	"StartDate" : $.column_4,
+	"EndDate" : $.column_5,
+	"Amount" : $.column_6,
+	"CaseID" : $.column_7,
+	"GroupSize" : $.column_8,
+	"TanfCheckRecipientsName": $.column_9,
+	"TanfCheckRecipientsRoleRelation": $.column_10,
+	"TanfCheckRecipientsDOB": $.column_11,
+	"TanfCheckRecipientsMCI": $.column_12,						
+	"errorDesc" : ( "Client MCI number is Missing" when ($.column_0 == null or $.column_0 == "")  otherwise "" ) 
+	++ ( " Client MCI number is InValid" when (not (isValidNumber((trim $.column_0))))  otherwise "" )
+	++ ( " Client MCI number is not present in FOCUS" when (flowVars.MCIMap[((trim $.column_0) as :number as :string)] == null)  otherwise "" )
+	++ ( " Child Name is Missing" when ($.column_1 == null or $.column_1 == ""  )  otherwise "" ) 
+	++ ( " Effective Date is Missing" when ($.column_2 == null or $.column_2 == "" )  otherwise "" ) 
+	++ ( " Effective Date is Invalid" when (($.column_2 != null and $.column_2 != "" ) and isInvalidDate($.column_2,"MM/dd/yyyy") )  otherwise "" )
+	++ ( " Payment Month is Missing" when ($.column_3 == null or $.column_3 == "")  otherwise "" )
+	++ ( " Payment Month is Invalid" when ( ($.column_3 != null and $.column_3 != "") and (isInvalidDate($.column_3 ++ "01","yyyyMMdd")))  otherwise "" )
+	++ ( " Start Date is Invalid" when ( ($.column_4 != null) and (isInvalidDate($.column_4,"MM/dd/yyyy")))  otherwise "" )
+	++ ( " End Date is Invalid" when ( ($.column_5 != null) and (isInvalidDate($.column_5,"MM/dd/yyyy")))  otherwise "" )
+	++ ( " Amount is Missing" when ($.column_6 == null or $.column_6 == "")  otherwise "" ) 
+	++ ( "Group Size is Missing" when ($.column_8 == null or $.column_8 == "")  otherwise "" )
+}]]></dw:set-variable>
+						</dw:transform-message>
+						<expression-component doc:name="Expression : Calculate Valid Record Count"
+							doc:description="Get Missing Records as String , this is required since Dataweave gives output as Stream 
+Calculate Valid Records count after removing Missing Field records"><![CDATA[flowVars.InvalidRecords = flowVars.InvalidRecords:java.lang.String;
+sessionVars.totalSuccCount = flowVars.InvalidRecords.equals("") ? sessionVars.totalRecCount : (sessionVars.totalRecCount - flowVars.InvalidRecords.split("\n").length) ]]></expression-component>
+
+						<choice doc:name="Choice : Check for Valid Records"
+							doc:description="Check if valid records are present">
+							<when expression="#[(sessionVars.totalSuccCount) == 0]">
+								<logger message="No valid Records are present in this Set"
+									level="INFO" doc:name="Logger" />
+							</when>
+							<otherwise>
+								<dw:transform-message doc:name="Get Valid records"
+									doc:description="This transform step filters out Valid data not having Missing Fields or Incorrect form of data">
+									<dw:set-variable variableName="validData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (
+(($.column_0 != null) and ($.column_0 != ""))
+and ( isValidNumber((trim $.column_0)) )
+and (flowVars.MCIMap[((trim $.column_0) as :number as :string)] != null)
+
+and (($.column_1 != null) and ($.column_1 != "") )
+and (($.column_2 != null) and ($.column_2 != "") )
+and (($.column_2 != null) and ( not (isInvalidDate($.column_2,"MM/dd/yyyy")) ) )
+and (($.column_3 != null) and ($.column_3 != ""))
+and ( ($.column_3 != null) and ( not (isInvalidDate($.column_3 ++ "01","yyyyMMdd")) ) )
+and ( (($.column_4 == null) or ($.column_4 == "") ) or ( ($.column_4 != null) and ( not ( isInvalidDate($.column_4,"MM/dd/yyyy")) ) ) )
+and ( (($.column_5 == null) or ($.column_5 == "") ) or ( ($.column_5 != null) and ( not ( isInvalidDate($.column_5,"MM/dd/yyyy")) ) ) )
+and (($.column_6 != null) and ($.column_6 != ""))
+and (($.column_8 != null) and ($.column_8 != ""))
+) orderBy $.column_0]]></dw:set-variable>
+								</dw:transform-message>
+								<dw:transform-message
+									doc:name="Transform Message : Prepare Data for Upsert"
+									doc:description="This Transformation prepares data for Upsert and maps data as per field of the Corresponding Object in Salesforce
+This step also takes care of Business Rule 4 &quot;A record on the file is compared to determine if it exists in the Client eligibility object based on MCI, TANF month, Start Date, End Date, DCIS Case ID, Group Size and Amount. If the record does exist in FOCUS Client eligibility object, then existing record is updated otherwise a new TANF Eligibility record is inserted into FOCUS object.&quot; it gets handled by doing a Upsert with the same combination of Exteranal ID stated in the rule">
+									<dw:set-variable variableName="preUpsertData"><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+flowVars.validData map {
+	"RecordTypeId" : flowVars.RecordTypeDetailsTANF["Id"],
+	//"Effective_Date__c" : $.column_2 as :date {format: "MM/dd/yyyy"},
+	Effective_Date__c: (($.column_2[0..5] as :string ++ "4000") when ($.column_2[6..9] as :number) > 4000  otherwise $.column_2 ) as :date {format: "MM/dd/yyyy"},	
+	"Payment_Month__c" : $.column_3,	
+	//("Start_Date__c" : $.column_4 as :date {format: "MM/dd/yyyy"}) when not ($.column_4 endsWith "9999"),
+	(Start_Date__c: (($.column_4[0..5] as :string ++ "4000") when ($.column_4[6..9] as :number) > 4000  otherwise $.column_4 ) as :date {format: "MM/dd/yyyy"}) when ($.column_4 != null and $.column_4 != ""),	
+	//("End_Date__c" : $.column_5 as :date {format: "MM/dd/yyyy"} ) when not ($.column_5 endsWith "9999"),
+	(End_Date__c: (($.column_5[0..5] as :string ++ "4000") when ($.column_5[6..9] as :number) > 4000  otherwise $.column_5 ) as :date {format: "MM/dd/yyyy"}) when ($.column_5 != null and $.column_5 != ""),	
+	"External_Interface_Id__c" : ((trim $.column_0) as :number as :string) ++ "-" ++ $.column_3 ++ "-" ++ $.column_4 ++ "-" ++ $.column_5 ++ "-" ++ $.column_7 ++ "-" ++ $.column_8 ++ "-" ++ (flowVars.RecordTypeDetailsTANF["DeveloperName"] default "") ++ "-" ++ $.column_6,
+	"Monthly_Amount__c" : $.column_6,
+	"AWW_Case_ID__c" : $.column_7,
+	"Household_Size__c" : $.column_8,
+	"TANF_Recipient_Name__c" : $.column_9 default "",
+	"TANF_Recipient_Role__c": flowVars.LOVReturned[("TANF_RECIPIENT_ROLE-" ++ $.column_10)][0] default "",
+	"TANF_Recipient_Birth_Dt__c": $.column_11 as :date {format: "MM/dd/yyyy"} default "",
+	"TANF_Recipient_MCI__c": (pad("0",(10 - sizeOf $.column_12 )) ++ $.column_12) when $.column_12 != null and $.column_12 != "" otherwise "",
+	//Person_Type__c : flowVars.records[$$].recordVars.PersonTypeID
+	Person_Type__c : flowVars.MCIMap[((trim $.column_0) as :number as :string)]
+	//$.PersonTypeID
+}]]></dw:set-variable>
+								</dw:transform-message>
+
+								<enricher source="#[payload]" target="#[flowVars.jobInfo]"
+									doc:name="Invoke SFDC Upsert in encricher"
+									doc:description="Message Enricher : Invoke SFDC Upsert in encricher so that orignal payload is not disturbed">
+									<sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication"
+										externalIdFieldName="External_Interface_Id__c" type="DEL_Income_Eligibility__c"
+										doc:name="Salesforce : Upsert Records for the Child"
+										doc:description="Salesforce FOCUS : Upsert Bulk Records for the Child
+This take care of the business rule which requires to load the Tanf Response records in FOCUS">
+										<sfdc:objects ref="#[flowVars.preUpsertData]" />
+
+									</sfdc:upsert-bulk>
+								</enricher>
+								<until-successful maxRetries="50"
+									millisBetweenRetries="30000" synchronous="true" doc:name="Until Successful"
+									doc:description="Pause the thread and retry until the SFDC Batch Job Result Stream is Ready">
+									<sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication"
+										doc:name="Salesforce : Get Batch Result Stream"
+										doc:description="Get Batch Result Stream for the Upsert Operation">
+										<sfdc:batch-info ref="#[flowVars.jobInfo]" />
+									</sfdc:batch-result-stream>
+								</until-successful>
+								<object-to-string-transformer
+									mimeType="application/xml" doc:name="Object to String : Consume Stream"
+									doc:description="Consume Stream : To make the Batch result it Resuable" />
+								<enricher source="#[payload]" target="#[flowVars.closeJobResult]"
+									doc:name="Invoke Close Job in Enricher"
+									doc:description="Message Enricher : Invoke SFDC Close Job operation in encricher so that the orignal payload is not tampered">
+									<sfdc:close-job config-ref="Salesforce__Basic_Authentication"
+										jobId="#[flowVars.jobInfo.jobId]" doc:name="Salesforce: Close Job"
+										doc:description="Close Job Since the Batch was processed" />
+								</enricher>
+								<dw:transform-message
+									doc:name="Transform Message : Get error report of records failed in SFDC"
+									doc:description="This Transformation creates a Error Report for all the records which failed in Salesforce
+This step also takes care of Business Rule 5 &quot;Exception Report in FOCUS for the TANF Load file will include the following fields at a minimum to aid business resolve data issues with the partner  PID, MCI, Error Message.&quot;
+This will be added to Error Attachment after some processing">
+									<dw:input-payload mimeType="application/xml" />
+									<dw:set-variable variableName="SFDCUpsertErrors"><![CDATA[%dw 1.0
+%output application/csv separator=",", header=false,quoteValues=true
+---
+payload map {
+	"MCI" : flowVars.validData[$$].column_0,
+	"ChildName" : flowVars.validData[$$].column_1,
+	"EffectiveDate" : flowVars.validData[$$].column_2,
+	"PaymentMonth" : flowVars.validData[$$].column_3,
+	"StartDate" : flowVars.validData[$$].column_4,
+	"EndDate" : flowVars.validData[$$].column_5,
+	"Amount" : flowVars.validData[$$].column_6,
+	"CaseID" : flowVars.validData[$$].column_7,
+	"GroupSize" : flowVars.validData[$$].column_8,
+	"TanfCheckRecipientsName": $.column_9,
+	"TanfCheckRecipientsRoleRelation": $.column_10,
+	"TanfCheckRecipientsDOB": $.column_11,
+	"TanfCheckRecipientsMCI": $.column_12,
+	("Errors" : ($.errors.message)		
+	) when ($.success == "false")
+} filter $.Errors != null]]></dw:set-variable>
+								</dw:transform-message>
+								<expression-component
+									doc:name="Expression : Calculate Valid Record Count"
+									doc:description="Get SFDC Error Record report String , this is required since Dataweave gives output as Stream, Also calculate number of successfull records"><![CDATA[flowVars.SFDCUpsertErrors = flowVars.SFDCUpsertErrors:java.lang.String;
+sessionVars.totalSuccCount = flowVars.SFDCUpsertErrors.equals("") ? sessionVars.totalSuccCount : (sessionVars.totalSuccCount - flowVars.SFDCUpsertErrors.split("\n").length) 
+]]></expression-component>
+							</otherwise>
+						</choice>
+						<message-properties-transformer
+							overwrite="true" scope="session" doc:name="Message Properties : Update Error count"
+							doc:description="Message Properties : Update Error count">
+							<add-message-property key="totalErrorCount"
+								value="#[sessionVars.totalRecCount -  sessionVars.totalSuccCount]" />
+						</message-properties-transformer>
+						<message-properties-transformer
+							overwrite="true" scope="session"
+							doc:name="Message Properties : Update Record Status, ErrorAttachment"
+							doc:description="Message Properties : Update Record Status and ErrorAttachment Error Attachment is created with a header and the Invalid Records report and SFDC error report
+The Attachment will contain the Business Exception details and will be present in the business Exception file in the dashboard">
+							<add-message-property key="recStatus"
+								value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+							<add-message-property key="ErrorAttachment" value="#[(sessionVars.totalErrorCount == 0)  ? null : ((&quot;MCI,Child Name,EffectiveDate,Payment Month,Start Date,End Date,Amount,Case ID,Group Size,TANF Check Recipients Name,TANF Check Recipients RoleRelation to Child,TANF Check Recipients Date of Birth,TANF Check Recipients MCI Number,Errors&quot;) + System.lineSeparator() + ((flowVars.InvalidRecords == null ? &quot;&quot; : flowVars.InvalidRecords )  + ( flowVars.SFDCUpsertErrors == null ? &quot;&quot; : flowVars.SFDCUpsertErrors ))) ]"/>
+
+						</message-properties-transformer>
+						<set-payload
+							value="{&quot;InterfaceID&quot;: &quot;INF003&quot;, &quot;InterfaceName&quot;: &quot;TANF Response Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TANFResponseLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+							mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+							doc:description="Set Payload for the Logging Framework to complete the Transaction" />
+						<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"
+							doc:description="This Step Invokes the Logging Transaction SubFlow which invokes the Logging and Exception Handling Framework
+thus this step takes care of Business Rule 6 &quot;Exception handling for TANF Load file is expected to be managed by DMSS cost recovery, so Exception notification will be sent to MIS administrator and Cost recovery liaison.&quot;" />
+					</when>
+					<otherwise>
+						<message-properties-transformer
+							overwrite="true" scope="session" doc:name="Message Properties : Update Count"
+							doc:description="Update Success count to be used in Logging Framework">
+
+							<add-message-property key="totalRecCount"
+								value="#[0]" />
+							<add-message-property key="totalSuccCount"
+								value="#[0]" />
+							<add-message-property key="totalErrorCount"
+								value="#[0]" />
+							<add-message-property key="recStatus" value="#['Success']" />
+
+						</message-properties-transformer>
+
+						<set-payload
+							value="{&quot;InterfaceID&quot;: &quot;INF003&quot;, &quot;InterfaceName&quot;: &quot;TANF Response Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TANFResponseLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;No Detail level records Present in the File&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+							mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+							doc:description="Set JSON Payload for Logging Framework to Complete Transaction" />
+						<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"
+							doc:description="Invoke Log Transaction SubFlow of the Logging Framework" />
+
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise>
+				<!-- <validation:is-true config-ref="Validation_Configuration1" message="No 
+					Records Present in the File" exceptionClass="java.lang.Exception" expression="#[payload.size() 
+					&gt; 0]" doc:name="Validate Records " doc:description="Validate Records , 
+					Raises Exception if no Records are found"/> -->
+				<message-properties-transformer
+					overwrite="true" scope="session" doc:name="Message Properties : Update Count"
+					doc:description="Update Success count to be used in Logging Framework">
+					<add-message-property key="totalRecCount"
+						value="#[0]" />
+					<add-message-property key="totalSuccCount"
+						value="#[0]" />
+					<add-message-property key="totalErrorCount"
+						value="#[0]" />
+					<add-message-property key="recStatus" value="#['Success']" />
+				</message-properties-transformer>
+				<set-payload
+					value="{&quot;InterfaceID&quot;: &quot;INF003&quot;, &quot;InterfaceName&quot;: &quot;TANF Response Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TANFResponseLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;No Records Present in the File&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+					mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+					doc:description="Set JSON Payload for Logging Framework to complete Transaction" />
+				<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"
+					doc:description="Invoke Log Transaction SubFlow of the Logging Framework" />
+			</otherwise>
+		</choice>
+		<exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+
+	<sub-flow name="TANF_Response_Load_LogInProgressTransaction_Sub_Flow">
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF003&quot;, &quot;InterfaceName&quot;: &quot;TANF Response Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_dss_dscyf_ddx015b_tanflod&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+			doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+
+	</sub-flow>
+	<sub-flow name="LOVQuery">
+        	<set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'TANF_RECIPIENT_ROLE'&quot;} " mimeType="text/xml" doc:name="Set Payload" doc:description="In this payload step we will be setting all the attributes required for calling LOVQuery framework. In case there is more than one field required to transform source to Target values, you need to give comma separated LOV type in the payload."/>
+        	<flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow" doc:description="This step calls LOVQuery framework to get the source to target mapping values."/>
+    	</sub-flow>
+</mule>

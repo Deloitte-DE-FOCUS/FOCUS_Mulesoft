@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   	  <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans>  
+   	<!-- <spring:beans>
+         <spring:import resource="classpath:/test-framework.xml" /> 
+   	</spring:beans> -->
+   	 
+    <flow name="inf002-tanf-request-extract-flow" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <schedulers:cron-scheduler expression="0 5 13 1 1/1 ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF002" doc:name="Set Payload to Interface ID"/>
+
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID"/>
+        <enricher doc:name="Message Enricher">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF002&quot;, &quot;InterfaceName&quot;: &quot;TANF Request Extract&quot;, &quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" doc:name="SP with Transaction Start info"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Client_PID__c, Episode_Start_Date__c, Episode_End_Date__c, Client__r.DEL_MCI__c, DFS_Indicator__c, YRS_Indicator__c, PBH_Indicator__c from DEL_Placement_Episode__c where Episode_End_Date__c = null and Episode_Start_Date__c != null" doc:name="Salesforce"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf002-tanf-request-extract-NoPayload_Flow" doc:name="inf002-tanf-request-extract-NoPayload_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size()!=0]" doc:name="Expression"/>
+
+        <dw:transform-message metadata:id="52b24c6e-e732-47d5-a35d-8da46bf29c5a" doc:name="TM - Convert Query Output to Map">
+            <dw:input-payload/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	ClientPID: $.Client_PID__c default "",
+	MCI: $.Client__r.DEL_MCI__c default "",
+	EpisodeStartDate: ((($.Episode_Start_Date__c[0..3]-2) ++ $.Episode_Start_Date__c[5..6]  ++ $.Episode_Start_Date__c[8..9]-1) as :string {format: "YYYYMMDD"}) 
+				when (((($.Episode_Start_Date__c[0..3] as :number mod 4) == 0 and ($.Episode_Start_Date__c[0..3] as :number mod 100) != 0) or ($.Episode_Start_Date__c[0..3] as :number mod 400) == 0) and $.Episode_Start_Date__c[5..6] as :number == 2 and $.Episode_Start_Date__c[8..9] as :number == 29) 
+				otherwise (($.Episode_Start_Date__c[0..3]-2 ++ $.Episode_Start_Date__c[5..6]  ++ $.Episode_Start_Date__c[8..9]) as :string {format: "YYYYMMDD"}),
+	DFSDivision: "Y" when $.DFS_Indicator__c == "true"  otherwise "N",
+	YRSDivision: "Y" when $.YRS_Indicator__c == "true"  otherwise "N",
+	PBHSDivision: "Y" when $.PBH_Indicator__c == "true"  otherwise "N"
+}]]></dw:set-payload>
+
+        </dw:transform-message>
+        <set-variable variableName="QueryOutput" value="#[payload]" doc:name="FV:Store QueryOutput"/>
+
+        <set-payload value="#[flowVars.QueryOutput]" doc:name="SP: Reset with QueryOutput"/>
+        <set-variable variableName="TotalRecCount" value="#[payload.size()]" doc:name="FV - Set Total Rec Count"/>
+        <dw:transform-message metadata:id="1a0b9500-704d-4f97-8881-6cd151216fba" doc:name="TM - Generate CSVs">
+            <dw:input-payload doc:sample="sample_data\MAP.dwl" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv
+header = false , separator = "|"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map
+{
+	MCINumber: ( pad(0,(10 - sizeOf $.MCI )) ++ $.MCI ) when ($.MCI != null and $.MCI != "") otherwise 0,
+	EpisodeStartDate: $.EpisodeStartDate
+} filter payload[$$].MCI != null and payload[$$].MCI != ""]]></dw:set-payload>
+            <dw:set-variable variableName="MCImissing"><![CDATA[%dw 1.0
+%output application/csv
+---
+payload map
+{
+	FieldName: "MCI",
+	FieldValue: $.MCI,
+	ErrorDescription: "No MCI Found for Client with PID",
+	PID: $.ClientPID,
+	DFSDivision: $.DFSDivision default "",
+	YRSDivision: $.YRSDivision default "",
+	PBHSDivision: $.PBHSDivision default ""
+	
+} filter payload[$$].MCI == "" or payload[$$].MCI == null]]></dw:set-variable>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String" mimeType="application/csv"/>
+        <flow-ref name="Write_to-SFTP_TANF_RequestExtract" doc:name="Write_to-SFTP_TANF_RequestExtract"/>
+
+        <message-properties-transformer scope="invocation" doc:name="MP - Set Rec Count Details">
+            <add-message-property key="MCIMissingCount" value="#[flowVars.MCImissing != null &amp;&amp; flowVars.MCImissing != &quot;&quot; ? (flowVars.MCImissing.split(&quot;\n&quot;).length - 1) : 0]"/>
+            <add-message-property key="SuccessCount" value="#[flowVars.TotalRecCount - flowVars.MCIMissingCount]"/>
+            <add-message-property key="RecStatus" value="#[TotalRecCount == SuccessCount ? 'Success' : (TotalRecCount == MCIMissingCount ? 'Error' : 'Completed with Error(s)')]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+            <when expression="#[RecStatus == 'Completed with Error(s)']">
+                <message-properties-transformer scope="session" mimeType="application/csv" doc:name="MP: Completed with Errors">
+                    <add-message-property key="ErrorAttachment" value="#[flowVars.MCImissing]"/>
+                    <add-message-property key="TransAttachment" value="#[payload]"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF002&quot;, &quot;InterfaceName&quot;: &quot;TANF Request Extract&quot;, &quot;TransactionID&quot;: &quot;#[TID]&quot;, &quot;Status&quot;:&quot;#[RecStatus]&quot;,&quot;RecordCount&quot;:&quot;#[TotalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[SuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[MCIMissingCount]&quot;,&quot;ErrorDescription&quot;:&quot;Check attached file for Error details&quot;, &quot;ErrorFilename&quot;: &quot;Error/WarningTANFRequestExtract_&quot;, &quot;CompletedFilename&quot;: &quot;Backup_dss_dscyf_ddx015a_tanfrex_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;ErrorExtension&quot;:&quot;csv&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}" doc:name="SP with Transaction Complete info"/>
+            </when>
+            <when expression="#[RecStatus == 'Success']">
+                <message-properties-transformer scope="session" mimeType="application/csv" doc:name="MP: Success">
+                    <add-message-property key="TransAttachment" value="#[payload]"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF002&quot;, &quot;InterfaceName&quot;: &quot;TANF Request Extract&quot;, &quot;TransactionID&quot;: &quot;#[TID]&quot;, &quot;Status&quot;:&quot;#[RecStatus]&quot;,&quot;RecordCount&quot;:&quot;#[TotalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[SuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[MCIMissingCount]&quot;,&quot;ErrorDescription&quot;:&quot;&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;Backup_dss_dscyf_ddx015a_tanfrex_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;, &quot;ExceptionType&quot;:&quot;&quot;, &quot;ErrorExtension&quot;:&quot;&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}" doc:name="SP with Transaction Success info"/>
+            </when>
+            <otherwise>
+                <message-properties-transformer scope="session" mimeType="application/csv" doc:name="MP: Error">
+                    <add-message-property key="ErrorAttachment" value="#[flowVars.MCImissing]"/>
+                    <add-message-property key="TransAttachment" value="#[&quot;&quot;]"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF002&quot;, &quot;InterfaceName&quot;: &quot;TANF Request Extract&quot;, &quot;TransactionID&quot;: &quot;#[TID]&quot;, &quot;Status&quot;:&quot;#[RecStatus]&quot;,&quot;RecordCount&quot;:&quot;#[TotalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[SuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[MCIMissingCount]&quot;,&quot;ErrorDescription&quot;:&quot;Check attached file for Error details&quot;, &quot;ErrorFilename&quot;: &quot;Error/WarningTANFRequestExtract_&quot;, &quot;CompletedFilename&quot;: &quot;Backup_dss_dscyf_ddx015a_tanfrex_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;ErrorExtension&quot;:&quot;csv&quot;, &quot;CompletedExtension&quot;:&quot;&quot;}" doc:name="SP with Transaction Complete info"/>
+            </otherwise>
+        </choice>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+    
+    <sub-flow name="Write_to-SFTP_TANF_RequestExtract">
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-1" outputPattern="${sftp.tanfreqextract.transaction.filename}" host="${sftp.tanfreqextract.transaction.host}" port="${sftp.tanfreqextract.transaction.port}" path="${sftp.tanfreqextract.transaction.path}" user="${sftp.tanfreqextract.transaction.username}" password="${sftp.tanfreqextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP - Write Transaction File"/>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-1" outputPattern="${sftp.tanfreqextract.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.tanfreqextract.archive.host}" port="${sftp.tanfreqextract.archive.port}" path="${sftp.tanfreqextract.archive.path}" user="${sftp.tanfreqextract.archive.username}" password="${sftp.tanfreqextract.archive.password}" responseTimeout="10000" doc:name="Write Archive File into SFTP"/>
+    </sub-flow>
+    
+    <sub-flow name="inf002-tanf-request-extract-NoPayload_Flow">
+        <choice doc:name="Choice">
+            <when expression="#[payload.size() == 0]">
+                <set-payload value="#[&quot;&quot;]" doc:name="Set Payload : Empty payload for empty file"/>
+                <flow-ref name="Write_to-SFTP_TANF_RequestExtract" doc:name="Write_to-SFTP_TANF_RequestExtract"/>
+                <set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="SV Set TransAttachment"/>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF002&quot;, &quot;InterfaceName&quot;: &quot;TANF Request Extract&quot;,&quot;MuleID&quot;:&quot;#[message.rootId]&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;Backup_dss_dscyf_ddx015a_tanfrex_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;, &quot;CompletedExtension&quot; : &quot;txt&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </when>
+            <otherwise>
+                <logger message="Payload Extracted" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+</mule>

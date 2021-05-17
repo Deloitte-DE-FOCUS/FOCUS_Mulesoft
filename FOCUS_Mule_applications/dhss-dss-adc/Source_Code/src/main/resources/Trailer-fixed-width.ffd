@@ -1,0 +1,6 @@
+form: FIXEDWIDTH
+name: 'Trailer-fixed-width'
+values: 
+- { name: 'Identifier', usage: M, type: String, length: 1 }
+- { name: 'Count', usage: M, type: String, length: 10 }
+- { name: 'Filler', usage: M, type: String, length: 1822 }

@@ -1,0 +1,1974 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:filters="http://www.mulesoft.org/schema/mule/filters" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:ss="http://www.springframework.org/schema/security" xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd http://www.mulesoft.org/schema/mule/filters http://www.mulesoft.org/schema/mule/filters/current/mule-filters.xsd http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd">
+    <!-- <http:listener-config name="HTTPS_ListenerConfig" protocol="HTTPS" 
+		host="0.0.0.0" port="${https.port}" doc:name="HTTP Listener Configuration"> 
+		<tls:context> <tls:key-store type="jks" path="focus_interface.jks" alias="focus_interfaces" 
+		keyPassword="password" password="password"/> </tls:context> </http:listener-config> -->
+    <http:request-config name="HTTP_Request_dss_Solr_Configuration" host="${solr.dss.host}" port="${solr.dss.port}" basePath="${solr.dss.path}" doc:name="HTTP Request Configuration" protocol="HTTPS">
+        <http:basic-authentication username="${solr.dss.auth.userName}" password="${solr.dss.auth.pwd}" preemptive="true" />
+    </http:request-config>
+    <configuration doc:name="Configuration">
+        <expression-language>
+            <global-functions>def convertToEnglish(input) {
+					gov.delaware.replacer.LatinToEnglishConverter lconv = new
+					gov.delaware.replacer.LatinToEnglishConverter();
+					return lconv.convertToEnglish(input);
+				}
+				def parseIp(fullIp) {
+	            	return fullIp.substring(fullIp.indexOf('/') + 1, fullIp.indexOf(':'))
+	            }</global-functions>
+        </expression-language>
+    </configuration>
+    <spring:beans>
+        <ss:authentication-manager alias="authenticationManager">
+            <ss:authentication-provider>
+                <ss:user-service id="userService">
+                    <ss:user name="${vantage.username}" password="${vantage.pwd}" authorities="ROLE_ADMIN" />
+                </ss:user-service>
+            </ss:authentication-provider>
+        </ss:authentication-manager>
+    </spring:beans>
+    <mule-ss:security-manager name="adc_security_manager" doc:name="Spring Security Provider">
+        <mule-ss:delegate-security-provider name="memory-provider" delegate-ref="authenticationManager" />
+    </mule-ss:security-manager>
+    <apikit:config name="dss_adc_solr_api-config" raml="dss_adc_solr_api.raml" consoleEnabled="false" doc:name="Router" keepRamlBaseUri="false" />
+    
+    <flow name="dss_adc_solr_api-main">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/api/*" doc:name="HTTP" />
+        <logger message="Input from FOCUS #[payload] " level="INFO" doc:name="Logger" />
+        <apikit:router config-ref="dss_adc_solr_api-config" doc:name="APIkit Router" />
+        <exception-strategy ref="dss_adc_solr_api-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy" />
+    </flow>
+    <flow name="dss_adc_solr_api-console">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/console/*" doc:name="HTTP" />
+        <apikit:console config-ref="dss_adc_solr_api-config" doc:name="APIkit Console" />
+    </flow>
+    <flow name="get:/ConnectivityTest:dss_adc_solr_api-config">
+        <flow-ref name="TestFramework" doc:name="TestFramework" />
+    </flow>
+    <flow name="put:/assessment/results/v2:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="Assessment Results Update process started." level="INFO" doc:name="Logger" />
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP : Set Operation details" doc:description=" Setting Operation name and Operation Filename in the Logging framework">
+            <add-message-property key="operation" value="#['Update M-PACT Assessment Results']" />
+            <add-message-property key="operationFilename" value="#['AssessmentResults']" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.userExternalId]" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" />
+        <enricher doc:name="ME : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+            <flow-ref name="adc_realtime_LogRequest_Sub_Flow" doc:name="adc_realtime_LogRequest_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+        </enricher>
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress]" level="INFO" doc:name="Logger" />
+        <!-- <objectstore:store config-ref="ObjectStore__Connector" key="#[dw('payload.SubjectExternalID')]" value-ref="#[payload]" doc:name="ObjectStore"/> -->
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <enricher source="#[flowVars.validToken]" target="#[flowVars.validToken]" doc:name="Message Enricher">
+                    <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                </enricher>
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <dw:transform-message doc:name="TM : Convert Input JSON to Java Map">
+                            <dw:input-payload mimeType="application/json" />
+                            <dw:set-variable variableName="inputData"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"CreatedDate": payload.DateCreated, 
+	"DateCompleted": payload.DateCompleted,
+	"AssessmentTitle": payload.AssessmentTitle,
+	"AssessmentType": payload.AssessmentType,
+	"OffenderAssessmentID": payload.UserAssessmentID,
+	"OverallRiskLevel": payload.OverallRiskLevel, 
+	//"CriminogenicNeed1" : payload.CriminogenicNeed1,
+	//"CriminogenicNeed2" : payload.CriminogenicNeed2,
+	//"ProtectiveFactor1": payload.ProtectiveFactor1,
+	//"ProtectiveFactor2" : payload.ProtectiveFactor2,
+	"subjectExternalId": payload.SubjectExternalID,
+	"QuestionResponses" : payload.QuestionResponses,
+	//"CompletedBy": payload.CompletedBy,
+	"Properties": payload.Properties
+}]]></dw:set-variable>
+                        </dw:transform-message>
+                        <choice doc:name="Choice">
+                            <when expression="#[flowVars.inputData.OffenderAssessmentID == null &amp;&amp; flowVars.inputData.OffenderAssessmentID.trim() != '']">
+                                <logger message="Pending Assessment Query 1 : Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where Assessment__r.Assessment_Status__c = 'Pending' and Assessment__r.Client_PID__c = '#[flowVars.inputData.subjectExternalId]' AND RecordType.Name = 'PACT Assessment'" level="INFO" doc:name="Logger" />
+                                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where Assessment__r.Assessment_Status__c = 'Pending' and Assessment__r.Client_PID__c = '#[flowVars.inputData.subjectExternalId]' AND RecordType.Name = 'PACT Assessment'" doc:name="Salesforce" />
+                            </when>
+                            <otherwise>
+                                <logger message="Assessment Query : Select id, Assessment__r.id from DEL_Assessment_Extension__c where VantagePoint_Assessment_ID__c = '#[flowVars.inputData.OffenderAssessmentID]' AND RecordType.Name = 'PACT Assessment'" level="INFO" doc:name="Logger" />
+                                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where VantagePoint_Assessment_ID__c = '#[flowVars.inputData.OffenderAssessmentID]' AND RecordType.Name = 'PACT Assessment'" doc:name="Salesforce" />
+                                <choice doc:name="Choice">
+                                    <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                        <logger level="INFO" doc:name="Logger" />
+                                    </when>
+                                    <otherwise>
+                                        <logger message="Pending Assessment Query : Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where Assessment__r.Assessment_Status__c = 'Pending' and Assessment__r.Client_PID__c = '#[flowVars.inputData.subjectExternalId]' AND RecordType.Name = 'PACT Assessment'" level="INFO" doc:name="Logger" />
+                                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where Assessment__r.Assessment_Status__c = 'Pending' and Assessment__r.Client_PID__c = '#[flowVars.inputData.subjectExternalId]' AND RecordType.Name = 'PACT Assessment'" doc:name="Salesforce" />
+                                    </otherwise>
+                                </choice>
+                            </otherwise>
+                        </choice>
+                        <choice doc:name="Choice">
+                            <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                <dw:transform-message doc:name="TM : Assessment SFId's">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"AssessmentExtensionSFId": payload.Id[0],
+	"AssessmentSFId": payload.Assessment__r.Id,
+	"Question_67_Describe__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][21].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_82_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][12].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_94_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Mental Health"][9].Responses filter ( ($.Label == "Describe:") ) map $.Response,
+	//"Question_94_Attempted_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Date of last attempt:") ) map $.Response,
+	//"Question_94_Known_Person_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Date:")  ) map $.Response,
+	"Question_86_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Mental Health"][1].Responses filter (($.Label == "Describe:") or ($.Label == "Who, when, and how:") ) map $.Response,
+	//"Question_86_Attempted_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][1].Responses filter ($.Label == "Date of last attempt:") map $.Response,
+	"Question_116_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Aggression"][4].Responses filter (($.Label == "Describe:") ) map $.Response,
+	"Question_66_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][20].Responses filter (($.Label == "Number of persons in household") or ($.Label == "Annual income") ) map $.Response,
+	"Question_85_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Describe:")) map $.Response,
+	"Question_52_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][6].Responses filter ($.Label == "Name/Relationship of relative(s):") map $.Response,
+	"Question_52_Non_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][6].Responses filter ($.Label == "Name of non-relative(s):") map $.Response,
+	"Question_21_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Education"][6].Responses filter (($.Label == "Describe impairment:")) map $.Response,
+	"Question_21_Date_of_Last_IEP__c" : flowVars.inputData.QuestionResponses["Education"][6].Responses filter (($.Label == "Date of last IEP:")) map $.Response,
+	"Question_20_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Education"][5].Responses filter (($.Response == "1") or ($.Response == "2") or ($.Response == "2 or 3") or ($.Response == "3+") or ($.Response == "More than 3")) map $.Response,
+	"Question_19_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Education"][4].Responses filter (($.Response == "1") or ($.Response == "2") or ($.Response == "3") or ($.Response == "4") or ($.Response == "5") or ($.Response == "6") or ($.Response == "7+")) map $.Response,
+	"Question_17_Describe_School_Type__c" : flowVars.inputData.QuestionResponses["Education"][2].Responses filter (($.Label == "Describe school type:")) map $.Response,
+	"Question_73_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][3].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_78_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][8].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_79_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][9].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_72_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][2].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_80_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][10].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_81_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][11].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_82_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][12].Responses filter ($.Label == "Describe:") map $.Response
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <dw:transform-message doc:name="TM : AssessmentExtension">
+                                    <dw:set-payload resource="classpath:assessmentMapping2.dwl" />
+                                </dw:transform-message>
+                                <sfdc:update-single config-ref="Salesforce__Basic_Authentication" type="DEL_Assessment_Extension__c" doc:name="Salesforce">
+                                    <sfdc:object ref="#[payload]" />
+                                </sfdc:update-single>
+                                <choice doc:name="Choice">
+                                    <when expression="#[payload != null &amp;&amp; payload.Id != null]">
+                                        <logger message="#[payload]" level="INFO" doc:name="Logger" />
+                                        <set-property propertyName="http.status" value="200" doc:name="Property" />
+                                        <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                            <add-message-property key="status" value="Y" />
+                                            <add-message-property key="message" value="#['Updated Assessment Results Successfully.']" />
+                                        </message-properties-transformer>
+                                    </when>
+                                    <otherwise>
+                                        <logger message="Error : #[payload]" level="INFO" doc:name="Logger" />
+                                        <set-property propertyName="http.status" value="304" doc:name="Property" />
+                                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                            <add-message-property key="status" value="N" />
+                                            <add-message-property key="message" value="#['Error occurred while update Assessment Results.']" />
+                                        </message-properties-transformer>
+                                    </otherwise>
+                                </choice>
+                                <dw:transform-message doc:name="TM: Update Result">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	Id: payload.Id,
+	Error: payload.errors[0].statusCode,
+	Field_Name_in_Error: payload.errors[0].fields[0],
+	Error_Description:payload.errors[0].message
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <logger level="INFO" doc:name="Logger" />
+                            </when>
+                            <otherwise>
+                                <logger message="No Pending assessment found." level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="304" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['Error occurred while update Assessment Results.']" />
+                                </message-properties-transformer>
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <logger message="Token Validation Failed." level="INFO" doc:name="Logger" />
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+                <enricher doc:name="ME: Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+                    <flow-ref name="adc_realtime_LogResponse_Sub_Flow" doc:name="adc_realtime_LogResponse_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+                    <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+                    <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+                </enricher>
+            </when>
+            <otherwise>
+                <logger message="Not a Valid IP address." level="INFO" doc:name="Logger" />
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <logger message="Assessment Results updated failed #[payload]" level="INFO" doc:name="Logger" />
+            </when>
+            <otherwise>
+                <logger message="Assessment Results updated Successfully" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="put:/assessment/riskNeedsScreenerResults/v2:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="Risk Screener Assessment Results Update process started." level="INFO" doc:name="Logger" />
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP : Set Operation details" doc:description=" Setting Operation name and Operation Filename in the Logging framework">
+            <add-message-property key="operation" value="#['Risk-Needs Screener Results']" />
+            <add-message-property key="operationFilename" value="#['risk-needs Screener']" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.userExternalId]" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" />
+        <enricher doc:name="ME : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+            <flow-ref name="adc_realtime_LogRequest_Sub_Flow" doc:name="adc_realtime_LogRequest_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+        </enricher>
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress]" level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <enricher source="#[flowVars.validToken]" target="#[flowVars.validToken]" doc:name="Message Enricher">
+                    <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                </enricher>
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <dw:transform-message doc:name="TM : Convert Input JSON to Java Map">
+                            <dw:input-payload mimeType="application/json" />
+                            <dw:set-variable variableName="inputData"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"DateCreated": payload.DateCreated, 
+	"DateCompleted": payload.DateCompleted,
+	"AssessmentTitle": payload.AssessmentType,
+	"AssessmentType": payload.AssessmentTitle,
+	"OffenderAssessmentID": payload.UserAssessmentID,
+	//"OverallRiskLevel": payload.OverallRiskLevel, 
+	//"CriminogenicNeed" : payload.CriminogenicNeed,
+	//"ProtectiveFactor": payload.ProtectiveFactor,
+	"SubjectExternalID": payload.SubjectExternalID,
+	//"CompletedBy": payload.CompletedBy,
+	"Properties": payload.Properties,
+	"QuestionResponses" : payload.QuestionResponses
+}]]></dw:set-variable>
+                        </dw:transform-message>
+                        <choice doc:name="Choice">
+                            <when expression="#[flowVars.inputData.OffenderAssessmentID == null]">
+                                <logger message="Pending Screener Query 1 : Select id from DEL_Screener__c where Status__c = 'Pending' and Client_PID__c = '#[flowVars.inputData.SubjectExternalID]' and RecordType.Name = 'Risk Screener'" level="INFO" doc:name="Logger" />
+                                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id from DEL_Screener__c where Status__c = 'Pending' and Client_PID__c = '#[flowVars.inputData.SubjectExternalID]' and RecordType.Name = 'Risk Screener'" doc:name="Salesforce" />
+                            </when>
+                            <otherwise>
+                                <logger message="Screener Query : Select id from DEL_Screener__c where Vant4gePoint_Assessment_ID__c = '#[flowVars.inputData.OffenderAssessmentID]' and RecordType.Name = 'Risk Screener'" level="INFO" doc:name="Logger" />
+                                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id from DEL_Screener__c where Vant4gePoint_Assessment_ID__c = '#[flowVars.inputData.OffenderAssessmentID]' and RecordType.Name = 'Risk Screener'" doc:name="Salesforce" />
+                                <choice doc:name="Choice">
+                                    <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                        <logger level="INFO" doc:name="Logger" />
+                                    </when>
+                                    <otherwise>
+                                        <logger message="Pending Screener Query : Select id from DEL_Screener__c where Status__c = 'Pending' and Client_PID__c = '#[flowVars.inputData.SubjectExternalID]' and RecordType.Name = 'Risk Screener'" level="INFO" doc:name="Logger" />
+                                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id from DEL_Screener__c where Status__c = 'Pending' and Client_PID__c = '#[flowVars.inputData.SubjectExternalID]' and RecordType.Name = 'Risk Screener'" doc:name="Salesforce" />
+                                    </otherwise>
+                                </choice>
+                            </otherwise>
+                        </choice>
+                        <choice doc:name="Choice">
+                            <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                <dw:transform-message doc:name="TM : Screener SFId's">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"AssessmentExtensionSFId": payload.Id[0],
+	"AssessmentSFId": payload.Assessment__r.Id,
+	"Question_26_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][3].Responses filter ($.Label == "Name/Relationship of relative(s):") map $.Response,
+	"Question_26_Non_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][3].Responses filter ($.Label == "Name of non-relative(s):") map $.Response,
+	"Question_42_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][2].Responses filter (($.Label == "Describe:") or ($.Label == "List/describe other drug use:")) map $.Response,
+	"Question_54_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Mental Health"][3].Responses filter (($.Label == "Describe:") or ($.Label == "Who and how:") ) map $.Response,
+	"Question_45_Known_Person_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Date:") ) map $.Response,
+	"Question_45_Attempted_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Date of last attempt:") ) map $.Response,
+	"Question_27_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][4].Responses filter ($.Label == "Other relative") map $.Response,
+	"Question_27_Non_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][4].Responses filter ($.Label == "Other non-relative") map $.Response,
+	"Question_42_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][1].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_43_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][2].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_47_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][6].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_48_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][7].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_49_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][8].Responses filter ($.Label == "Describe:") map $.Response
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <dw:transform-message doc:name="TM : ScreenerExtenstion">
+                                    <dw:set-payload resource="classpath:riskScreenerMapping2.dwl" />
+                                    <!--<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (standarddatetime - |PT4H| )  when  (isDateInDST(((standarddatetime - |PT4H|) ) as :date,"US/Eastern") == true) otherwise (standarddatetime - |PT5H|)
+
+{
+	"Id": payload.AssessmentExtensionSFId,
+	"Vantage_Assessment_Created_Date__c": (flowVars.inputData.CreatedDate as :datetime  + |PT5H|) when flowVars.inputData.CreatedDate != null otherwise null,
+	// as :string {format:"yyyy-MM-dd'T'HH:mm:ss.SSS"},
+	"Screener_Title__c": flowVars.inputData.AssessmentTitle,
+	"": flowVars.inputData.DateCompleted as :datetime when flowVars.inputData.DateCompleted != null otherwise null,
+	"ScreenerScreener_Completed_Date__c_Type_Case__c": flowVars.inputData.AssessmentType,
+	"Vant4gePoint_Assessment_ID__c": flowVars.inputData.OffenderAssessmentID as :string,
+	//"Completed_By__c": flowVars.inputData.CompletedBy,
+	("Overall_Level_Risk_to_Reoffend__c": flowVars.inputData.OverallRiskLevel) when flowVars.inputData.OverallRiskLevel != null and flowVars.inputData.OverallRiskLevel != '',
+	("Criminogenic_Need__c": flowVars.inputData.CriminogenicNeed) when flowVars.inputData.CriminogenicNeed != null and flowVars.inputData.CriminogenicNeed != '',
+	("Protective_Factor__c" : flowVars.inputData.ProtectiveFactor) when flowVars.inputData.ProtectiveFactor != null and flowVars.inputData.ProtectiveFactor != '',
+	"Vantage_Assessment_Status__c": "Completed"
+}]]></dw:set-payload>-->
+                                </dw:transform-message>
+                                <sfdc:update-single config-ref="Salesforce__Basic_Authentication" type="DEL_Screener__c" doc:name="Salesforce">
+                                    <sfdc:object ref="#[payload]" />
+                                </sfdc:update-single>
+                                <choice doc:name="Choice">
+                                    <when expression="#[payload != null &amp;&amp; payload.Id != null]">
+                                        <set-property propertyName="http.status" value="200" doc:name="Property" />
+                                        <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                            <add-message-property key="status" value="Y" />
+                                            <add-message-property key="message" value="#['Updated risk-needs screener Results Successfully.']" />
+                                        </message-properties-transformer>
+                                    </when>
+                                    <otherwise>
+                                        <logger message="Error : #[payload]" level="INFO" doc:name="Logger" />
+                                        <set-property propertyName="http.status" value="304" doc:name="Property" />
+                                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                            <add-message-property key="status" value="N" />
+                                            <add-message-property key="message" value="#['Error occurred while update risk-needs screener Results.']" />
+                                        </message-properties-transformer>
+                                    </otherwise>
+                                </choice>
+                                <dw:transform-message doc:name="TM: Update Result">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	Id: payload.Id,
+	Error: payload.errors[0].statusCode,
+	Field_Name_in_Error: payload.errors[0].fields[0],
+	Error_Description:payload.errors[0].message
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                            </when>
+                            <otherwise>
+                                <logger message="No Pending Assessment found." level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="304" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['Error occurred while update risk-needs screener Results.']" />
+                                </message-properties-transformer>
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <logger message="Token Validation Failed." level="INFO" doc:name="Logger" />
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+                <enricher doc:name="ME: Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+                    <flow-ref name="adc_realtime_LogResponse_Sub_Flow" doc:name="adc_realtime_LogResponse_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+                    <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+                    <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+                </enricher>
+            </when>
+            <otherwise>
+                <logger message="Not a Valid IP address." level="INFO" doc:name="Logger" />
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <logger message="Risk-Needs Screener Results updated failed #[payload]" level="INFO" doc:name="Logger" />
+            </when>
+            <otherwise>
+                <logger message="Risk-Needs Screener Results updated Successfully" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="put:/assessment/results:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="Assessment 1.1 Results Update process started." level="INFO" doc:name="Logger" />
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP : Set Operation details" doc:description=" Setting Operation name and Operation Filename in the Logging framework">
+            <add-message-property key="operation" value="#['Update M-PACT Assessment Results']" />
+            <add-message-property key="operationFilename" value="#['AssessmentResults']" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.userExternalId]" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" />
+        <enricher doc:name="ME : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+            <flow-ref name="adc_realtime_LogRequest_Sub_Flow" doc:name="adc_realtime_LogRequest_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+        </enricher>
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress] " level="INFO" doc:name="Logger" />
+        <!-- <objectstore:store config-ref="ObjectStore__Connector" key="#[dw('payload.SubjectExternalID')]" value-ref="#[payload]" doc:name="ObjectStore"/> -->
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <enricher source="#[flowVars.validToken]" target="#[flowVars.validToken]" doc:name="Message Enricher">
+                    <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                </enricher>
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <dw:transform-message doc:name="TM : Convert Input JSON to Java Map">
+                            <dw:input-payload mimeType="application/json" />
+                            <dw:set-variable variableName="inputData"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"CreatedDate": payload.DateCreated, 
+	"DateCompleted": payload.DateCompleted,
+	"AssessmentTitle": payload.AssessmentType,
+	"AssessmentType": payload.AssessmentTitle,
+	"OffenderAssessmentID": payload.UserAssessmentID,
+	"OverallRiskLevel": payload.OverallRiskLevel, 
+	//"CriminogenicNeed1" : payload.CriminogenicNeed1,
+	//"CriminogenicNeed2" : payload.CriminogenicNeed2,
+	//"ProtectiveFactor1": payload.ProtectiveFactor1,
+	//"ProtectiveFactor2" : payload.ProtectiveFactor2,
+	"subjectExternalId": payload.SubjectExternalID,
+	"QuestionResponses" : payload.QuestionResponses,
+	//"CompletedBy": payload.CompletedBy,
+	"Properties": payload.Properties
+}]]></dw:set-variable>
+                        </dw:transform-message>
+                        <choice doc:name="Choice">
+                            <when expression="#[flowVars.inputData.OffenderAssessmentID == null &amp;&amp; flowVars.inputData.OffenderAssessmentID.trim() != '']">
+                                <logger message="Pending Assessment Query 1 : Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where Assessment__r.Assessment_Status__c = 'Pending' and Assessment__r.Client_PID__c = '#[flowVars.inputData.subjectExternalId]' AND RecordType.Name = 'PACT Assessment'" level="INFO" doc:name="Logger" />
+                                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where Assessment__r.Assessment_Status__c = 'Pending' and Assessment__r.Client_PID__c = '#[flowVars.inputData.subjectExternalId]' AND RecordType.Name = 'PACT Assessment'" doc:name="Salesforce" />
+                            </when>
+                            <otherwise>
+                                <logger message="Assessment Query : Select id, Assessment__r.id from DEL_Assessment_Extension__c where VantagePoint_Assessment_ID__c = '#[flowVars.inputData.OffenderAssessmentID]' AND RecordType.Name = 'PACT Assessment'" level="INFO" doc:name="Logger" />
+                                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where VantagePoint_Assessment_ID__c = '#[flowVars.inputData.OffenderAssessmentID]' AND RecordType.Name = 'PACT Assessment'" doc:name="Salesforce" />
+                                <choice doc:name="Choice">
+                                    <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                        <logger level="INFO" doc:name="Logger" />
+                                    </when>
+                                    <otherwise>
+                                        <logger message="Pending Assessment Query : Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where Assessment__r.Assessment_Status__c = 'Pending' and Assessment__r.Client_PID__c = '#[flowVars.inputData.subjectExternalId]' AND RecordType.Name = 'PACT Assessment'" level="INFO" doc:name="Logger" />
+                                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Assessment__r.Id from DEL_Assessment_Extension__c where Assessment__r.Assessment_Status__c = 'Pending' and Assessment__r.Client_PID__c = '#[flowVars.inputData.subjectExternalId]' AND RecordType.Name = 'PACT Assessment'" doc:name="Salesforce" />
+                                    </otherwise>
+                                </choice>
+                            </otherwise>
+                        </choice>
+                        <choice doc:name="Choice">
+                            <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                <dw:transform-message doc:name="TM : Assessment SFId's">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"AssessmentExtensionSFId": payload.Id[0],
+	"AssessmentSFId": payload.Assessment__r.Id,
+	"Question_67_Describe__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][21].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_75_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][5].Responses filter ($.Label == "Describe:") map $.Response,
+	"Question_83_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Describe:") or ($.Label == "Who and how:") ) map $.Response,
+	"Question_83_Attempted_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Date of last attempt:") ) map $.Response,
+	"Question_83_Known_Person_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Date:")  ) map $.Response,
+	"Question_84_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Mental Health"][1].Responses filter (($.Label == "Describe:") or ($.Label == "Who, when, and how:") ) map $.Response,
+	"Question_84_Attempted_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][1].Responses filter ($.Label == "Date of last attempt:") map $.Response,
+	"Question_114_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Aggression"][4].Responses filter (($.Label == "Describe:") ) map $.Response,
+	"Question_66_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][20].Responses filter (($.Label == "Number of persons in household:") or ($.Label == "Income:") ) map $.Response,
+	"Question_88_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Mental Health"][5].Responses filter (($.Label == "Describe:")) map $.Response,
+	"Question_52_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][6].Responses filter ($.Label == "Name/Relationship of relative(s):") map $.Response,
+	"Question_52_Non_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][6].Responses filter ($.Label == "Name of non-relative(s):") map $.Response,
+	"Question_21_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Education"][6].Responses filter (($.Label == "Describe impairment:")) map $.Response,
+	"Question_21_Date_of_Last_IEP__c" : flowVars.inputData.QuestionResponses["Education"][6].Responses filter (($.Label == "Date of last IEP:")) map $.Response,
+	"Question_20_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Education"][5].Responses filter (($.Response == "1") or ($.Response == "2") or ($.Response == "2 or 3") or ($.Response == "3+") or ($.Response == "More than 3")) map $.Response,
+	"Question_19_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Education"][4].Responses filter (($.Response == "1") or ($.Response == "2") or ($.Response == "3") or ($.Response == "4") or ($.Response == "5") or ($.Response == "6") or ($.Response == "7+")) map $.Response,
+	"Question_17_Describe_School_Type__c" : flowVars.inputData.QuestionResponses["Education"][2].Responses filter (($.Label == "Describe school type:")) map $.Response
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <dw:transform-message doc:name="TM : AssessmentExtension">
+                                    <dw:set-payload resource="classpath:assessmentMapping.dwl" />
+                                </dw:transform-message>
+                                <sfdc:update-single config-ref="Salesforce__Basic_Authentication" type="DEL_Assessment_Extension__c" doc:name="Salesforce">
+                                    <sfdc:object ref="#[payload]" />
+                                </sfdc:update-single>
+                                <choice doc:name="Choice">
+                                    <when expression="#[payload != null &amp;&amp; payload.Id != null]">
+                                        <logger message="#[payload]" level="INFO" doc:name="Logger" />
+                                        <set-property propertyName="http.status" value="200" doc:name="Property" />
+                                        <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                            <add-message-property key="status" value="Y" />
+                                            <add-message-property key="message" value="#['Updated Assessment Results Successfully.']" />
+                                        </message-properties-transformer>
+                                    </when>
+                                    <otherwise>
+                                        <logger message="Error : #[payload]" level="INFO" doc:name="Logger" />
+                                        <set-property propertyName="http.status" value="304" doc:name="Property" />
+                                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                            <add-message-property key="status" value="N" />
+                                            <add-message-property key="message" value="#['Error occurred while update Assessment Results.']" />
+                                        </message-properties-transformer>
+                                    </otherwise>
+                                </choice>
+                                <dw:transform-message doc:name="TM: Update Result">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	Id: payload.Id,
+	Error: payload.errors[0].statusCode,
+	Field_Name_in_Error: payload.errors[0].fields[0],
+	Error_Description:payload.errors[0].message
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <logger level="INFO" doc:name="Logger" />
+                            </when>
+                            <otherwise>
+                                <logger message="No Pending assessment found." level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="304" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['Error occurred while update Assessment Results.']" />
+                                </message-properties-transformer>
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <logger message="Token Validation Failed." level="INFO" doc:name="Logger" />
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+                <enricher doc:name="ME: Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+                    <flow-ref name="adc_realtime_LogResponse_Sub_Flow" doc:name="adc_realtime_LogResponse_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+                    <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+                    <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+                </enricher>
+            </when>
+            <otherwise>
+                <logger message="Not a Valid IP address." level="INFO" doc:name="Logger" />
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <logger message="Assessment Results updated failed #[payload]" level="INFO" doc:name="Logger" />
+            </when>
+            <otherwise>
+                <logger message="Assessment Results updated Successfully" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="put:/assessment/riskNeedsScreenerResults:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="Risk Screener Assessment Results Update process started." level="INFO" doc:name="Logger" />
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP : Set Operation details" doc:description=" Setting Operation name and Operation Filename in the Logging framework">
+            <add-message-property key="operation" value="#['Risk-Needs Screener Results']" />
+            <add-message-property key="operationFilename" value="#['risk-needs Screener']" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.userExternalId]" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" />
+        <enricher doc:name="ME : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+            <flow-ref name="adc_realtime_LogRequest_Sub_Flow" doc:name="adc_realtime_LogRequest_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+        </enricher>
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress]" level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <enricher source="#[flowVars.validToken]" target="#[flowVars.validToken]" doc:name="Message Enricher">
+                    <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                </enricher>
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <dw:transform-message doc:name="TM : Convert Input JSON to Java Map">
+                            <dw:input-payload mimeType="application/json" />
+                            <dw:set-variable variableName="inputData"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"DateCreated": payload.DateCreated, 
+	"DateCompleted": payload.DateCompleted,
+	"AssessmentTitle": payload.AssessmentType,
+	"AssessmentType": payload.AssessmentTitle,
+	"OffenderAssessmentID": payload.UserAssessmentID,
+	//"OverallRiskLevel": payload.OverallRiskLevel, 
+	//"CriminogenicNeed" : payload.CriminogenicNeed,
+	//"ProtectiveFactor": payload.ProtectiveFactor,
+	"SubjectExternalID": payload.SubjectExternalID,
+	//"CompletedBy": payload.CompletedBy,
+	"Properties": payload.Properties,
+	"QuestionResponses" : payload.QuestionResponses
+}]]></dw:set-variable>
+                        </dw:transform-message>
+                        <choice doc:name="Choice">
+                            <when expression="#[flowVars.inputData.OffenderAssessmentID == null]">
+                                <logger message="Pending Screener Query 1 : Select id from DEL_Screener__c where Status__c = 'Pending' and Client_PID__c = '#[flowVars.inputData.SubjectExternalID]' and RecordType.Name = 'Risk Screener'" level="INFO" doc:name="Logger" />
+                                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id from DEL_Screener__c where Status__c = 'Pending' and Client_PID__c = '#[flowVars.inputData.SubjectExternalID]' and RecordType.Name = 'Risk Screener'" doc:name="Salesforce" />
+                            </when>
+                            <otherwise>
+                                <logger message="Screener Query : Select id from DEL_Screener__c where Vant4gePoint_Assessment_ID__c = '#[flowVars.inputData.OffenderAssessmentID]' and RecordType.Name = 'Risk Screener'" level="INFO" doc:name="Logger" />
+                                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id from DEL_Screener__c where Vant4gePoint_Assessment_ID__c = '#[flowVars.inputData.OffenderAssessmentID]' and RecordType.Name = 'Risk Screener'" doc:name="Salesforce" />
+                                <choice doc:name="Choice">
+                                    <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                        <logger level="INFO" doc:name="Logger" />
+                                    </when>
+                                    <otherwise>
+                                        <logger message="Pending Screener Query : Select id from DEL_Screener__c where Status__c = 'Pending' and Client_PID__c = '#[flowVars.inputData.SubjectExternalID]' and RecordType.Name = 'Risk Screener'" level="INFO" doc:name="Logger" />
+                                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id from DEL_Screener__c where Status__c = 'Pending' and Client_PID__c = '#[flowVars.inputData.SubjectExternalID]' and RecordType.Name = 'Risk Screener'" doc:name="Salesforce" />
+                                    </otherwise>
+                                </choice>
+                            </otherwise>
+                        </choice>
+                        <choice doc:name="Choice">
+                            <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                <dw:transform-message doc:name="TM : Screener SFId's">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"AssessmentExtensionSFId": payload.Id[0],
+	"AssessmentSFId": payload.Assessment__r.Id,
+	"Question_26_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][3].Responses filter ($.Label == "Name/Relationship of relative(s):") map $.Response,
+	"Question_26_Non_Relative_Name__c" : flowVars.inputData.QuestionResponses["Family & Social Support"][3].Responses filter ($.Label == "Name of non-relative(s):") map $.Response,
+	"Question_42_Describe__c" : flowVars.inputData.QuestionResponses["Substance Abuse"][2].Responses filter (($.Label == "Describe:") or ($.Label == "List/describe other drug use:")) map $.Response,
+	"Question_45_Additional_Answers__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Describe:") or ($.Label == "Who and how:") ) map $.Response,
+	"Question_45_Known_Person_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Date:") ) map $.Response,
+	"Question_45_Attempted_Suicide_Date__c" : flowVars.inputData.QuestionResponses["Mental Health"][0].Responses filter (($.Label == "Date of last attempt:") ) map $.Response
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <dw:transform-message doc:name="TM : ScreenerExtenstion">
+                                    <dw:set-payload resource="classpath:riskScreenerMapping.dwl" />
+                                    <!--<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (standarddatetime - |PT4H| )  when  (isDateInDST(((standarddatetime - |PT4H|) ) as :date,"US/Eastern") == true) otherwise (standarddatetime - |PT5H|)
+
+{
+	"Id": payload.AssessmentExtensionSFId,
+	"Vantage_Assessment_Created_Date__c": (flowVars.inputData.CreatedDate as :datetime  + |PT5H|) when flowVars.inputData.CreatedDate != null otherwise null,
+	// as :string {format:"yyyy-MM-dd'T'HH:mm:ss.SSS"},
+	"Screener_Title__c": flowVars.inputData.AssessmentTitle,
+	"": flowVars.inputData.DateCompleted as :datetime when flowVars.inputData.DateCompleted != null otherwise null,
+	"ScreenerScreener_Completed_Date__c_Type_Case__c": flowVars.inputData.AssessmentType,
+	"Vant4gePoint_Assessment_ID__c": flowVars.inputData.OffenderAssessmentID as :string,
+	//"Completed_By__c": flowVars.inputData.CompletedBy,
+	("Overall_Level_Risk_to_Reoffend__c": flowVars.inputData.OverallRiskLevel) when flowVars.inputData.OverallRiskLevel != null and flowVars.inputData.OverallRiskLevel != '',
+	("Criminogenic_Need__c": flowVars.inputData.CriminogenicNeed) when flowVars.inputData.CriminogenicNeed != null and flowVars.inputData.CriminogenicNeed != '',
+	("Protective_Factor__c" : flowVars.inputData.ProtectiveFactor) when flowVars.inputData.ProtectiveFactor != null and flowVars.inputData.ProtectiveFactor != '',
+	"Vantage_Assessment_Status__c": "Completed"
+}]]></dw:set-payload>-->
+                                </dw:transform-message>
+                                <sfdc:update-single config-ref="Salesforce__Basic_Authentication" type="DEL_Screener__c" doc:name="Salesforce">
+                                    <sfdc:object ref="#[payload]" />
+                                </sfdc:update-single>
+                                <choice doc:name="Choice">
+                                    <when expression="#[payload != null &amp;&amp; payload.Id != null]">
+                                        <set-property propertyName="http.status" value="200" doc:name="Property" />
+                                        <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                            <add-message-property key="status" value="Y" />
+                                            <add-message-property key="message" value="#['Updated risk-needs screener Results Successfully.']" />
+                                        </message-properties-transformer>
+                                    </when>
+                                    <otherwise>
+                                        <logger message="Error : #[payload]" level="INFO" doc:name="Logger" />
+                                        <set-property propertyName="http.status" value="304" doc:name="Property" />
+                                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                            <add-message-property key="status" value="N" />
+                                            <add-message-property key="message" value="#['Error occurred while update risk-needs screener Results.']" />
+                                        </message-properties-transformer>
+                                    </otherwise>
+                                </choice>
+                                <dw:transform-message doc:name="TM: Update Result">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	Id: payload.Id,
+	Error: payload.errors[0].statusCode,
+	Field_Name_in_Error: payload.errors[0].fields[0],
+	Error_Description:payload.errors[0].message
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                            </when>
+                            <otherwise>
+                                <logger message="No Pending Assessment found." level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="304" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['Error occurred while update risk-needs screener Results.']" />
+                                </message-properties-transformer>
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <logger message="Token Validation Failed." level="INFO" doc:name="Logger" />
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+                <enricher doc:name="ME: Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+                    <flow-ref name="adc_realtime_LogResponse_Sub_Flow" doc:name="adc_realtime_LogResponse_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+                    <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+                    <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+                </enricher>
+            </when>
+            <otherwise>
+                <logger message="Not a Valid IP address." level="INFO" doc:name="Logger" />
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <logger message="Risk-Needs Screener Results updated failed #[payload]" level="INFO" doc:name="Logger" />
+            </when>
+            <otherwise>
+                <logger message="Risk-Needs Screener Results updated Successfully" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="get:/user/profile/{userExternalId}:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="User Profile process started." level="INFO" doc:name="Logger" />
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP : Set Operation details" doc:description=" Setting Operation name and Operation Filename in the Logging framework">
+            <add-message-property key="operation" value="#['Get User Profile Information']" />
+            <add-message-property key="operationFilename" value="#['UserProfileInfo']" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.'http.uri.params'.userExternalId]" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String" doc:description="Consume Incoming HTTP Request, so that it can be logged and also can be operated" />
+        <set-payload value="#[&quot;&quot;]" doc:name="Set Payload" />
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress]" level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <logger message="User Profile Query : SELECT Person_PID__c, Person_First_Name__c, Person_Last_Name__c, Person__r.MiddleName, Business_Email__c, Phone_Number__c, Cell_Number__c, Status__c, Title__c, Vantagepoint_Permission__c, Site__c, Program__c, Person_Supervisor_PID__c FROM DEL_Person_Type__c where Person_PID__c = '#[flowVars.workerId]' AND Record_Type_Name__c = 'DSCYF Staff'" level="INFO" doc:name="Logger" />
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Person_PID__c, Person_First_Name__c, Person_Last_Name__c, Person__r.MiddleName, Business_Email__c, Phone_Number__c, Cell_Number__c, Status__c, Title__c, Vantagepoint_Permission__c, Site__c, Program__c, Person_Supervisor_PID__c FROM DEL_Person_Type__c where Person_PID__c = '#[flowVars.workerId]' AND Record_Type_Name__c = 'DSCYF Staff'" doc:name="Salesforce : User Profile Information from FOCUS" doc:description="Salesforce Query Operation to Get User Profile Details using PID and Person Type Staff" />
+                        <choice doc:name="Choice">
+                            <when expression="#[payload == null || payload.size() == 0]">
+                                <logger message="No user was found for the external user ID" level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="204" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['No user was found for the external user ID']" />
+                                </message-properties-transformer>
+                            </when>
+                            <when expression="#[payload != null &amp;&amp; payload.size() &gt; 1]">
+                                <logger message="More than 1 user was found with the user external ID. The system only expects and requires 1 user for an external ID." level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="300" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" />
+                                <message-properties-transformer doc:name="MP : set output values" scope="invocation">
+                                    <add-message-property key="status" value="#['N']" />
+                                    <add-message-property key="message" value="#['More than 1 user was found with the user external ID. The system only expects and requires 1 user for an external ID.']" />
+                                </message-properties-transformer>
+                            </when>
+                            <otherwise>
+                                <logger message="User profile found the data is returned as a JSON object" level="INFO" doc:name="Logger" />
+                                <dw:transform-message doc:name="TM : User Profile Information">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+				%output application/json
+				%var statusMap = {
+					"Active" : "1",
+					"Inactive" : "0"
+				}
+				---
+				{
+					"UserPermissionGroup": payload[0].Vantagepoint_Permission__c,
+					"FirstName": payload[0].Person_First_Name__c,
+					"LastName": payload[0].Person_Last_Name__c,
+					"StatusID": statusMap[(payload[0].Status__c default 0)] default 0,
+					"PositionTitle": payload[0].Title__c,
+					"EmailAddress": payload[0].Business_Email__c,
+					"Phone": payload[0].Phone_Number__c when (payload[0].Phone_Number__c != null) otherwise (payload[0].Cell_Number__c when (payload[0].Cell_Number__c != null) otherwise null)
+				}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <object-to-string-transformer doc:name="Object to String" mimeType="application/json" />
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+                <logger message="User Profile retrieval process failed #[payload]" level="INFO" doc:name="Logger" />
+            </when>
+            <otherwise>
+                <logger message="User profile retrieval process Success" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="get:/subject/profile/{subjectExternalId}:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="Subject Profile process started." level="INFO" doc:name="Logger" />
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP : Set Operation details" doc:description=" Setting Operation name and Operation Filename in the Logging framework">
+            <add-message-property key="operation" value="#['Get Subject Profile Information']" />
+            <add-message-property key="operationFilename" value="#['SubjectProfileInfo']" />
+            <add-message-property key="subjectExternalId" value="#[message.inboundProperties.'http.uri.params'.subjectExternalId]" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.userExternalId]" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String" doc:description="Consume Incoming HTTP Request, so that it can be logged and also can be operated" />
+        <set-payload value="#[&quot;&quot;]" doc:name="Set Payload" />
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress]" level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <logger message="Subject Profile Query : SELECT DEL_PID__c, FirstName, MiddleName, LastName, Birthdate, DEL_DYRS_Status__c, DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_Gender__c, HomePhone, DEL_Cellphone1_Text__c, DEL_Cellphone2_Text__c, (SELECT Id, Address_Type__c, Street_1__c, Street_2__c, City__c, State__c, ZIP__c, County__c  FROM Person_Address__r WHERE Address_Type__c IN('Home', 'Current') AND status__c = 'Active' order by Address_Type__c DESC LIMIT 1), (SELECT Id, Edu_Last_Grade_Completed__c, Employer_Name__c, Info_Occupation__c FROM Person_Type__r WHERE Record_Type_Name__c = 'Client') from Contact where DEL_PID__c = '#[flowVars.subjectExternalId]'" level="INFO" doc:name="Logger" />
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT DEL_PID__c, FirstName, MiddleName, LastName, Birthdate, DEL_DYRS_Status__c, DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_Gender__c, HomePhone, DEL_Cellphone1_Text__c, DEL_Cellphone2_Text__c, (SELECT Id, Address_Type__c, Street_1__c, Street_2__c, City__c, State__c, ZIP__c, County__c  FROM Person_Address__r WHERE Address_Type__c IN('Home', 'Current') AND status__c = 'Active' order by Address_Type__c DESC LIMIT 1), (SELECT Id, Edu_Last_Grade_Completed__c, Employer_Name__c, Info_Occupation__c FROM Person_Type__r WHERE Record_Type_Name__c = 'Client') from Contact where DEL_PID__c = '#[flowVars.subjectExternalId]'" doc:name="Salesforce : Subject Profile Information from FOCUS" doc:description="Salesforce Query Operation to Get User Profile Details using PID and Person Type Staff" />
+                        <choice doc:name="Choice">
+                            <when expression="#[payload == null || payload.size() == 0]">
+                                <logger message="No subject was found for the provided subjectExternalID" level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="204" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['No subject was found for the provided subjectExternalID']" />
+                                </message-properties-transformer>
+                            </when>
+                            <when expression="#[payload != null &amp;&amp; payload.size() &gt; 1]">
+                                <logger message="More than 1 subject was found with the provided subjectExternalID. The system only expects and requires 1 subject for an external ID." level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="300" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['More than 1 subject was found with the provided subjectExternalID. The system only expects and requires 1 subject for an external ID.']" />
+                                </message-properties-transformer>
+                            </when>
+                            <otherwise>
+                                <flow-ref name="subject-profile-support-inofrmation" doc:name="subject-profile-support-inofrmation" />
+                                <dw:transform-message doc:name="TM : Subject Profile Information">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+				%output application/json
+				%var GenderMap = {
+					"Female" : "F",
+					"Male" : "M"
+				}
+				%var statusMap = {
+					"Active" : "1",
+					"Inactive" : "0"
+				}
+				%var RaceMap = {
+					"N/A, Abandoned, Unable to Determine, Unknown" : "0",
+					"Other" : "1",
+					"White" : "2",
+					"Black or African American" : "3",
+					"American Indian or Alaska Native" : "4",
+					"Asian" : "5",
+					"Native Hawaiian or Other Pacific Islander" : "6",
+					"Hispanic or Latino" : "7"
+				}
+				---
+				{
+					"FirstName": payload[0].FirstName,
+					"LastName": payload[0].LastName,
+					"DOB": (payload[0].Birthdate as :date as :string {format : "MM/dd/yyyy"}) when (payload[0].Birthdate != null) otherwise null,
+					"Status" : statusMap[(payload[0].DEL_DYRS_Status__c default 0)] default 0,
+					"Race" : RaceMap[(payload[0].DEL_Race_Primary__c default 0)] default 0	,
+					"Ethnicity": payload[0].DEL_Ethnicity__c,
+					"Gender": ((GenderMap[(payload[0].DEL_Gender__c)]) default null) when (payload[0].DEL_Gender__c != null) otherwise null,
+					//"AddressType" : payload[0].Person__r.DEL_Person_Home_Address__r.Address_Type__c when (payload[0].Person__r.DEL_Person_Home_Address__r.Address_Type__c != null) otherwise null,
+					"Address1":  ( payload[0].Person_Address__r[0].Street_1__c ) when ((payload[0].Person_Address__r != null) and ((sizeOf payload[0].Person_Address__r) > 0) ) otherwise null,
+					"Address2": ( payload[0].Person_Address__r[0].Street_2__c ) when ((payload[0].Person_Address__r != null) and ((sizeOf payload[0].Person_Address__r) > 0) ) otherwise null,
+					"City": ( payload[0].Person_Address__r[0].City__c ) when ((payload[0].Person_Address__r != null) and ((sizeOf payload[0].Person_Address__r) > 0) ) otherwise null,
+					"State": ( payload[0].Person_Address__r[0].State__c ) when ((payload[0].Person_Address__r != null) and ((sizeOf payload[0].Person_Address__r) > 0) ) otherwise null,
+					"Zip": ( payload[0].Person_Address__r[0].ZIP__c ) when ((payload[0].Person_Address__r != null) and ((sizeOf payload[0].Person_Address__r) > 0) ) otherwise null,
+					"County": (payload[0].Person_Address__r[0].County__c) when ((payload[0].Person_Address__r != null) and ((sizeOf payload[0].Person_Address__r) > 0) ) otherwise null,
+					"Phone" : payload[0].HomePhone when payload[0].HomePhone != null otherwise (payload[0].DEL_Cellphone1_Text__c when payload[0].DEL_Cellphone1_Text__c != null otherwise null),
+					"HairColor": flowVars.physicalAttributes.Hair_color__c,
+					"EyeColor": flowVars.physicalAttributes.Eye_Color__c,
+					"GED" : (payload[0].Person_Type__r[0].Edu_Last_Grade_Completed__c) when ((payload[0].Person_Type__r != null) and ((sizeOf payload[0].Person_Type__r) > 0) ) otherwise null ,
+					"OffenderSite": [{
+						"SiteID": flowVars.placementDetails.Provider_ID__c when flowVars.placementDetails != null otherwise null,
+						"SiteName": flowVars.placementDetails.Last_Name_Organization_Name_No_Drilldown__c when flowVars.placementDetails != null otherwise null,
+						"SiteType": flowVars.providerAddress.Address_Type__c,
+						"SiteAddressLine1": flowVars.providerAddress.Street_1__c,
+						"SiteAddressLine2": flowVars.providerAddress.Street_2__c,
+						"SiteCity": flowVars.providerAddress.City__c,
+						"SiteState": flowVars.providerAddress.State__c,
+						"SiteZip": flowVars.providerAddress.ZIP__c
+					}],
+					"ExpirationDate": flowVars.courtOrderDetails.Case_Legal_Statuses__r[0].Cur_Max_Discharge_Date__c when flowVars.courtOrderDetails.Case_Legal_Statuses__r != null otherwise null,
+					"PendingCharges" : flowVars.cjisCharges.CJIS_Charges__r[0].Final_Disp_Literal__c when flowVars.cjisCharges != null and flowVars.cjisCharges.CJIS_Charges__r != null otherwise null,
+					"SecurityThreatGroup": {
+						"SecurityThreatGroupName": flowVars.placementDetails.Risk_Level__c when flowVars.placementDetails != null otherwise null,
+						"SecurityThreatGroupRank": flowVars.placementDetails.Risk_Sub_Level__c when flowVars.placementDetails != null otherwise null,
+						"SecurityThreatGroupStatusDate": flowVars.placementDetails.Placement_Start_Date__c when flowVars.placementDetails != null otherwise null
+					},
+					"SupervisionLevel": {
+						"SupervisionLevel": flowVars.courtOrderDetails.Court_Orders__r[0].Level__c when flowVars.courtOrderDetails.Court_Orders__r != null otherwise flowVars.courtOrderDetails.Case_Legal_Statuses__r[0].Legal_Status_Level__c when flowVars.courtOrderDetails.Case_Legal_Statuses__r != null otherwise null
+					},
+					"ISCSentences": flowVars.iscSentences default [] map {
+						"Jurisdiction": $.Sending_State__c,
+						"ISCStatus": $.Status__c,
+						"CaseYear": ((trim $.Case_Open_Date__c) splitBy "-")[0] when $.Case_Open_Date__c != null otherwise null,
+						"ExpirationDate": $.Quarterly_Reports__r[0].Expiration_Date__c when $.Quarterly_Reports__r != null otherwise null
+					},
+					"Disciplinaries": flowVars.courtOrderDetails.Facility_Sanction__r default [] map {
+						"DisciplinaryType": $.Sanction_Type__c,
+						"DispositionDate": $.Date_Reviewed__c
+					},
+					"Employment": ([{
+						"EmployerName": payload[0].Person_Type__r[0].Employer_Name__c,
+						"Occupation": payload[0].Person_Type__r[0].Info_Occupation__c
+					}]) when ((payload[0].Person_Type__r != null) and ((sizeOf payload[0].Person_Type__r) > 0)) otherwise null
+				}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <logger message="Subject profile found the data is returned as a JSON object" level="INFO" doc:name="Logger" />
+                                <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <object-to-string-transformer doc:name="Object to String" mimeType="application/json" />
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+            </when>
+            <otherwise>
+                <logger message="Subject profile retrieval process Success" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <sub-flow name="subject-profile-support-inofrmation">
+        <enricher source="#[dw('payload default {}')]" target="#[flowVars.physicalAttributes]" doc:name="ME :Physical Attributes">
+            <sfdc:query-single config-ref="Salesforce__Basic_Authentication" query="SELECT Eye_Color__c, Hair_color__c, Height__c, Weight__c, Identifying_Scars_Marks_Tattoos__c FROM DEL_Physical_Attributes__c WHERE Person_Type__r.Person__r.DEL_PID__c = '#[flowVars.subjectExternalId]' AND Division__c = 'DYRS' Order by CreatedDate DESC LIMIT 1" doc:name="Salesforce" />
+        </enricher>
+        <logger message="SubJect Profile : Physical Attributes retrieved." level="INFO" doc:name="Logger" />
+        <enricher source="#[dw('payload[0] default {}')]" target="#[flowVars.placementDetails]" doc:name="ME : Placement Details">
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Provider_ID__c, Last_Name_Organization_Name_No_Drilldown__c, Risk_Level__c, Risk_Sub_Level__c, Placement_Start_Date__c, Placement_Start_Date_Report__c, Placement_Start_Date_Division_Wide__c FROM DEL_Placement__c WHERE Case_Number__r.Client_Name_Lk__r.DEL_PID__c = '#[flowVars.subjectExternalId]' AND Placement_Status__c = 'Admitted' limit 1" doc:name="Salesforce" />
+        </enricher>
+        <logger message="SubJect Profile : Placement Details retrieved.  SELECT Id, Address_Type__c, Street_1__c, Street_2__c, City__c, State__c, ZIP__c, County__c FROM DEL_Provider_Address__c WHERE Provider__r.DEL_Provider_ID__c = '#[flowVars.placementDetails.Provider_ID__c]' AND Status__c = 'Active' AND Address_Type__c = 'Site' Order by CreatedDate DESC LIMIT 1" level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.placementDetails == null || flowVars.placementDetails.Provider_ID__c == null]">
+                <set-variable variableName="providerAddress" value="#[dw('{}')]" mimeType="application/java" doc:name="Variable" />
+            </when>
+            <otherwise>
+                <enricher source="#[dw('payload[0] default {}')]" target="#[flowVars.providerAddress]" doc:name="ME : Provider Address">
+                    <sfdc:query-single config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Address_Type__c, Street_1__c, Street_2__c, City__c, State__c, ZIP__c, County__c FROM DEL_Provider_Address__c WHERE Provider__r.DEL_Provider_ID__c = '#[flowVars.placementDetails.Provider_ID__c]' AND Status__c = 'Active' AND Address_Type__c = 'Site' Order by CreatedDate DESC LIMIT 1" doc:name="Salesforce" />
+                </enricher>
+                <logger message="SubJect Profile : Provider Address retrieved." level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+        <enricher source="#[dw('payload[0] default {}')]" target="#[flowVars.courtOrderDetails]" doc:name="ME : Court Order Details">
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Client_Name_Lk__r.DEL_PID__C, (SELECT Id, Level__c, Court_County__c FROM Court_Orders__r order by Order_Date__c DESC LIMIT 1), (SELECT Id, Cur_Max_Discharge_Date__c, Legal_Status_Level__c FROM Case_Legal_Statuses__r Order By Effective_Date__c DESC LIMIT 1), (SELECT Id, Sanction_Type__c, Date_Reviewed__c FROM Facility_Sanction__r) FROM DEL_Case__c WHERE Client_Name_Lk__r.DEL_PID__C = '#[flowVars.subjectExternalId]' AND Division__c = 'DYRS' AND Status__c = 'Open' Order By Case_Open_Date__c DESC LIMIT 1" doc:name="Salesforce" />
+        </enricher>
+        <logger message="SubJect Profile : Court Order Details retrieved." level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.courtOrderDetails == null || flowVars.courtOrderDetails.Case_Legal_Statuses__c == null]">
+                <set-variable variableName="cjisCharges" value="#[dw('{}')]" mimeType="application/java" doc:name="Variable" />
+            </when>
+            <otherwise>
+                <enricher source="#[dw('payload[0] default {}')]" target="#[flowVars.cjisCharges]" doc:name="ME : CJIS Charges">
+                    <sfdc:query-single config-ref="Salesforce__Basic_Authentication" query="SELECT Id, (SELECT Id, Final_Disp_Literal__c FROM CJIS_Charges__r limit 1) FROM DEL_Case_Legal_Status__c WHERE Id = '#[flowVars.CourtOrderDetails.Case_Legal_Statuses__r[0].Id]'" doc:name="Salesforce" />
+                </enricher>
+                <logger message="SubJect Profile : CJIS Charges retrieved." level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+        <enricher source="#[dw('payload default [{}]')]" target="#[flowVars.iscSentences]" doc:name="ME : ISC Sentences">
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Sending_State__c, Status__c, Case_Open_Date__c, (SELECT Id, Expiration_Date__c FROM Quarterly_Reports__r where Status__c = 'Completed' order by CreatedDate DESC limit 1), Client_Name_Lk__r.DEL_PID__C  FROM DEL_Case__c WHERE Client_Name_Lk__r.DEL_PID__C = '#[flowVars.subjectExternalId]' AND Division__c = 'DYRS' AND Case_Type__c = 'DYRS IC Treatment' Order By Case_Open_Date__c DESC" doc:name="Salesforce" />
+        </enricher>
+        <logger message="SubJect Profile : ISC Sentences retrieved." level="INFO" doc:name="Logger" />
+    </sub-flow>
+    <flow name="get:/ccr/sentences/{subjectExternalId}:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="CCR Sentences process started." level="INFO" doc:name="Logger" />
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP : Set Operation details" doc:description=" Setting Operation name and Operation Filename in the Logging framework">
+            <add-message-property key="operation" value="#['Get Sentences Information']" />
+            <add-message-property key="operationFilename" value="#['SentencesInfo']" />
+            <add-message-property key="subjectExternalId" value="#[message.inboundProperties.'http.uri.params'.subjectExternalId]" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.userExternalId]" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String" doc:description="Consume Incoming HTTP Request, so that it can be logged and also can be operated" />
+        <set-payload value="#[&quot;&quot;]" doc:name="Set Payload" />
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress]" level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <logger message="CCR Sentence Query : SELECT Court_Order__r.Case__r.Client_Name_Lk__r.DEL_PID__c, DUC__c, Sentence_Date__c, Name, Court_Order__r.Name, Court_Order__r.Suspended_For__c, Court_Order__r.Level__c, Court_Order__r.Disposition_Type__c, Court_Order__r.State_List__c, Court_Order__r.Court_County__c, Court_Order__r.Court_Name__c, Court_Order__r.Judge__c,Court_Order__r.Other_Judge__c   FROM DEL_Charges_Table__c WHERE ( Court_Order__r.Case__r.Client_Name_Lk__r.DEL_PID__c = '#[flowVars.subjectExternalId]' OR Court_Order__r.Diversion__r.Person_Look_up__r.DEL_PID__c = '#[flowVars.subjectExternalId]') AND  Sentence_Date__c != null  AND (not Court_Order__r.Case__r.Expungement_Warning__c like'%EXPUNGED%') AND Court_Order__r.Court_Order_Status__c in ('Completed', 'Pending')" level="INFO" doc:name="Logger" />
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Sentence Information from FOCUS" doc:description="Salesforce Query Operation to Get User Profile Details using PID and Person Type Staff" query="SELECT Court_Order__r.Case__r.Client_Name_Lk__r.DEL_PID__c, DUC__c, Sentence_Date__c, Name, Court_Order__r.Name, Court_Order__r.Suspended_For__c, Court_Order__r.Level__c, Court_Order__r.Disposition_Type__c, Court_Order__r.State_List__c, Court_Order__r.Court_County__c, Court_Order__r.File_Number__c, Court_Order__r.Court_Name__c, Court_Order__r.Judge__c, Court_Order__r.Other_Judge__c, Sentence__c FROM DEL_Charges_Table__c WHERE ( Court_Order__r.Case__r.Client_Name_Lk__r.DEL_PID__c = '#[flowVars.subjectExternalId]' OR Court_Order__r.Diversion__r.Person_Look_up__r.DEL_PID__c = '#[flowVars.subjectExternalId]') AND  Sentence_Date__c != null AND (not Court_Order__r.Case__r.Expungement_Warning__c like'%EXPUNGED%') AND Court_Order__r.Court_Order_Status__c in ('Completed', 'Pending')" />
+                        <choice doc:name="Choice">
+                            <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                <logger message="CCR sentences were found and returned as an array for JSON SentenceV2DTO objects" level="INFO" doc:name="Logger" />
+                                <dw:transform-message doc:name="TM : Sentence Information">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+				%output application/json
+				---
+				payload map {
+					"SentenceExternalId": ($.Court_Order__r.Name default "") ++ "-" ++ ($.DUC__c default ""),
+					"Source": ($.Court_Order__r.Court_County__c default "") ++ "-" ++ ($.Court_Order__r.Court_Name__c default ""),
+					"SentenceDate": ($.Sentence_Date__c as :string) when ($.Sentence_Date__c != null) otherwise null,
+					"Type": "Juvenile",
+					"SentenceType": ($.Court_Order__r.Level__c) when (($.Court_Order__r.Suspended_For__c default "") == "true") otherwise ($.Court_Order__r.Disposition_Type__c),
+					"State": $.Court_Order__r.State_List__c,
+					"County": $.Court_Order__r.Court_County__c,
+					//"CaseNumber": $.Court_Order__r.File_Number__c,
+					"CaseNumber": $.DUC__c,
+					"SentenceCourt": $.Court_Order__r.Court_Name__c,
+					"SentenceJudge": ($.Court_Order__r.Judge__c) when (($.Court_Order__r.Judge__c != null) and ($.Court_Order__r.Judge__c != "Others") ) otherwise  ($.Court_Order__r.Other_Judge__c),
+					"SentenceVerified": "Y" when $.Sentence_c == "true" otherwise "N" //Check the status
+				}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <object-to-string-transformer doc:name="Object to String" mimeType="application/json" />
+                            </when>
+                            <otherwise>
+                                <logger message="No CCR sentence was found for the subjectExternalId" level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="204" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['No CCR sentence was found for the subjectExternalId']" />
+                                </message-properties-transformer>
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+                <logger message="CCR sentence retrieval process failed #[payload]" level="INFO" doc:name="Logger" />
+            </when>
+            <otherwise>
+                <logger message="CCR sentence retrieval process Success" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="get:/ccr/offensesWithDispo/{subjectExternalId}:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="CCR Offenses process started. Input : #[message.inboundProperties.'http.uri.params'.subjectExternalId]" level="INFO" doc:name="Logger" />
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP : Set Operation details" doc:description=" Setting Operation name and Operation Filename in the Logging framework">
+            <add-message-property key="operation" value="#['Get Offenses Information']" />
+            <add-message-property key="operationFilename" value="#['OffensesInfo']" />
+            <add-message-property key="subjectExternalId" value="#[message.inboundProperties.'http.uri.params'.subjectExternalId]" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.userExternalId]" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String" doc:description="Consume Incoming HTTP Request, so that it can be logged and also can be operated" />
+        <set-payload value="#[&quot;&quot;]" doc:name="Set Payload" />
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress]" level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <logger message="CCR Offesnse Query : SELECT Court_Order__r.Case__r.Client_Name_Lk__r.DEL_PID__c, Sentence_Date__c, Adjudication_Date__c, Name, Court_Order__r.Name, Adjudicated_Offense__c, Adjudicated_Offense__r.Short_Description__c, Adjudicated_Offense__r.Title__c, Adjudicated_Offense__r.Section__c, Adjudicated_Offense__r.Sub_Section__c, Adjudicated_Offense__r.Class__c, Adjudicated_Offense__r.Victim_Notification__c, Adjudicated_Offense__r.Name, Date_of_Occurrence__c, Court_Order__r.Disposition_Type__c, DUC__c, Adjudication__c, Court_Order_Type__c FROM DEL_Charges_Table__c WHERE ( Court_Order__r.Case__r.Client_Name_Lk__r.DEL_PID__c = '#[flowVars.subjectExternalId]' OR Court_Order__r.Diversion__r.Person_Look_up__r.DEL_PID__c = '#[flowVars.subjectExternalId]') AND Court_Order__r.Court_Order_Status__c in ('Completed', 'Pending') AND Court_Order__r.Order_Type__c IN ('Adjudicatory', 'Arbitration', 'Amenability','Sentence Review', 'Sentencing', 'Violation of Probation','Arraignment','Case Review','Diversion','Interstate Compact', 'Preliminary','Probation Before Adjudication','Civil Citation') AND (not Court_Order__r.Case__r.Expungement_Warning__c like'%EXPUNGED%')" level="INFO" doc:name="Logger" />
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Query Offenses from FOCUS" doc:description="Salesforce Query Operation to Get Offenses Details using PID " query="SELECT Court_Order__r.Case__r.Client_Name_Lk__r.DEL_PID__c, Sentence_Date__c, Adjudication_Date__c, Name, Court_Order__r.Name, Adjudicated_Offense__c, Adjudicated_Offense__r.Short_Description__c, Adjudicated_Offense__r.Title__c, Adjudicated_Offense__r.Section__c, Adjudicated_Offense__r.Sub_Section__c, Adjudicated_Offense__r.Class__c, Adjudicated_Offense__r.Victim_Notification__c, Adjudicated_Offense__r.Name, Date_of_Occurrence__c, Court_Order__r.Disposition_Type__c, DUC__c, Adjudication__c, Court_Order_Type__c FROM DEL_Charges_Table__c WHERE ( Court_Order__r.Case__r.Client_Name_Lk__r.DEL_PID__c = '#[flowVars.subjectExternalId]' OR Court_Order__r.Diversion__r.Person_Look_up__r.DEL_PID__c = '#[flowVars.subjectExternalId]')  AND Court_Order__r.Court_Order_Status__c in ('Completed', 'Pending') AND Court_Order__r.Order_Type__c IN ('Adjudicatory', 'Arbitration', 'Amenability','Sentence Review', 'Sentencing', 'Violation of Probation','Arraignment','Case Review','Diversion','Interstate Compact', 'Preliminary','Probation Before Adjudication','Civil Citation') AND (not Court_Order__r.Case__r.Expungement_Warning__c like'%EXPUNGED%')" />
+                        <choice doc:name="Choice">
+                            <when expression="#[payload != null &amp;&amp; payload.size() &gt; 0]">
+                                <logger message="CCR offenses were found and returned as an array for JSON OffenseDTO objects" level="INFO" doc:name="Logger" />
+                                <dw:transform-message doc:name="TM : Offense Information">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+				%output application/json
+				%var DispositionType = {
+					"Level I" : "Probation with Parent",
+					"Level II" :  "Probation with DYRS / Sending State",
+					"Level III" : "Probation with DYRS / Sending State",
+					"Level IV Staff Secure Commitment" : "Commitment",
+					"Released" : "",
+					"Arbitration" : "Diversion / Arbitration",
+					"Nonsecure Detention" : "",
+					"Secure Detention" : "",
+					"Level 5 Secure Care Committement" : "Committement"
+				}
+				---
+				payload map {
+				
+					"SentenceExternalId": ($.Court_Order__r.Name default "") ++ "-" ++ ($.DUC__c default ""),
+					"OffenseExternalId": (($.Adjudication_Date__c as :date as :string {format : "MM/dd/yyyy"} ) when ($.Adjudication_Date__c != null) otherwise "" ) ++ "-" ++ ($.Name default "") ++ "-" ++ ($.Court_Order__r.Name default ""),
+					"OffenseLegalCodeExternalId": $.Adjudicated_Offense__r.Short_Description__c,
+					"OffenseTitle": $.Adjudicated_Offense__r.Name,
+					"OffenseCode": "DE" ++ ":" ++ ($.Adjudicated_Offense__r.Title__c default "") ++ ":" ++ ($.Adjudicated_Offense__r.Section__c default "") ++ ":" ++ ($.Adjudicated_Offense__r.Sub_Section__c default "") ++ ":" ++ ($.Adjudicated_Offense__r.Class__c[0] when ($.Adjudicated_Offense__r.Class__c != null) otherwise "" ) ++ ":" ++  ($.Adjudicated_Offense__r.Class__c[1..-1] when ($.Adjudicated_Offense__r.Class__c != null) otherwise "" ),
+					"DomesticViolence": $.Adjudicated_Offense__r.Victim_Notification__c, //ig
+					"IsAssaultOffense": "",//$.Adjudicated_Offense__c
+					"Qualifier": ("ATTEMPT" when ($.Adjudicated_Offense__r.Name contains "ATTEMPT") otherwise (
+										"CONSPIRACY" when ($.Adjudicated_Offense__r.Name contains "CONSPIRACY" ) otherwise (
+											"SOLICITATION" when ($.Adjudicated_Offense__r.Name contains "SOLICITATION" ) otherwise (
+												"ACCOMPLICE" when ($.Adjudicated_Offense__r.Name contains "ACCOMPLICE" ) otherwise (
+													"COMPLICITY" when ($.Adjudicated_Offense__r.Name contains "COMPLICITY" ) otherwise "NONE" 
+												)
+											)
+										)
+									)
+								) when ($.Adjudicated_Offense__r.Name != null) otherwise null,
+					"Enhancement": "None",
+					"ArrestDate": ($.Date_of_Occurrence__c as :date as :string {format : "MM/dd/yyyy"} ) when ($.Date_of_Occurrence__c != null) otherwise null,
+					"ConvictionDate" : ($.Adjudication_Date__c as :date as :string {format : "MM/dd/yyyy"} ) when ($.Adjudication_Date__c != null) otherwise null,
+					"ConvictionOffense" : $.Adjudicated_Offense__r.Name,
+					//"DispositionDate" : ($.Adjudication_Date__c as :date as :string {format : "MM/dd/yyyy"} ) when ($.Adjudication_Date__c != null) otherwise null,
+					"DispositionDate" : ($.Sentence_Date__c as :string) when ($.Sentence_Date__c != null) otherwise null,
+					"RecordDispostion": $.Adjudication__c
+				}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <object-to-string-transformer doc:name="Object to String" mimeType="application/json" />
+                            </when>
+                            <otherwise>
+                                <logger message="No CCR offense was found for the subjectExternalId" level="INFO" doc:name="Logger" />
+                                <set-property propertyName="http.status" value="204" doc:name="Property" />
+                                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                                    <add-message-property key="status" value="N" />
+                                    <add-message-property key="message" value="#['No CCR offense was found for the subjectExternalId']" />
+                                </message-properties-transformer>
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+                <logger message="CCR Offense retrieval request status : #[payload]" level="INFO" doc:name="Logger" />
+            </when>
+            <otherwise>
+                <logger message="CCR Offense retrieval process Success" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="get:/user/validateToken:dss_adc_solr_api-config">
+        <http:basic-security-filter realm="mule-realm" />
+        <logger message="Valiate Token process started." level="INFO" doc:name="Logger" />
+        <message-properties-transformer scope="invocation" doc:name="MP : Set Operation details">
+            <add-message-property key="operation" value="#['Validate Token']" />
+            <add-message-property key="operationFilename" value="#['ValidateToken']" />
+            <add-message-property key="tokenId" value="#[message.inboundProperties.tokenId.replaceAll(' ','+')]" />
+            <add-message-property key="workerId" value="#[message.inboundProperties.userExternalId]" />
+            <add-message-property key="requestIpAddress" value="#[message.inboundProperties.'X-Forwarded-For']" />
+            <add-message-property key="allowedIpAddress" value="${vantage.ipAddress}" />
+        </message-properties-transformer>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String" doc:description="Consume Incoming HTTP Request, so that it can be logged and also can be operated" />
+        <logger message="requestIpAddress : #[flowVars.requestIpAddress]  AllowedIpAddress : #[flowVars.allowedIpAddress]" level="INFO" doc:name="Logger" />
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.allowedIpAddress.contains(flowVars.requestIpAddress)]">
+                <flow-ref name="token-validation-process" doc:name="token-validation-process" />
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.validToken]">
+                        <set-property propertyName="http.status" value="200" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Success']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="Y" />
+                            <add-message-property key="message" value="#['Valid Token']" />
+                        </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <set-property propertyName="http.status" value="401" doc:name="Property" />
+                        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                        <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                            <add-message-property key="status" value="N" />
+                            <add-message-property key="message" value="#['Authentication Error or Invalid Token. Please contact DE FOCUS Liaison.']" />
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <set-property propertyName="http.status" value="401" doc:name="Property" />
+                <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+                <message-properties-transformer scope="invocation" doc:name="MP : set output values">
+                    <add-message-property key="status" value="N" />
+                    <add-message-property key="message" value="#['Authentication Error or Invalid Client. Please contact DE FOCUS Liaison.']" />
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.recStatus == 'Error']">
+                <set-payload value="{&quot;status&quot; : &quot;#[flowVars.status]&quot;,  &quot;message&quot;: &quot;#[flowVars.message]&quot; }" doc:name="Set Payload" />
+                <logger message="Validate token process failed #[payload]" level="INFO" doc:name="Logger" />
+            </when>
+            <otherwise>
+                <logger message="Validate token process Successfully" level="INFO" doc:name="Logger" />
+            </otherwise>
+        </choice>
+    </flow>
+    <sub-flow name="token-validation-process">
+        <logger message="Validate Token Query : SELECT Id FROM User WHERE DEL_PID__c='#[flowVars.workerId]' AND DEL_Authentication_Token__c = '#[flowVars.tokenId]' AND DEL_Authentication_Token_End_Date__c &gt;= #[server.dateTime]" level="INFO" doc:name="Logger" />
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id FROM User WHERE DEL_PID__c='#[flowVars.workerId]' AND DEL_Authentication_Token__c = '#[flowVars.tokenId]' AND DEL_Authentication_Token_End_Date__c &gt;= #[server.dateTime]" doc:name="Salesforce" />
+        <choice doc:name="Choice">
+            <when expression="#[payload.size() &gt; 0]">
+                <set-variable variableName="validToken" value="#['true']" doc:name="Variable" />
+            </when>
+            <otherwise>
+                <set-variable variableName="validToken" value="#['false']" doc:name="Variable" />
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="adc_realtime_LogRequest_Sub_Flow">
+        <choice doc:name="Choice">
+            <when expression="#[payload != null &amp;&amp; payload.trim() != '']">
+                <set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="SV : Store Request Payload in Transaction Attachment" doc:description="Store Request Payload in Transaction Attachment" />
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF043&quot;, &quot;InterfaceName&quot;: &quot;ADC Assessments&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;#[flowVars.operationFilename + &quot;_&quot; + dw('payload.SubjectExternalID')]_Request&quot;,&quot;CompletedExtension&quot;:&quot;json&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;#[flowVars.operation]&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}" mimeType="application/json" doc:name="Set Payload for Logging FW" doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+                <message-properties-transformer overwrite="true" scope="session" doc:name="MP : Delete Transattachment" doc:description=" Delete Transattachment, so that it can't be used again for logging">
+                    <delete-message-property key="TransAttachment" />
+                </message-properties-transformer>
+            </when>
+            <otherwise>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF043&quot;, &quot;InterfaceName&quot;: &quot;ADC Assessments&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;json&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;#[flowVars.operation]&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}" doc:name="Set Payload for Logging FW" />
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="adc_realtime_LogResponse_Sub_Flow">
+        <choice doc:name="Choice">
+            <when expression="#[payload != null]">
+                <!-- <set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="SV : Response in Transaction Attachment" doc:description="Store Request Payload in Transaction Attachment" /> -->
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF043&quot;, &quot;InterfaceName&quot;: &quot;ADC Assessments&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;#[flowVars.operationFilename]_Response&quot;,&quot;CompletedExtension&quot;:&quot;json&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;#[flowVars.operation]&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}" mimeType="application/json" doc:name="Set Payload for Logging FW" doc:description="Set Payload for Logging Framework for Transaction completion" />
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Log Transaction SubFlow of the Logging Framework" />
+                <!-- <message-properties-transformer overwrite="true" scope="session" doc:name="MP : Delete Transattachment" doc:description=" Delete Transattachment, so that it can't be used again for logging">
+                    <delete-message-property key="TransAttachment" />
+                </message-properties-transformer> -->
+            </when>
+            <otherwise>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF043&quot;, &quot;InterfaceName&quot;: &quot;ADC Assessments&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;json&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;#[flowVars.operation]&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}" doc:name="Set Payload for Logging FW" />
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="adc_realtime_errorResponse_Sub_Flow">
+        <set-session-variable variableName="recStatus" value="#['Error']" doc:name="SV : Set Process Status" doc:description="Set in the variable whether the process is success or failure" />
+        <enricher doc:name="ME : Invoke Logging FW" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+            <flow-ref name="adc_realtime_LogResponse_Sub_Flow" doc:name="adc_realtime_LogResponse_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to Log Request" />
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+        </enricher>
+    </sub-flow>
+    <flow name="post:/providerNewUpsert:dss_adc_solr_api-config">
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" />
+        <set-session-variable variableName="providerFlag" value="#[&quot;Y&quot;]" doc:name="SV : provider flag" />
+        <logger message="Input Provider Payload : #[payload]" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="TM : Collect SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id when $.sObject.@type == 'sf:Account' otherwise $.sObject.Provider__c
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM : Combine SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Provider Salesforce Ids : #[payload]" level="INFO" doc:name="Logger" />
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Name, DEL_First_Name__c, DEL_Provider_Category__c, DEL_Business_Phone_formula__c, DEL_Other_Phone_Formula__c, DEL_Fax_Formula__c, DEL_Email__c, DEL_Payee_FEIN__c, DEL_Payee_SSN__c, DEL_Provider_ID__c, (SELECT Id, Name, First_Name__c, Last_Org_Name__c FROM Provider_Alias__r), (SELECT Id, Name, Street_1__c, Street_2__c, City__c, State__c, ZIP__c, County__c, Country__c, Address_Type__c, PO_Box_Number__c FROM Provider_Addresses__r), (SELECT Id, Name, NPI_Number__c FROM NPI__r), (SELECT Id, Name, Provider_Type__c, Prov_Type_Status__c, Level__c, OCCL_Facility_Type__c FROM Provider_Types__r) FROM Account WHERE recordtype.developername = 'Provider' AND Id in (#[payload])" doc:name="Salesforce" />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map (parent, parentIndex) -> {
+	"type" : "providerDetails",
+	"providerId" : parent.DEL_Provider_ID__c as :number,
+	"firstName": (convertToEnglish(parent.DEL_First_Name__c) replace /([\s,.,!,@,#,parent,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when parent.DEL_First_Name__c != null otherwise '',
+	"firstName_P" : (parent.DEL_First_Name__c),
+	"firstNameAlias" : (parent.Provider_Alias__r.First_Name__c) when parent.Provider_Alias__r.First_Name__c != null otherwise [],
+	"firstNameAlias_P" : (parent.Provider_Alias__r.First_Name__c) when parent.Provider_Alias__r.First_Name__c != null otherwise [],
+	"lastNameOrgName" : (convertToEnglish(parent.Name) replace /([\s,.,!,@,#,parent,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when parent.Name != null otherwise '',
+	"lastNameOrgName_P" : (parent.Name),
+	"lastNameOrgName_syn" : (parent.Name),
+	"lastNameOrgNameAlias" : (parent.Provider_Alias__r.Last_Org_Name__c) when parent.Provider_Alias__r.Last_Org_Name__c != null otherwise [],
+	"lastNameOrgNameAlias_P" : (parent.Provider_Alias__r.Last_Org_Name__c) when parent.Provider_Alias__r.Last_Org_Name__c != null otherwise [],
+	"providerCategory": parent.DEL_Provider_Category__c,	
+	"businessPhnNumber": parent.DEL_Business_Phone_formula__c,
+	"otherPhnNumber": parent.DEL_Other_Phone_Formula__c,
+	"faxNumber": parent.DEL_Fax_Formula__c,
+	"email": parent.DEL_Email__c,
+	"FEIN": parent.DEL_Payee_FEIN__c,
+	"SSN": parent.DEL_Payee_SSN__c,
+	"SFDC_ID": parent.Id,
+	"_childDocuments_" : [] when (parent.Provider_Types__r == null) otherwise (parent.Provider_Types__r map {
+			"SFDC_ID": parent.Id,
+			"level": 0 when ($.Level__c == null) otherwise $.Level__c as :number,
+			"providerType": (convertToEnglish($.Provider_Type__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Provider_Type__c != null otherwise '',
+			"providerTypeStatus": (convertToEnglish($.Prov_Type_Status__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Prov_Type_Status__c != null otherwise '',
+			"occlFacilityType": (convertToEnglish($.OCCL_Facility_Type__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.OCCL_Facility_Type__c != null otherwise ''
+	}),
+
+	"npi": parent.NPI__r.NPI_Number__c 
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <!-- <dw:transform-message doc:name="Transform Message"> <dw:set-variable 
+			variableName="providerTypeStatusMap"><![CDATA[%dw 1.0 %output application/java 
+			- flatten (payload map { ($.Provider_Types__r default [] map { ($.Id as :string): 
+			$.Provider_Type__c default '' ++ ('-' when (($.Provider_Type__c != null and 
+			$.Provider_Type__c != '') and ($.Prov_Type_Status__c != null and $.Prov_Type_Status__c 
+			!= '')) otherwise '') ++ $.Prov_Type_Status__c default '' }) }) ]]></dw:set-variable> 
+			<dw:set-variable variableName="occlFacilityTypeMap"><![CDATA[%dw 1.0 %output 
+			application/java - (flatten payload map { ($.Provider_Types__r default [] 
+			map { ($.Id as :string): $.OCCL_Facility_Type__c default '' }) })]]></dw:set-variable> 
+			</dw:transform-message> -->
+        <http:request config-ref="HTTP_Request_dss_Solr_Configuration" path="${solr.provider.new.core}/update" method="POST" doc:name="HTTP : Solr Update">
+            <http:request-builder>
+                <http:query-param paramName="commit" value="true" />
+                <http:query-param paramName="Content-Type" value="application/json" />
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" mimeType="application/json" />
+        <logger message="After Transformation : #[payload]" level="INFO" doc:name="Logger" />
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+    </flow>
+    <flow name="post:/provAddressUpsert:dss_adc_solr_api-config">
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" />
+        <!-- <logger message="Before Delay" level="INFO" doc:name="Logger" />
+		<scripting:component doc:name="Groovy : Delay 10 Seconds"> <scripting:script 
+			engine="Groovy"><![CDATA[sleep(10000); return message.payload;]]></scripting:script> 
+			</scripting:component> -->
+        <logger message="Input Provider Address Payload : #[payload]" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="TM : Collect SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM : Combine SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Provider Address Salesforce Ids : #[payload]" level="INFO" doc:name="Logger" />
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Name, Address__r.Name, PO_Box_Number__c, Street_1__c, Street_2__c, City__c, State__c, ZIP__c, County__c, Country__c, Provider__c, Address_Type__c, Provider__r.DEL_Provider_ID__c, Provider__r.DEL_Provider_Category__c, Provider__r.DEL_Other_Phone_Formula__c, Provider__r.DEL_Fax_Formula__c, Provider__r.DEL_Email__c, Provider__r.DEL_Payee_FEIN__c, Provider__r.DEL_Payee_SSN__c, Provider__r.DEL_Business_Phone_formula__c,Provider__r.DEL_First_Name__c FROM DEL_Provider_Address__c WHERE Id in (#[payload])" doc:name="Salesforce" />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var ADDIDMap =
+{ 
+	(flatten payload map {
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.Name default '' 
+		})
+	})
+}
+%var addr1Map =
+{
+	(flatten payload map {
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.Street_1__c default ' '
+		})
+	})
+}
+%var addr1SPMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.Street_1__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '' default ' '
+		})
+	})
+}
+%var addr2Map =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.Street_2__c default ' '
+		})
+	})
+}
+%var addr2SPMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.Street_2__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '' default ' '
+		})
+	})
+}
+%var cityMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.City__c default ' '
+		})
+	})
+}
+%var stateMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.State__c default ' '
+		})
+	})
+}
+%var zipCodeMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.ZIP__c replace /([\-,\s])/ with '' default ' '
+		})
+	})
+}
+%var countyMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.County__c replace /([\-])/ with '' default ' '
+		})
+	})
+}
+%var countryMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.Country__c default ' '
+		})
+	})
+}
+%var addressTypeMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.Address_Type__c default ' '
+		})
+	})
+}
+%var poBoxNumberMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Addresses__r default [] map {
+			($.Id as :string): $.PO_Box_Number__c replace /([\-])/ with '' default ' '
+		})
+	})
+}
+%var npiMap =
+{ 
+	(flatten payload map {	
+		($.NPI__r default [] map {
+			($.Id as :string): $.NPI_Number__c default ' '
+		})
+	})
+}
+%var providerTypeMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Types__r default [] map {
+			($.Id as :string): $.Provider_Type__c default ' '
+		})
+	})
+}
+%var providerTypeStatusMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Types__r default [] map {
+			($.Id as :string): $.Provider_Type__c default '' ++ ('-' when (($.Provider_Type__c != null and $.Provider_Type__c != '') and ($.Prov_Type_Status__c != null and $.Prov_Type_Status__c != '')) otherwise '') ++ $.Prov_Type_Status__c default ''
+		})
+	})
+}
+%var levelMap =
+{ 
+	(flatten payload map {	
+		($.Provider_Types__r default [] map {
+			($.Id as :string): (($.Level__c splitBy ".")[0] as :number) when $.Level__c != null otherwise 0
+		})
+	})
+}
+%var occlFacilityTypeMap =
+{ 
+	(flatten payload map {
+		($.Provider_Types__r default [] map {
+			($.Id as :string): $.OCCL_Facility_Type__c default ' '
+		})
+	})
+}
+---
+payload map {
+	"SFDC_ID" : $.Provider__r.Id,
+	"ADD_ID": $.Name,
+	"providerId": $.Provider__r.DEL_Provider_ID__c as :number default '',
+	"addr1": ($.Street_1__c) ,
+	"addr1_P": ($.Street_1__c),
+	"addr2": ($.Street_2__c),
+	"addr2_P": ($.Street_2__c),
+	"city": ($.City__c),
+	"state": ($.State__c),
+	"zipCode": ($.ZIP__c),
+	"county": ($.County__c),
+	"country": ($.Country__c),
+	"addressType": ($.Address_Type__c),
+	"poBoxNumber": ($.PO_Box_Number__c)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <http:request config-ref="HTTP_Request_dss_Solr_Configuration" path="${solr.prov.addr.core}/update" method="POST" doc:name="HTTP : Solr Update">
+            <http:request-builder>
+                <http:query-param paramName="commit" value="true" />
+                <http:query-param paramName="Content-Type" value="application/json" />
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" />
+        <logger message="After Transformation : #[payload]" level="INFO" doc:name="Logger" />
+        <!-- query solr -->
+        <!-- <solr:query config-ref="focusSolr" q="*:*" doc:name="Solr" highlightField="content"/> -->
+        <!-- return results -->
+        <!-- <set-payload value="#[groovy: payload.getResults()]" doc:name="Set 
+			Payload"/> -->
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+    </flow>
+    <flow name="post:/provAliasUpsert:dss_adc_solr_api-config">
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" />
+        <!-- <logger message="Before Delay" level="INFO" doc:name="Logger" />
+		<scripting:component doc:name="Groovy : Delay 10 Seconds"> <scripting:script 
+			engine="Groovy"><![CDATA[sleep(10000); return message.payload;]]></scripting:script> 
+			</scripting:component> -->
+        <logger message="Input Provider Alias Payload : #[payload]" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="TM : Collect SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM : Combine SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Provider Alias Salesforce Ids : #[payload]" level="INFO" doc:name="Logger" />
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Name, First_Name__c, Last_Org_Name__c, Provider__c, Provider__r.DEL_Provider_ID__c, Provider__r.DEL_Provider_Category__c, Provider__r.DEL_Other_Phone_Formula__c, Provider__r.DEL_Fax_Formula__c, Provider__r.DEL_Email__c, Provider__r.DEL_Payee_FEIN__c, Provider__r.DEL_Payee_SSN__c, Provider__r.DEL_Business_Phone_formula__c FROM DEL_Provider_Alias__c WHERE Id in (#[payload])" doc:name="Salesforce" />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"SFDC_ID": $.Id,
+    "CORE_TYPE": 'Provider Alias',
+	"FLD_ONE": $.Name,
+	"FLD_TWO": $.First_Name__c,
+	"FLD_THREE": $.Last_Org_Name__c,
+	"FLD_FOUR": $.Provider__r.DEL_Provider_Category__c,
+	"FLD_FIVE": $.Provider__r.DEL_Other_Phone_Formula__c,
+	"FLD_SIX": $.Provider__r.DEL_Fax_Formula__c,
+	"FLD_SEVEN": $.Provider__r.DEL_Email__c,
+	"FLD_EIGHT": '', //$.Provider__r.DEL_Payee_FEIN__c,
+	"FLD_NINE": $.Provider__r.DEL_Payee_SSN__c,
+	"FLD_TEN": (convertToEnglish($.First_Name__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.First_Name__c != null otherwise '',
+	"FLD_ELEVEN": (convertToEnglish($.First_Name__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.First_Name__c != null otherwise '',
+	"FLD_TWELVE": (convertToEnglish($.Last_Org_Name__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Last_Org_Name__c != null otherwise '',
+	"FLD_THIRTEEN": (convertToEnglish($.Last_Org_Name__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Last_Org_Name__c != null otherwise '',
+	//"PRVDR_ID": $.Provider__r.DEL_Provider_ID__c,
+	"PRVDR_ID": '',
+	"PRVDR_SF_ID": $.Provider__c,
+	"FLD_PHN": $.Provider__r.DEL_Business_Phone_formula__c
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <http:request config-ref="HTTP_Request_dss_Solr_Configuration" path="${solr.prov.alias.core}/update" method="POST" doc:name="HTTP : Solr Update">
+            <http:request-builder>
+                <http:query-param paramName="commit" value="true" />
+                <http:query-param paramName="Content-Type" value="application/json" />
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" />
+        <logger message="After Transformation : #[payload]" level="INFO" doc:name="Logger" />
+        <!-- query solr -->
+        <!-- <solr:query config-ref="focusSolr" q="*:*" doc:name="Solr" highlightField="content"/> -->
+        <!-- return results -->
+        <!-- <set-payload value="#[groovy: payload.getResults()]" doc:name="Set 
+			Payload"/> -->
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+    </flow>
+    <flow name="post:/provNpiUpsert:dss_adc_solr_api-config">
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" />
+        <!-- <logger message="Before Delay" level="INFO" doc:name="Logger" />
+		<scripting:component doc:name="Groovy : Delay 10 Seconds"> <scripting:script 
+			engine="Groovy"><![CDATA[sleep(10000); return message.payload;]]></scripting:script> 
+			</scripting:component> -->
+        <logger message="Input Provider NPI Payload : #[payload]" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="TM : Collect SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM : Combine SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Provider NPI Salesforce Ids : #[payload]" level="INFO" doc:name="Logger" />
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Name, NPI_Number__c, Provider__c, Provider__r.DEL_Provider_ID__c FROM DEL_NPI__c WHERE Id in (#[payload])" doc:name="Salesforce" />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"SFDC_ID": $.Id,
+	"CORE_TYPE": 'Provider NPI',
+	"FLD_ONE": $.Name,
+	"FLD_TWO": '',
+	"FLD_THREE": '',
+	"FLD_FOUR": '',
+	"FLD_FIVE": '',
+	"FLD_SIX": '',
+	"FLD_SEVEN": '',
+	"FLD_EIGHT": '',
+	"FLD_NINE": '',
+	//"PRVDR_ID": $.Provider__r.DEL_Provider_ID__c,
+	"PRVDR_ID": '',
+	"PRVDR_SF_ID": $.Provider__c,
+	"FLD_FACILITY_NPI": $.NPI_Number__c
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <http:request config-ref="HTTP_Request_dss_Solr_Configuration" path="${solr.prov.npi.core}/update/json/docs" method="POST" doc:name="HTTP : Solr Update">
+            <http:request-builder>
+                <http:query-param paramName="commit" value="true" />
+                <http:query-param paramName="Content-Type" value="application/json" />
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" />
+        <logger message="After Transformation : #[payload]" level="INFO" doc:name="Logger" />
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+    </flow>
+    <flow name="post:/provTypeUpsert:dss_adc_solr_api-config">
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" />
+        <logger message="Input Provider Type Payload : #[payload]" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="TM : Collect SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM : Combine SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Provider Type Salesforce Ids : #[payload]" level="INFO" doc:name="Logger" />
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Name, OCCL_Facility_Type__c, Provider_Type__c, Prov_Type_Status__c,Level__c, Provider__c, Provider__r.DEL_Provider_ID__c FROM DEL_Provider_Types__c WHERE Id in (#[payload])" doc:name="Salesforce" />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"SFDC_ID": $.Id,
+	"CORE_TYPE": 'Provider Type',
+	"FLD_ONE": $.Name,
+	"FLD_TWO": '',
+	"FLD_THREE": $.Provider_Type__c,
+	"FLD_FOUR": '',
+	"FLD_FIVE": $.Level__c,
+	"FLD_SIX": $.Prov_Type_Status__c,
+	"FLD_SEVEN": '',
+	"FLD_EIGHT": '',
+	"FLD_NINE": '',
+	//"PRVDR_ID": $.Provider__r.DEL_Provider_ID__c,
+	"PRVDR_ID": '',
+	"PRVDR_SF_ID": $.Provider__c,
+	"FLD_FACILITY_NPI": $.OCCL_Facility_Type__c
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <http:request config-ref="HTTP_Request_dss_Solr_Configuration" path="${solr.prov.type.core}/update/json/docs" method="POST" doc:name="HTTP : Solr Update">
+            <http:request-builder>
+                <http:query-param paramName="commit" value="true" />
+                <http:query-param paramName="Content-Type" value="application/json" />
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" />
+        <logger message="After Transformation : #[payload]" level="INFO" doc:name="Logger" />
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+    </flow>
+    <flow name="post:/providerUpsert:dss_adc_solr_api-config">
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" />
+        <!-- <logger message="Before Delay" level="INFO" doc:name="Logger" />
+		<scripting:component doc:name="Groovy : Delay 10 Seconds"> <scripting:script 
+			engine="Groovy"><![CDATA[sleep(10000); return message.payload;]]></scripting:script> 
+			</scripting:component> -->
+        <logger message="Input Provider Payload : #[payload]" level="INFO" doc:name="Logger" />
+        <dw:transform-message doc:name="TM : Collect SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM : Combine SF Ids">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Provider Salesforce Ids : #[payload]" level="INFO" doc:name="Logger" />
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,Name, DEL_First_Name__c, DEL_Provider_Category__c, DEL_Business_Phone_formula__c, DEL_Other_Phone_Formula__c, DEL_Fax_Formula__c, DEL_Email__c, DEL_Payee_FEIN__c, DEL_Payee_SSN__c, DEL_Provider_ID__c FROM Account WHERE Id in (#[payload])" doc:name="Salesforce" />
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"SFDC_ID": $.Id,
+	"CORE_TYPE": 'Provider',
+	"FLD_ONE": $.Name,
+	"FLD_TWO": $.DEL_First_Name__c,
+	"FLD_THREE": $.DEL_Provider_Category__c,
+	"FLD_FOUR": '',
+	"FLD_FIVE": $.DEL_Other_Phone_Formula__c,
+	"FLD_SIX": $.DEL_Fax_Formula__c,
+	"FLD_SEVEN": $.DEL_Email__c,
+	"FLD_EIGHT": $.DEL_Payee_FEIN__c,
+	"FLD_NINE": $.DEL_Payee_SSN__c,
+	"FLD_TEN": (convertToEnglish($.DEL_First_Name__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.DEL_First_Name__c != null otherwise '',
+	"FLD_ELEVEN": (convertToEnglish($.DEL_First_Name__c) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.DEL_First_Name__c != null otherwise '',
+	"FLD_TWELVE": (convertToEnglish($.Name) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Name != null otherwise '',
+	"FLD_THIRTEEN": (convertToEnglish($.Name) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Name != null otherwise '',
+	"PRVDR_ID": $.DEL_Provider_ID__c,
+	"PRVDR_SF_ID": $.Id,
+	"FLD_PHN": $.DEL_Business_Phone_formula__c
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <http:request config-ref="HTTP_Request_dss_Solr_Configuration" path="${solr.provider.core}/update" method="POST" doc:name="HTTP : Solr Update">
+            <http:request-builder>
+                <http:query-param paramName="commit" value="true" />
+                <http:query-param paramName="Content-Type" value="application/json" />
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-string-transformer doc:name="Byte Array to String" mimeType="application/json" />
+        <logger message="After Transformation : #[payload]" level="INFO" doc:name="Logger" />
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+    </flow>
+    <apikit:mapping-exception-strategy name="dss_adc_solr_api-apiKitGlobalExceptionMapping">
+        <apikit:mapping statusCode="404">
+            <apikit:exception value="org.mule.module.apikit.exception.NotFoundException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;status&quot; : &quot;N&quot;,&quot;message&quot;: &quot;Resource not found&quot; }" doc:name="Set Payload" />
+            <choice doc:name="Choice">
+                <when expression="#[sessionVars.providerFlag != null &amp;&amp; sessionVars.providerFlag == &quot;Y&quot;]">
+                    <logger level="INFO" doc:name="Logger" />
+                </when>
+                <otherwise>
+                    <flow-ref name="adc_realtime_errorResponse_Sub_Flow" doc:name="adc_realtime_errorResponse_Sub_Flow" />
+                </otherwise>
+            </choice>
+        </apikit:mapping>
+        <apikit:mapping statusCode="405">
+            <apikit:exception value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{&quot;status&quot; : &quot;N&quot;, &quot;message&quot;: &quot;Method not allowed&quot; }" doc:name="Set Payload" />
+            <choice doc:name="Choice">
+                <when expression="#[sessionVars.providerFlag != null &amp;&amp; sessionVars.providerFlag == &quot;Y&quot;]">
+                    <logger message="Provider Upsert Response : 405" level="INFO" doc:name="Logger" />
+                </when>
+                <otherwise>
+                    <flow-ref name="adc_realtime_errorResponse_Sub_Flow" doc:name="adc_realtime_errorResponse_Sub_Flow" />
+                </otherwise>
+            </choice>
+        </apikit:mapping>
+        <apikit:mapping statusCode="415">
+            <apikit:exception value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;status&quot; : &quot;N&quot;, &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload" />
+            <choice doc:name="Choice">
+                <when expression="#[sessionVars.providerFlag != null &amp;&amp; sessionVars.providerFlag == &quot;Y&quot;]">
+                    <logger message="Provider Upsert Response : 415" level="INFO" doc:name="Logger" />
+                </when>
+                <otherwise>
+                    <flow-ref name="adc_realtime_errorResponse_Sub_Flow" doc:name="adc_realtime_errorResponse_Sub_Flow" />
+                </otherwise>
+            </choice>
+        </apikit:mapping>
+        <apikit:mapping statusCode="406">
+            <apikit:exception value="org.mule.module.apikit.exception.NotAcceptableException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;status&quot; : &quot;N&quot;, &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload" />
+            <choice doc:name="Choice">
+                <when expression="#[sessionVars.providerFlag != null &amp;&amp; sessionVars.providerFlag == &quot;Y&quot;]">
+                    <logger message="Provider Upsert Response : 406" level="INFO" doc:name="Logger" />
+                </when>
+                <otherwise>
+                    <flow-ref name="adc_realtime_errorResponse_Sub_Flow" doc:name="adc_realtime_errorResponse_Sub_Flow" />
+                </otherwise>
+            </choice>
+        </apikit:mapping>
+        <apikit:mapping statusCode="401">
+            <apikit:exception value="org.springframework.security.authentication.BadCredentialsException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;status&quot; : &quot;N&quot;, &quot;message&quot;: &quot; Unauthorized. Either the provided username and password combination is invalid, or the user is not allowed to access the content provided by the requested URL&quot; }" doc:name="Set Payload" />
+            <!-- <flow-ref name="adc_realtime_errorResponse_Sub_Flow" doc:name="adc_realtime_errorResponse_Sub_Flow"/> -->
+        </apikit:mapping>
+        <apikit:mapping statusCode="500">
+            <apikit:exception value="java.lang.Exception" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;status&quot; : &quot;N&quot;, &quot;message&quot;: &quot; Unexpected Error occured - #[exception.Message]&quot; }" doc:name="Set Payload" />
+            <choice doc:name="Choice">
+                <when expression="#[sessionVars.providerFlag != null &amp;&amp; sessionVars.providerFlag == &quot;Y&quot;]">
+                    <logger message="Provider Upsert Response : 500" level="INFO" doc:name="Logger" />
+                </when>
+                <otherwise>
+                    <flow-ref name="adc_realtime_errorResponse_Sub_Flow" doc:name="adc_realtime_errorResponse_Sub_Flow" />
+                </otherwise>
+            </choice>
+        </apikit:mapping>
+        <apikit:mapping statusCode="400">
+            <apikit:exception value="org.mule.module.apikit.exception.BadRequestException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;status&quot; : &quot;N&quot;, &quot;message&quot;: &quot;Bad request&quot; }" doc:name="Set Payload" />
+            <choice doc:name="Choice">
+                <when expression="#[sessionVars.providerFlag != null &amp;&amp; sessionVars.providerFlag == &quot;Y&quot;]">
+                    <logger message="Provider Upsert Response : 400" level="INFO" doc:name="Logger" />
+                </when>
+                <otherwise>
+                    <flow-ref name="adc_realtime_errorResponse_Sub_Flow" doc:name="adc_realtime_errorResponse_Sub_Flow" />
+                </otherwise>
+            </choice>
+        </apikit:mapping>
+    </apikit:mapping-exception-strategy>
+
+</mule>	

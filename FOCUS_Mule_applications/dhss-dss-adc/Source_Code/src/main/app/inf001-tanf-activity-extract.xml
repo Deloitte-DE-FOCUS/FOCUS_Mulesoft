@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+    
+   <!--  <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" url="${sfdc.url}" doc:name="Salesforce: Basic Authentication" disableSessionInvalidation="true" >
+        <reconnect  count="5"/>
+    </sfdc:config>
+<spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans>
+   	 <spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans> -->
+    <flow name="inf001-tanf-activity-extractFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll-DHSS" doc:description="Poll SFDC as per the defined time">
+            <schedulers:cron-scheduler expression="0 0 13 1 1/1 ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF001" doc:name="Set Payload to Interface ID" doc:description="Set Payload to Interface Id since the scope of poll is limited"/>
+           <!--  <expression-transformer doc:name="Expression" expression="#[sessionVars.ToEmailAddress='hharshvardhan@deloitte.com']"/> -->
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Set Interface ID variable to use i nerror framework , since the scope of poll islimited to itself"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Placement_Start_Date__c, Placement_End_Date__c, Placement__r.Division__c, Placement__r.Name, Client__c, Client__r.DEL_PID__c, Client__r.FirstName, Client__r.LastName, Client__r.Birthdate, Client__r.DEL_MCI__c, Client__r.DEL_SSN_Text__c, Placement__r.Caregiver1_Name__c, Placement__r.Caregiver1_Name__r.LastName, Placement__r.Caregiver1_Name__r.FirstName, Placement__r.Caregiver1_Name__r.DEL_SSN_Text__c, Placement__r.Caregiver2_Name__c, Placement__r.Caregiver2_Name__r.FirstName, Placement__r.Caregiver2_Name__r.LastName, Placement__r.Caregiver2_Name__r.DEL_SSN_Text__c from DEL_TANF_Activity_Placement__c" doc:name="Salesforce : Query qualified placement records" doc:description="Query SFDC to get records"/>
+        <enricher doc:name="Message Enricher">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF001&quot;, &quot;InterfaceName&quot;: &quot;TANF Activity Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" mimeType="application/json" doc:name="SP:Set JSON payload for logging Framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf001-tanf-activity-extract-NoPayload_Flow" doc:name="inf001-tanf-activity-extract-NoPayload_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size()!=0]" doc:name="Expression"/>
+
+        <dw:transform-message doc:name="TM:Convert Query Output to Map">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function changeDiv(string3) ("PBH") when string3 == 'DPBHS'  otherwise (("DFS") when string3 == 'DFS' otherwise (("YRS") when string3 =="DYRS" otherwise (("DMS") when string3=='DMSS' otherwise '' ))) 
+---
+payload map {
+	Id:$.Id,
+	MCI:$.Client__r.DEL_MCI__c,
+	SSN:$.Client__r.DEL_SSN_Text__c ,
+	LastName: $.Client__r.LastName,
+	FirstName: $.Client__r.FirstName,
+	BirthDate: $.Client__r.Birthdate as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"} default "",
+	StartDate: $.Placement_Start_Date__c as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"} default "",
+	EndDate:  $.Placement_End_Date__c as :date {format: "yyyy-MM-dd"}  as :string {format: "yyyyMMdd"} default "",
+	ParentName: ($.Placement__r.Caregiver1_Name__r.LastName default "" ++ ',' ++ $.Placement__r.Caregiver1_Name__r.FirstName default "" ) when $.Placement__r.Caregiver1_Name__c != null and $.Placement__r.Caregiver1_Name__c != "" and $.Placement__r.Division__c == "DFS"
+		otherwise ($.Placement__r.Caregiver2_Name__r.LastName default "" ++ ',' ++ $.Placement__r.Caregiver2_Name__r.FirstName default "" ) when $.Placement__r.Caregiver2_Name__c != null and $.Placement__r.Caregiver2_Name__c != ""  and $.Placement__r.Division__c == "DFS" otherwise "" ,
+	ParentSSN: ($.Placement__r.Caregiver1_Name__r.DEL_SSN_Text__c default "" ) when $.Placement__r.Caregiver1_Name__c != null and $.Placement__r.Caregiver1_Name__c != ""  and $.Placement__r.Division__c == "DFS"
+		otherwise ($.Placement__r.Caregiver2_Name__r.DEL_SSN_Text__c default "" ) when $.Placement__r.Caregiver2_Name__c != null and $.Placement__r.Caregiver2_Name__c != ""  and $.Placement__r.Division__c == "DFS" otherwise "" ,
+	Division: changeDiv($.Placement__r.Division__c),
+	PlacementID : $.Placement__r.Name,
+	PID:$.Client__r.DEL_PID__c
+} 
+]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer scope="session" doc:name="MP:Set Initial Payload,Query" overwrite="true">
+
+            <add-message-property key="InitialPayload" value="#[payload]"/>
+            <add-message-property key="Query" value="['']"/>
+        </message-properties-transformer>
+        <foreach batchSize="200" doc:name="For Each">
+            <dw:transform-message doc:name="TM : Prepare , separated PIDs">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter $.PID != null and $.PID != "" map ("'" ++ $.PID ++ "'" )) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id, Person__r.DEL_PID__c, Related_Person__c, Relationship_Type__c, Related_Person__r.DEL_SSN_Text__c, Related_Person__r.LastName, Related_Person__r.FirstName  from DEL_Person_Relationship__c where Relationship_Type__c in ('Adoptive Mother in Home','Adoptive Father in Home','Mother in Home','Father in Home','Step Mother in Home','Step Father in Home') AND Active__c= TRUE AND Person__r.DEL_PID__c IN (#[payload]) Order by Person__r.DEL_PID__c" doc:name="SFDC:Get Parent Info"/>
+            <dw:transform-message doc:name="TM:Convert Query Output to Map">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	ID:$.Id,
+	PID:$.Person__r.DEL_PID__c,
+	RelationshipID:$.Related_Person__c,
+	Relationship:$.Relationship_Type__c,
+	ParentSSN:$.Related_Person__r.DEL_SSN_Text__c,
+	ParentLastName:$.Related_Person__r.LastName,
+	ParentFirstName:$.Related_Person__r.FirstName,
+	RelationshipSequence:'1' when (upper $.Relationship_Type__c)=='ADOPTIVE MOTHER IN HOME' otherwise 
+						('2' when (upper $.Relationship_Type__c)=='ADOPTIVE FATHER IN HOME'  otherwise 
+						('3' when (upper $.Relationship_Type__c)=='MOTHER IN HOME' otherwise 
+						('4' when (upper $.Relationship_Type__c)=='FATHER IN HOME' otherwise
+						('5' when (upper $.Relationship_Type__c)=='STEP MOTHER IN HOME' otherwise	
+						('6' when (upper $.Relationship_Type__c)=='STEP FATHER IN HOME' otherwise							
+						'' ))))) 
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Concatenate the list">
+                <dw:set-variable variableName="ParentInfoVar"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.ParentInfoVar default {}) ++ (payload)]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+
+        <dw:transform-message doc:name="TM:Order by Relationship Hierarchy">
+            <dw:set-variable variableName="ParentDetails1"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.ParentInfoVar map {
+	ID:$.ID,
+	PID:$.PID,
+	RelationshipID:$.RelationshipID,
+	Relationship:$.Relationship,
+	ParentSSN:$.ParentSSN,
+	ParentLastName:$.ParentLastName,
+	ParentFirstName:$.ParentFirstName,
+	RelationshipSequence:$.RelationshipSequence
+} orderBy $.RelationshipSequence]]></dw:set-variable>
+        </dw:transform-message>
+         <set-payload doc:name="SP:Set Payload to Initial Payload" value="#[sessionVars.InitialPayload]"/>
+        <dw:transform-message doc:name="TM : Prepare Java out put">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/java
+%output application/java
+%var FName = {(flowVars.ParentDetails1 map {
+     ($.PID as :string) : $.ParentLastName default "" ++ ',' ++ $.ParentFirstName default ""    
+     } ) }
+%var SSN = {(flowVars.ParentDetails1 map {
+     ($.PID as :string) : $.ParentSSN     
+     } ) }
+---
+payload map {
+	Id:$.Id,
+	MCI:$.MCI,
+	SSN:$.SSN,
+	PID:$.PID,
+	LastName: $.LastName,
+	FirstName: $.FirstName,
+	BirthDate: $.BirthDate,
+	StartDate: $.StartDate,
+	EndDate: $.EndDate,
+	ParentName: FName[$.PID] when $.Division != "DFS" otherwise $.ParentName,
+	ParentSSN: SSN[$.PID]  when $.Division != "DFS" otherwise $.ParentSSN,
+	PlacementID : $.PlacementID,
+	Division: $.Division
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <set-session-variable variableName="InitialPayload" value="#[payload]" doc:name="Session Variable : Store Payload"/>
+        <dw:transform-message metadata:id="e9c9221b-3e7a-41a2-9667-4297805f0999" doc:name="TM:Create MCI error,and final CSV file">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-variable variableName="EndDatePayload"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = "|"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	MCI:( pad(0,(10 - sizeOf $.MCI )) ++ $.MCI ) when $.MCI != null otherwise '' ,
+	SSN:$.SSN,
+	LastName: $.LastName,
+	FirstName: $.FirstName,
+	BirthDate: $.BirthDate,
+	StartDate: '',
+	EndDate: $.EndDate,
+	ParentName: $.ParentName,
+	ParentSSN: $.ParentSSN,
+	Division: $.Division
+} filter ( payload[$$].EndDate != null and payload[$$].EndDate != '' ) and ( payload[$$].MCI != null and payload[$$].MCI != '')]]></dw:set-variable>
+
+            <dw:set-variable variableName="StartDatePayload"><![CDATA[%dw 1.0
+%input payload application/java
+%output application/csv header = false , separator = "|"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	MCI:( pad(0,(10 - sizeOf $.MCI )) ++ $.MCI ) when $.MCI != null otherwise '' ,
+	SSN:$.SSN,
+	LastName: $.LastName,
+	FirstName: $.FirstName,
+	BirthDate: $.BirthDate,
+	StartDate: $.StartDate,
+	EndDate: '',
+	ParentName: $.ParentName,
+	ParentSSN: $.ParentSSN,
+	Division: $.Division
+} filter (payload[$$].StartDate != null and payload[$$].StartDate != '') and (payload[$$].MCI != null and payload[$$].MCI != '')
+	
+]]></dw:set-variable>
+            <dw:set-variable variableName="MissingMCI"><![CDATA[%dw 1.0
+%output application/csv header=true, separator = "," , quoteValues=true, escape="\"" 
+---
+payload  filter $.MCI == null or $.MCI == ""  map {
+	PlacementID : $.PlacementID,
+	PID: $.PID,
+	MCI: $.MCI,
+	SSN:$.SSN,
+	LastName: $.LastName,
+	FirstName: $.FirstName,
+	BirthDate: $.BirthDate,
+	StartDate: $.StartDate,
+	EndDate: $.EndDate,
+	ParentName: $.ParentName,
+	ParentSSN: $.ParentSSN,
+	Division: $.Division,
+	Error : ("MCI is Missing" when ($.MCI == null or $.MCI == "") otherwise  " ")
+}
+]]></dw:set-variable>
+
+
+        </dw:transform-message>
+        <logger message="#[flowVars.MissingMCI]" level="INFO" doc:name="Logger"/>
+        <set-payload value="#[flowVars.StartDatePayload + flowVars.EndDatePayload]" doc:name="SP:Combine StartDate and EndDate Records"/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set Record-Error,Count,Success and Error/Trans Attachment">
+
+            <add-message-property key="RecordSuccess" value="#[payload != '' ? (payload.split(&quot;\n&quot;).length) : 0]"/>
+
+            <add-message-property key="ErrorAttachment" value="#[flowVars.MissingMCI]"/>
+
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="RecordError" value="#[flowVars.MissingMCI != '' ? (flowVars.MissingMCI.split(&quot;\n&quot;).length - 1):0 ]"/>
+            <add-message-property key="RecordCount" value="#[(payload != '' ? (payload.split(&quot;\n&quot;).length) : 0) + (flowVars.MissingMCI != '' ? (flowVars.MissingMCI.split(&quot;\n&quot;).length - 1):0 )]"/>
+
+        </message-properties-transformer>
+
+
+
+          <flow-ref name="Write_to_SFTP" doc:name="Write_to_SFTP"/>
+        <dw:transform-message doc:name="TM : Prepare TANF Staging Ids to delete">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.InitialPayload filter $.MCI != null and $.MCI != "" map ($.Id)
+	
+]]></dw:set-payload>
+        </dw:transform-message>
+        <foreach batchSize="200" doc:name="For Each">
+            <sfdc:delete config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Delete TANF Staging Records"/>
+        </foreach>
+
+
+
+         <set-payload value="{&quot;InterfaceID&quot;: &quot;INF001&quot;, &quot;InterfaceName&quot;: &quot;TANF Activity Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TANFActivityExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_dss_dscyf_tanfex_activity_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordError == 0?'Success':(sessionVars.RecordSuccess==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.Status != 'Success'?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.MissingMCI != null?'Business':'']&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" mimeType="application/json" doc:name="SP:Set payload to JSON for Logging Framework"/>
+
+        <logger message="Error:::::::::#[sessionVars.ErrorAttachment]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+
+           
+          </flow>
+    <sub-flow name="Write_to_SFTP">
+
+
+        <logger message="Final File #[payload]" level="INFO" doc:name="Logger"/>
+        <sftp:outbound-endpoint connector-ref="SFTP-1" exchange-pattern="one-way" outputPattern="${sftp.tanfactextract.transaction.filename}" host="${sftp.tanfactextract.transaction.host}" port="${sftp.tanfactextract.transaction.port}" path="${sftp.tanfactextract.transaction.path}" user="${sftp.tanfactextract.transaction.username}" password="${sftp.tanfactextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder"/>
+        <sftp:outbound-endpoint connector-ref="SFTP-1" exchange-pattern="one-way" outputPattern="${sftp.tanfactextract.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.tanfactextract.archive.host}" port="${sftp.tanfactextract.archive.port}" path="${sftp.tanfactextract.archive.path}" user="${sftp.tanfactextract.archive.username}" password="${sftp.tanfactextract.archive.password}" responseTimeout="10000" duplicateHandling="append" doc:name="SFTP:Write to Archive"/>
+
+    </sub-flow>
+    <sub-flow name="inf001-tanf-activity-extract-NoPayload_Flow">
+        <choice doc:name="Choice">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF001&quot;, &quot;InterfaceName&quot;: &quot;TANF Activity Extract&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </when>
+            <otherwise>
+                <logger message="Payload Extracted" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+
+    
+    </mule>

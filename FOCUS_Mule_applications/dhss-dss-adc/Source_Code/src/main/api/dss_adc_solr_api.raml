@@ -1,0 +1,391 @@
+#%RAML 1.0
+title : Solar Interface API
+version: v1
+protocols: [ HTTP,HTTPS ]
+baseUri: http://api.samplehost.com/solrproviderservices
+mediaType: [ application/xml, application/json, text/xml ]
+#mediaType: application/json
+securitySchemes:
+  basicAuth:
+    description: Each request must contain the headers necessary for basic authentication
+    type: Basic Authentication
+    describedBy:
+      headers:
+        Authorization:
+          description: |
+            Used to send the Base64 encoded "username:password" credentials
+            type: string
+      responses:
+        401:
+          description: |
+            Unauthorized. Either the provided username and password combination is invalid, or the user is not allowed to access the content provided by the requested URL.
+traits:
+  client-id-required:
+    queryParameters:
+      client_id:
+        type: string
+      client_secret:
+        type: string
+  hasNotFound:
+    responses:
+      404:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string
+  isNotAcceptable:
+    responses:
+      406:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string   
+/ConnectivityTest:
+  get:
+    displayName: Test Connectivity for Interfaces
+    description: Test Connectivity for Interfaces 
+#    is: [hasNotFound,isNotAcceptable]
+    responses:
+      200:
+        body:
+          application/json:
+
+/user:
+  /validateToken:
+    get:
+      displayName: Criminal Conviction Record Verification Notification
+      description: Criminal Conviction Record Verification Notification
+#     is: [hasNotFound,isNotAcceptable] 
+      responses:
+        200:
+          body:
+            application/json:
+              example: {"errorMessage": "The token is validated successfully"}
+        401:
+          body:
+            application/json:
+              example: {"errorMessage": "Invalid token. Please contac System Administrator"}
+        500:
+          body:
+            application/json:
+              example: {"errorMessage": "Error has occurred processing the token validation"}
+              
+  /profile:
+    /{userExternalId}:
+      displayName: User profile Information
+      description: User profile Information  
+      securedBy: [basicAuth]
+      get:  
+#        is: [hasNotFound,isNotAcceptable]
+        responses: 
+          200:
+            body: 
+              application/json:
+                example: !include examples/UserProfileInformationResponse.json
+          400:
+            body: 
+              application/json:
+                example: !include examples/UserProfileInformationResponse.json
+          401:
+            body: 
+              text/plain:
+                example: !include examples/UnAuthorized.txt
+#        responses:
+#          200:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "User profile found the data is returned as a JSON object"}
+#          204:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "No user was found for the external user ID"}
+#          300:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "More than 1 user was found with the user external ID. The system only expects and requires 1 user for an external ID."}
+#          500:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "An unexpected error occurred retrieving the user profile. Please try again later or contact support."}
+/subject:
+  /profile:
+    /{subjectExternalId}:
+      displayName: Subject (Client) Information
+      description: Subject (Client) Information  
+      securedBy: [basicAuth]
+      get:
+        responses: 
+          200:
+            body: 
+              application/json:
+                example: !include examples/SubjectInformationResponse.json
+          400:
+            body: 
+              application/json:
+                example: !include examples/SubjectInformationResponse.json
+          401:
+            body: 
+              text/plain:
+                example: !include examples/UnAuthorized.txt 
+#       is: [hasNotFound,isNotAcceptable]
+#        responses:
+#          200:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "Subject profile found the data is returned as a JSON object"}
+#          204:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "No subject was found for the provided subjectExternalID"}
+#          300:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "More than 1 subject was found with the provided subjectExternalID. The system only expects and requires 1 subject for an external ID."}
+#          500:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "An unexpected error occurred retrieving the subject profile. Please try again later or contact support."}
+/ccr:
+  /sentences:
+    /{subjectExternalId}:
+      displayName: Criminal Conviction Record Subject Sentence Information
+      description: Criminal Conviction Record Subject Sentence Information
+      securedBy: [basicAuth]
+      get: 
+        responses: 
+          200:
+            body: 
+              application/json:
+                example: !include examples/SentenceInformationResponse.json
+          400:
+            body: 
+              application/json:
+                example: !include examples/SentenceInformationResponse.json
+          401:
+            body: 
+              text/plain:
+                example: !include examples/UnAuthorized.txt 
+#       is: [hasNotFound,isNotAcceptable]
+#        responses:
+#          200:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "CCR sentences were found and returned as an array for JSON SentenceV2DTO objects"}
+#          500:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "Error has occurred retrieving CCR sentences for subject"}
+  /offensesWithDispo:
+    /{subjectExternalId}:
+      displayName: Criminal Conviction Record Subject Offense Information
+      description: Criminal Conviction Record Subject Offense Information
+      securedBy: [basicAuth]
+      get:
+        responses: 
+          200:
+            body: 
+              application/json:
+                example: !include examples/OffenseInformationResponse.json
+          400:
+            body: 
+              application/json:
+                example: !include examples/OffenseInformationResponse.json
+          401:
+            body: 
+              text/plain:
+                example: !include examples/UnAuthorized.txt
+#       is: [hasNotFound,isNotAcceptable] 
+#        responses:
+#          200:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "CCR offenses were found and returned as an array for JSON OffenseDTO objects"}
+#          500:
+#            body:
+#              application/json:
+#                example: {"errorMessage": "Error has occurred retrieving CCR offences for subject"} 
+/assessment:
+  /results:
+    displayName: Assessment Results
+    description: Create Update Assessment Information in FOCUS
+    securedBy: [basicAuth]    
+    put:
+      body: 
+        application/json:
+          example: !include examples/AssessmentResultsRequest.json
+      responses: 
+        200:
+          body: 
+            application/json:
+              example: !include examples/AssessmentResultsResponse.json
+        400:
+          body: 
+            application/json:
+              example: !include examples/AssessmentResultsResponse.json
+        401:
+          body: 
+            text/plain:
+              example: !include examples/UnAuthorized.txt
+    /v2:
+      displayName: Assessment Results varsion 2 version
+      description: Create Update Assessment Information in FOCUS
+      securedBy: [basicAuth]    
+      put:
+        body: 
+          application/json:
+            example: !include examples/AssessmentResultsRequest.json
+        responses: 
+          200:
+            body: 
+              application/json:
+                example: !include examples/AssessmentResultsResponse.json
+          400:
+            body: 
+              application/json:
+                example: !include examples/AssessmentResultsResponse.json
+          401:
+            body: 
+              text/plain:
+                example: !include examples/UnAuthorized.txt   
+#    put:
+#      displayName: PACT Assessment Results
+#      description: PACT Assessment Results
+#     is: [hasNotFound,isNotAcceptable]
+#      body:
+#        application/json:
+#      responses:
+#        200:
+#          body:
+#            application/json:
+#              example: {"errorMessage": "Assessment results were successfully stored in the system of record"}
+#        500:
+#          body:
+#            application/json:
+#              example: {"errorMessage": "An unexpected error occurred storing the subject's assessment results. Please try again later or contact support."}
+  
+  #    put:
+  #      displayName: PACT Assessment Results
+  #      description: PACT Assessment Results
+  #     is: [hasNotFound,isNotAcceptable]
+  #      body:
+  #        application/json:
+  #      responses:
+  #        200:
+  #          body:
+  #            application/json:
+  #              example: {"errorMessage": "Assessment results were successfully stored in the system of record"}
+  #        500:
+  #          body:
+  #            application/json:
+  #              example: {"errorMessage": "An unexpected error occurred storing the subject's assessment results. Please try again later or contact support."}
+
+  /riskNeedsScreenerResults:
+    displayName: Risk Needs Screener Results
+    description: Save Assessment PreScreen Url
+    securedBy: [basicAuth]    
+    put:
+      body: 
+        application/json:
+          example: !include examples/riskNeedsScreenerResultsRequest.json
+      responses: 
+        200:
+          body: 
+            application/json:
+              example: !include examples/riskNeedsScreenerResultsSuccessResponse.json
+        400:
+          body: 
+            application/json:
+              example: !include examples/riskNeedsScreenerResultsFailureResponse.json
+        401:
+          body: 
+            text/plain:
+              example: !include examples/UnAuthorized.txt
+    /v2:
+      displayName: Risk Needs Screener version 2 Results 
+      description: Save Assessment PreScreen Url
+      securedBy: [basicAuth]
+      put:
+        body: 
+          application/json:
+            example: !include examples/riskNeedsScreenerResultsRequest.json
+        responses: 
+          200:
+            body: 
+              application/json:
+                example: !include examples/riskNeedsScreenerResultsSuccessResponse.json
+          400:
+            body: 
+              application/json:
+                example: !include examples/riskNeedsScreenerResultsFailureResponse.json
+          401:
+            body: 
+              text/plain:
+                example: !include examples/UnAuthorized.txt
+
+/providerUpsert:
+  post:
+    displayName: Provider Upsert
+    description: Provider Upsert   
+#    is: [hasNotFound,isNotAcceptable]
+    body:
+    responses:
+      200:
+        body:
+          application/json:
+          
+/providerNewUpsert:
+  post:
+    displayName: Provider Upsert
+    description: Provider Upsert   
+#    is: [hasNotFound,isNotAcceptable]
+    body:
+    responses:
+      200:
+        body:
+          application/json:
+          
+/provAddressUpsert:
+  post:
+    displayName: Provider Address Upsert
+    description: Provider Address Upsert   
+#    is: [hasNotFound,isNotAcceptable]
+    body: 
+    responses:
+      200:
+        body:
+          application/json:
+          
+/provAliasUpsert:
+  post:
+    displayName: Provider Alias Upsert
+    description: Provider Alias Upsert   
+#    is: [hasNotFound,isNotAcceptable]
+    body: 
+    responses:
+      200:
+        body:
+          application/json:
+          
+/provNpiUpsert:
+  post:
+    displayName: Provider NPI Upsert
+    description: Provider NPI Upsert   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:  
+/provTypeUpsert:
+  post:
+    displayName: Provider Type Upsert
+    description: Provider Type Upsert   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:
+          
