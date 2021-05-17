@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?><s:Detail xmlns:s="http://www.w3.org/2003/05/soap-envelope"><ExceptionDetail xmlns="http://schemas.datacontract.org/2004/07/System.ServiceModel" xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><HelpLink i:nil="true"/><InnerException i:nil="true"/><Message>&lt;ns0:SoapFault xmlns:ns0="http://MCICommon.MasterClientIndexFault"&gt;&#13;
+  &lt;Error&gt;SystemID in the SOAP Request Header is Invalid: ABCUAT.DSCYF.FOCUS&lt;/Error&gt;&#13;
+&lt;/ns0:SoapFault&gt;</Message><StackTrace>   at Microsoft.BizTalk.Adapter.Wcf.Runtime.BizTalkAsyncResult.End()&#13;
+   at Microsoft.BizTalk.Adapter.Wcf.Runtime.BizTalkServiceInstance.EndOperation(IAsyncResult result)&#13;
+   at AsyncInvokeEndEndTwoWayMethod(Object , Object[] , IAsyncResult )&#13;
+   at System.ServiceModel.Dispatcher.AsyncMethodInvoker.InvokeEnd(Object instance, Object[]&amp; outputs, IAsyncResult result)&#13;
+   at System.ServiceModel.Dispatcher.DispatchOperationRuntime.InvokeEnd(MessageRpc&amp; rpc)&#13;
+   at System.ServiceModel.Dispatcher.ImmutableDispatchRuntime.ProcessMessage7(MessageRpc&amp; rpc)&#13;
+   at System.ServiceModel.Dispatcher.MessageRpc.Process(Boolean isOperationContextSet)</StackTrace><Type>Microsoft.BizTalk.Adapter.Wcf.Runtime.BizTalkNackException</Type></ExceptionDetail></s:Detail>

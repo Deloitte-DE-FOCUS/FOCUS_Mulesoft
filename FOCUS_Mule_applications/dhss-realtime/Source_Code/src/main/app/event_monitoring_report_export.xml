@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:sfdc-analytics="http://www.mulesoft.org/schema/mule/sfdc-analytics"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/sfdc-analytics http://www.mulesoft.org/schema/mule/sfdc-analytics/current/mule-sfdc-analytics.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <flow name="reportDataIntoReportDataSetFlow">
+        <message-properties-transformer doc:name="MP : Initialize UID, distinct EvenLogFileIds" scope="session">
+            <add-message-property key="reportRootId" value="#[java.util.UUID.randomUUID().toString()]"/>
+            <add-message-property key="reportData" value="#[dw(&quot;[]&quot;)]"/>
+            <add-message-property key="reportRecordCount" value="#[0]"/>
+            <add-message-property key="reportProcessedCount" value="#[0]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF123&quot;, &quot;InterfaceName&quot;: &quot;Report(Export) DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.reportRootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <enricher source="#[flowVars.IdObjectMap]" target="#[flowVars.IdObjectMap]" doc:name="ME : Get Id Object Map">
+            <flow-ref name="URI_Object_Lookup_Sub_Flow" doc:name="URI_Object_Lookup_Sub_Flow"/>
+        </enricher>
+        <flow-ref name="retrieveApplicationIdFromDataSetSub_Flow" doc:name="retrieveApplicationIdFromDataSetSub_Flow"/>
+        <logger message="ReportDataIntoReportDataSet Query : SELECT SALESFORCE_ID, EVENTLOGFILEID, RECORD_NAME, OBJECT_NAME, URI, USER_ID, USER_NAME, EVENT_TYPE, RECORD_ACCESS_DATE_TIME, PAGE_NAME, DIVISION_STAFF, INTAKE_CASE_PROV_NAME, INTAKE_CASE_PROV_NUM ,
+CASE_INTAKE_DIV, MASTER_ENTITY FROM ${eventlog.schema}.event_log_view A, ${eventlog.schema}.eventlogfile B WHERE A.EVENTLOGFILEID = B.ID  AND (B.REPORT_LOAD_FLG IS NULL OR B.REPORT_LOAD_FLG = 'N') AND (A.EVENT_TYPE = 'Report' OR A.EVENT_TYPE = 'ReportExport')" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getProcessedEventLogData" method="GET" doc:name="Get All Request(Export) records from DB">
+                <http:request-builder>
+                    <http:query-param paramName="query" value="SELECT SALESFORCE_ID, EVENTLOGFILEID, RECORD_NAME, OBJECT_NAME, URI, USER_ID, USER_NAME, EVENT_TYPE, RECORD_ACCESS_DATE_TIME, PAGE_NAME, DIVISION_STAFF, INTAKE_CASE_PROV_NAME, INTAKE_CASE_PROV_NUM ,
+CASE_INTAKE_DIV, MASTER_ENTITY FROM ${eventlog.schema}.event_log_view A, ${eventlog.schema}.eventlogfile B WHERE A.EVENTLOGFILEID = B.ID  AND (B.REPORT_LOAD_FLG IS NULL OR B.REPORT_LOAD_FLG = 'N') AND (A.EVENT_TYPE = 'Report' OR A.EVENT_TYPE = 'ReportExport')"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+		<logger message="ReportDataIntoReportDataSet : Genric Total Count #[payload.size()] --- #[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="TM : Convert to List">
+        	<dw:input-payload mimeType="application/json" />
+            	<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="ReportDataIntoReportDataSet : Report (Export) retreival count : #[payload.size()] --- #[payload]]" level="INFO" doc:name="Logger"/>
+        <set-session-variable variableName="reportRecordCount" value="#[payload.size()]" doc:name="SV : Report(Export) Total"/>
+        <choice doc:name="Choice : Check if any data was pulled from Database" doc:description="Check if any data was pulled from Database">
+            <when expression="#[(payload.size() &gt; 0) &amp;&amp; (flowVars.datasetAppSfdcID != null)]">
+				<dw:transform-message doc:name="TM : Distinct Report EventLogFileId">
+                    <dw:set-session-variable variableName="reportData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload distinctBy $.EVENTLOGFILEID map $.EVENTLOGFILEID]]></dw:set-session-variable>
+
+                </dw:transform-message>
+                <logger message="ReportDataIntoReportDataSet : Data Set Creation process Initiated #[sessionVars.reportData]" level="INFO" doc:name="Logger"/>
+    			<enricher source="#[payload]" target="#[flowVars.datasetid]" doc:name="ME : Get Data Set ID">
+                    <sfdc-analytics:create-data-set config-ref="Salesforce_Analytics_Cloud__Basic_authentication" operation="APPEND" description="Create a Report related Dataset for appending data to the already present set" label="#[sessionVars.reportDataset]" dataSetName="#[sessionVars.reportDataset]" edgemartContainer="#[flowVars.datasetAppSfdcID]" type="EventLogReport.json:RELATIVE" doc:name="SF Analytics Cloud : Create Append dataset" doc:description="Create a Dataset for appending data to the already present set"/>
+                </enricher>
+                <logger message="ReportDataIntoReportDataSet : DataSet Created with ID #[flowVars.datasetid]" level="INFO" doc:name="Logger"/>
+                <set-variable variableName="uniqueRecs" value="#[dw(&quot;[]&quot;)]" doc:name="Variable : Initialize Unique Recs List" doc:description="Initialize Unique Recs List"/>
+                <foreach batchSize="10000" doc:name="For Each">
+                    <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                    <set-variable variableName="userMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initialize User Map"/>
+                    <foreach batchSize="150" doc:name="For Each">
+                        <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message" doc:description="Remove Root Message"/>
+                        <dw:transform-message doc:name="TM : Deserialize Payload">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                        </dw:transform-message>
+                        <dw:transform-message doc:name="TM : Prepare where clause">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SALESFORCE_ID ++ "'")) joinBy ","]]></dw:set-payload>
+                        </dw:transform-message>
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Name from Report where Id IN (#[payload])" doc:name="SF : Get Report Name"/>
+                        <dw:transform-message doc:name="TM : Consume Payload">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+                        </dw:transform-message>
+                        <dw:transform-message doc:name="TM : Group Report Data">
+                            <dw:set-variable variableName="reportDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.reportDetails default {}) ++ 
+( (payload default []) reduce ((val, acc = {}) -> acc ++ ({ ((val.Id as :string)[0..14]) : val.Name  }) ) ) ]]></dw:set-variable>
+                        </dw:transform-message>
+                    </foreach>
+                    <dw:transform-message doc:name="TM : Get User/Worker ID">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-variable variableName="userIDList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.USER_ID filter (($ default "") != "")]]></dw:set-variable>
+                    </dw:transform-message>
+                    <foreach collection="#[flowVars.userIDList]" batchSize="150" doc:name="For Each : User">
+                        <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                        <dw:transform-message doc:name="TM : Prepare Query">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload.*payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-payload>
+                        </dw:transform-message>
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Name from User where Id IN (#[payload])" doc:name="SF : Query User Details"/>
+
+                        <dw:transform-message doc:name="TM : Add to User Map">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-variable variableName="userMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.userMap) ++ ( (payload default []) reduce ((val, acc = {}) -> acc ++ ({ (val.Id as :string) : val.Name  }) ) )]]></dw:set-variable>
+                        </dw:transform-message>
+                    </foreach>
+                    <dw:transform-message doc:name="TM : Enrich Wave Data Set with Report And Staff Details">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter ($.RECORD_ACCESS_DATE_TIME != null)  map {
+	"Report_Name" : (flowVars.reportDetails[$.SALESFORCE_ID] default "") replace "\"" with  "\"\"",
+	"User_Name" : (flowVars.userMap[$.USER_ID] default "") replace "\"" with  "\"\"",
+	"Date" : $.RECORD_ACCESS_DATE_TIME as :datetime ,
+	"URI" : $."SALESFORCE_ID",
+	"Event_Type" : $.Event_Type				
+} distinctBy (($."URI" default "") ++ "-" ++ $."Event_Type" ++ "-" ++ ($.Report_Name default "") ++ "-" ++ ($.User_Name default "") ++ ($.Date as :datetime as :string {format : "MM-dd-yy"}))
+) filter ( not (flowVars.uniqueRecs contains (($."URI" default "") ++ "-" ++ $."Event_Type" ++ "-" ++ ($.Report_Name default "") ++ "-" ++ ($.User_Name default "") ++ ($.Date as :datetime as :string {format : "MM-dd-yy"})) ) )]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Unique Recs">
+                        <dw:set-variable variableName="uniqueRecs"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.uniqueRecs default []) ++ (payload map (($."URI" default "") ++ "-" ++ $."Event_Type" ++ "-" ++ ($.Report_Name default "") ++ "-" ++ ($.User_Name default "") ++ ($.Date as :datetime as :string {format : "MM-dd-yy"})) )]]></dw:set-variable>
+                    </dw:transform-message>
+                    <set-session-variable variableName="reportProcessedCount" value="#[sessionVars.reportProcessedCount + payload.size()]" doc:name="SV : Processed Count"/>
+        			<logger message="ReportDataIntoReportDataSet : Size of Report Data Part #[payload.size()] Current Total Processed Count : #[sessionVars.reportProcessedCount]" level="INFO" doc:name="Logger"/>
+                    <sfdc-analytics:upload-external-data config-ref="Salesforce_Analytics_Cloud__Basic_authentication" type="EventLogReport.json:RELATIVE" dataSetId="#[flowVars.datasetid]" doc:name="SF Analytics Cloud : Create DataSet Part">
+                        <sfdc-analytics:payload ref="#[payload]"/>
+                    </sfdc-analytics:upload-external-data>
+                    <message-properties-transformer scope="invocation" doc:name="MP : Delete Variables for Next Iteration" doc:description="Delete Variables for Next Iteration">
+                        <delete-message-property key="userMap"/>
+                        <delete-message-property key="URIMap"/>
+                        <delete-message-property key="userIDList"/>
+                        <delete-message-property key="CaseDetailsMap"/>
+                    </message-properties-transformer>
+                    <logger message="ReportDataIntoReportDataSet : Processing done for this Iteration. Distinct Records Count #[flowVars.uniqueRecs.size()] " level="INFO" doc:name="Logger"/>
+                </foreach>
+                <remove-variable variableName="uniqueRecs" doc:name="Variable : Remove Unique Recs" doc:description="Delete Unique Records count"/>
+                <sfdc-analytics:start-data-processing config-ref="Salesforce_Analytics_Cloud__Basic_authentication" dataSetId="#[flowVars.datasetid]" doc:name="SF Analytics Cloud : Start Data Processing"/>
+                <logger message="ReportDataIntoReportDataSet : Report DataSet Data Parts Processing triggered." level="INFO" doc:name="Logger"/>
+                <foreach collection="#[sessionVars.reportData]" batchSize="1000" doc:name="For Each">
+                	<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                	<dw:transform-message doc:name="TM : Collect Report EventLogFileIds">
+                		<dw:set-variable variableName="reportEventLogFileIds"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload.*payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-variable>
+                </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Update Report Flag">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"Fields": {
+		"REPORT_LOAD_FLG": "Y"
+	},
+	"Condition": "ID IN (" ++ flowVars.reportEventLogFileIds ++ ")"
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer doc:name="Object to String"/>
+                    <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+                    <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+                        <http:request config-ref="HTTP_Request_EM_Configuration" path="/updateEventLogFileTable" method="POST" doc:name="Update Report Load Flag to Y"/>
+                    </until-successful>
+                    <logger message="ReportDataIntoReportDataSet : Report Load Flag Updated on #[flowVars.reportEventLogFileIds]" level="INFO" doc:name="Logger"/>
+                </foreach>
+            </when>
+            <otherwise>
+                <logger message="ReportDataIntoReportDataSet : No Report(Export) records extracted from Database or Application for Dataset is not identified" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF123&quot;, &quot;InterfaceName&quot;: &quot;Report(Export) DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.reportRootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.reportRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.reportRecordCount]&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.reportRecordCount == 0 ? &quot;No records to Process&quot; : &quot;&quot;]&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="ReportDataIntoReportDataSet : Exception Occurred while Loading Report and Report Export Data into ReportDataSet. #[exception.message] " level="INFO" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                   <when expression="#[message.inboundProperties.'http.status' >= 500]">
+                       <set-session-variable variableName="toProceed" value="#[&quot;N&quot;]" doc:name="SV : Set Proceed Flag"/>
+                   </when>
+                   <otherwise>
+                       <logger level="INFO" doc:name="Logger" message="ReportDataIntoReportDataSet : #[exception.message]"/>
+                   </otherwise>
+               </choice>
+            <set-payload value="{&quot;InterfaceID&quot;: &quot;INF123&quot;, &quot;InterfaceName&quot;: &quot;Report(Export) DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.reportRootId]&quot;,&quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.reportRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.reportRecordCount]&quot;,&quot;ErrorDescription&quot;:&quot;Error Occurred while loading Report(Export) Data into ReportDataSet. #[exception.message] &quot;,&quot;ExceptionType&quot;:&quot;System&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        </catch-exception-strategy>
+    </flow>
+
+</mule>

@@ -1,0 +1,774 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd">
+    
+    <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans> 
+   	<spring:beans>
+		<spring:import resource="classpath:/queryframework.xml" />
+	</spring:beans>
+	<configuration doc:name="Configuration">
+  <expression-language autoResolveVariables="true">
+    <global-functions file = "GlobalUtilityFunctions.mvel">
+      def NoofDays(DateFrom, DateTo) 
+      { 
+      	org.delaware.util.DateUtil.getNumberofDays(DateFrom, DateTo); 
+      }
+    </global-functions>
+  </expression-language>
+</configuration>
+    <ws:consumer-config name="Web_Service_Consumer" service="BizTalkServiceInstance" port="WSHttpBinding_ITwoWayAsync" serviceAddress="https://ws.state.de.us:1406/dhss/IndividualManagementService" wsdlLocation="IndividualManagementService.wsdl" doc:name="Web Service Consumer"/>
+    <ws:consumer-config name="IndividCaseMgmtServiceConsumer" service="BizTalkServiceInstance" port="WSHttpBinding_ITwoWayAsync" serviceAddress="https://ws.state.de.us:1406/dhss/IndividualCaseManagementService" wsdlLocation="IndividualCaseManagementService.wsdl" doc:name="Web Service Consumer"/>
+    <vm:connector name="VM-GetDemogrpahics" validateConnections="true" doc:name="VM"/>
+    <vm:connector name="VM-GetCaseHistory" validateConnections="true" doc:name="VM"/>
+    <objectstore:config name="ObjectStore__Connector" partition="DHSS-007" doc:name="ObjectStore: Connector"/>
+    <flow name="inf007_dhss_case_activity_extract" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <schedulers:cron-scheduler expression="0 4 17 ? * MON,TUE,WED,THU,FRI *"/>
+            <set-payload value="INF007" doc:name="Set Payload"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="Variable : Set Interface ID"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id, Person_Cases__c, Person_Cases__r.Case__r.Name, Client__r.DEL_PID__c, Client__r.DEL_MCI__c, Person_Cases__r.Case__r.Status__c,  Person_Cases__r.Case__r.Division__c, MCI_Case_Person_ID__c, Person_Cases__r.Case__r.Owner.Name, Person_Cases__r.Person_Start_Date__c, Person_Cases__r.Person_End_Date__c  from DEL_DHSS_Case_Activity_Extract__c where Integrated_with_DHSS__c = false AND Person_Cases__c != null AND (Person_Cases__r.Person_End_Date__c = null OR Person_Cases__r.Person_End_Date__c = LAST_N_DAYS:30) AND (Person_Cases__r.Case_Close_Date__c = null OR Person_Cases__r.Case_Close_Date__c = LAST_N_DAYS:30) AND Person_Cases__r.Role__c NOT IN ${dhssCaseExtract.excludeRoles} AND Person_Cases__r.Case_Type__c NOT IN ${dhssCaseExtract.excludeCaseTypes}" doc:name="Salesforce :  Query for Qualified Case Person records"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf007-dhss-case-activity-extract-No-Payload-subflow" doc:name="inf007-dhss-case-activity-extract-No-Payload-subflow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression : If payload has records"/>
+        <dw:transform-message metadata:id="eeaf502c-729b-4ad2-b8d6-c54920e96a80" doc:name="Transform Message :  Transform the details into a list">
+            <dw:input-payload doc:sample="sample_data\DEL_Person_Cases__c.dwl" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (standarddatetime - |PT4H| )  when  (isDateInDST(((standarddatetime - |PT4H|) ) as :date,"US/Eastern") == true) otherwise (standarddatetime - |PT5H|)
+---
+payload map {
+    MCI : $.Client__r.DEL_MCI__c default "",
+    PID : $.Client__r.DEL_PID__c default "",
+    Division : $.Person_Cases__r.Case__r.Division__c default "",
+    CaseNumber : $.Person_Cases__r.Case__r.Name default "",
+    WorkerName : $.Person_Cases__r.Case__r.Owner.Name default "",  
+    PersonStartDate : (getDSTAdjustedDatetime($.Person_Cases__r.Person_Start_Date__c)  ) when $.Person_Cases__r.Person_Start_Date__c != null otherwise "" default "",
+    PersonEndDate :  (getDSTAdjustedDatetime($.Person_Cases__r.Person_End_Date__c) )  when $.Person_Cases__r.Person_End_Date__c != null otherwise "" default "",
+    SFCasePersonId : $.Id default "",
+    MCICasePersonId : $.MCI_Case_Person_ID__c default "",
+    IntegratedwithDHSS : $.Integrated_with_DHSS__c default ""
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="totalRecordCount" value="#[payload.size()]" doc:name="Variable : Set Total Record Count"/>
+        <dw:transform-message doc:name="Transform Message : Convert to CSV format; back up file">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+    MCI : $.MCI,
+    PID : $.PID,
+    CaseNumber : $.CaseNumber,
+    Division : $.Division,
+    MCICasePersonId : $.MCICasePersonId,
+    WorkerName : $.WorkerName,
+    SFCasePersonId : $.SFCasePersonId,
+    PersonStartDate : $.PersonStartDate, 
+    PersonEndDate : $.PersonEndDate
+} filter payload[$$].MCI != null and payload[$$].MCI != '']]></dw:set-payload>
+            <dw:set-variable variableName="MCIMissingFile"><![CDATA[%dw 1.0
+%output application/csv header = false, separator = "," , quoteValues=true, escape="\"" 
+---
+payload map {
+	MCI : $.MCI,
+    PID : $.PID,
+    CaseNumber : $.CaseNumber,
+    Division : $.Division,
+    WorkerName : $.WorkerName,
+    //PersonStartDate : $.PersonStartDate,
+    //PersonEndDate : $.PersonEndDate, 
+    PersonStartDate : ($.PersonStartDate as :string {format: "MM/dd/yy,HH:mm:ss"} ) when $.PersonStartDate != null and $.PersonStartDate != "" otherwise "", 
+    PersonEndDate : ($.PersonEndDate as :string {format: "MM/dd/yy,HH:mm:ss"}) when $.PersonEndDate != null and $.PersonEndDate != "" otherwise "",
+	ErrorDescription : 'MCI is missing'
+} filter $.MCI == null or $.MCI == '']]></dw:set-variable>
+
+        </dw:transform-message>
+        <set-variable variableName="incomingCasePersonRecords" value="#[payload]" doc:name="Variable : Store the records to be processed"/>
+
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF007&quot;, &quot;InterfaceName&quot;: &quot;DHSS Case Activity Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;DHSS Case Activity Extract Backup File&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Extension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload : In Progress Transaction" mimeType="application/json"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+
+        <set-session-variable variableName="FinalXMLOutput" value="" mimeType="application/xml" doc:name="Session Variable"/>
+        <set-variable variableName="ErrorXMLOutput " value="" doc:name="Variable"/>
+        <set-payload value="#[flowVars.incomingCasePersonRecords]" doc:name="Set Payload : Set query results from sfdc"/>
+        <foreach collection="#[payload]" doc:name="For Each : Pass one by one MCI record">
+            <set-variable variableName="MCIPayload" value="#[payload]" doc:name="Variable : Store the current record payload"/>
+            <flow-ref name="inf007-InterfaceCallout_Flow" doc:name="inf007-InterfaceCallout_Flow"/>
+        </foreach>
+        <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector" doc:name="ObjectStore: Retrieve all Keys"/>
+            <foreach doc:name="For Each Batch">
+                <set-variable variableName="Key" value="#[payload]" doc:name="FV: Store Key."/>
+
+                <objectstore:retrieve config-ref="ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore Retrieve"/>
+            <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+            <logger message="'Object store payload'#[payload] 'Session Variable'#[sessionVars.FinalXMLOutput]" level="INFO" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[sessionVars.FinalXMLOutput != null &amp;&amp; sessionVars.FinalXMLOutput != &quot;&quot; ]">
+                    <set-session-variable variableName="FinalXMLOutput" value="#[sessionVars.FinalXMLOutput]" mimeType="application/xml" doc:name="Session Variable"/>
+                    <dw:transform-message doc:name="TM: Object store get response">
+                    	<dw:input-payload mimeType="application/xml" />
+                        <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+---
+CasePersons:{
+	(sessionVars.FinalXMLOutput.CasePersons.*CasePerson map ((plrecord, indexOfplrecord) -> 
+        {
+              CasePerson: 
+              {
+					MCI : plrecord.MCI default "",
+					PID : plrecord.PID default "",
+				    CaseNumber : plrecord.CaseNumber default "",
+				    Division : plrecord.Division default "",
+				    WorkerName : plrecord.WorkerName default "",
+				    PersonStartDate : plrecord.PersonStartDate default "",
+				    PersonEndDate : plrecord.PersonEndDate default "",
+				    MCICasePersonId : plrecord.MCICasePersonId default "",
+				    SFCasePersonId : plrecord.SFCasePersonId default "",
+					ErrorMessage: plrecord.ErrorMessage default ""
+              }
+        }
+        )
+     ), 	
+	(payload.CasePersons.*CasePerson map {
+		CasePerson: {
+			MCI : $.MCI default "",
+			PID : $.PID default "",
+		    CaseNumber : $.CaseNumber default "",
+		    Division : $.Division default "",
+		    WorkerName : $.WorkerName default "",
+		    PersonStartDate : $.PersonStartDate default "",
+		    PersonEndDate : $.PersonEndDate default "",
+		    MCICasePersonId : $.MCICasePersonId default "",
+		    SFCasePersonId : $.SFCasePersonId default "",
+			ErrorMessage : $.ErrorMessage default ""
+		}
+	})
+	
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+                </when>
+                <otherwise>
+                    <set-session-variable variableName="FinalXMLOutput" value="#[payload]" mimeType="application/xml" doc:name="Session Variable"/>
+                </otherwise>
+            </choice>
+
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                <add-message-property key="FinalXMLOutput" value="#[payload]"/>
+
+                </message-properties-transformer>
+
+                <objectstore:remove config-ref="ObjectStore__Connector" key="#[Key]" ignoreNotExists="true" doc:name="ObjectStore : Remove Key" doc:description="Remove Key value pair once retrieved so that it will be empty for the next job."/>
+            </foreach>
+        <logger message="'Final XML Output before SFDC Output Call'#[sessionVars.FinalXMLOutput]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="UpdateSFDCCasePersonRecords_Subflow" doc:name="UpdateSFDCCasePersonRecords_Subflow"/>
+
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+    <flow name="inf007-InterfaceCallout_Flow" processingStrategy="synchronous">
+        <flow-ref name="GetDemographicInformation_Subflow" doc:name="GetDemographicInformation_Subflow"/>
+        <exception-strategy ref="inf007-dhss-case-activity-Choice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="GetDemographicInformation_Subflow">
+        <dw:transform-message doc:name="Transform Message :  Transform to DHSS request payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ind http://DHSS/DataServiceHub/MCI/IndividualManagement
+---
+{
+	ind#GetDemographicInformation: {
+		ind#mciNumber: payload.MCI
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property - SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.DemogrpahicAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <logger message="'Webservice Request for GetdemogrpahicInfo Request'#[payload]" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="2" doc:name="Until Successful" synchronous="true" millisBetweenRetries="3000">
+            <processor-chain doc:name="Processor Chain">
+                <ws:consumer config-ref="Web_Service_Consumer_Ind_Mgmt_Service" operation="GetDemographicInformation" doc:name="Web Service Consumer - Get Demogrpahic Information Request"/>
+                <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+            </processor-chain>
+        </until-successful>
+
+        <logger message="'Response from webservice getdemogrpahic Response'#[payload]" level="INFO" doc:name="Logger: Demogrpahic Response Logger"/>
+        <expression-component doc:name="Expression"><![CDATA[Thread.sleep(2000);]]></expression-component>
+        <logger message="'After getdemogrpahic choice step'#[xpath3('/CasePersons/CasePerson/ErrorMessage')]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message : Get the record details" metadata:id="943cfde6-06fe-457b-8b40-16b1164ea546">
+            <dw:input-payload doc:sample="sample_data\GetDemographicInformationResponse.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://DHSS/DataServiceHub/MCI/IndividualManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns2 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	Person: {
+		(MCINumber:  payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MCINumber as :string ) when payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MCINumber != null
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String : Convert to XML format"/>
+        <choice doc:name="Choice : If MCI Exists">
+            <when expression="xpath3('/Person/MCINumber') !=''">
+                <flow-ref name="GetCaseHistory_Subflow" doc:name="GetCaseHistory_Subflow"/>
+            </when>
+            <otherwise>
+                <set-variable variableName="errorAttachment" value="#[flowVars.errorAttachment  +  flowVars.MCIPayload.mci + ',' + 'GetDemographicInformation, ' + 'MCI is not found in DHSS System' + '\n' ]" doc:name="Variable"/>
+            </otherwise>
+        </choice>
+
+    </sub-flow>
+
+    <sub-flow name="GetCaseHistory_Subflow">
+
+        <dw:transform-message doc:name="Transform Message : Transform to DHSS request payload format">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace cas http://DHSS/DataServiceHub/MCI/CaseManagement
+---
+{
+	cas#GetCaseHistory: {
+		cas#mciNumber: flowVars.MCIPayload.MCI
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <logger message="'Get Case History Request' #[payload]" level="INFO" doc:name="Logger - Case History Request"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property - SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.CaseHistoryAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <until-successful maxRetries="2" doc:name="Until Successful" synchronous="true" millisBetweenRetries="3000">
+            <processor-chain doc:name="Processor Chain">
+                <ws:consumer config-ref="Web_Service_Consumer_Individ_Case_Mgmt_Service" operation="GetCaseHistory" doc:name="Web Service Consumer : Get CaseHistory"/>
+                <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+            </processor-chain>
+        </until-successful>
+
+        <logger message="'GetCaseHistory Response'#[payload]" level="INFO" doc:name="Logger : Case History Response"/>
+        <expression-component doc:name="Expression :  Wait for 2 seconds"><![CDATA[Thread.sleep(2000);]]></expression-component>
+        <dw:transform-message doc:name="Transform Message :  Get the MCICasePersonId if exists" metadata:id="f5fdadc6-0c09-4386-8f30-f27e2e162740">
+            <dw:input-payload doc:sample="sample_data\GetCaseHistoryResponse.xml" mimeType="application/xml"/>
+            <dw:input-variable doc:sample="sample_data\string.dwl" variableName="MCICasePersonId"/>
+            <dw:input-variable doc:sample="sample_data\string_1.dwl" variableName="MCIPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 Dhss.Common.MasterClientIndex.Services
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns2 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+CasePerson: 
+{
+	(
+		payload.GetCaseHistoryResponse.GetCaseHistoryResult.*m_Item2 filter ($.Program?) == true  map
+		{
+			Program: 
+			{
+				( $.*Program map
+					{
+						MCICasePersonId: $.PrimaryKey,
+						Department : $.Department,
+						DivisionCode : $.DivisionCode
+					} filter $.Department == "DSCYF" and $.DivisionCode == "CYF"	
+					)
+			}
+		}
+	)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String : Convert to XML Format"/>
+        <logger message="'Case History Transformer Message' #[payload]" level="INFO" doc:name="Logger : Case Histroy Tranasformer"/>
+        <choice doc:name="Choice : If Case History Record Exists in DHSS">
+            <when expression="xpath3('/CasePerson/Program/MCICasePersonId') !=''">
+                <set-session-variable variableName="DHSSCasePersonID" value="#[xpath3('/CasePerson/Program/MCICasePersonId')]" doc:name="Session Variable"/>
+                <flow-ref name="UpdateCaseHistory_Subflow" doc:name="UpdateCaseHistory_Subflow"/>
+            </when>
+            <otherwise>
+                <flow-ref name="AddCaseHistory_Subflow" doc:name="AddCaseHistory_Subflow"/>
+            </otherwise>
+        </choice>
+
+    </sub-flow>
+
+    <sub-flow name="AddCaseHistory_Subflow">
+
+        <dw:transform-message doc:name="Transform Message : Transform to DHSS request payload format" metadata:id="622eda8a-a2ad-44b8-9bba-d522a32ed3f0">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://DHSS/DataServiceHub/MCI/CaseManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	ns0#AddCaseHistory: {
+		ns0#mciNumber: flowVars.MCIPayload.MCI,
+		ns0#program: {
+			ns1#ProgramAdd: {
+				//ns1#AccountTypeCode: '',
+				ns1#CaseNumber: flowVars.MCIPayload.CaseNumber,
+				ns1#CaseStatusCode: 'I' when flowVars.MCIPayload.PersonEndDate != null and flowVars.MCIPayload.PersonEndDate != ""  otherwise 'A',
+				ns1#CreateWorker: flowVars.MCIPayload.WorkerName,
+				ns1#Department: 'DSCYF',
+				ns1#DivisionCode: 'CYF',
+				(ns1#EndDate: flowVars.MCIPayload.PersonEndDate) when flowVars.MCIPayload.PersonEndDate != null and flowVars.MCIPayload.PersonEndDate != "",
+				ns1#ParticipantStatusCode: 'I' when flowVars.MCIPayload.PersonEndDate != null and flowVars.MCIPayload.PersonEndDate != "" otherwise 'A',
+				ns1#ParticipantType: 'P',
+				(ns1#StartDate: flowVars.MCIPayload.PersonStartDate) when flowVars.MCIPayload.PersonStartDate != null and flowVars.MCIPayload.PersonStartDate != "",
+				ns1#System: 6300
+			}
+		}
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <logger message="'Add Case History Request'#[payload]" level="INFO" doc:name="Logger :  AddCaseHistory Request"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property - systemid"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.AddCaseHistoryAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <ws:consumer config-ref="Web_Service_Consumer_Individ_Case_Mgmt_Service" operation="AddCaseHistory" doc:name="Web Service Consumer"/>
+        <mulexml:dom-to-xml-transformer mimeType="application/xml" doc:name="DOM to XML"/>
+        <logger level="INFO" doc:name="Logger" message="'Add Case History Response'#[payload]"/>
+        <expression-component doc:name="Expression"><![CDATA[Thread.sleep(2000);]]></expression-component>
+        <choice doc:name="Choice : If it is not a first record">
+            <when expression="#[sessionVars.FinalXMLOutput!=&quot;&quot;]">
+                <set-session-variable variableName="FinalXMLOutput" value="#[sessionVars.FinalXMLOutput]" mimeType="application/xml" doc:name="Session Variable"/>
+
+                <dw:transform-message doc:name="Transform Message:  Update the FinalXMLoutput with the new value" metadata:id="4c7dc0c1-fab2-42d1-8cfa-8e80cbcca41e">
+                    <dw:input-payload mimeType="application/xml"/>
+                    <dw:input-variable mimeType="application/xml" variableName="FinalXMLOutput"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://DHSS/DataServiceHub/MCI/CaseManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns3 http://schemas.microsoft.com/2003/10/Serialization/Arrays
+---
+CasePersons:{
+	(sessionVars.FinalXMLOutput.CasePersons.*CasePerson map ((plrecord, indexOfplrecord) -> 
+        {
+              CasePerson: 
+              {
+                    MCICasePersonId: plrecord.MCICasePersonId default "",
+					SFCasePersonId :  plrecord.SFCasePersonId default "",
+					MCINumber : plrecord.MCI default "",
+					PID : plrecord.PID default "",
+				    CaseNumber : plrecord.CaseNumber default "",
+				    Division : plrecord.Division default "",
+				    WorkerName : plrecord.WorkerName default "",
+				    PersonStartDate : plrecord.PersonStartDate default "",
+				    PersonEndDate : plrecord.PersonEndDate default "",
+					ErrorMessage : plrecord.ErrorMessage
+              }
+        }
+        )
+     ), 	
+	(payload.AddCaseHistoryResponse.AddCaseHistoryResult.m_Item2.*KeyValueOfintguid map {
+		CasePerson: {
+			MCICasePersonId: $.Value default "",
+			SFCasePersonId :  flowVars.MCIPayload.SFCasePersonId default "",
+			MCI : flowVars.MCIPayload.MCI default "",
+			PID : flowVars.MCIPayload.PID default "",
+		    CaseNumber : flowVars.MCIPayload.CaseNumber default "",
+		    Division : flowVars.MCIPayload.Division default "",
+		    WorkerName : flowVars.MCIPayload.WorkerName default "",
+		    PersonStartDate : flowVars.MCIPayload.PersonStartDate default "",
+		    PersonEndDate : flowVars.MCIPayload.PersonEndDate default "",
+			ErrorMessage : ""
+		}
+	})
+	
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message :  First record ; Store SF ID and MCI Caseperson ID" metadata:id="a81bb3a7-e4ad-4c73-9ada-eca77f89add2">
+                    <dw:input-payload doc:sample="sample_data\AddCaseHistoryResponse_2.xml" mimeType="application/xml"/>
+                    <dw:input-variable variableName="FinalXMLOutput"/>
+                    <dw:input-variable doc:sample="sample_data\string_2.dwl" variableName="MCIPayload"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%namespace ns0 http://DHSS/DataServiceHub/MCI/CaseManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns3 http://schemas.microsoft.com/2003/10/Serialization/Arrays
+---
+CasePersons: {
+	(payload.AddCaseHistoryResponse.AddCaseHistoryResult.m_Item2.*KeyValueOfintguid map {
+		CasePerson : {
+			MCICasePersonId: $.Value default "",
+			SFCasePersonId :  flowVars.MCIPayload.SFCasePersonId default "",
+			MCI : flowVars.MCIPayload.MCI default "",
+			PID : flowVars.MCIPayload.PID default "",
+		    CaseNumber : flowVars.MCIPayload.CaseNumber default "",
+		    Division : flowVars.MCIPayload.Division default "",
+		    WorkerName : flowVars.MCIPayload.WorkerName default "",
+		    PersonStartDate : flowVars.MCIPayload.PersonStartDate default "",
+		    PersonEndDate : flowVars.MCIPayload.PersonEndDate default "",
+			ErrorMessage : ""
+		}
+	}
+	)
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+            <add-message-property key="FinalXMLOutput" value="#[sessionVars.FinalXMLOutput]"/>
+
+        </message-properties-transformer>
+        <objectstore:store config-ref="ObjectStore__Connector" key="XMLOutput_#[server.nanoTime()]" value-ref="#[payload]" doc:name="ObjectStore"/>
+        <logger message="'Add Case History in Final XML output' #[sessionVars.FinalXMLOutput]" level="INFO" doc:name="Logger"/>
+
+
+
+    </sub-flow>
+    <sub-flow name="UpdateCaseHistory_Subflow">
+        <logger message="'DHSS Case Person ID Session Var' #[sessionVars.DHSSCasePersonID]" level="INFO" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Transform Message : Transform to DHSS request payload format" metadata:id="3d5a74b9-dd10-4b9e-ad33-ad14d70f19b6">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://DHSS/DataServiceHub/MCI/CaseManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	ns0#UpdateCaseHistory: {
+		ns0#mciNumber: flowVars.MCIPayload.MCI,
+		ns0#programList: {
+			ns1#ProgramUpdate: {
+				//ns1#AccountTypeCode: '',
+				ns1#CaseNumber: flowVars.MCIPayload.caseNumber,
+				ns1#CaseStatusCode: 'I' when flowVars.MCIPayload.PersonEndDate != null and flowVars.MCIPayload.PersonEndDate != "" otherwise 'A',
+				ns1#Department: 'DSCYF',
+				ns1#DivisionCode: 'CYF',
+				(ns1#EndDate: flowVars.MCIPayload.PersonEndDate) when flowVars.MCIPayload.PersonEndDate != null and flowVars.MCIPayload.PersonEndDate != "",
+				ns1#ParticipantStatusCode: 'I' when flowVars.MCIPayload.PersonEndDate != null and flowVars.MCIPayload.PersonEndDate != "" otherwise 'A',
+				ns1#ParticipantType: 'P',
+				ns1#PrimaryKey: sessionVars.DHSSCasePersonID,
+				(ns1#StartDate: flowVars.MCIPayload.PersonStartDate) when flowVars.MCIPayload.PersonStartDate != null and flowVars.MCIPayload.PersonStartDate != "",
+				ns1#System: 6300
+			}
+		}
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <logger message="'Update Case History Request'#[payload] " level="INFO" doc:name="Logger"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property : SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.UpdateCaseHistoryAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <ws:consumer config-ref="Web_Service_Consumer_Individ_Case_Mgmt_Service" operation="UpdateCaseHistory" doc:name="Web Service Consumer : Update Case History Request"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <logger message="'update case history response'#[payload]" level="INFO" doc:name="Logger"/>
+        <expression-component doc:name="Expression : Wait for 2 seconds"><![CDATA[Thread.sleep(2000);]]></expression-component>
+        <logger message="'Session Var in Update history'#[sessionVars.FinalXMLOutput]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice : If it is not first record">
+            <when expression="#[sessionVars.FinalXMLOutput!=&quot;&quot;]">
+                <set-session-variable variableName="FinalXMLOutput" value="#[sessionVars.FinalXMLOutput]" mimeType="application/xml" doc:name="Session Variable"/>
+                <logger message="'More than one record'#[sessionVars.FinalXMLOutput]" level="INFO" doc:name="Logger"/>
+                <logger level="INFO" doc:name="Logger"/>
+
+                <dw:transform-message doc:name="Transform Message" metadata:id="90b400ba-63d8-4389-8e73-6a78b9070d9c">
+                    <dw:input-payload doc:sample="sample_data\UpdateCaseHistoryResponse.xml"/>
+                    <dw:input-variable doc:sample="sample_data\empty.xml" variableName="FinalXMLOutput"/>
+                    <dw:input-variable doc:sample="sample_data\string_3.dwl" variableName="MCIPayload"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%namespace ns0 http://DHSS/DataServiceHub/MCI/CaseManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns3 http://schemas.microsoft.com/2003/10/Serialization/Arrays
+---
+CasePersons:{
+	(sessionVars.FinalXMLOutput.CasePersons.*CasePerson map ((plrecord, indexOfplrecord) -> 
+        {
+              CasePerson: 
+              {
+                    MCICasePersonId: plrecord.MCICasePersonId default "",
+					SFCasePersonId :  plrecord.SFCasePersonId default "",
+					MCI : plrecord.MCI default "",
+					PID : plrecord.PID default "",
+				    CaseNumber : plrecord.CaseNumber default "",
+				    Division : plrecord.Division default "",
+				    WorkerName : plrecord.WorkerName default "",
+				    PersonStartDate : plrecord.PersonStartDate default "",
+				    PersonEndDate : plrecord.PersonEndDate default "",
+					ErrorMessage: plrecord.ErrorMessage
+              }
+        }
+        )
+     ), 	
+	(payload.UpdateCaseHistoryResponse.UpdateCaseHistoryResult.m_Item2.*KeyValueOfintguid map {
+		CasePerson: {
+			MCICasePersonId: $.Value default "",
+			SFCasePersonId :  flowVars.MCIPayload.SFCasePersonId default "",
+			MCI : flowVars.MCIPayload.MCI default "",
+			PID : flowVars.MCIPayload.PID default "",
+		    CaseNumber : flowVars.MCIPayload.CaseNumber default "",
+		    Division : flowVars.MCIPayload.Division default "",
+		    WorkerName : flowVars.MCIPayload.WorkerName default "",
+		    PersonStartDate : flowVars.MCIPayload.PersonStartDate default "",
+		    PersonEndDate : flowVars.MCIPayload.PersonEndDate default "",
+			ErrorMessage : ""
+		}
+	})
+	
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <logger message="'First Record'#[sessionVars.FinalXMLOutput]" level="INFO" doc:name="Logger"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%namespace ns0 http://DHSS/DataServiceHub/MCI/CaseManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns3 http://schemas.microsoft.com/2003/10/Serialization/Arrays
+---
+CasePersons: {
+	(payload.UpdateCaseHistoryResponse.UpdateCaseHistoryResult.m_Item2.*KeyValueOfintguid map {
+		CasePerson : {
+			MCICasePersonId: $.Value default "",
+			SFCasePersonId :  flowVars.MCIPayload.SFCasePersonId default "",
+			MCI : flowVars.MCIPayload.MCI default "",
+			PID : flowVars.MCIPayload.PID default "",
+		    CaseNumber : flowVars.MCIPayload.CaseNumber default "",
+		    Division : flowVars.MCIPayload.Division default "",
+		    WorkerName : flowVars.MCIPayload.WorkerName default "",
+		    PersonStartDate : flowVars.MCIPayload.PersonStartDate default "",
+		    PersonEndDate : flowVars.MCIPayload.PersonEndDate default "",
+			ErrorMessage : ""
+		}
+	}
+	)
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties" mimeType="application/xml">
+            <add-message-property key="FinalXMLOutput" value="#[sessionVars.FinalXMLOutput]"/>
+
+
+        </message-properties-transformer>
+        <objectstore:store config-ref="ObjectStore__Connector" key="XMLOutput_#[server.nanoTime()]" value-ref="#[payload]" doc:name="ObjectStore"/>
+        <logger message="'Update Case History in Final XML output' #[sessionVars.FinalXMLOutput]" level="INFO" doc:name="Logger"/>
+
+
+
+    </sub-flow>
+    <sub-flow name="UpdateSFDCCasePersonRecords_Subflow">
+        <logger message="'In Salesforce Step Final XMl Var'#[sessionVars.FinalXMLOutput] '" level="INFO" doc:name="Logger"/>
+        <set-payload value="#[sessionVars.FinalXMLOutput]" mimeType="application/xml" doc:name="Set Payload"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload != null &amp;&amp; payload != &quot;&quot;]">
+                <dw:transform-message doc:name="Transform Message : Transform to salesforce required format" metadata:id="5a5f2c00-e420-4e67-b8c8-9943b161f489">
+                    <dw:input-payload mimeType="application/xml" doc:sample="sample_data\empty_4.xml"/>
+                    <dw:set-payload><![CDATA[//Extend the functionality to capture the "Date on which record is integrated with DHSS" so that it will be helpful for business to fetch the records based on the date criteria
+%dw 1.0
+%output application/java
+---
+payload.CasePersons.*CasePerson filter $.ErrorMessage == null or $.ErrorMessage == "" map {
+	Id: $.SFCasePersonId,
+	Integrated_with_DHSS__c: true,
+	Integrated_Date_with_DHSS__c : now as :date {format: "yyyy-MM-dd"},
+	MCI_Case_Person_ID__c: $.MCICasePersonId
+} ]]></dw:set-payload>
+                    <dw:set-variable variableName="WebServiceErrorFile"><![CDATA[//Extend the functionality to capture the "Date on which record is integrated with DHSS" so that it will be helpful for business to fetch the records based on the date criteria
+%dw 1.0
+%output application/csv header = false, separator = "," , quoteValues=true, escape="\"" 
+---
+payload.CasePersons.*CasePerson filter $.ErrorMessage != null and $.ErrorMessage != ""  map {
+	MCI : $.MCI,
+	PID : $.PID,
+    CaseNumber : $.CaseNumber,
+    Division : $.Division,
+    WorkerName : $.WorkerName,
+    PersonStartDate : ($.PersonStartDate as :datetime  as :string {format: "MM/dd/yy,HH:mm:ss"} ) when $.PersonStartDate != null and $.PersonStartDate != "" otherwise "",
+    PersonEndDate : ($.PersonEndDate as :datetime  as :string {format: "MM/dd/yy,HH:mm:ss"} ) when $.PersonEndDate != null and $.PersonEndDate != "" otherwise "",
+    //PersonStartDate : $.PersonStartDate , 
+    //PersonEndDate : $.PersonEndDate ,
+	ErrorMessage : $.ErrorMessage replace "\n" with "" replace "\r\n" with "" replace "\r" with ""
+}]]></dw:set-variable>
+                    <dw:set-variable variableName="BackupFile"><![CDATA[%dw 1.0
+%output application/csv separator = "," , quoteValues=true, escape="\"" 
+---
+payload.CasePersons.*CasePerson filter $.ErrorMessage == null or $.ErrorMessage == ""  map {
+	MCI : $.MCI,
+	PID : $.PID,
+    CaseNumber : $.CaseNumber,
+    Division : $.Division,
+    WorkerName : $.WorkerName,
+    PersonStartDate : ($.PersonStartDate as :datetime  as :string {format: "MM/dd/yy,HH:mm:ss"} ) when $.PersonStartDate != null and $.PersonStartDate != "" otherwise "",
+    PersonEndDate : ($.PersonEndDate as :datetime  as :string {format: "MM/dd/yy,HH:mm:ss"} ) when $.PersonEndDate != null and $.PersonEndDate != "" otherwise "",
+    //PersonStartDate : $.PersonStartDate, 
+    //PersonEndDate : $.PersonEndDate,
+	DHSSCasePersonID: $.MCICasePersonId
+}]]></dw:set-variable>
+                    <dw:set-session-variable variableName="CasePersonsToUpdate"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.CasePersons.*CasePerson filter $.ErrorMessage == null and $.ErrorMessage == ""  map {
+	MCI : $.MCI,
+	PID : $.PID,
+    CaseNumber : $.CaseNumber,
+    Division : $.Division,
+    WorkerName : $.WorkerName,
+    PersonStartDate : $.PersonStartDate, 
+    PersonEndDate : $.PersonEndDate,
+	ErrorMessage : $.ErrorMessage
+}]]></dw:set-session-variable>
+
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <set-payload value="#[[]]" doc:name="Set Payload : Set Null payload"/>
+            </otherwise>
+        </choice>
+        <logger message="'Before salesforce update step'#[payload] 'Backup File '#[flowVars.BackupFile]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload != null &amp;&amp; payload != &quot;&quot; &amp;&amp; payload.size() &gt; 0]">
+                <logger message="'Before salesforce update call'#[payload]" level="INFO" doc:name="Logger"/>
+                <logger message="'Session Var Cases to update'#[sessionVars.CasePersonsToUpdate]" level="INFO" doc:name="Logger"/>
+                <sfdc:update-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_DHSS_Case_Activity_Extract__c" doc:name="Salesforce : Update Case Person with MCI Response">
+                    <sfdc:objects ref="#[payload]"/>
+                </sfdc:update-bulk>
+                <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP: Save JobID">
+                        <add-message-property key="JobId" value="#[payload.jobId]"/>
+                        <add-message-property key="JobResponse" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <until-successful maxRetries="50" millisBetweenRetries="3000" failureExpression="#[payload.state== 'Queued' || payload.state == 'InProgress' ]" synchronous="true" doc:name="Until Successful">
+                        <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Upsert Result">
+                            <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
+                        </sfdc:batch-result-stream>
+                    </until-successful>
+                <object-to-string-transformer mimeType="application/xml" doc:name="O to S: Change Filestream to XML"/>
+                    <dw:transform-message doc:name="TM: Case Person Salesforce Error Details">
+                        <dw:set-payload><![CDATA[%input payload application/xml 
+%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+---
+payload.results.*result map {
+	MCI : sessionVars.CasePersonsToUpdate[$$].MCI,
+	PID : sessionVars.CasePersonsToUpdate[$$].PID,
+    CaseNumber : sessionVars.CasePersonsToUpdate[$$].CaseNumber,
+    Division : sessionVars.CasePersonsToUpdate[$$].Division,
+    WorkerName : sessionVars.CasePersonsToUpdate[$$].WorkerName,
+    PersonStartDate : sessionVars.CasePersonsToUpdate[$$].PersonStartDate, 
+    PersonEndDate : sessionVars.CasePersonsToUpdate[$$].PersonEndDate,
+	ErrorDescription: ($.errors.fields) ++ (    ( ' ' ++ 'is Missing' ) when $.errors.statusCode == 'REQUIRED_FIELD_MISSING' otherwise (' ' ++ 'is of Invalid Format')) when $.errors.fields != null otherwise null
+} filter $.ErrorDescription != null and $.ErrorDescription != ""]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Convert to CSV format"/>
+                <set-session-variable variableName="errorAttachment" value="#[payload != null &amp;&amp; payload != &quot;&quot; ? flowVars.WebServiceErrorFile +flowVars.MCIMissingFile + payload : flowVars.WebServiceErrorFile +flowVars.MCIMissingFile]" mimeType="application/csv" doc:name="Session Variable"/>
+
+                    <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.JobId]" doc:name="SFDC: Close Job"/>
+
+            </when>
+            <otherwise>
+                <logger message="&quot;No records to update in salesforce&quot;" level="INFO" doc:name="Logger"/>
+                <set-session-variable variableName="errorAttachment" value="#[flowVars.WebServiceErrorFile +flowVars.MCIMissingFile]" mimeType="application/csv" doc:name="Session Variable"/>
+            </otherwise>
+        </choice>
+
+
+        <logger message="'Error Attachment in the end'#[sessionVars.errorAttachment]" level="INFO" doc:name="Logger"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id, Person_Cases__c  from DEL_DHSS_Case_Activity_Extract__c where Person_Cases__c = null AND MCI_Case_Person_ID__c = null" doc:name="Salesforce : Query temp table to get the blank person case records"/>
+        <dw:transform-message doc:name="TM : Take the Ids to Delete">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ($.Id)]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:delete config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Delete the records"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="totalErrorCount" value="#[(sessionVars.errorAttachment == &quot;&quot; || sessionVars.errorAttachment == null) ? 0 : (sessionVars.errorAttachment.split('\n').size())]"/>
+
+        </message-properties-transformer>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Success Count and Status">
+            <add-message-property key="totalSuccCount" value="#[totalRecordCount - totalErrorCount]"/>
+            <add-message-property key="recStatus" value="#[totalErrorCount == 0 ? 'Success' : (totalRecordCount == totalErrorCount ? 'Error' : 'Completed with Error(s)')]"/>
+        </message-properties-transformer>
+        <logger message="'Status'#[flowVars.recStatus] 'totalErrorCount' #[totalErrorCount]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.recStatus != 'Success']">
+                <set-session-variable variableName="ErrorAttachment" value="#['MCI,PID,Case Number,Division,Worker Name,Start Date,End Date,Error Message' + '\n' + sessionVars.errorAttachment]" doc:name="Session Variable : Set Error Attachment"/>
+            </when>
+            <otherwise>
+                <logger message="' No Error file ' #[flowVars.recStatus != 'Success']" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <set-session-variable variableName="TransAttachment" value="#[flowVars.BackupFile]" doc:name="Session Variable"/>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF007&quot;, &quot;InterfaceName&quot;: &quot;DHSS Case Activity Extract&quot;,&quot;ErrorFilename&quot;:&quot;Errors/Warning_DHSSCaseActivityExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;DHSS Case Activity Extract File Backup&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.totalRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload :  Transaction Completed Record" mimeType="application/json"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+    </sub-flow>
+    <sub-flow name="inf007-dhss-case-activity-extract-No-Payload-subflow">
+        <choice doc:name="Choice : Check if Payload has records">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF007&quot;, &quot;InterfaceName&quot;: &quot;DHSS Case Activity Extract&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to No Records Found for Logging Framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </when>
+            <otherwise>
+                <logger message="No records found in salesforce extraction" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <choice-exception-strategy name="inf007-dhss-case-activity-Choice_Exception_Strategy">
+        <catch-exception-strategy doc:name="default Exception Strategy">
+            <mulexml:dom-to-xml-transformer mimeType="text/xml" doc:name="DOM to XML"/>
+
+            <logger message="'Exception from service'#[payload] " level="INFO" doc:name="Logger"/>
+            <logger message="'Initial for each payload record details'#[flowVars.MCIPayload]" level="INFO" doc:name="Logger"/>
+            <dw:transform-message metadata:id="08b06376-dc27-4c4c-8a14-d0841c8aea7d" doc:name="Transform Message">
+                <dw:input-payload doc:sample="C:\Users\hemanth.chada\Desktop\sample payload.xml" mimeType="application/xml"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Detail.ExceptionDetail.Message]]></dw:set-payload>
+            </dw:transform-message>
+            <set-payload value="#[payload.replaceAll(&quot;&amp;gt;&quot;,&quot;&gt;&quot;).replaceAll(&quot;&amp;lt;&quot;,&quot;&lt;&quot;)]" mimeType="application/xml" doc:name="Set Payload"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	CasePersons : {
+      CasePerson : {
+      		MCI	:flowVars.MCIPayload.MCI,
+      		PID : flowVars.MCIPayload.PID,
+		    CaseNumber : flowVars.MCIPayload.CaseNumber,
+		    Division : flowVars.MCIPayload.Division,
+		    WorkerName : flowVars.MCIPayload.WorkerName,
+		    PersonStartDate : flowVars.MCIPayload.PersonStartDate, 
+		    PersonEndDate : flowVars.MCIPayload.PersonEndDate,
+            ErrorMessage: payload.SoapFault.Error.Fault.detail.ExceptionDetail.Message      
+      }
+	}
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+            <logger message="Catch Exception Strategy Payload #[payload]" level="INFO" doc:name="Logger"/>
+            <objectstore:store config-ref="ObjectStore__Connector" key="XMLOutput_#[server.nanoTime()]" value-ref="#[payload]" doc:name="ObjectStore"/>
+
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+</mule>

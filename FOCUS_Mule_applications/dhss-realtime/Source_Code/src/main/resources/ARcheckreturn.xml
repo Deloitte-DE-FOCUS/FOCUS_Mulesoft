@@ -1,0 +1,10 @@
+
+	<soap:Body>
+      <ARRequestCheckReturn xmlns:soap="http://kids.delaware.gov/">
+         <IsSuccessful>False</IsSuccessful>
+         <RequestReciept/>
+         <FirstName1>test</FirstName1>
+         <LastName1>test</LastName1>
+         <BirthDate>1990-02-02T00:00:00</BirthDate>
+      </ARRequestCheckReturn>
+   </soap:Body>

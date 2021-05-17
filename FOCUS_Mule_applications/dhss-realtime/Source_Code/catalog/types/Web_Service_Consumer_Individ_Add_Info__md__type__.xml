@@ -1,0 +1,1996 @@
+<metadata__catalog__entry>
+  <version>5.2.0.0</version>
+  <types class="tree-map">
+    <entry>
+      <org.mule.common.metadata.DefaultMetaDataKey>
+        <id>GetContactInformation</id>
+        <displayName>GetContactInformation</displayName>
+        <category>DEFAULT</category>
+        <metaDataKeyPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+          </properties>
+        </metaDataKeyPropertiesManager>
+      </org.mule.common.metadata.DefaultMetaDataKey>
+      <org.mule.common.metadata.DefaultXmlMetaDataModel>
+        <dataType>XML</dataType>
+        <metaDataModelPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.property.TextBasedExampleMetaDataModelProperty/>
+            <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/>
+            <org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+              <metaDataKey class="org.mule.common.metadata.DefaultMetaDataKey" reference="../../../../../org.mule.common.metadata.DefaultMetaDataKey"/>
+              <derivedStructure>false</derivedStructure>
+              <generatedStructure>false</generatedStructure>
+            </org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+          </properties>
+        </metaDataModelPropertiesManager>
+        <fields>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>ns0:mciNumber</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <dataType>LONG</dataType>
+              <metaDataModelPropertiesManager>
+                <properties>
+                  <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                    <typeQName>
+                      <namespaceURI>http://www.w3.org/2001/XMLSchema</namespaceURI>
+                      <localPart>unsignedLong</localPart>
+                      <prefix></prefix>
+                    </typeQName>
+                  </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                </properties>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.property.QNameMetaDataProperty>
+                  <name>
+                    <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+                    <localPart>mciNumber</localPart>
+                    <prefix>ns0</prefix>
+                  </name>
+                </org.mule.common.metadata.property.QNameMetaDataProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+        </fields>
+        <rootElement>
+          <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+          <localPart>GetContactInformation</localPart>
+          <prefix>ns0</prefix>
+        </rootElement>
+        <schemas class="org.mule.common.metadata.StringBasedSchemaProvider">
+          <schemas>
+            <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.microsoft.com/Message&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.microsoft.com/Message&quot;&gt;&#xd;
+&lt;xs:complexType name=&quot;MessageBody&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:any maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; namespace=&quot;##any&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+            <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation/Imports&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; targetNamespace=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation/Imports&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+            <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; attributeFormDefault=&quot;qualified&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;&gt;&#xd;
+&lt;xs:element name=&quot;anyType&quot; nillable=&quot;true&quot; type=&quot;xs:anyType&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;anyURI&quot; nillable=&quot;true&quot; type=&quot;xs:anyURI&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;base64Binary&quot; nillable=&quot;true&quot; type=&quot;xs:base64Binary&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;boolean&quot; nillable=&quot;true&quot; type=&quot;xs:boolean&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;byte&quot; nillable=&quot;true&quot; type=&quot;xs:byte&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;dateTime&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;decimal&quot; nillable=&quot;true&quot; type=&quot;xs:decimal&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;double&quot; nillable=&quot;true&quot; type=&quot;xs:double&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;float&quot; nillable=&quot;true&quot; type=&quot;xs:float&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;int&quot; nillable=&quot;true&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;long&quot; nillable=&quot;true&quot; type=&quot;xs:long&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;QName&quot; nillable=&quot;true&quot; type=&quot;xs:QName&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;short&quot; nillable=&quot;true&quot; type=&quot;xs:short&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;string&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;unsignedByte&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedByte&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;unsignedInt&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedInt&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;unsignedLong&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;unsignedShort&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedShort&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;char&quot; nillable=&quot;true&quot; type=&quot;tns:char&quot;/&gt;&#xd;
+&lt;xs:simpleType name=&quot;char&quot;&gt;&#xd;
+&lt;xs:restriction base=&quot;xs:int&quot;/&gt;&#xd;
+&lt;/xs:simpleType&gt;&#xd;
+&lt;xs:element name=&quot;duration&quot; nillable=&quot;true&quot; type=&quot;tns:duration&quot;/&gt;&#xd;
+&lt;xs:simpleType name=&quot;duration&quot;&gt;&#xd;
+&lt;xs:restriction base=&quot;xs:duration&quot;&gt;&#xd;
+&lt;xs:pattern value=&quot;\-?P(\d*D)?(T(\d*H)?(\d*M)?(\d*(\.\d*)?S)?)?&quot;/&gt;&#xd;
+&lt;xs:minInclusive value=&quot;-P10675199DT2H48M5.4775808S&quot;/&gt;&#xd;
+&lt;xs:maxInclusive value=&quot;P10675199DT2H48M5.4775807S&quot;/&gt;&#xd;
+&lt;/xs:restriction&gt;&#xd;
+&lt;/xs:simpleType&gt;&#xd;
+&lt;xs:element name=&quot;guid&quot; nillable=&quot;true&quot; type=&quot;tns:guid&quot;/&gt;&#xd;
+&lt;xs:simpleType name=&quot;guid&quot;&gt;&#xd;
+&lt;xs:restriction base=&quot;xs:string&quot;&gt;&#xd;
+&lt;xs:pattern value=&quot;[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}&quot;/&gt;&#xd;
+&lt;/xs:restriction&gt;&#xd;
+&lt;/xs:simpleType&gt;&#xd;
+&lt;xs:attribute name=&quot;FactoryType&quot; type=&quot;xs:QName&quot;/&gt;&#xd;
+&lt;xs:attribute name=&quot;Id&quot; type=&quot;xs:ID&quot;/&gt;&#xd;
+&lt;xs:attribute name=&quot;Ref&quot; type=&quot;xs:IDREF&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+            <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:ser=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;references xmlns=&quot;http://schemas.microsoft.com/BizTalk/2003&quot;&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/references&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAlternativeReference&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AlternativeReference&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReference&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAlternativeReference&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAlternativeReference&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AlternativeReference&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastUpdatedDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PrimaryKey&quot; type=&quot;ser:guid&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceDataKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceTypeKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AlternativeReference&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReference&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAlternativeReferenceAdd&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AlternativeReferenceAdd&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReferenceAdd&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAlternativeReferenceAdd&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAlternativeReferenceAdd&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AlternativeReferenceAdd&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceDataKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceTypeKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AlternativeReferenceAdd&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReferenceAdd&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;UpdateResult&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;MciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;Result&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;UpdateResult&quot; nillable=&quot;true&quot; type=&quot;tns:UpdateResult&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAlternativeReferenceUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AlternativeReferenceUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReferenceUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAlternativeReferenceUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAlternativeReferenceUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AlternativeReferenceUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PrimaryKey&quot; type=&quot;ser:guid&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceDataKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceTypeKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AlternativeReferenceUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReferenceUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfPhone&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;Phone&quot; nillable=&quot;true&quot; type=&quot;tns:Phone&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfPhone&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfPhone&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;Phone&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastUpdatedDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneNumber&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;Phone&quot; nillable=&quot;true&quot; type=&quot;tns:Phone&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;Email&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailAddress&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastUpdatedDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;Email&quot; nillable=&quot;true&quot; type=&quot;tns:Email&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAddress&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;Address&quot; nillable=&quot;true&quot; type=&quot;tns:Address&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAddress&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAddress&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;Address&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine1&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine2&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressValidationFlag&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AptNo&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;City&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CountyCode&quot; nillable=&quot;true&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastUpdatedDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;State&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipCode&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipSuffix&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;Address&quot; nillable=&quot;true&quot; type=&quot;tns:Address&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfPhoneCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;PhoneCreate&quot; nillable=&quot;true&quot; type=&quot;tns:PhoneCreate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfPhoneCreate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfPhoneCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;PhoneCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneNumber&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;PhoneCreate&quot; nillable=&quot;true&quot; type=&quot;tns:PhoneCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;EmailCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailAddress&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;EmailCreate&quot; nillable=&quot;true&quot; type=&quot;tns:EmailCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAddressCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AddressCreate&quot; nillable=&quot;true&quot; type=&quot;tns:AddressCreate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAddressCreate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAddressCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AddressCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine1&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine2&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressValidationFlag&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AptNo&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;City&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CountyCode&quot; nillable=&quot;true&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;State&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipCode&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipSuffix&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AddressCreate&quot; nillable=&quot;true&quot; type=&quot;tns:AddressCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfPhoneUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;PhoneUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:PhoneUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfPhoneUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfPhoneUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;PhoneUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneNumber&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;PhoneUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:PhoneUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;EmailUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailAddress&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;EmailUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:EmailUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAddressUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AddressUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:AddressUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAddressUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAddressUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AddressUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine1&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine2&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressValidationFlag&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AptNo&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;City&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CountyCode&quot; nillable=&quot;true&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;State&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipCode&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipSuffix&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AddressUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:AddressUpdate&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+            <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:ser=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;references xmlns=&quot;http://schemas.microsoft.com/BizTalk/2003&quot;&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/references&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfKeyValueOfintguid&quot;&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;IsDictionary xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;&gt;true&lt;/IsDictionary&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;KeyValueOfintguid&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element name=&quot;Key&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;Value&quot; type=&quot;ser:guid&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfKeyValueOfintguid&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfKeyValueOfintguid&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+            <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.datacontract.org/2004/07/System&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;/&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;references xmlns=&quot;http://schemas.microsoft.com/BizTalk/2003&quot;&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;/&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/references&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:complexType name=&quot;TupleOfunsignedLongArrayOfAlternativeReferenceeGKO5UHU&quot;&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;GenericType xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; Name=&quot;TupleOf{0}{1}{#}&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;&gt;&#xd;
+&lt;GenericParameter Name=&quot;unsignedLong&quot; Namespace=&quot;http://www.w3.org/2001/XMLSchema&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;ArrayOfAlternativeReference&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;/GenericType&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element name=&quot;m_Item1&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q1=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item2&quot; nillable=&quot;true&quot; type=&quot;q1:ArrayOfAlternativeReference&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;TupleOfunsignedLongArrayOfAlternativeReferenceeGKO5UHU&quot; nillable=&quot;true&quot; type=&quot;tns:TupleOfunsignedLongArrayOfAlternativeReferenceeGKO5UHU&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot;&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;GenericType xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; Name=&quot;TupleOf{0}{1}{#}&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;&gt;&#xd;
+&lt;GenericParameter Name=&quot;UpdateResult&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;ArrayOfKeyValueOf{0}{1}{#}&quot; Namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;&gt;&#xd;
+&lt;GenericParameter Name=&quot;int&quot; Namespace=&quot;http://www.w3.org/2001/XMLSchema&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;guid&quot; Namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/GenericParameter&gt;&#xd;
+&lt;/GenericType&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q2=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item1&quot; nillable=&quot;true&quot; type=&quot;q2:UpdateResult&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q3=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot; name=&quot;m_Item2&quot; nillable=&quot;true&quot; type=&quot;q3:ArrayOfKeyValueOfintguid&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot; nillable=&quot;true&quot; type=&quot;tns:TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV&quot;&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;GenericType xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; Name=&quot;TupleOf{0}{1}{2}{3}{#}&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;&gt;&#xd;
+&lt;GenericParameter Name=&quot;unsignedLong&quot; Namespace=&quot;http://www.w3.org/2001/XMLSchema&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;ArrayOfPhone&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;Email&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;ArrayOfAddress&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;/GenericType&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element name=&quot;m_Item1&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q4=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item2&quot; nillable=&quot;true&quot; type=&quot;q4:ArrayOfPhone&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q5=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item3&quot; nillable=&quot;true&quot; type=&quot;q5:Email&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q6=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item4&quot; nillable=&quot;true&quot; type=&quot;q6:ArrayOfAddress&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV&quot; nillable=&quot;true&quot; type=&quot;tns:TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+            <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;b:references&gt;&#xd;
+&lt;b:reference targetNamespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;b:reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;/&gt;&#xd;
+&lt;b:reference targetNamespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;/&gt;&#xd;
+&lt;b:reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/b:references&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:element name=&quot;GetAlternativeReference&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;GetAlternativeReferenceResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q1=&quot;http://schemas.datacontract.org/2004/07/System&quot; minOccurs=&quot;0&quot; name=&quot;GetAlternativeReferenceResult&quot; nillable=&quot;true&quot; type=&quot;q1:TupleOfunsignedLongArrayOfAlternativeReferenceeGKO5UHU&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;AddAlternativeReference&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q2=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;alternativeReference&quot; nillable=&quot;true&quot; type=&quot;q2:ArrayOfAlternativeReferenceAdd&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;AddAlternativeReferenceResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q3=&quot;http://schemas.datacontract.org/2004/07/System&quot; minOccurs=&quot;0&quot; name=&quot;AddAlternativeReferenceResult&quot; nillable=&quot;true&quot; type=&quot;q3:TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;UpdateAlternativeReference&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q4=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;alternativeReferencesList&quot; nillable=&quot;true&quot; type=&quot;q4:ArrayOfAlternativeReferenceUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;UpdateAlternativeReferenceResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q5=&quot;http://schemas.datacontract.org/2004/07/System&quot; minOccurs=&quot;0&quot; name=&quot;UpdateAlternativeReferenceResult&quot; nillable=&quot;true&quot; type=&quot;q5:TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;GetContactInformation&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;GetContactInformationResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q6=&quot;http://schemas.datacontract.org/2004/07/System&quot; minOccurs=&quot;0&quot; name=&quot;GetContactInformationResult&quot; nillable=&quot;true&quot; type=&quot;q6:TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;AddContactInformation&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q7=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;phoneList&quot; nillable=&quot;true&quot; type=&quot;q7:ArrayOfPhoneCreate&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q8=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;email&quot; nillable=&quot;true&quot; type=&quot;q8:EmailCreate&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q9=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;addressList&quot; nillable=&quot;true&quot; type=&quot;q9:ArrayOfAddressCreate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;AddContactInformationResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q10=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;AddContactInformationResult&quot; nillable=&quot;true&quot; type=&quot;q10:UpdateResult&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;UpdateContactInformation&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q11=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;phoneList&quot; nillable=&quot;true&quot; type=&quot;q11:ArrayOfPhoneUpdate&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q12=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;email&quot; nillable=&quot;true&quot; type=&quot;q12:EmailUpdate&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q13=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;addressList&quot; nillable=&quot;true&quot; type=&quot;q13:ArrayOfAddressUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;UpdateContactInformationResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q14=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;UpdateContactInformationResult&quot; nillable=&quot;true&quot; type=&quot;q14:UpdateResult&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+          </schemas>
+          <encoding>windows-1252</encoding>
+          <baseUri>file:/C:/Users/hechada/Documents/AnypointStudio Workspace/DHSS-REALTIME-IUAT-V2/src/main/wsdl/IndividualAdditionalInformationService.wsdl</baseUri>
+        </schemas>
+        <namespaceManager>
+          <namespacePrefix>
+            <entry>
+              <string>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</string>
+              <string>ns0</string>
+            </entry>
+          </namespacePrefix>
+        </namespaceManager>
+      </org.mule.common.metadata.DefaultXmlMetaDataModel>
+    </entry>
+    <entry>
+      <org.mule.common.metadata.DefaultMetaDataKey>
+        <id>GetContactInformationResponse</id>
+        <displayName>GetContactInformationResponse</displayName>
+        <category>DEFAULT</category>
+        <metaDataKeyPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+          </properties>
+        </metaDataKeyPropertiesManager>
+      </org.mule.common.metadata.DefaultMetaDataKey>
+      <org.mule.common.metadata.DefaultXmlMetaDataModel>
+        <dataType>XML</dataType>
+        <metaDataModelPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.property.TextBasedExampleMetaDataModelProperty/>
+            <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/>
+            <org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+              <metaDataKey class="org.mule.common.metadata.DefaultMetaDataKey" reference="../../../../../org.mule.common.metadata.DefaultMetaDataKey"/>
+              <derivedStructure>false</derivedStructure>
+              <generatedStructure>false</generatedStructure>
+            </org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+          </properties>
+        </metaDataModelPropertiesManager>
+        <fields>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>ns0:GetContactInformationResult</name>
+            <model class="org.mule.common.metadata.DefaultXmlMetaDataModel">
+              <dataType>XML</dataType>
+              <metaDataModelPropertiesManager>
+                <properties>
+                  <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                    <typeQName>
+                      <namespaceURI>http://schemas.datacontract.org/2004/07/System</namespaceURI>
+                      <localPart>TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV</localPart>
+                      <prefix></prefix>
+                    </typeQName>
+                  </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                </properties>
+              </metaDataModelPropertiesManager>
+              <fields>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>ns1:m_Item1</name>
+                  <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                    <dataType>LONG</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties>
+                        <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                          <typeQName reference="../../../../../../../../../../../../entry/org.mule.common.metadata.DefaultXmlMetaDataModel/fields/org.mule.common.metadata.DefaultMetaDataField/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                        </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                      </properties>
+                    </metaDataModelPropertiesManager>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.property.QNameMetaDataProperty>
+                        <name>
+                          <namespaceURI>http://schemas.datacontract.org/2004/07/System</namespaceURI>
+                          <localPart>m_Item1</localPart>
+                          <prefix>ns1</prefix>
+                        </name>
+                      </org.mule.common.metadata.property.QNameMetaDataProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>ns1:m_Item2</name>
+                  <model class="org.mule.common.metadata.DefaultXmlMetaDataModel">
+                    <dataType>XML</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties>
+                        <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                          <typeQName>
+                            <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                            <localPart>ArrayOfPhone</localPart>
+                            <prefix></prefix>
+                          </typeQName>
+                        </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                      </properties>
+                    </metaDataModelPropertiesManager>
+                    <fields>
+                      <org.mule.common.metadata.DefaultMetaDataField>
+                        <name>ns2:Phone</name>
+                        <model class="org.mule.common.metadata.DefaultListMetaDataModel">
+                          <dataType>LIST</dataType>
+                          <metaDataModelPropertiesManager>
+                            <properties>
+                              <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                <typeQName>
+                                  <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                  <localPart>Phone</localPart>
+                                  <prefix></prefix>
+                                </typeQName>
+                              </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                              <org.mule.common.metadata.property.xml.UnboundMetaDataProperty>
+                                <maxOccurs>2147483647</maxOccurs>
+                                <minOccurs>0</minOccurs>
+                              </org.mule.common.metadata.property.xml.UnboundMetaDataProperty>
+                            </properties>
+                          </metaDataModelPropertiesManager>
+                          <model class="org.mule.common.metadata.DefaultXmlMetaDataModel">
+                            <dataType>XML</dataType>
+                            <metaDataModelPropertiesManager>
+                              <properties/>
+                            </metaDataModelPropertiesManager>
+                            <fields>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:CreateDate</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>DATE_TIME</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName>
+                                          <namespaceURI>http://www.w3.org/2001/XMLSchema</namespaceURI>
+                                          <localPart>dateTime</localPart>
+                                          <prefix></prefix>
+                                        </typeQName>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>CreateDate</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:CreateWorker</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName>
+                                          <namespaceURI>http://www.w3.org/2001/XMLSchema</namespaceURI>
+                                          <localPart>string</localPart>
+                                          <prefix></prefix>
+                                        </typeQName>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>CreateWorker</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:LastUpdatedDate</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>DATE_TIME</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../org.mule.common.metadata.DefaultMetaDataField/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>LastUpdatedDate</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:LastWorkerID</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>LastWorkerID</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:PhoneNumber</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>LONG</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../../../../../../../entry/org.mule.common.metadata.DefaultXmlMetaDataModel/fields/org.mule.common.metadata.DefaultMetaDataField/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>PhoneNumber</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:PhoneType</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>PhoneType</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                            </fields>
+                            <rootElement>
+                              <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+                              <localPart>GetContactInformationResponse</localPart>
+                              <prefix>ns0</prefix>
+                            </rootElement>
+                            <schemas class="org.mule.common.metadata.StringBasedSchemaProvider">
+                              <schemas>
+                                <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.microsoft.com/Message&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.microsoft.com/Message&quot;&gt;&#xd;
+&lt;xs:complexType name=&quot;MessageBody&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:any maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; namespace=&quot;##any&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+                                <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation/Imports&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; targetNamespace=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation/Imports&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+                                <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; attributeFormDefault=&quot;qualified&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;&gt;&#xd;
+&lt;xs:element name=&quot;anyType&quot; nillable=&quot;true&quot; type=&quot;xs:anyType&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;anyURI&quot; nillable=&quot;true&quot; type=&quot;xs:anyURI&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;base64Binary&quot; nillable=&quot;true&quot; type=&quot;xs:base64Binary&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;boolean&quot; nillable=&quot;true&quot; type=&quot;xs:boolean&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;byte&quot; nillable=&quot;true&quot; type=&quot;xs:byte&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;dateTime&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;decimal&quot; nillable=&quot;true&quot; type=&quot;xs:decimal&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;double&quot; nillable=&quot;true&quot; type=&quot;xs:double&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;float&quot; nillable=&quot;true&quot; type=&quot;xs:float&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;int&quot; nillable=&quot;true&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;long&quot; nillable=&quot;true&quot; type=&quot;xs:long&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;QName&quot; nillable=&quot;true&quot; type=&quot;xs:QName&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;short&quot; nillable=&quot;true&quot; type=&quot;xs:short&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;string&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;unsignedByte&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedByte&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;unsignedInt&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedInt&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;unsignedLong&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;unsignedShort&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedShort&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;char&quot; nillable=&quot;true&quot; type=&quot;tns:char&quot;/&gt;&#xd;
+&lt;xs:simpleType name=&quot;char&quot;&gt;&#xd;
+&lt;xs:restriction base=&quot;xs:int&quot;/&gt;&#xd;
+&lt;/xs:simpleType&gt;&#xd;
+&lt;xs:element name=&quot;duration&quot; nillable=&quot;true&quot; type=&quot;tns:duration&quot;/&gt;&#xd;
+&lt;xs:simpleType name=&quot;duration&quot;&gt;&#xd;
+&lt;xs:restriction base=&quot;xs:duration&quot;&gt;&#xd;
+&lt;xs:pattern value=&quot;\-?P(\d*D)?(T(\d*H)?(\d*M)?(\d*(\.\d*)?S)?)?&quot;/&gt;&#xd;
+&lt;xs:minInclusive value=&quot;-P10675199DT2H48M5.4775808S&quot;/&gt;&#xd;
+&lt;xs:maxInclusive value=&quot;P10675199DT2H48M5.4775807S&quot;/&gt;&#xd;
+&lt;/xs:restriction&gt;&#xd;
+&lt;/xs:simpleType&gt;&#xd;
+&lt;xs:element name=&quot;guid&quot; nillable=&quot;true&quot; type=&quot;tns:guid&quot;/&gt;&#xd;
+&lt;xs:simpleType name=&quot;guid&quot;&gt;&#xd;
+&lt;xs:restriction base=&quot;xs:string&quot;&gt;&#xd;
+&lt;xs:pattern value=&quot;[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}&quot;/&gt;&#xd;
+&lt;/xs:restriction&gt;&#xd;
+&lt;/xs:simpleType&gt;&#xd;
+&lt;xs:attribute name=&quot;FactoryType&quot; type=&quot;xs:QName&quot;/&gt;&#xd;
+&lt;xs:attribute name=&quot;Id&quot; type=&quot;xs:ID&quot;/&gt;&#xd;
+&lt;xs:attribute name=&quot;Ref&quot; type=&quot;xs:IDREF&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+                                <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:ser=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;references xmlns=&quot;http://schemas.microsoft.com/BizTalk/2003&quot;&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/references&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAlternativeReference&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AlternativeReference&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReference&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAlternativeReference&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAlternativeReference&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AlternativeReference&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastUpdatedDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PrimaryKey&quot; type=&quot;ser:guid&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceDataKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceTypeKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AlternativeReference&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReference&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAlternativeReferenceAdd&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AlternativeReferenceAdd&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReferenceAdd&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAlternativeReferenceAdd&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAlternativeReferenceAdd&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AlternativeReferenceAdd&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceDataKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceTypeKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AlternativeReferenceAdd&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReferenceAdd&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;UpdateResult&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;MciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;Result&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;UpdateResult&quot; nillable=&quot;true&quot; type=&quot;tns:UpdateResult&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAlternativeReferenceUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AlternativeReferenceUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReferenceUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAlternativeReferenceUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAlternativeReferenceUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AlternativeReferenceUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PrimaryKey&quot; type=&quot;ser:guid&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceDataKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ReferenceTypeKey&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AlternativeReferenceUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:AlternativeReferenceUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfPhone&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;Phone&quot; nillable=&quot;true&quot; type=&quot;tns:Phone&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfPhone&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfPhone&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;Phone&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastUpdatedDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneNumber&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;Phone&quot; nillable=&quot;true&quot; type=&quot;tns:Phone&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;Email&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailAddress&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastUpdatedDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;Email&quot; nillable=&quot;true&quot; type=&quot;tns:Email&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAddress&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;Address&quot; nillable=&quot;true&quot; type=&quot;tns:Address&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAddress&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAddress&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;Address&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine1&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine2&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressValidationFlag&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AptNo&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;City&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CountyCode&quot; nillable=&quot;true&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastUpdatedDate&quot; nillable=&quot;true&quot; type=&quot;xs:dateTime&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;State&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipCode&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipSuffix&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;Address&quot; nillable=&quot;true&quot; type=&quot;tns:Address&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfPhoneCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;PhoneCreate&quot; nillable=&quot;true&quot; type=&quot;tns:PhoneCreate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfPhoneCreate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfPhoneCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;PhoneCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneNumber&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;PhoneCreate&quot; nillable=&quot;true&quot; type=&quot;tns:PhoneCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;EmailCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailAddress&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;EmailCreate&quot; nillable=&quot;true&quot; type=&quot;tns:EmailCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAddressCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AddressCreate&quot; nillable=&quot;true&quot; type=&quot;tns:AddressCreate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAddressCreate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAddressCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AddressCreate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine1&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine2&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressValidationFlag&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AptNo&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;City&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CountyCode&quot; nillable=&quot;true&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CreateWorker&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;State&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipCode&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipSuffix&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AddressCreate&quot; nillable=&quot;true&quot; type=&quot;tns:AddressCreate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfPhoneUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;PhoneUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:PhoneUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfPhoneUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfPhoneUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;PhoneUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneNumber&quot; nillable=&quot;true&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;PhoneType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;PhoneUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:PhoneUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;EmailUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailAddress&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;EmailType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;EmailUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:EmailUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfAddressUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;AddressUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:AddressUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfAddressUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfAddressUpdate&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;AddressUpdate&quot;&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine1&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressLine2&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressType&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AddressValidationFlag&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;AptNo&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;City&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;CountyCode&quot; nillable=&quot;true&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;LastWorkerID&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;State&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipCode&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;ZipSuffix&quot; nillable=&quot;true&quot; type=&quot;xs:string&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;AddressUpdate&quot; nillable=&quot;true&quot; type=&quot;tns:AddressUpdate&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+                                <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:ser=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;references xmlns=&quot;http://schemas.microsoft.com/BizTalk/2003&quot;&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/references&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:complexType name=&quot;ArrayOfKeyValueOfintguid&quot;&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;IsDictionary xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;&gt;true&lt;/IsDictionary&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element maxOccurs=&quot;unbounded&quot; minOccurs=&quot;0&quot; name=&quot;KeyValueOfintguid&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element name=&quot;Key&quot; type=&quot;xs:int&quot;/&gt;&#xd;
+&lt;xs:element name=&quot;Value&quot; type=&quot;ser:guid&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;ArrayOfKeyValueOfintguid&quot; nillable=&quot;true&quot; type=&quot;tns:ArrayOfKeyValueOfintguid&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+                                <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://schemas.datacontract.org/2004/07/System&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;/&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;references xmlns=&quot;http://schemas.microsoft.com/BizTalk/2003&quot;&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;/&gt;&#xd;
+&lt;reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/references&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:complexType name=&quot;TupleOfunsignedLongArrayOfAlternativeReferenceeGKO5UHU&quot;&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;GenericType xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; Name=&quot;TupleOf{0}{1}{#}&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;&gt;&#xd;
+&lt;GenericParameter Name=&quot;unsignedLong&quot; Namespace=&quot;http://www.w3.org/2001/XMLSchema&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;ArrayOfAlternativeReference&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;/GenericType&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element name=&quot;m_Item1&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q1=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item2&quot; nillable=&quot;true&quot; type=&quot;q1:ArrayOfAlternativeReference&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;TupleOfunsignedLongArrayOfAlternativeReferenceeGKO5UHU&quot; nillable=&quot;true&quot; type=&quot;tns:TupleOfunsignedLongArrayOfAlternativeReferenceeGKO5UHU&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot;&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;GenericType xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; Name=&quot;TupleOf{0}{1}{#}&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;&gt;&#xd;
+&lt;GenericParameter Name=&quot;UpdateResult&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;ArrayOfKeyValueOf{0}{1}{#}&quot; Namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;&gt;&#xd;
+&lt;GenericParameter Name=&quot;int&quot; Namespace=&quot;http://www.w3.org/2001/XMLSchema&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;guid&quot; Namespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/GenericParameter&gt;&#xd;
+&lt;/GenericType&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q2=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item1&quot; nillable=&quot;true&quot; type=&quot;q2:UpdateResult&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q3=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot; name=&quot;m_Item2&quot; nillable=&quot;true&quot; type=&quot;q3:ArrayOfKeyValueOfintguid&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot; nillable=&quot;true&quot; type=&quot;tns:TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot;/&gt;&#xd;
+&lt;xs:complexType name=&quot;TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV&quot;&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;GenericType xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot; Name=&quot;TupleOf{0}{1}{2}{3}{#}&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;&gt;&#xd;
+&lt;GenericParameter Name=&quot;unsignedLong&quot; Namespace=&quot;http://www.w3.org/2001/XMLSchema&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;ArrayOfPhone&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;Email&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;GenericParameter Name=&quot;ArrayOfAddress&quot; Namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;/GenericType&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element name=&quot;m_Item1&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q4=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item2&quot; nillable=&quot;true&quot; type=&quot;q4:ArrayOfPhone&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q5=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item3&quot; nillable=&quot;true&quot; type=&quot;q5:Email&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q6=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; name=&quot;m_Item4&quot; nillable=&quot;true&quot; type=&quot;q6:ArrayOfAddress&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;xs:element name=&quot;TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV&quot; nillable=&quot;true&quot; type=&quot;tns:TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV&quot;/&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+                                <string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;xs:schema xmlns:xs=&quot;http://www.w3.org/2001/XMLSchema&quot; xmlns:b=&quot;http://schemas.microsoft.com/BizTalk/2003&quot; xmlns:msc=&quot;http://schemas.microsoft.com/ws/2005/12/wsdl/contract&quot; xmlns:soap=&quot;http://schemas.xmlsoap.org/wsdl/soap/&quot; xmlns:soap12=&quot;http://schemas.xmlsoap.org/wsdl/soap12/&quot; xmlns:soapenc=&quot;http://schemas.xmlsoap.org/soap/encoding/&quot; xmlns:tns=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation&quot; xmlns:wsa=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing&quot; xmlns:wsa10=&quot;http://www.w3.org/2005/08/addressing&quot; xmlns:wsam=&quot;http://www.w3.org/2007/05/addressing/metadata&quot; xmlns:wsap=&quot;http://schemas.xmlsoap.org/ws/2004/08/addressing/policy&quot; xmlns:wsaw=&quot;http://www.w3.org/2006/05/addressing/wsdl&quot; xmlns:wsdl=&quot;http://schemas.xmlsoap.org/wsdl/&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2004/09/policy&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; xmlns:wsx=&quot;http://schemas.xmlsoap.org/ws/2004/09/mex&quot; xmlns:xsd=&quot;http://www.w3.org/2001/XMLSchema&quot; elementFormDefault=&quot;qualified&quot; targetNamespace=&quot;http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation&quot;&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;/&gt;&#xd;
+&lt;xs:import namespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;xs:annotation&gt;&#xd;
+&lt;xs:appinfo&gt;&#xd;
+&lt;b:references&gt;&#xd;
+&lt;b:reference targetNamespace=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot;/&gt;&#xd;
+&lt;b:reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/Arrays&quot;/&gt;&#xd;
+&lt;b:reference targetNamespace=&quot;http://schemas.datacontract.org/2004/07/System&quot;/&gt;&#xd;
+&lt;b:reference targetNamespace=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;/&gt;&#xd;
+&lt;/b:references&gt;&#xd;
+&lt;/xs:appinfo&gt;&#xd;
+&lt;/xs:annotation&gt;&#xd;
+&lt;xs:element name=&quot;GetAlternativeReference&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;GetAlternativeReferenceResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q1=&quot;http://schemas.datacontract.org/2004/07/System&quot; minOccurs=&quot;0&quot; name=&quot;GetAlternativeReferenceResult&quot; nillable=&quot;true&quot; type=&quot;q1:TupleOfunsignedLongArrayOfAlternativeReferenceeGKO5UHU&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;AddAlternativeReference&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q2=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;alternativeReference&quot; nillable=&quot;true&quot; type=&quot;q2:ArrayOfAlternativeReferenceAdd&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;AddAlternativeReferenceResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q3=&quot;http://schemas.datacontract.org/2004/07/System&quot; minOccurs=&quot;0&quot; name=&quot;AddAlternativeReferenceResult&quot; nillable=&quot;true&quot; type=&quot;q3:TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;UpdateAlternativeReference&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q4=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;alternativeReferencesList&quot; nillable=&quot;true&quot; type=&quot;q4:ArrayOfAlternativeReferenceUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;UpdateAlternativeReferenceResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q5=&quot;http://schemas.datacontract.org/2004/07/System&quot; minOccurs=&quot;0&quot; name=&quot;UpdateAlternativeReferenceResult&quot; nillable=&quot;true&quot; type=&quot;q5:TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;GetContactInformation&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;GetContactInformationResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q6=&quot;http://schemas.datacontract.org/2004/07/System&quot; minOccurs=&quot;0&quot; name=&quot;GetContactInformationResult&quot; nillable=&quot;true&quot; type=&quot;q6:TupleOfunsignedLongArrayOfPhoneEmailArrayOfAddressQbxK29LV&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;AddContactInformation&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q7=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;phoneList&quot; nillable=&quot;true&quot; type=&quot;q7:ArrayOfPhoneCreate&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q8=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;email&quot; nillable=&quot;true&quot; type=&quot;q8:EmailCreate&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q9=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;addressList&quot; nillable=&quot;true&quot; type=&quot;q9:ArrayOfAddressCreate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;AddContactInformationResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q10=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;AddContactInformationResult&quot; nillable=&quot;true&quot; type=&quot;q10:UpdateResult&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;UpdateContactInformation&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element minOccurs=&quot;0&quot; name=&quot;mciNumber&quot; type=&quot;xs:unsignedLong&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q11=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;phoneList&quot; nillable=&quot;true&quot; type=&quot;q11:ArrayOfPhoneUpdate&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q12=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;email&quot; nillable=&quot;true&quot; type=&quot;q12:EmailUpdate&quot;/&gt;&#xd;
+&lt;xs:element xmlns:q13=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;addressList&quot; nillable=&quot;true&quot; type=&quot;q13:ArrayOfAddressUpdate&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;xs:element name=&quot;UpdateContactInformationResponse&quot;&gt;&#xd;
+&lt;xs:complexType&gt;&#xd;
+&lt;xs:sequence&gt;&#xd;
+&lt;xs:element xmlns:q14=&quot;http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities&quot; minOccurs=&quot;0&quot; name=&quot;UpdateContactInformationResult&quot; nillable=&quot;true&quot; type=&quot;q14:UpdateResult&quot;/&gt;&#xd;
+&lt;/xs:sequence&gt;&#xd;
+&lt;/xs:complexType&gt;&#xd;
+&lt;/xs:element&gt;&#xd;
+&lt;/xs:schema&gt;</string>
+                              </schemas>
+                              <encoding reference="../../../../../../../../../../../../../../entry/org.mule.common.metadata.DefaultXmlMetaDataModel/schemas/encoding"/>
+                              <baseUri>file:/C:/Users/hechada/Documents/AnypointStudio Workspace/DHSS-REALTIME-IUAT-V2/src/main/wsdl/IndividualAdditionalInformationService.wsdl</baseUri>
+                            </schemas>
+                            <namespaceManager>
+                              <namespacePrefix>
+                                <entry>
+                                  <string>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</string>
+                                  <string>ns0</string>
+                                </entry>
+                                <entry>
+                                  <string>http://schemas.datacontract.org/2004/07/System</string>
+                                  <string>ns1</string>
+                                </entry>
+                                <entry>
+                                  <string>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</string>
+                                  <string>ns2</string>
+                                </entry>
+                              </namespacePrefix>
+                            </namespaceManager>
+                          </model>
+                          <isArray>false</isArray>
+                        </model>
+                        <accessType>READ_WRITE</accessType>
+                        <metaDataFieldPropertyManager>
+                          <properties>
+                            <org.mule.common.metadata.property.QNameMetaDataProperty>
+                              <name>
+                                <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                <localPart>Phone</localPart>
+                                <prefix>ns2</prefix>
+                              </name>
+                            </org.mule.common.metadata.property.QNameMetaDataProperty>
+                          </properties>
+                        </metaDataFieldPropertyManager>
+                      </org.mule.common.metadata.DefaultMetaDataField>
+                    </fields>
+                    <rootElement>
+                      <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+                      <localPart>GetContactInformationResponse</localPart>
+                      <prefix>ns0</prefix>
+                    </rootElement>
+                    <schemas class="org.mule.common.metadata.StringBasedSchemaProvider" reference="../fields/org.mule.common.metadata.DefaultMetaDataField/model/model/schemas"/>
+                    <namespaceManager reference="../fields/org.mule.common.metadata.DefaultMetaDataField/model/model/namespaceManager"/>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.property.QNameMetaDataProperty>
+                        <name>
+                          <namespaceURI>http://schemas.datacontract.org/2004/07/System</namespaceURI>
+                          <localPart>m_Item2</localPart>
+                          <prefix>ns1</prefix>
+                        </name>
+                      </org.mule.common.metadata.property.QNameMetaDataProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>ns1:m_Item3</name>
+                  <model class="org.mule.common.metadata.DefaultXmlMetaDataModel">
+                    <dataType>XML</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties>
+                        <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                          <typeQName>
+                            <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                            <localPart>Email</localPart>
+                            <prefix></prefix>
+                          </typeQName>
+                        </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                      </properties>
+                    </metaDataModelPropertiesManager>
+                    <fields>
+                      <org.mule.common.metadata.DefaultMetaDataField>
+                        <name>ns2:CreateDate</name>
+                        <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                          <dataType>DATE_TIME</dataType>
+                          <metaDataModelPropertiesManager>
+                            <properties>
+                              <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                <typeQName reference="../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                              </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                            </properties>
+                          </metaDataModelPropertiesManager>
+                        </model>
+                        <accessType>READ_WRITE</accessType>
+                        <metaDataFieldPropertyManager>
+                          <properties>
+                            <org.mule.common.metadata.property.QNameMetaDataProperty>
+                              <name>
+                                <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                <localPart>CreateDate</localPart>
+                                <prefix>ns2</prefix>
+                              </name>
+                            </org.mule.common.metadata.property.QNameMetaDataProperty>
+                          </properties>
+                        </metaDataFieldPropertyManager>
+                      </org.mule.common.metadata.DefaultMetaDataField>
+                      <org.mule.common.metadata.DefaultMetaDataField>
+                        <name>ns2:CreateWorker</name>
+                        <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                          <dataType>STRING</dataType>
+                          <metaDataModelPropertiesManager>
+                            <properties>
+                              <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                <typeQName reference="../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                              </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                            </properties>
+                          </metaDataModelPropertiesManager>
+                        </model>
+                        <accessType>READ_WRITE</accessType>
+                        <metaDataFieldPropertyManager>
+                          <properties>
+                            <org.mule.common.metadata.property.QNameMetaDataProperty>
+                              <name>
+                                <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                <localPart>CreateWorker</localPart>
+                                <prefix>ns2</prefix>
+                              </name>
+                            </org.mule.common.metadata.property.QNameMetaDataProperty>
+                          </properties>
+                        </metaDataFieldPropertyManager>
+                      </org.mule.common.metadata.DefaultMetaDataField>
+                      <org.mule.common.metadata.DefaultMetaDataField>
+                        <name>ns2:EmailAddress</name>
+                        <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                          <dataType>STRING</dataType>
+                          <metaDataModelPropertiesManager>
+                            <properties>
+                              <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                <typeQName reference="../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                              </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                            </properties>
+                          </metaDataModelPropertiesManager>
+                        </model>
+                        <accessType>READ_WRITE</accessType>
+                        <metaDataFieldPropertyManager>
+                          <properties>
+                            <org.mule.common.metadata.property.QNameMetaDataProperty>
+                              <name>
+                                <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                <localPart>EmailAddress</localPart>
+                                <prefix>ns2</prefix>
+                              </name>
+                            </org.mule.common.metadata.property.QNameMetaDataProperty>
+                          </properties>
+                        </metaDataFieldPropertyManager>
+                      </org.mule.common.metadata.DefaultMetaDataField>
+                      <org.mule.common.metadata.DefaultMetaDataField>
+                        <name>ns2:EmailType</name>
+                        <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                          <dataType>STRING</dataType>
+                          <metaDataModelPropertiesManager>
+                            <properties>
+                              <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                <typeQName reference="../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                              </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                            </properties>
+                          </metaDataModelPropertiesManager>
+                        </model>
+                        <accessType>READ_WRITE</accessType>
+                        <metaDataFieldPropertyManager>
+                          <properties>
+                            <org.mule.common.metadata.property.QNameMetaDataProperty>
+                              <name>
+                                <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                <localPart>EmailType</localPart>
+                                <prefix>ns2</prefix>
+                              </name>
+                            </org.mule.common.metadata.property.QNameMetaDataProperty>
+                          </properties>
+                        </metaDataFieldPropertyManager>
+                      </org.mule.common.metadata.DefaultMetaDataField>
+                      <org.mule.common.metadata.DefaultMetaDataField>
+                        <name>ns2:LastUpdatedDate</name>
+                        <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                          <dataType>DATE_TIME</dataType>
+                          <metaDataModelPropertiesManager>
+                            <properties>
+                              <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                <typeQName reference="../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                              </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                            </properties>
+                          </metaDataModelPropertiesManager>
+                        </model>
+                        <accessType>READ_WRITE</accessType>
+                        <metaDataFieldPropertyManager>
+                          <properties>
+                            <org.mule.common.metadata.property.QNameMetaDataProperty>
+                              <name>
+                                <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                <localPart>LastUpdatedDate</localPart>
+                                <prefix>ns2</prefix>
+                              </name>
+                            </org.mule.common.metadata.property.QNameMetaDataProperty>
+                          </properties>
+                        </metaDataFieldPropertyManager>
+                      </org.mule.common.metadata.DefaultMetaDataField>
+                      <org.mule.common.metadata.DefaultMetaDataField>
+                        <name>ns2:LastWorkerID</name>
+                        <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                          <dataType>STRING</dataType>
+                          <metaDataModelPropertiesManager>
+                            <properties>
+                              <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                <typeQName reference="../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                              </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                            </properties>
+                          </metaDataModelPropertiesManager>
+                        </model>
+                        <accessType>READ_WRITE</accessType>
+                        <metaDataFieldPropertyManager>
+                          <properties>
+                            <org.mule.common.metadata.property.QNameMetaDataProperty>
+                              <name>
+                                <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                <localPart>LastWorkerID</localPart>
+                                <prefix>ns2</prefix>
+                              </name>
+                            </org.mule.common.metadata.property.QNameMetaDataProperty>
+                          </properties>
+                        </metaDataFieldPropertyManager>
+                      </org.mule.common.metadata.DefaultMetaDataField>
+                    </fields>
+                    <rootElement>
+                      <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+                      <localPart>GetContactInformationResponse</localPart>
+                      <prefix>ns0</prefix>
+                    </rootElement>
+                    <schemas class="org.mule.common.metadata.StringBasedSchemaProvider" reference="../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/schemas"/>
+                    <namespaceManager reference="../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/namespaceManager"/>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.property.QNameMetaDataProperty>
+                        <name>
+                          <namespaceURI>http://schemas.datacontract.org/2004/07/System</namespaceURI>
+                          <localPart>m_Item3</localPart>
+                          <prefix>ns1</prefix>
+                        </name>
+                      </org.mule.common.metadata.property.QNameMetaDataProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>ns1:m_Item4</name>
+                  <model class="org.mule.common.metadata.DefaultXmlMetaDataModel">
+                    <dataType>XML</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties>
+                        <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                          <typeQName>
+                            <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                            <localPart>ArrayOfAddress</localPart>
+                            <prefix></prefix>
+                          </typeQName>
+                        </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                      </properties>
+                    </metaDataModelPropertiesManager>
+                    <fields>
+                      <org.mule.common.metadata.DefaultMetaDataField>
+                        <name>ns2:Address</name>
+                        <model class="org.mule.common.metadata.DefaultListMetaDataModel">
+                          <dataType>LIST</dataType>
+                          <metaDataModelPropertiesManager>
+                            <properties>
+                              <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                <typeQName>
+                                  <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                  <localPart>Address</localPart>
+                                  <prefix></prefix>
+                                </typeQName>
+                              </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                              <org.mule.common.metadata.property.xml.UnboundMetaDataProperty>
+                                <maxOccurs>2147483647</maxOccurs>
+                                <minOccurs>0</minOccurs>
+                              </org.mule.common.metadata.property.xml.UnboundMetaDataProperty>
+                            </properties>
+                          </metaDataModelPropertiesManager>
+                          <model class="org.mule.common.metadata.DefaultXmlMetaDataModel">
+                            <dataType>XML</dataType>
+                            <metaDataModelPropertiesManager>
+                              <properties/>
+                            </metaDataModelPropertiesManager>
+                            <fields>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:AddressLine1</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>AddressLine1</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:AddressLine2</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>AddressLine2</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:AddressType</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>AddressType</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:AddressValidationFlag</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>AddressValidationFlag</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:AptNo</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>AptNo</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:City</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>City</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:CountyCode</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>INTEGER</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName>
+                                          <namespaceURI>http://www.w3.org/2001/XMLSchema</namespaceURI>
+                                          <localPart>int</localPart>
+                                          <prefix></prefix>
+                                        </typeQName>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>CountyCode</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:CreateDate</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>DATE_TIME</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>CreateDate</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:CreateWorker</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>CreateWorker</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:LastUpdatedDate</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>DATE_TIME</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>LastUpdatedDate</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:LastWorkerID</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>LastWorkerID</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:State</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>State</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:ZipCode</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>ZipCode</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                              <org.mule.common.metadata.DefaultMetaDataField>
+                                <name>ns2:ZipSuffix</name>
+                                <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                                  <dataType>STRING</dataType>
+                                  <metaDataModelPropertiesManager>
+                                    <properties>
+                                      <org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                        <typeQName reference="../../../../../../../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/metaDataModelPropertiesManager/properties/org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty/typeQName"/>
+                                      </org.mule.common.metadata.property.xml.SchemaTypeMetaDataProperty>
+                                    </properties>
+                                  </metaDataModelPropertiesManager>
+                                </model>
+                                <accessType>READ_WRITE</accessType>
+                                <metaDataFieldPropertyManager>
+                                  <properties>
+                                    <org.mule.common.metadata.property.QNameMetaDataProperty>
+                                      <name>
+                                        <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                        <localPart>ZipSuffix</localPart>
+                                        <prefix>ns2</prefix>
+                                      </name>
+                                    </org.mule.common.metadata.property.QNameMetaDataProperty>
+                                  </properties>
+                                </metaDataFieldPropertyManager>
+                              </org.mule.common.metadata.DefaultMetaDataField>
+                            </fields>
+                            <rootElement>
+                              <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+                              <localPart>GetContactInformationResponse</localPart>
+                              <prefix>ns0</prefix>
+                            </rootElement>
+                            <schemas class="org.mule.common.metadata.StringBasedSchemaProvider" reference="../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/schemas"/>
+                            <namespaceManager reference="../../../../../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/namespaceManager"/>
+                          </model>
+                          <isArray>false</isArray>
+                        </model>
+                        <accessType>READ_WRITE</accessType>
+                        <metaDataFieldPropertyManager>
+                          <properties>
+                            <org.mule.common.metadata.property.QNameMetaDataProperty>
+                              <name>
+                                <namespaceURI>http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities</namespaceURI>
+                                <localPart>Address</localPart>
+                                <prefix>ns2</prefix>
+                              </name>
+                            </org.mule.common.metadata.property.QNameMetaDataProperty>
+                          </properties>
+                        </metaDataFieldPropertyManager>
+                      </org.mule.common.metadata.DefaultMetaDataField>
+                    </fields>
+                    <rootElement>
+                      <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+                      <localPart>GetContactInformationResponse</localPart>
+                      <prefix>ns0</prefix>
+                    </rootElement>
+                    <schemas class="org.mule.common.metadata.StringBasedSchemaProvider" reference="../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/schemas"/>
+                    <namespaceManager reference="../../../org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/namespaceManager"/>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.property.QNameMetaDataProperty>
+                        <name>
+                          <namespaceURI>http://schemas.datacontract.org/2004/07/System</namespaceURI>
+                          <localPart>m_Item4</localPart>
+                          <prefix>ns1</prefix>
+                        </name>
+                      </org.mule.common.metadata.property.QNameMetaDataProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+              </fields>
+              <rootElement>
+                <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+                <localPart>GetContactInformationResponse</localPart>
+                <prefix>ns0</prefix>
+              </rootElement>
+              <schemas class="org.mule.common.metadata.StringBasedSchemaProvider" reference="../fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/schemas"/>
+              <namespaceManager reference="../fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/namespaceManager"/>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.property.QNameMetaDataProperty>
+                  <name>
+                    <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+                    <localPart>GetContactInformationResult</localPart>
+                    <prefix>ns0</prefix>
+                  </name>
+                </org.mule.common.metadata.property.QNameMetaDataProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+        </fields>
+        <rootElement>
+          <namespaceURI>http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation</namespaceURI>
+          <localPart>GetContactInformationResponse</localPart>
+          <prefix>ns0</prefix>
+        </rootElement>
+        <schemas class="org.mule.common.metadata.StringBasedSchemaProvider">
+          <schemas reference="../../fields/org.mule.common.metadata.DefaultMetaDataField/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/schemas/schemas"/>
+          <encoding reference="../../../../entry/org.mule.common.metadata.DefaultXmlMetaDataModel/schemas/encoding"/>
+          <baseUri>file:/C:/Users/hechada/Documents/AnypointStudio Workspace/DHSS-REALTIME-IUAT-V2/src/main/wsdl/IndividualAdditionalInformationService.wsdl</baseUri>
+        </schemas>
+        <namespaceManager reference="../fields/org.mule.common.metadata.DefaultMetaDataField/model/fields/org.mule.common.metadata.DefaultMetaDataField[2]/model/fields/org.mule.common.metadata.DefaultMetaDataField/model/model/namespaceManager"/>
+      </org.mule.common.metadata.DefaultXmlMetaDataModel>
+    </entry>
+  </types>
+  <connectorName>Web_Service_Consumer_Individ_Add_Info</connectorName>
+</metadata__catalog__entry>

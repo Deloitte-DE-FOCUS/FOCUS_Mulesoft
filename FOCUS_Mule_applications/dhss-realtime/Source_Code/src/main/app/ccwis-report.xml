@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <flow name="sacwis-reportFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/getCCWISReport" allowedMethods="POST" doc:name="generateCCWISreport"/>
+        <logger level="INFO" doc:name="started" message="CCWIS report gneration started"/>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-component doc:name="Expression"><![CDATA[flowVars.startDate=payload.Report_Start__c;
+flowVars.endDate=dw('(payload.Report_Start__c  + |P3M| ) as :string {format : "YYYY-MM-dd"} ');
+flowVars.ParentID=payload.Id;]]></expression-component>
+        
+        <async doc:name="Async">
+        
+        
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.startDate == null &amp;&amp; flowVars.endDate == null]">
+                    <logger message="Invalid Input" level="INFO" doc:name="Invalid Input"/>
+                    <dw:transform-message doc:name="Prepare Error Response for FOCUS">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.ParentID,
+		"Attachment_Generated__c": false as :boolean,
+		"Failure_Reason__c": "No Records qualified for the Extract as inputs are incorrect. "
+
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Extract__c" doc:name="Update Extract field">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                </when>
+                <otherwise>
+                    <enricher doc:name="Message Enricher" source="#[flowVars.CCWISSummaryFile]" target="#[flowVars.MainSummaryFile]">
+                        <flow-ref name="generateCCWISSummaryEventCountReport" doc:name="generateCCWISSummaryEventCountReport"/>
+                    </enricher>
+                    <enricher doc:name="Message Enricher" source="#[flowVars.CCWISFile]" target="#[flowVars.MainFile]">
+                        <flow-ref name="generateCCWISEventCountReport" doc:name="generateCCWISEventCountReport"/>
+                    </enricher>
+                    <dw:transform-message doc:name="Prepare Response for FOCUS">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.ParentID,
+		"Attachment_Generated__c": (true as :boolean ) when ( (flowVars.MainFile[0].Success == true and flowVars.MainSummaryFile[0].Success == true) or flowVars.ExceptionFile[0].Success == true) otherwise (false as :boolean),
+		"Failure_Reason__c": flowVars.MainFile[0].Failure ++ flowVars.MainSummaryFile[0].Failure ++ ( ("\n" ++ flowVars.ExceptionFile[0].Failure) when (flowVars.ExceptionFile[0].Failure != "") otherwise "") default ""
+
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Extract__c" doc:name="Update Extract object">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                </otherwise>
+            </choice>
+        </async>
+        
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": true,
+	"FailureReason": ""
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <exception-strategy ref="CCWIS_Report_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+        
+    </flow>
+    
+    <sub-flow name="generateCCWISSummaryEventCountReport">
+    <until-successful maxRetries="3" doc:name="Until Successful" synchronous="true">
+            
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getDivisionEventCounts" method="GET" doc:name="getDivisionEventCounts">
+                <http:request-builder>
+                        <http:query-param paramName="date1" value="#[flowVars.startDate]"/>
+                        <http:query-param paramName="date2" value="#[flowVars.endDate]"/>
+                </http:request-builder>
+            </http:request>
+            
+        </until-successful>
+        <!-- <set-payload value="[{&quot;Count&quot;:&quot;294734&quot;,&quot;StaffDivision&quot;:&quot;DYRS&quot;},{&quot;Count&quot;:&quot;1664974&quot;,&quot;StaffDivision&quot;:&quot;DFS&quot;},{&quot;Count&quot;:&quot;477768&quot;,&quot;StaffDivision&quot;:&quot;DPBHS&quot;},{&quot;Count&quot;:&quot;162642&quot;,&quot;StaffDivision&quot;:&quot;DMSS&quot;}]" doc:name="Set Payload" mimeType="application/json"/> -->
+        <dw:transform-message doc:name="Calculate Element">
+                <dw:set-variable variableName="getDivisionEventCountsResponse"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <set-variable variableName="SummaryHeader" value="#['DFSCount,DYRSCount,DPBHSCount,DMSSCount,TotalObjectViewed']" doc:name="Prepare Summary Header"/>
+        <dw:transform-message doc:name="generate report data">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/json
+%output text/csv separator=","
+---
+payload map {
+	(flowVars.getDivisionEventCountsResponse[0].StaffDivision ++ "Count") : flowVars.getDivisionEventCountsResponse[0].Count ,
+	(flowVars.getDivisionEventCountsResponse[1].StaffDivision ++ "Count") : flowVars.getDivisionEventCountsResponse[1].Count ,
+	(flowVars.getDivisionEventCountsResponse[2].StaffDivision ++ "Count") : flowVars.getDivisionEventCountsResponse[2].Count ,
+	(flowVars.getDivisionEventCountsResponse[3].StaffDivision ++ "Count") : flowVars.getDivisionEventCountsResponse[3].Count ,
+	TotalCount : (flowVars.getDivisionEventCountsResponse[0].Count + flowVars.getDivisionEventCountsResponse[1].Count + flowVars.getDivisionEventCountsResponse[2].Count + flowVars.getDivisionEventCountsResponse[3].Count)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+
+        <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Split payload into lines"/>
+        <set-payload value="#[(payload[0] + &quot;\n&quot; + payload[1])]" doc:name="Set Payload"/>
+
+                <string-to-byte-array-transformer doc:name="String to Byte Array"/>
+        <message-properties-transformer doc:name="Message Properties : Store File Data" overwrite="true" scope="invocation">
+            <add-message-property key="SummaryFileData" value="#[payload]"/>
+        </message-properties-transformer>
+                
+        <!-- <dw:transform-message doc:name="Prepare data for attachment">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+      ParentId: flowVars.ParentID, 
+      Name: "CCWIS_Summary_Event_Count_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,
+      Description: 'CCWIS Summary Report Count',
+      Body: flowVars.SummaryFileData
+      }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Create attachment for generated report">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create> -->
+        <logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : "CCWIS_Summary_Event_Count_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv",
+             Title : "CCWIS_Summary_Event_Count_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv",
+             VersionData : flowVars.SummaryFileData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.ParentID default ""
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+        
+        <dw:transform-message doc:name="Transform Message : Create Payload for SFDC Update">
+            <dw:set-variable variableName="CCWISSummaryFile"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Success:$.success,
+	Failure:"CCWIS Summary Report File could not be attached." when $.success == false otherwise ""
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="Summary event count report attached : #[payload]" level="INFO" doc:name="Summary report attached"/>
+    </sub-flow>
+    <sub-flow name="generateCCWISEventCountReport">
+    	<until-successful maxRetries="3" doc:name="Until Successful" synchronous="true">
+            
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getDivisionObjectEventCounts" method="GET" doc:name="getDivisionObjectEventCounts">
+                <http:request-builder>
+                        <http:query-param paramName="date1" value="#[flowVars.startDate]"/>
+                        <http:query-param paramName="date2" value="#[flowVars.endDate]"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <!-- <set-payload value="[]" doc:name="Set Payload" mimeType="application/json"/> -->
+        <logger level="INFO" doc:name="print response" message="Response received from web service #[payload]"/>
+        <dw:transform-message doc:name="Calculate Element">
+                <dw:set-variable variableName="getDivisionObjectEventCountsResponse"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="DFSSummary"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.getDivisionObjectEventCountsResponse filter ($.StaffDivision == "DFS")  map {
+	ObjectName: ($.ObjectName) ,
+	Count : $.Count
+} ]]></dw:set-variable>
+            <dw:set-variable variableName="DMSSSummary"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.getDivisionObjectEventCountsResponse filter ($.StaffDivision == "DMSS")  map {
+	ObectName : ($.ObjectName) ,
+	Count: $.Count
+}]]></dw:set-variable>
+            <dw:set-variable variableName="DYRSSummary"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.getDivisionObjectEventCountsResponse filter ($.StaffDivision == "DYRS")  map {
+	ObjectName: ($.ObjectName) ,
+	Count: $.Count
+} ]]></dw:set-variable>
+            <dw:set-variable variableName="DPBHSSummary"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.getDivisionObjectEventCountsResponse filter ($.StaffDivision == "DPBHS")  map {
+	ObjectName: ($.ObjectName),
+	Count: $.Count
+} ]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.getDivisionObjectEventCountsResponse map {
+	ObjectName : $.ObjectName,
+	DFSCount : $.Count when ($.StaffDivision == "DFS") otherwise null,
+	DYRSCount : $.Count when ($.StaffDivision == "DYRS") otherwise null,
+	DMSSCount : $.Count when ($.StaffDivision == "DMSS") otherwise null,
+	DPBHSCount : $.Count when ($.StaffDivision == "DPBHS") otherwise null
+} ]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json skipNullOn="everywhere"
+---
+payload groupBy $.ObjectName map {
+	"ObjectName": $.ObjectName[0],
+	"DFSCount" : $.DFSCount[0] default 0,
+	"DYRSCount" : $.DYRSCount[0] default 0,
+	"DPBHSCount" : $.DPBHSCount[0] default 0,
+	"DMSSCount" : $.DMSSCount[0] default 0
+	}
+	]]></dw:set-payload>
+        </dw:transform-message>
+<!--         <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java 
+
+flowVars.getDivisionObjectEventCountsResponse map (value, index) -> {
+	ObjectName : value.ObjectName,
+	(flowVars.DFSSummary map (v,i) -> {DFSCount : (flowVars.DFSSummary.Count[i] when (flowVars.DFSSummary.ObjectName[i] == (value.ObjectName) ) otherwise null)}),
+	( flowVars.DMSSSummary map (v,i) -> {DMSSCount : (flowVars.DMSSSummary.Count[i] when (flowVars.DMSSummary.ObjectName[i] == (value.ObjectName) ) otherwise null)}),	
+	( flowVars.DYRSSummary map (v,i) -> {DYRSCount : (flowVars.DYRSSummary.Count[i] when (flowVars.DYRSSummary.ObjectName[i] == (value.ObjectName) ) otherwise null)}),
+	( flowVars.DPBHSSummary map (v,i) -> {DPBHSCount : (flowVars.DPBHSSummary.Count[i] when (flowVars.DPBHSSummary.ObjectName[i] == (value.ObjectName) ) otherwise null)})
+}]]></dw:set-payload>
+        </dw:transform-message> -->
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv separator="," 
+---
+payload distinctBy $.ObjectName map {
+	"ObjectName": $.ObjectName,
+	"DFSCount" : $.DFSCount,
+	"DYRSCount" : $.DYRSCount,
+	"DPBHSCount" : $.DPBHSCount,
+	"DMSSCount" : $.DMSSCount,
+	"TotalObjectViewed" : $.DFSCount as :number + $.DPBHSCount as :number + $.DYRSCount as :number + $.DMSSCount as :number,
+	"Total Objects Viewed(DPBHS+DFS+DYRS)" : $.DFSCount + $.DPBHSCount + $.DYRSCount,
+	"DYRS Allocation Percentage" : (($.DYRSCount / ($.DFSCount + $.DPBHSCount + $.DYRSCount)) as :number as :string {format: ".##"}) when (($.DFSCount + $.DPBHSCount + $.DYRSCount) != 0) otherwise $.DYRSCount,
+	"DFS Allocation Percentage" : (($.DFSCount / ($.DFSCount + $.DPBHSCount + $.DYRSCount)) as :number as :string {format: ".##"}) when (($.DFSCount + $.DPBHSCount + $.DYRSCount) != 0) otherwise $.DFSCount,
+	"DPBHS Allocation Percentage" : (($.DPBHSCount / ($.DFSCount + $.DPBHSCount + $.DYRSCount)) as :number as :string {format: ".##"}) when (($.DFSCount + $.DPBHSCount + $.DYRSCount) != 0) otherwise $.DPBHSCount,
+	"Proportioned DMSS object Viewed for DPBHS" : ((($.DPBHSCount / ($.DFSCount + $.DPBHSCount + $.DYRSCount)) as :number as :string {format: ".##"}) * $.DMSSCount) when (($.DFSCount + $.DPBHSCount + $.DYRSCount) != 0) otherwise (0),
+	"Proportioned DMSS object Viewed for DYRS" : ((($.DYRSCount / ($.DFSCount + $.DPBHSCount + $.DYRSCount)) as :number as :string {format: ".##"}) * $.DMSSCount) when (($.DFSCount + $.DPBHSCount + $.DYRSCount) != 0) otherwise (0),
+	"Proportioned DMSS object Viewed for DFS" : ((($.DFSCount / ($.DFSCount + $.DPBHSCount + $.DYRSCount)) as :number as :string {format: ".##"}) * $.DMSSCount) when (($.DFSCount + $.DPBHSCount + $.DYRSCount) != 0) otherwise (0)
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+        <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload"/>
+
+                <dw:transform-message doc:name="Transform Message : Remove blank lines">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) > "0")) joinBy "\n"]]></dw:set-payload>
+                </dw:transform-message>
+                <string-to-byte-array-transformer doc:name="String to Byte Array"/>
+        <message-properties-transformer doc:name="Message Properties : Store File Data" overwrite="true" scope="invocation">
+            <add-message-property key="FileData" value="#[payload]"/>
+        </message-properties-transformer>
+        <!-- <dw:transform-message doc:name="Preapre date for attachemnt">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+      ParentId: flowVars.ParentID, 
+      Name: "CCWIS_Event_Count_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,
+      Description: 'CCWIS Event Count',
+      Body: flowVars.FileData
+      }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Create attachemnt for generated report">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create> -->
+        <logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : "CCWIS_Event_Count_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv",
+             Title : "CCWIS_Event_Count_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv",
+             VersionData : flowVars.FileData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.ParentID default ""
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+        
+        <dw:transform-message doc:name="Transform Message : Create Payload for SFDC Update">
+            <dw:set-variable variableName="CCWISFile"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Success:$.success,
+	Failure:"CCWIS Report File could not be attached." when $.success == false otherwise ""
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="Event count report attached : #[payload]" level="INFO" doc:name="Event count report attached "/>
+         
+    </sub-flow>
+    <catch-exception-strategy name="CCWIS_Report_Exception_Strategy">
+    	<message-properties-transformer scope="invocation" doc:name="Message Properties">
+
+                <add-message-property key="ParentID" value="#[flowVars.ParentID]"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Error" doc:description="Stores the message property for logging."/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.ParentID,
+		"Attachment_Generated__c": (true as :boolean ) when ( flowVars.MainFile[0].Success == true and flowVars.MainSummaryFile[0].Success == true) otherwise (false as :boolean),
+		"Failure_Reason__c": flowVars.Exception.Message
+
+}]]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Extract__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </catch-exception-strategy>
+</mule>

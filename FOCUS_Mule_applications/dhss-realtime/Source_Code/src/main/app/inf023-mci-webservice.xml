@@ -1,0 +1,840 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:ss="http://www.springframework.org/schema/security" 
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+   <!--  <http:listener-config name="inf023-mci-webservice-httpListenerConfig" host="${http.host}" port="${http.mci.port}" doc:name="HTTP Listener Configuration" />  -->
+    <apikit:config name="inf023-mci-webservice-config" raml="inf023-mci-webservice.raml" consoleEnabled="false" doc:name="Router" keepRamlBaseUri="false"/>
+    <sftp:connector name="SFTP" validateConnections="true" autoDelete="false" doc:name="SFTP"/>
+    <!-- <spring:beans>      
+        <ss:authentication-manager alias="authenticationManager">
+          <ss:authentication-provider>
+            <ss:user-service id="userService">
+              <ss:user name="${focus.mci.username}" password="${focus.mci.password}" authorities="ROLE_ADMIN" />
+            </ss:user-service>
+          </ss:authentication-provider>
+        </ss:authentication-manager>
+    </spring:beans>
+    <mule-ss:security-manager name="federal_batch_security_manager" doc:name="Spring Security Provider">
+      <mule-ss:delegate-security-provider name="memory-provider-1" delegate-ref="authenticationManager" />
+    </mule-ss:security-manager> -->
+    <!-- <http:request-config name="HTTP_Request_Configuration_mci" protocol="HTTPS" host="testws.state.de.us" port="1406" doc:name="HTTP Request Configuration"/> -->
+    <http:request-config name="HTTP_Request_Configuration_mci" protocol="HTTPS" host="${http.DHSS.MCIClearance.host}" port="${http.DHSS.MCIClearance.port}" doc:name="HTTP Request Configuration" connectionIdleTimeout="${http.DHSS.MCIClearance.timeout}"/>
+    <ws:consumer-config name="Web_Service_Consumer_Ind_Mgmt_Service" service="BizTalkServiceInstance" port="WSHttpBinding_ITwoWayAsync" serviceAddress="${DHSS.IndMgmtEndpointURL}" wsdlLocation="IndividualManagementService.wsdl" doc:name="Web Service Consumer" connectorConfig="HTTP_Request_Configuration">
+        <ws:security>
+            <ws:wss-username-token username="${soap.SystemUsername}" password="${soap.SystemPassword}" passwordType="DIGEST" addCreated="true" addNonce="true"/>
+            <ws:wss-timestamp expires="1500"/>
+        </ws:security>
+    </ws:consumer-config>
+    <apikit:config name="Router-test" raml="inf023-mci-webservice.raml" consoleEnabled="true" consolePath="console" keepRamlBaseUri="false" doc:name="Router"/>
+    <ws:consumer-config name="Web_Service_Consumer_MCI_Clearance" service="BizTalkServiceInstance" port="WSHttpBinding_ITwoWayAsync" serviceAddress="${DHSS.MCIClearanceEndpointURL}" wsdlLocation="MCIClearanceService.wsdl" doc:name="Web Service Consumer" connectorConfig="HTTP_Request_Configuration_mci">
+        <ws:security>
+            <ws:wss-username-token username="${soap.SystemUsername}" password="${soap.SystemPassword}" passwordType="DIGEST" addCreated="true" addNonce="true"/>
+            <ws:wss-timestamp expires="1500"/>
+        </ws:security>
+    </ws:consumer-config>
+    <ws:consumer-config name="Web_Service_Consumer_Individ_Add_Info" service="BizTalkServiceInstance" port="WSHttpBinding_ITwoWayAsync" serviceAddress="${DHSS.IndAdditionalInfoEndpointURL}" wsdlLocation="IndividualAdditionalInformationService.wsdl" doc:name="Web Service Consumer">
+        <ws:security>
+            <ws:wss-username-token username="${soap.SystemUsername}" password="${soap.SystemPassword}" passwordType="DIGEST" addCreated="true" addNonce="true"/>
+            <ws:wss-timestamp expires="1500"/>
+        </ws:security>
+    </ws:consumer-config>
+    <ws:consumer-config name="Web_Service_Consumer_Individ_Case_Mgmt_Service" service="BizTalkServiceInstance" port="WSHttpBinding_ITwoWayAsync" serviceAddress="${DHSS.IndCaseMgmtEndpointURL}" wsdlLocation="IndividualCaseManagementService.wsdl" doc:name="Web Service Consumer">
+        <ws:security>
+            <ws:wss-username-token username="${soap.SystemUsername}" password="${soap.SystemPassword}" passwordType="DIGEST" addCreated="true" addNonce="true"/>
+            <ws:wss-timestamp expires="1500"/>
+        </ws:security>
+    </ws:consumer-config>
+    <flow name="inf023-mci-webservice-main">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/MCIWebservice/*" doc:name="HTTP-Request" allowedMethods="POST"/>
+        <logger message="Input from FOCUS #[payload] MCI User ${focus.mci.username} MCI Password ${focus.mci.password}" level="INFO" doc:name="Logger"/>
+        <http:basic-security-filter realm="mule-realm"/> 
+        <apikit:router config-ref="inf023-mci-webservice-config" doc:name="APIkit Router"/>
+        <exception-strategy ref="inf023-Default_Catch_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <catch-exception-strategy name="inf023-Default_Catch_Exception_Strategy">
+        <logger message="Exception Message #[exception.getMessage()]" level="INFO" doc:name="Logger"/>
+        <set-property propertyName="http.status" value="500" doc:name="Property : Set HTTP Status Code"/>
+        <set-payload value="#[exception.cause != null ? exception.cause.getMessage() : exception.getMessage()]" doc:name="Set Payload"/>
+    </catch-exception-strategy>
+    <choice-exception-strategy name="inf023-mci-webserviceChoice_Exception_Strategy">
+        <catch-exception-strategy doc:name="default Exception Strategy">
+            <mulexml:dom-to-xml-transformer mimeType="text/xml" doc:name="DOM to XML"/>
+
+            <logger message="'Exception from service'#[payload]" level="INFO" doc:name="Logger"/>
+            <dw:transform-message metadata:id="08b06376-dc27-4c4c-8a14-d0841c8aea7d" doc:name="Transform Message">
+                <dw:input-payload doc:sample="C:\Users\hemanth.chada\Desktop\sample payload.xml" mimeType="application/xml"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Detail.ExceptionDetail.Message]]></dw:set-payload>
+            </dw:transform-message>
+            <set-payload value="#[payload.replaceAll(&quot;&amp;gt;&quot;,&quot;&gt;&quot;).replaceAll(&quot;&amp;lt;&quot;,&quot;&lt;&quot;)]" mimeType="application/xml" doc:name="Set Payload"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+      ErrorResponse: {
+            ErrorMessage: payload.SoapFault.Error.Fault.detail.ExceptionDetail.Message      
+      }
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer mimeType="application/json" doc:name="Object to String"/>
+            <logger message="'Exception Message'#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+    <flow name="post:/searchIndividual:inf023-mci-webservice-config">
+
+        <logger message="'Recceived a call from Salesforce for SearchIndividual operation' #[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf023_LOVOutbound_Subflow" doc:name="inf023_LOVOutbound_Subflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Name and Transaction ID">
+            <add-message-property key="filename" value="SearchMCIRequest.xml"/>
+            <add-message-property key="TransactionID" value="#[json:/searchRequest/interfaceTransId]"/>
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="884d6a72-e495-411c-9fda-d27ca2851fe5" doc:name="Transform Message : Search Individual Request XML">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace cle http://DHSS/DataServiceHub/MCI/Clearance
+%namespace dhss http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+%var raceClass =  {
+"American Indian or Alaskan Native" : "AA",
+"Asian":"AS",
+"Black or African American":"BL",
+"Native Hawaiian or Other Pacific Islander":"PA",
+"Other":"OT",
+"Unknown":"UN",
+"White":"CA",
+"Hispanic":"HS",
+"Unable to Determine" : ""
+}
+%var genderClass =  {
+"Female":"F",
+"Male":"M",
+"Unknown":"U"
+}
+
+
+---
+{
+	cle#SearchIndividuals: {
+		cle#searchInput: {
+			dhss#DateOfBirth: payload.searchRequest.birthDate,
+			dhss#FirstName: payload.searchRequest.firstName,
+			dhss#LastName: payload.searchRequest.lastName,
+			dhss#MCINumber: payload.searchRequest.MCI,
+			dhss#MiddleName: payload.searchRequest.middleName,
+			//(dhss#RaceCode : raceClass[(payload.searchRequest.race default "-1")] default payload.searchRequest.race ) when (payload.searchRequest.race != null and payload.searchRequest.race != ""),
+			(dhss#RaceCode : flowVars.LOVReturned[("RACE_MCI-" ++ payload.searchRequest.race)][0] default payload.searchRequest.race ) when (payload.searchRequest.race != null and payload.searchRequest.race != ""),
+			dhss#SSN: payload.searchRequest.SSN,
+			//(dhss#SexCode: genderClass[(payload.searchRequest.gender default "-1")] default payload.searchRequest.gender ) when (payload.searchRequest.gender != null and payload.searchRequest.gender != ""),
+			(dhss#SexCode: flowVars.LOVReturned[("GENDER_MCI-" ++ payload.searchRequest.gender)][0] default payload.searchRequest.gender ) when (payload.searchRequest.gender != null and payload.searchRequest.gender != ""),
+			dhss#SuffixName: payload.searchRequest.suffix
+		}
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property -  SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.SearchIndividualAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <logger message="'Search Individual Request'#[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <until-successful maxRetries="2" millisBetweenRetries="2000" synchronous="true" doc:name="Until Successful">
+            <processor-chain doc:name="Processor Chain">
+                <flow-ref name="inf023-SearchIndividuals_Flow" doc:name="inf023-SearchIndividuals_Flow"/>
+                <validation:is-true config-ref="Validation_Configuration" message="#[flowVars.exception == null ? 'Unexpected Exception Occured' : flowVars.exception]" exceptionClass="java.lang.Exception" expression="#[(flowVars.exception == null) || ((flowVars.exception != null) &amp;&amp; (flowVars.exception instanceof org.mule.module.ws.consumer.SoapFaultException)) ]" doc:name="Validation"/>
+            </processor-chain>
+        </until-successful>
+        <mulexml:dom-to-xml-transformer mimeType="application/xml" doc:name="DOM to XML"/>
+        <logger message="'Webservice Response for SearchIndividual operation'#[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Name">
+            <add-message-property key="filename" value="SearchMCIResponse.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <choice doc:name="Choice : If there is any exception">
+            <when expression="#[((flowVars.exception != null) &amp;&amp; (flowVars.exception instanceof org.mule.module.ws.consumer.SoapFaultException)) ]">
+                <logger level="INFO" doc:name="Logger : If Exception Occurred" message="Logic For Handling Fault Exception #[flowVars.exception] ; Payload #[payload]"/>
+                <dw:transform-message metadata:id="08b06376-dc27-4c4c-8a14-d0841c8aea7d" doc:name="TM : Get Exception Message">
+                <dw:input-payload doc:sample="C:\Users\hemanth.chada\Desktop\sample payload.xml" mimeType="application/xml"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Detail.ExceptionDetail.Message]]></dw:set-payload>
+            </dw:transform-message>
+                <logger message="'Exception After TM'#[payload]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[payload.replaceAll(&quot;&amp;gt;&quot;,&quot;&gt;&quot;).replaceAll(&quot;&amp;lt;&quot;,&quot;&lt;&quot;)]" mimeType="application/xml" doc:name="Set Payload : Replace Special Chars"/>
+                <logger message="payload after replace #[payload]" level="INFO" doc:name="Logger"/>
+            <dw:transform-message doc:name="TM : Prepare JSON output">
+                    <dw:input-payload doc:sample="sample_data\empty_3.xml"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+      ErrorResponse: {
+            ErrorMessage: payload.SoapFault.Error
+      }
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer mimeType="application/json" doc:name="Object to String"/>
+                <logger message="Exception Response back to salesforce for SearchIndividual operation #[payload]" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <enricher doc:name="Message Enricher">
+                    <flow-ref name="inf023_LOVInbound_Subflow" doc:name="inf023_LOVInbound_Subflow"/>
+                    <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+                </enricher>
+                <dw:transform-message doc:name="Transform Message :  Search Individual to json" metadata:id="b5ece580-a4c7-4fb8-98dc-3959cfa852b8">
+                    <dw:input-payload doc:sample="sample_data\string_1.dwl"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%namespace ns0 http://DHSS/DataServiceHub/MCI/Clearance
+%namespace ns1 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	(SearchResponse: payload.SearchIndividualsResponse.SearchIndividualsResult.*Search map ((search , indexOfSearch) -> {
+		(birthDate: search.Individual.DateOfBirth as :date) when (search.Individual.DateOfBirth != null and search.Individual.DateOfBirth != ""),
+		(firstName: search.Individual.FirstName default "" as :string) when search.Individual.FirstName != null,
+		(middleName: search.Individual.MiddleName default "" as :string) when search.Individual.MiddleName != null,
+		(lastName: search.Individual.LastName default "" as :string) when search.Individual.LastName != null,
+		(suffix: search.Individual.Suffix default "" as :string) when search.Individual.Suffix != null,
+		(mci: search.Individual.MCINumber default "" as :string) when search.Individual.MCINumber != null,
+	    //("gender" : genderClass[(search.Individual.SexCode default "-1")] default search.Individual.SexCode ) when (search.Individual.SexCode != null and search.Individual.SexCode != ""),
+	    //("race" : raceClass[(search.PrimaryRace.RaceCode default "-1")] default search.PrimaryRace.RaceCode ) when (search.PrimaryRace.RaceCode != null and search.PrimaryRace.RaceCode != ""),
+		("gender" : flowVars.LOVReturned[("GENDER_MCI-" ++ search.Individual.SexCode)][0] default search.Individual.SexCode ) when (search.Individual.SexCode != null and search.Individual.SexCode != ""),
+	    ("race" : flowVars.LOVReturned[("RACE_MCI-" ++ search.PrimaryRace.RaceCode)][0] default search.PrimaryRace.RaceCode ) when (search.PrimaryRace.RaceCode != null and search.PrimaryRace.RaceCode != ""),
+		
+		(score: search.Score default "" as :string) when search.Score != null,
+		(SSN: search.PrimarySsn.SSN default "" as :string) when search.PrimarySsn.SSN != null														
+		
+	})
+	) when payload.SearchIndividualsResponse.SearchIndividualsResult is :object and payload.SearchIndividualsResponse.SearchIndividualsResult != null
+		 and payload.SearchIndividualsResponse.SearchIndividualsResult != ""
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/json" doc:name="Object to String : To JSON format"/>
+                <logger message="'Response sent back to salesforce for SearchIndividual operation' #[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+    </flow>
+    <flow name="inf023-SearchIndividuals_Flow">
+        <ws:consumer config-ref="Web_Service_Consumer_MCI_Clearance" operation="SearchIndividuals" doc:name="Web Service Consumer : Search Individual"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Exception in SearchIndividual Operation #[exception]" level="INFO" doc:name="Logger"/>
+            <set-variable variableName="exception" value="#[exception]" doc:name="Variable"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="inf023_CreateIndividual_Flow">
+        <ws:consumer config-ref="Web_Service_Consumer_Ind_Mgmt_Service" operation="CreateIndividual" doc:name="Web Service Consumer : CreateIndividual"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Exception in CreateIndividual Operation #[exception]" level="INFO" doc:name="Logger"/>
+            <set-variable variableName="exception" value="#[exception]" doc:name="Variable"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="post:/createIndividual:inf023-mci-webservice-config">
+        <logger message="'Recceived a call from Salesforce for CreateIndividual operation' #[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf023_LOVOutbound_Subflow" doc:name="inf023_LOVOutbound_Subflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set file name and trans Id">
+            <add-message-property key="filename" value="CreateMCIRequest.xml"/>
+            <add-message-property key="TransactionID" value="#[json:/CreateIndividualRequest/interfaceTransId]"/>
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="2deaeac6-acb8-4a86-9df2-be1f4886d275" doc:name="Transform Message :  Create Individual Request XML">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ind http://DHSS/DataServiceHub/MCI/IndividualManagement
+%namespace dhss http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	ind#CreateIndividual: {
+		ind#individual: {
+			dhss#Age: payload.CreateIndividualRequest.age,
+			(dhss#CitizenshipCode: flowVars.LOVReturned[("CITIZENSHIP_MCI-" ++ payload.CreateIndividualRequest.citizenship)][0] default payload.CreateIndividualRequest.citizenship) when (payload.CreateIndividualRequest.citizenship != null and payload.CreateIndividualRequest.citizenship != ""),
+			dhss#DateOfBirth: payload.CreateIndividualRequest.birthDate,
+			dhss#DateOfDeath: payload.CreateIndividualRequest.deathDate,
+			dhss#FirstName: payload.CreateIndividualRequest.firstName,
+			dhss#LastName: payload.CreateIndividualRequest.lastName,
+			dhss#MiddleName: payload.CreateIndividualRequest.middleName,
+			(dhss#SexCode: flowVars.LOVReturned[("GENDER_MCI-" ++ payload.CreateIndividualRequest.gender)][0] default payload.CreateIndividualRequest.gender ) when (payload.CreateIndividualRequest.gender != null and payload.CreateIndividualRequest.gender != ""),
+			(dhss#MaritalStatusCode: flowVars.LOVReturned[("MARITAL_STATUS_MCI-" ++ payload.CreateIndividualRequest.maritalStatus)][0] default payload.CreateIndividualRequest.maritalStatus ) when (payload.CreateIndividualRequest.maritalStatus != null and payload.CreateIndividualRequest.maritalStatus != ""),
+			dhss#SuffixName: payload.CreateIndividualRequest.suffix
+		},
+		ind#raceList: {
+			dhss#RaceCreate: {
+				(dhss#PrimaryFlag: true)  when payload.CreateIndividualRequest.race != null,
+				(dhss#RaceCode : flowVars.LOVReturned[("RACE_MCI-" ++ payload.CreateIndividualRequest.race)][0] default payload.CreateIndividualRequest.race ) when (payload.CreateIndividualRequest.race != null and payload.CreateIndividualRequest.race != "")
+				//(dhss#RaceCode : raceClass[(payload.CreateIndividualRequest.race default "-1")] default payload.CreateIndividualRequest.race ) when (payload.CreateIndividualRequest.race != null and payload.CreateIndividualRequest.race != "")
+				
+			}
+		},
+		(ind#ssn: {
+			dhss#SSN: payload.CreateIndividualRequest.ssn,
+			dhss#PrimaryFlag : true
+		}) when payload.CreateIndividualRequest.ssn != null and payload.CreateIndividualRequest.ssn != "",
+		(ind#phoneList: {
+			dhss#PhoneCreate: {
+				dhss#PhoneNumber: payload.CreateIndividualRequest.phone,
+				dhss#PhoneType: "HP"
+			}
+		}) when payload.CreateIndividualRequest.phone != null and payload.CreateIndividualRequest.phone != "",
+		(ind#email: {
+			dhss#EmailAddress: payload.CreateIndividualRequest.emailAddress,
+			dhss#EmailType: "ET"
+		}) when payload.CreateIndividualRequest.emailAddress != null and payload.CreateIndividualRequest.emailAddress != "",
+		ind#addressList: {
+			dhss#AddressCreate: {
+				dhss#AddressLine1: payload.CreateIndividualRequest.individAddress.addressLine1,
+				dhss#AddressLine2: payload.CreateIndividualRequest.individAddress.addressLine2,
+				dhss#AddressType: "PA",
+				dhss#City: payload.CreateIndividualRequest.individAddress.city,
+				(dhss#ZipCode: payload.CreateIndividualRequest.individAddress.zipCode[0..4]) when ( payload.CreateIndividualRequest.individAddress.zipCode != null and payload.CreateIndividualRequest.individAddress.zipCode != '' and (sizeOf payload.CreateIndividualRequest.individAddress.zipCode) > 4 ),
+				(dhss#ZipSuffix: payload.CreateIndividualRequest.individAddress.zipCode[6..9]) when ( payload.CreateIndividualRequest.individAddress.zipCode != null and payload.CreateIndividualRequest.individAddress.zipCode != '' and (sizeOf payload.CreateIndividualRequest.individAddress.zipCode) > 9 ),
+				(dhss#CountyCode : flowVars.LOVReturned[("COUNTY_MCI-" ++ payload.CreateIndividualRequest.individAddress.county)][0] default payload.CreateIndividualRequest.individAddress.county ) when (payload.CreateIndividualRequest.individAddress.county != null and payload.CreateIndividualRequest.individAddress.county != ""),
+				(dhss#State: flowVars.LOVReturned[("STATECODE-" ++ payload.CreateIndividualRequest.individAddress.state)][0] default payload.CreateIndividualRequest.individAddress.state) when (payload.CreateIndividualRequest.individAddress.state != null and payload.CreateIndividualRequest.individAddress.state != "")
+			}
+		}
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property -  SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.CreateIndividualAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <logger message="'Create Individual Request'#[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <flow-ref name="inf023_CreateIndividual_Flow" doc:name="inf023_CreateIndividual_Flow"/>
+
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <logger message="'Create Individual Response'#[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : set file name">
+            <add-message-property key="filename" value="CreateMCIResponse.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <choice doc:name="Choice">
+            <when expression="#[((flowVars.exception != null) &amp;&amp; (flowVars.exception instanceof org.mule.module.ws.consumer.SoapFaultException)) ]">
+                <logger message="Logic For Handling Fault Exception #[flowVars.exception] ; Payload #[payload]" level="INFO" doc:name="Logger"/>
+                <dw:transform-message metadata:id="08b06376-dc27-4c4c-8a14-d0841c8aea7d" doc:name="TM : Get Exception Message">
+                <dw:input-payload doc:sample="C:\Users\hemanth.chada\Desktop\sample payload.xml" mimeType="application/xml"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Detail.ExceptionDetail.Message]]></dw:set-payload>
+            </dw:transform-message>
+            <set-payload value="#[payload.replaceAll(&quot;&amp;gt;&quot;,&quot;&gt;&quot;).replaceAll(&quot;&amp;lt;&quot;,&quot;&lt;&quot;)]" mimeType="application/xml" doc:name="Set Payload : Replace Special Characters"/>
+                <logger message="'Error Message After Replace'#[payload]" level="INFO" doc:name="Logger"/>
+            <dw:transform-message doc:name="TM : Prepare JSON output">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+      ErrorResponse: {
+            ErrorMessage: payload.SoapFault.Error.Fault.detail.ExceptionDetail.Message
+      }
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer mimeType="application/json" doc:name="Object to String"/>
+                <logger message="Exception Response back to salesforce for CreateIndividual operation #[payload]" level="INFO" doc:name="Logger"/>
+            </when>
+            <when expression="#[flowVars.exception != null]">
+                <logger message="Exception Details #[flowVars.exception]" level="INFO" doc:name="Logger"/>
+                <set-property propertyName="http.status" value="500" doc:name="Property : Set http status code"/>
+                <set-payload value="Internal server error while sending the request to MCI" doc:name="Set Payload : Set error description "/>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message : CreateIndividual to JSON" metadata:id="1450e2d2-2282-496b-aa41-c3bd5900dffa">
+                    <dw:input-payload doc:sample="sample_data\string_3.dwl"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/json
+%namespace ns0 http://DHSS/DataServiceHub/MCI/IndividualManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	CreateIndividualResponse: {
+		mciNumber: payload.CreateIndividualResponse.CreateIndividualResult.MciNumber as :string,
+		result: payload.CreateIndividualResponse.CreateIndividualResult.Result as :string
+	}
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/json" doc:name="Object to String : To JSON format"/>
+                <logger message="'Response sent back to salesforce for CreateIndividual operation' #[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+    </flow>
+    <flow name="post:/getDemographicInformation:inf023-mci-webservice-config">
+
+        <logger message="'Recceived a call from Salesforce for getDemographicInfo operation' #[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Name and transaction ID">
+            <add-message-property key="filename" value="DemographicInfoRequest.xml"/>
+            <add-message-property key="TransactionID" value="#[json:/DemographicInformationRequest/interfaceTransId]"/>
+        </message-properties-transformer>
+
+        <dw:transform-message metadata:id="67e96955-daad-4a61-91b4-31dc2e11a6b5" doc:name="Transform Message :  GetDemographicInfo Request">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ind http://DHSS/DataServiceHub/MCI/IndividualManagement
+---
+{
+	ind#GetDemographicInformation: {
+		ind#mciNumber: payload.DemographicInformationRequest.mciNumber
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property -  SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.DemogrpahicAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <logger message="'Get Demographic Request'#[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <ws:consumer config-ref="Web_Service_Consumer_Ind_Mgmt_Service" operation="GetDemographicInformation" doc:name="Web Service Consumer : Demographic Request"/>
+        <mulexml:dom-to-xml-transformer mimeType="application/xml" doc:name="DOM to XML"/>
+        <logger message="'getDemogrphic Response'#[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set Response File Name">
+            <add-message-property key="filename" value="DemographicInfoResponse.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf023_LOVInbound_Subflow" doc:name="inf023_LOVInbound_Subflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <dw:transform-message metadata:id="e9a4e7d9-4b36-4135-b5dd-14584f105ca0" doc:name="Transform Message : GetDemographicInformation to JSON">
+            <dw:input-payload doc:sample="sample_data\GetDemographicInformationResponse.xml" mimeType="application/xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var raceClass =  {
+"AA": "American Indian or Alaskan Native",
+"AS":"Asian",
+"BL":"Black or African American",
+"PA":"Native Hawaiian or Other Pacific Islander",
+"OT":"Other",
+"UN":"Unable to Determine",
+"CA":"White",
+"HS":"Hispanic"
+
+}
+%var genderClass =  {
+"F":"Female",
+"M":"Male",
+"U":"Unknown"
+}
+%var suffixClass =  {
+"I":"The First",
+"II":"The Second",
+"III":"The Third",
+"IV":"The Fourth",
+"JR":"Junior",
+"SR":"Senior",
+"V":"The Fifth",
+"VI":"The Sixth",
+"VII":"The Seventh"
+}
+%var citizenshipClass =  {
+"G"	:"Other Alien",
+"U"	:"Unknown",
+"C"	:"U.S. Citizen",
+"A"	:"Alien Admitted for Permanent Residence",
+"B"	:"Alien Permanently Residing in U.S. Under Color Of Law",
+"D"	:"Cuban Entrant",
+"E"	:"Cambodian Refugee",
+"F"	:"Vietnamese Refugee",
+"H"	:"Soviet Refugee",
+"I"	:"Repatriate",
+"J"	:"Hatian Entrant",
+"K"	:"Non-Qualified",
+"L"	:"Conditional Entrant",
+"M"	:"Asylee",
+"N"	:"Refugee",
+"O"	:"Parolee",
+"P"	:"Deportation Withheld",
+"Q"	:"Veteran",
+"R"	:"Spouse Of Veteran",
+"S" :"Dependent Of Veteran",
+"T"	:"Non-Legal Alien"
+}
+%var maritalStatusClass =  {
+"V" : "Civil Union",
+"C": "Cohabiting",
+"D": "Divorced",
+"M": "Married",
+"S":"Single",
+"X":"Separated",
+"U":"Unknown",
+"W":"Widowed"
+
+	
+}
+%namespace ns0 http://DHSS/DataServiceHub/MCI/IndividualManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns2 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	DemogrpahicInformationResponse: {
+		(MCI: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MCINumber as :string ) when payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MCINumber != null,
+		(firstName: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.FirstName as :string) when payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.FirstName != null,
+		(middleName: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MiddleName as :string) when payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MiddleName != null,
+		(lastName: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.LastName as :string )  when payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.LastName != null,
+		(suffix: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SuffixName as :string)  when payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SuffixName != null,
+		//("gender" : genderClass[(payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SexCode default "-1")] default payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SexCode ) when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SexCode != null and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SexCode != ""),
+		("gender" : flowVars.LOVReturned[("GENDER_MCI-" ++ payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SexCode)][0] default payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SexCode )
+					 when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SexCode != null and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.SexCode != ""),
+		//("maritalStatus" : maritalStatusClass[(payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MaritalStatusCode default "-1")] default payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MaritalStatusCode ) when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MaritalStatusCode != null and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MaritalStatusCode != ""),
+		("maritalStatus" : flowVars.LOVReturned[("MARITAL_STATUS_MCI-" ++ payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MaritalStatusCode)][0] default payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MaritalStatusCode )
+					 when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MaritalStatusCode != null and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.MaritalStatusCode != ""),
+		//("citizenship" : citizenshipClass[(payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.CitizenshipCode default "-1")] default payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.CitizenshipCode ) when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.CitizenshipCode != null and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.CitizenshipCode != ""),
+		("citizenship" : flowVars.LOVReturned[("CITIZENSHIP_MCI-" ++ payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.CitizenshipCode)][0] default payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.CitizenshipCode )
+					 when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.CitizenshipCode != null and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.CitizenshipCode != ""),
+		(birthDate: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.DateOfBirth as :date) when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.DateOfBirth != null and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.DateOfBirth != ""),
+		(dateOfDeath: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.DateOfDeath as :date) when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.DateOfDeath != null and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item1.DateOfDeath != ""),
+		(aliasNameList: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item4.*AlternativeName map ((alternativeName , indexOfAlternativeName) -> {
+			//suffix: alternativeName.Suffix,
+			//("suffix" : suffixClass[(alternativeName.Suffix default "-1")] default alternativeName.Suffix ) when (alternativeName.Suffix != null and alternativeName.Suffix != ""),
+			("suffix" : alternativeName.Suffix ) when (alternativeName.Suffix != null and alternativeName.Suffix != ""),
+			(nameType: alternativeName.NameTypeCode) when alternativeName.NameTypeCode != null,
+			(middleName: alternativeName.MiddleName) when alternativeName.MiddleName != null,
+			(lastName: alternativeName.LastName) when alternativeName.LastName != null,
+			(firstName: alternativeName.FirstName) when alternativeName.FirstName != null
+		})) when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item4 is :object and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item4.AlternativeName? ) == true,
+		(SSN: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item3.SocialSecurityNumber.SSN as :string) when payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item3 is :object and 
+				payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item3.SocialSecurityNumber is :object  and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item3.SocialSecurityNumber.SSN != null,
+		(raceList: payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item2.*Race map ((race , indexOfRace) -> {
+			//("race" : raceClass[(race.RaceCode default "-1")] default race.RaceCode ) when (race.RaceCode != null and race.RaceCode != ""),
+			("race" : flowVars.LOVReturned[("RACE_MCI-" ++ race.RaceCode)][0] default race.RaceCode ) when (race.RaceCode != null and race.RaceCode != ""),
+			(bIsPrimary: race.PrimaryFlag) when race.PrimaryFlag != null
+		})) when (payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item2 is :object and payload.GetDemographicInformationResponse.GetDemographicInformationResult.m_Item2.Race? ) == true
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String : To JSON format"/>
+        <logger message="'Response sent back to salesforce for getDemogrpahic operation' #[payload]" level="INFO" doc:name="Logger"/>
+
+    </flow>
+    <flow name="post:/getContacts:inf023-mci-webservice-config">
+        <logger message="'Recceived a call from Salesforce for getContacts operation' #[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer doc:name="Message Properties : set file name and trans Id" scope="invocation">
+            <add-message-property key="filename" value="ContactAddressRequest.xml"/>
+            <add-message-property key="TransactionID" value="#[json:/conAddressInformationRequest/interfaceTransId]"/>
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="f61debd4-1236-40a8-8b96-0e713b5ef866" doc:name="Transform Message :  getContacts Request to XML format">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ind http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation
+---
+{
+	ind#GetContactInformation: {
+		ind#mciNumber: payload.conAddressInformationRequest.mciNumber
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property -  SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.contactAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <logger message="'Get Contacts Request'#[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <ws:consumer config-ref="Web_Service_Consumer_Individ_Add_Info" operation="GetContactInformation" doc:name="Web Service Consumer : GetContactInformation"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <logger message="'Get Contacts Response'#[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer doc:name="Message Properties : Set Response File Name" overwrite="true" scope="invocation">
+            <add-message-property key="filename" value="ContactAddressResponse.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf023_LOVInbound_Subflow" doc:name="inf023_LOVInbound_Subflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <dw:transform-message metadata:id="f99c41f6-12e7-417b-b453-15a6cfca3a5d" doc:name="Transform Message : GetContactInformation to JSON format">
+            <dw:input-payload doc:sample="sample_data\empty.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+
+%var countyClass =  {
+"K":"Kent",
+"N":"New Castle",
+"S":"Sussex"
+}
+%namespace ns0 http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns2 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	conAddressInformationResponse: {
+		(email: payload.GetContactInformationResponse.GetContactInformationResult.m_Item3.EmailAddress) when (payload.GetContactInformationResponse.GetContactInformationResult.m_Item3 is :object and payload.GetContactInformationResponse.GetContactInformationResult.m_Item3.EmailAddress != null),
+		(phoneList: payload.GetContactInformationResponse.GetContactInformationResult.m_Item2.*Phone map ((phone , indexOfPhone) -> {
+			(phone: phone.PhoneNumber) when phone.PhoneNumber != null,
+			(phoneType: phone.PhoneType) when phone.PhoneType != null
+		})) when (payload.GetContactInformationResponse.GetContactInformationResult.m_Item2 is :object and payload.GetContactInformationResponse.GetContactInformationResult.m_Item2.Phone? ) == true,		
+		(individAddList: payload.GetContactInformationResponse.GetContactInformationResult.m_Item4.*Address map ((address , indexOfaddress) -> {
+			(addressType: address.AddressType) when address.AddressType != null,
+			(AddressLine1: address.AddressLine1) when  address.AddressLine1 != null,
+			(AddressLine2: address.AddressLine2) when  address.AddressLine2 != null,
+			(city: address.City) when address.City != null,
+			//(state: address.State) when address.State != null,
+			//("county" : countyClass[(address.CountyCode default "-1")] default address.CountyCode) when (address.CountyCode != null and address.CountyCode != ""),
+			(state: flowVars.LOVReturned[("STATECODE-" ++ address.State)][0]) when address.State != null and address.State != "",
+			("county" : flowVars.LOVReturned[("COUNTY_MCI-" ++ address.CountyCode)][0] default address.CountyCode) when (address.CountyCode != null and address.CountyCode != ""),
+			(zip: address.ZipCode) when address.ZipCode != null
+		})) when (payload.GetContactInformationResponse.GetContactInformationResult.m_Item4 is :object and payload.GetContactInformationResponse.GetContactInformationResult.m_Item4.Address?) == true	
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String : To JSON format"/>
+        <logger message="'Response sent back to salesforce for getContacts operation' #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="post:/registerLinkIndividual:inf023-mci-webservice-config">
+        <logger message="'Recceived a call from Salesforce for LinkMCI operation' #[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer doc:name="Message Properties : Set file name and transId" overwrite="true" scope="invocation">
+            <add-message-property key="filename" value="LinkMCIRequest.xml"/>
+            <add-message-property key="TransactionID" value="#[json:/LinkMCIRequest/interfaceTransId]"/>
+        </message-properties-transformer>
+        <set-variable variableName="SystemId" value="${soap.SystemID}" doc:name="Variable : Set System ID"/>
+        <dw:transform-message metadata:id="f61debd4-1236-40a8-8b96-0e713b5ef866" doc:name="Transform Message :  RegisterLinkIndividual to XML format">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace cle http://DHSS/DataServiceHub/MCI/Clearance
+%namespace dhss http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	cle#RegisterLinkIndividual: {
+		cle#subscribingSystem: {
+			dhss#MCINumber: payload.LinkMCIRequest.mciNumber,
+			dhss#SystemID: flowVars.SystemId
+		}
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property -  SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.LinkIndividualAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <logger message="'Register Link Individual Request'#[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <ws:consumer config-ref="Web_Service_Consumer_MCI_Clearance" operation="RegisterLinkIndividual" doc:name="Web Service Consumer : RegisterLinkIndividual"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <logger message="'RegisterLinkIndividual Response'#[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer doc:name="Message Properties : Set Response File Name" overwrite="true" scope="invocation">
+            <add-message-property key="filename" value="LinkMCIResponse.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <dw:transform-message metadata:id="f99c41f6-12e7-417b-b453-15a6cfca3a5d" doc:name="Transform Message : GetLinkMCI to JSON format">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/json
+%namespace ns0 http://DHSS/DataServiceHub/MCI/IndividualManagement
+%namespace ns1 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	LinkMCIResponse: {
+		(mciNumber: payload.RegisterLinkIndividualResponse.RegisterLinkIndividualResult.MciNumber as :string) when payload.RegisterLinkIndividualResponse.RegisterLinkIndividualResult.MciNumber != null,
+		(result: payload.RegisterLinkIndividualResponse.RegisterLinkIndividualResult.Result as :string) when payload.RegisterLinkIndividualResponse.RegisterLinkIndividualResult.Result != null
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String : To JSON format"/>
+        <logger message="'Response sent back to salesforce for LinkMCI operation' #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="post:/getCaseHistory:inf023-mci-webservice-config">
+        <logger message="'Recceived a call from Salesforce for getCaseHistory operation' #[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer doc:name="Message Properties : Set File name and TransId" overwrite="true" scope="invocation">
+            <add-message-property key="filename" value="CaseHistoryRequest.xml"/>
+            <add-message-property key="TransactionID" value="#[json:/caseHistoryRequest/interfaceTransId]"/>
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="f61debd4-1236-40a8-8b96-0e713b5ef866" doc:name="Transform Message :  getCaseHistoryRequest to XML format">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace cas http://DHSS/DataServiceHub/MCI/CaseManagement
+---
+{
+	cas#GetCaseHistory: {
+		cas#mciNumber: payload.caseHistoryRequest.mciNumber
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <set-property propertyName="soap.systemid" value="&lt;SystemID xmlns=&quot;http://www.w3.org/2003/05/soap-envelope&quot;&gt;${soap.SystemID}&lt;/SystemID&gt;" doc:name="Property -  SystemId"/>
+        <set-property propertyName="soap.Action" value="&lt;Action xmlns=&quot;http://www.w3.org/2005/08/addressing&quot;&gt;${soap.CaseHistoryAction}&lt;/Action&gt;" doc:name="Property - Action"/>
+        <logger message="'Get Case History Request'#[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <ws:consumer config-ref="Web_Service_Consumer_Individ_Case_Mgmt_Service" operation="GetCaseHistory" doc:name="Web Service Consumer : GetCaseHistory"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <logger message="'Get Case History Response'#[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set Response File Name">
+            <add-message-property key="filename" value="CaseHistoryRespone.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf023_LOVInbound_Subflow" doc:name="inf023_LOVInbound_Subflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+
+        <dw:transform-message metadata:id="f99c41f6-12e7-417b-b453-15a6cfca3a5d" doc:name="Transform Message : GetCaseHistory to JSON format">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var statusClass = {
+	"A": "Active",
+	"I": "Inactive"
+}
+%namespace ns0 Dhss.Common.MasterClientIndex.Services
+%namespace ns1 http://schemas.datacontract.org/2004/07/System
+%namespace ns2 http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities
+---
+{
+	(caseHistoryResponse: payload.GetCaseHistoryResponse.GetCaseHistoryResult.m_Item2.*Program map ((program , indexOfProgram) -> {
+			(department: program.Department as :string) when program.Department != null,
+			(divisionCode: program.DivisionCode as :string) when program.DivisionCode != null,
+			(caseNumber: program.CaseNumber as :string) when program.CaseNumber != null,
+			("caseStatus" : flowVars.LOVReturned[("CASESTATUS_MCI-" ++ program.CaseStatusCode)][0] default program.CaseStatusCode ) when (program.CaseStatusCode != null and program.CaseStatusCode != ""),
+			//("caseStatus" : statusClass[(program.CaseStatusCode default "-1")] default program.CaseStatusCode) when (program.CaseStatusCode != null and program.CaseStatusCode != ""),
+			//participantStatus: program.ParticipantStatusCode as :string,
+			("participantStatus" : flowVars.LOVReturned[("PARTICIPANTSTATUS_MCI-" ++ program.ParticipantStatusCode)][0] default program.ParticipantStatusCode ) when (program.ParticipantStatusCode != null and program.ParticipantStatusCode != ""),
+			//("participantStatus" : statusClass[(program.ParticipantStatusCode default "-1")] default program.ParticipantStatusCode) when (program.ParticipantStatusCode != null and program.ParticipantStatusCode != ""),
+			(startDate: program.StartDate as :date) when (program.StartDate != null and program.StartDate != ""),
+			(endDate: program.EndDate as :date) when (program.EndDate != null and program.EndDate != ""),
+			(accountType: program.AccountTypeCode as :string) when program.AccountTypeCode != null,
+			("participantType" : flowVars.LOVReturned[("PARTICIPANTTYPE_MCI-" ++ program.ParticipantType)][0] default program.ParticipantType ) when (program.ParticipantType != null and program.ParticipantType != ""),
+			//(participantType: program.ParticipantType as :string) when program.ParticipantType != null,
+			(contactName: program.ResponsibleWorkerName as :string) when program.ResponsibleWorkerName != null,
+			(systemVal: program.System as :string) when program.System != null
+		})
+		) when payload.GetCaseHistoryResponse.GetCaseHistoryResult.m_Item2 is :object and payload.GetCaseHistoryResponse.GetCaseHistoryResult.m_Item2 != null
+		 and payload.GetCaseHistoryResponse.GetCaseHistoryResult.m_Item2 != ""
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String : To JSON format"/>
+        <logger message="'Response sent back to salesforce for getCaseHistory operation' #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <sub-flow name="inf023_LOVOutbound_Subflow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'GENDER_MCI','RACE_MCI','CITIZENSHIP_MCI','MARITAL_STATUS_MCI','STATECODE','COUNTY_MCI'&quot;}" mimeType="application/json" doc:name="Set Payload : Picklist values and direction"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+	<sub-flow name="inf023_LOVInbound_Subflow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'GENDER_MCI','RACE_MCI','CITIZENSHIP_MCI','MARITAL_STATUS_MCI','STATECODE','COUNTY_MCI','CASESTATUS_MCI','PARTICIPANTSTATUS_MCI','PARTICIPANTTYPE_MCI'&quot;}" mimeType="application/json" doc:name="Set Payload : Picklist values and direction"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+    <sub-flow name="CreateTransactionAttachment">
+    	<string-to-byte-array-transformer doc:name="String to Byte Array"/>
+                <set-variable variableName="AttachmentBody" value="#[payload]" doc:name="Variable : Store the Fixed width file"/>
+                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+	ParentId: flowVars.TransactionID, //Need to Check
+	Name: flowVars.filename,
+	//Description: '',
+	Body: flowVars.AttachmentBody
+	}
+] ]]></dw:set-payload>
+                </dw:transform-message>
+         <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce : Create Attachment">
+              <sfdc:objects ref="#[payload]"/>
+         </sfdc:create>-->
+		 <logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.filename,
+             Title : flowVars.filename,
+             VersionData : flowVars.AttachmentBody
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.TransactionID
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+        <logger message="After Create Attachment : #[payload]" level="INFO" doc:name="Logger"/>
+        
+    </sub-flow>
+
+
+</mule>

@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "Web_Service_Consumer_Individ_Case_Mgmt_Service",
+            "typeId": "GetCaseHistoryResponse"
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "f5fdadc6-0c09-4386-8f30-f27e2e162740",
+    "version": "5.2.0.0"
+}

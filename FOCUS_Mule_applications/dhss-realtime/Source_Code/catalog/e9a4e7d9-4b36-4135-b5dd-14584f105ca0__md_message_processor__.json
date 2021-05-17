@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "Web_Service_Consumer_Ind_Mgmt_Service_UAT",
+            "typeId": "GetDemographicInformationResponse"
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "e9a4e7d9-4b36-4135-b5dd-14584f105ca0",
+    "version": "5.2.0.0"
+}

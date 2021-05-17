@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions targetNamespace="http://dbcs.delaware.gov/services/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:tns="http://dbcs.delaware.gov/services/" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsx="http://schemas.xmlsoap.org/ws/2004/09/mex" xmlns:wsap="http://schemas.xmlsoap.org/ws/2004/08/addressing/policy" xmlns:wsaw="http://www.w3.org/2006/05/addressing/wsdl" xmlns:msc="http://schemas.microsoft.com/ws/2005/12/wsdl/contract" xmlns:wsp="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:wsa10="http://www.w3.org/2005/08/addressing" xmlns:wsam="http://www.w3.org/2007/05/addressing/metadata">
+  <wsdl:types>
+    <xsd:schema targetNamespace="http://dbcs.delaware.gov/services/Imports">
+      <xsd:import schemaLocation="DscyfService.xsd" namespace="http://dbcs.delaware.gov/services/"/>
+      <xsd:import schemaLocation="DscyfService_1_2_3.xsd" namespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+      <xsd:import schemaLocation="DscyfService_1.xsd" namespace="http://schemas.datacontract.org/2004/07/Dhss.Ltcrp.Bcc.ServiceLibrary"/>
+      <xsd:import schemaLocation="DscyfService_1_2.xsd" namespace="http://schemas.datacontract.org/2004/07/Dhss.Ltcrp.Bcc.ServiceLibrary.Kids"/>
+    </xsd:schema>
+  </wsdl:types>
+  <wsdl:message name="IDscyfService_SimpleTest_InputMessage">
+    <wsdl:part name="parameters" element="tns:SimpleTest"/>
+  </wsdl:message>
+  <wsdl:message name="IDscyfService_SimpleTest_OutputMessage">
+    <wsdl:part name="parameters" element="tns:SimpleTestResponse"/>
+  </wsdl:message>
+  <wsdl:message name="IDscyfService_Test_InputMessage">
+    <wsdl:part name="parameters" element="tns:Test"/>
+  </wsdl:message>
+  <wsdl:message name="IDscyfService_Test_OutputMessage">
+    <wsdl:part name="parameters" element="tns:TestResponse"/>
+  </wsdl:message>
+  <wsdl:message name="IDscyfService_NotifyResultReady_InputMessage">
+    <wsdl:part name="parameters" element="tns:NotifyResultReady"/>
+  </wsdl:message>
+  <wsdl:message name="IDscyfService_NotifyResultReady_OutputMessage">
+    <wsdl:part name="parameters" element="tns:NotifyResultReadyResponse"/>
+  </wsdl:message>
+  <wsdl:portType name="IDscyfService">
+    <wsdl:operation name="SimpleTest">
+      <wsdl:input wsaw:Action="http://dbcs.delaware.gov/services/IDscyfService/SimpleTest" message="tns:IDscyfService_SimpleTest_InputMessage"/>
+      <wsdl:output wsaw:Action="http://dbcs.delaware.gov/services/IDscyfService/SimpleTestResponse" message="tns:IDscyfService_SimpleTest_OutputMessage"/>
+    </wsdl:operation>
+    <wsdl:operation name="Test">
+      <wsdl:input wsaw:Action="http://dbcs.delaware.gov/services/IDscyfService/Test" message="tns:IDscyfService_Test_InputMessage"/>
+      <wsdl:output wsaw:Action="http://dbcs.delaware.gov/services/IDscyfService/TestResponse" message="tns:IDscyfService_Test_OutputMessage"/>
+    </wsdl:operation>
+    <wsdl:operation name="NotifyResultReady">
+      <wsdl:input wsaw:Action="http://dbcs.delaware.gov/services/IDscyfService/NotifyResultReady" message="tns:IDscyfService_NotifyResultReady_InputMessage"/>
+      <wsdl:output wsaw:Action="http://dbcs.delaware.gov/services/IDscyfService/NotifyResultReadyResponse" message="tns:IDscyfService_NotifyResultReady_OutputMessage"/>
+    </wsdl:operation>
+  </wsdl:portType>
+</wsdl:definitions>

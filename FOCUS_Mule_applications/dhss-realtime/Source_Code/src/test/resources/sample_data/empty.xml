@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ns0:GetContactInformationResponse xmlns:ns0="http://DHSS/DataServiceHub/MCI/IndividualAdditionalInformation" xmlns:a="http://www.w3.org/2005/08/addressing" xmlns:ns1="http://schemas.datacontract.org/2004/07/System" xmlns:ns2="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:ns3="http://schemas.microsoft.com/2003/10/Serialization/Arrays" xmlns:ns4="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities" xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+   <ns0:GetContactInformationResult>
+      <ns1:m_Item1>737754</ns1:m_Item1>
+      <ns1:m_Item2>
+         <ns4:Phone>
+            <ns4:CreateDate>1997-10-18T00:00:00</ns4:CreateDate>
+            <ns4:CreateWorker xsi:nil="true" />
+            <ns4:LastUpdatedDate>2014-10-21T00:00:00</ns4:LastUpdatedDate>
+            <ns4:LastWorkerID>KDOPO01</ns4:LastWorkerID>
+            <ns4:PhoneNumber>3023654446</ns4:PhoneNumber>
+            <ns4:PhoneType>HP</ns4:PhoneType>
+         </ns4:Phone>
+      </ns1:m_Item2>
+      <ns1:m_Item3 />
+      <ns1:m_Item4>
+         <ns4:Address>
+            <ns4:AddressLine1>3804 KILDOON DR.</ns4:AddressLine1>
+            <ns4:AddressLine2>APPLE CHASE APARTMENTS</ns4:AddressLine2>
+            <ns4:AddressType>PA</ns4:AddressType>
+            <ns4:AddressValidationFlag xsi:nil="true" />
+            <ns4:AptNo xsi:nil="true" />
+            <ns4:City>NEWARK</ns4:City>
+            <ns4:CountyCode>3</ns4:CountyCode>
+            <ns4:CreateDate>1997-10-18T00:00:00</ns4:CreateDate>
+            <ns4:CreateWorker>MCICONV</ns4:CreateWorker>
+            <ns4:LastUpdatedDate>2014-10-21T00:00:00</ns4:LastUpdatedDate>
+            <ns4:LastWorkerID>KDOPO01</ns4:LastWorkerID>
+            <ns4:State>DE</ns4:State>
+            <ns4:ZipCode>1970</ns4:ZipCode>
+            <ns4:ZipSuffix>2</ns4:ZipSuffix>
+         </ns4:Address>
+      </ns1:m_Item4>
+   </ns0:GetContactInformationResult>
+</ns0:GetContactInformationResponse>

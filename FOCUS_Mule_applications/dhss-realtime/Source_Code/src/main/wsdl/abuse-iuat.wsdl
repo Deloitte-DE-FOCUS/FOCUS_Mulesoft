@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wsdl:definitions xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:tns="http://kids.delaware.gov/" xmlns:s="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" targetNamespace="http://kids.delaware.gov/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:types>
+    <s:schema elementFormDefault="qualified" targetNamespace="http://kids.delaware.gov/">
+      <s:element name="SimpleTest">
+        <s:complexType />
+      </s:element>
+      <s:element name="SimpleTestResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="SimpleTestResult" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="Test">
+        <s:complexType />
+      </s:element>
+      <s:element name="TestResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="TestResult" type="tns:ARReturn" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="ARReturn">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="IsSuccessful" type="s:boolean" />
+          <s:element minOccurs="0" maxOccurs="1" name="ErrorMessages" type="tns:ArrayOfARError" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="ArrayOfARError">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="unbounded" name="ARError" nillable="true" type="tns:ARError" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="ARError">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="ErrorType" type="tns:ARErrorTypes" />
+          <s:element minOccurs="0" maxOccurs="1" name="ErrorMessage" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:simpleType name="ARErrorTypes">
+        <s:restriction base="s:string">
+          <s:enumeration value="Unknown" />
+          <s:enumeration value="Unavailable" />
+          <s:enumeration value="AuthenticationError" />
+          <s:enumeration value="DatabaseError" />
+          <s:enumeration value="InvalidInput" />
+        </s:restriction>
+      </s:simpleType>
+      <s:element name="AuthCredentials" type="tns:AuthCredentials" />
+      <s:complexType name="AuthCredentials">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="1" name="Username" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Password" type="s:string" />
+        </s:sequence>
+        <s:anyAttribute />
+      </s:complexType>
+      <s:element name="RequestCheckOutcome">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="requestID" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="RequestCheckOutcomeResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="RequestCheckOutcomeResult" type="tns:ARRequestCheckOutcomeReturn" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="ARRequestCheckOutcomeReturn">
+        <s:complexContent mixed="false">
+          <s:extension base="tns:ARReturn">
+            <s:sequence>
+              <s:element minOccurs="1" maxOccurs="1" name="IsProcessingCompleted" type="s:boolean" />
+              <s:element minOccurs="0" maxOccurs="1" name="FindingStatus" type="s:string" />
+              <s:element minOccurs="0" maxOccurs="1" name="RegistryStatus" type="s:string" />
+              <s:element minOccurs="0" maxOccurs="1" name="StatusDetails" type="tns:ArrayOfARStatusDetail" />
+              <s:element minOccurs="0" maxOccurs="1" name="Notes" type="s:string" />
+            </s:sequence>
+          </s:extension>
+        </s:complexContent>
+      </s:complexType>
+      <s:complexType name="ArrayOfARStatusDetail">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="unbounded" name="ARStatusDetail" nillable="true" type="tns:ARStatusDetail" />
+        </s:sequence>
+      </s:complexType>
+      <s:complexType name="ARStatusDetail">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="1" name="NumberOfCases" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Type" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Level" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Additional" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:element name="RequestCheck">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="request" type="tns:ARRequestCheck" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="ARRequestCheck">
+        <s:sequence>
+          <s:element minOccurs="0" maxOccurs="1" name="RequestID" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="FirstName1" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="MiddleName1" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="LastName1" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="FirstName2" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="MiddleName2" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="LastName2" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="FirstName3" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="MiddleName3" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="LastName3" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="FirstName4" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="MiddleName4" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="LastName4" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="FirstName5" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="MiddleName5" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="LastName5" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="SSN" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="BirthDate" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Sex" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Race" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="Ethnicity" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="AgencyName" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="AgencyType" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="AgencyAddrStreet1" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="AgencyAddrStreet2" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="AgencyAddrCity" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="AgencyAddrState" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="AgencyAddrZip" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="ContactName" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="ContactPhone" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="ContactExtension" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="ContactFax" type="s:string" />
+          <s:element minOccurs="0" maxOccurs="1" name="ContactEmail" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:element name="RequestCheckResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="RequestCheckResult" type="tns:ARRequestCheckReturn" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="ARRequestCheckReturn">
+        <s:complexContent mixed="false">
+          <s:extension base="tns:ARReturn">
+            <s:sequence>
+              <s:element minOccurs="0" maxOccurs="1" name="RequestReciept" type="s:string" />
+              <s:element minOccurs="0" maxOccurs="1" name="FirstName1" type="s:string" />
+              <s:element minOccurs="0" maxOccurs="1" name="LastName1" type="s:string" />
+              <s:element minOccurs="0" maxOccurs="1" name="BirthDate" type="s:string" />
+            </s:sequence>
+          </s:extension>
+        </s:complexContent>
+      </s:complexType>
+      <s:element name="RequestCheckStatus">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="requestID" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="RequestCheckStatusResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="RequestCheckStatusResult" type="tns:ARRequestCheckStatusReturn" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="ARRequestCheckStatusReturn">
+        <s:complexContent mixed="false">
+          <s:extension base="tns:ARReturn">
+            <s:sequence>
+              <s:element minOccurs="1" maxOccurs="1" name="Status" type="tns:ARCheckStatus" />
+            </s:sequence>
+          </s:extension>
+        </s:complexContent>
+      </s:complexType>
+      <s:simpleType name="ARCheckStatus">
+        <s:restriction base="s:string">
+          <s:enumeration value="NotFound" />
+          <s:enumeration value="InQueue" />
+          <s:enumeration value="InProcess" />
+          <s:enumeration value="Complete" />
+        </s:restriction>
+      </s:simpleType>
+    </s:schema>
+  </wsdl:types>
+  <wsdl:message name="SimpleTestSoapIn">
+    <wsdl:part name="parameters" element="tns:SimpleTest" />
+  </wsdl:message>
+  <wsdl:message name="SimpleTestSoapOut">
+    <wsdl:part name="parameters" element="tns:SimpleTestResponse" />
+  </wsdl:message>
+  <wsdl:message name="TestSoapIn">
+    <wsdl:part name="parameters" element="tns:Test" />
+  </wsdl:message>
+  <wsdl:message name="TestSoapOut">
+    <wsdl:part name="parameters" element="tns:TestResponse" />
+  </wsdl:message>
+  <wsdl:message name="TestAuthCredentials">
+    <wsdl:part name="AuthCredentials" element="tns:AuthCredentials" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckOutcomeSoapIn">
+    <wsdl:part name="parameters" element="tns:RequestCheckOutcome" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckOutcomeSoapOut">
+    <wsdl:part name="parameters" element="tns:RequestCheckOutcomeResponse" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckOutcomeAuthCredentials">
+    <wsdl:part name="AuthCredentials" element="tns:AuthCredentials" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckSoapIn">
+    <wsdl:part name="parameters" element="tns:RequestCheck" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckSoapOut">
+    <wsdl:part name="parameters" element="tns:RequestCheckResponse" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckAuthCredentials">
+    <wsdl:part name="AuthCredentials" element="tns:AuthCredentials" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckStatusSoapIn">
+    <wsdl:part name="parameters" element="tns:RequestCheckStatus" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckStatusSoapOut">
+    <wsdl:part name="parameters" element="tns:RequestCheckStatusResponse" />
+  </wsdl:message>
+  <wsdl:message name="RequestCheckStatusAuthCredentials">
+    <wsdl:part name="AuthCredentials" element="tns:AuthCredentials" />
+  </wsdl:message>
+  <wsdl:portType name="ABRExWSSoap">
+    <wsdl:operation name="SimpleTest">
+      <wsdl:input message="tns:SimpleTestSoapIn" />
+      <wsdl:output message="tns:SimpleTestSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="Test">
+      <wsdl:input message="tns:TestSoapIn" />
+      <wsdl:output message="tns:TestSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RequestCheckOutcome">
+      <wsdl:input message="tns:RequestCheckOutcomeSoapIn" />
+      <wsdl:output message="tns:RequestCheckOutcomeSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RequestCheck">
+      <wsdl:input message="tns:RequestCheckSoapIn" />
+      <wsdl:output message="tns:RequestCheckSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="RequestCheckStatus">
+      <wsdl:input message="tns:RequestCheckStatusSoapIn" />
+      <wsdl:output message="tns:RequestCheckStatusSoapOut" />
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="ABRExWSSoap" type="tns:ABRExWSSoap">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="SimpleTest">
+      <soap:operation soapAction="http://kids.delaware.gov/SimpleTest" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="Test">
+      <soap:operation soapAction="http://kids.delaware.gov/Test" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+        <soap:header message="tns:TestAuthCredentials" part="AuthCredentials" use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RequestCheckOutcome">
+      <soap:operation soapAction="http://kids.delaware.gov/RequestCheckOutcome" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+        <soap:header message="tns:RequestCheckOutcomeAuthCredentials" part="AuthCredentials" use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RequestCheck">
+      <soap:operation soapAction="http://kids.delaware.gov/RequestCheck" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+        <soap:header message="tns:RequestCheckAuthCredentials" part="AuthCredentials" use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RequestCheckStatus">
+      <soap:operation soapAction="http://kids.delaware.gov/RequestCheckStatus" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+        <soap:header message="tns:RequestCheckStatusAuthCredentials" part="AuthCredentials" use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  
+  <wsdl:service name="ABRExWS">
+    <wsdl:port name="ABRExWSSoap" binding="tns:ABRExWSSoap">
+      <soap:address location="https://dhss-realtime-https.cloudhub.io/ABRExternalWebService/ABRExWS" />
+    </wsdl:port>
+    
+  </wsdl:service>
+</wsdl:definitions>

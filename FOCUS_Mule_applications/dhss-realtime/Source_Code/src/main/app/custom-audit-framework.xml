@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="custom-audit-frameworkFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/customAudit" doc:name="HTTP Listner" allowedMethods="POST"/>
+        <logger message="Query recived for Custom Audit : #[payload]" level="INFO" doc:name="Logger"/>
+        <!-- <http:basic-security-filter realm="mule-realm"/> -->
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	requestTime : payload.requestTime,
+	query : payload.query
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <until-successful maxRetries="1" doc:name="Until Successful" millisBetweenRetries="60000" synchronous="true">
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getAuditData" method="GET" doc:name="Web service call to Oracle ">
+                <http:request-builder>
+                    <http:query-param paramName="query" value="#[payload.query]"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <logger message="Response recived from web serive #[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	responseTime : now as :string {format : "yyyy-MM-dd:HH:mm:ss"},
+	data : payload map $,
+	status : "Success",
+	errorMessage : ""
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <choice-exception-strategy doc:name="Choice Exception Strategy">
+            <catch-exception-strategy doc:name="417" when="#[dw('payload startsWith (&quot;ORA&quot;)')]">
+                <logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+                <set-variable variableName="Exception" value="#[exception]" doc:name="Variable"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	responseTime : now as :string {format : "yyyy-MM-dd:HH:mm:ss"},
+	data : [],
+	status : "Error",
+	errorMessage : payload
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </catch-exception-strategy>
+            <catch-exception-strategy doc:name="500" when="#[exception.causedBy(java.net.ConnectException)]">
+       		<logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+                <set-variable variableName="Exception" value="#[exception]" doc:name="Variable"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	responseTime : now as :string {format : "yyyy-MM-dd:HH:mm:ss"},
+	data : [],
+	status : "Error",
+	errorMessage : "Web service is down or not reachable"
+}]]></dw:set-payload>
+                </dw:transform-message>
+       </catch-exception-strategy>
+       <catch-exception-strategy doc:name="Default" >
+       		<logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+                <set-variable variableName="Exception" value="#[exception]" doc:name="Variable"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	responseTime : now as :string {format : "yyyy-MM-dd:HH:mm:ss"},
+	data : [],
+	status : "Error",
+	errorMessage : (flowVars.Exception.message)
+}]]></dw:set-payload>
+                </dw:transform-message>
+       </catch-exception-strategy>
+        </choice-exception-strategy>
+    </flow>
+</mule>

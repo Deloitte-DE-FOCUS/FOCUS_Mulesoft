@@ -1,0 +1,1083 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:sfdc-analytics="http://www.mulesoft.org/schema/mule/sfdc-analytics" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc-analytics http://www.mulesoft.org/schema/mule/sfdc-analytics/current/mule-sfdc-analytics.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans> 
+   	<spring:beans>
+		<spring:import resource="classpath:/queryframework.xml" />
+	</spring:beans>
+	
+	<configuration doc:name="Configuration">
+    <expression-language>
+     	<global-functions> 
+def parseQuery(uriString,param) {
+	if((org.springframework.web.util.UriComponentsBuilder.fromUriString(uriString).build().getQueryParams().get(param)) != null )
+     	return java.net.URLDecoder.decode( ( org.springframework.web.util.UriComponentsBuilder.fromUriString(uriString).build().getQueryParams().get(param).get(0) ),"UTF-8" );
+     else
+		return null
+	} 		
+     	</global-functions> 
+    </expression-language>  
+    </configuration>
+    <configuration defaultTransactionTimeout="1200000" defaultResponseTimeout="1200000" doc:name="Configuration">
+		<default-threading-profile poolExhaustedAction="RUN"/>
+	</configuration>
+	<sfdc-analytics:config name="Salesforce_Analytics_Cloud__Basic_authentication" username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}" url="${sfdc.url}" disableSessionInvalidation="true" metadataFileName="EventLogSampleDashboard.json" doc:name="SF Analytics Cloud: Basic authentication"/>
+	<http:request-config name="HTTP_Request_EM_Configuration"
+		host="${wcf.ws.host}" port="${wcf.ws.port}" doc:name="HTTP Request Configuration"
+		basePath="${wcf.ws.basePath}" protocol="HTTPS" connectionIdleTimeout="1200000" responseTimeout="1200000">
+		<http:basic-authentication username="${wcf.auth.userName}"
+			password="${wcf.auth.pwd}" preemptive="true"/>
+	</http:request-config>
+    <asynchronous-processing-strategy name="Asynchronous_Processing_Strategy" maxThreads="16" minThreads="5" poolExhaustedAction="WAIT" threadWaitTimeout="-1" doc:name="Asynchronous Processing Strategy"/>
+    <vm:connector name="VM-event-monitoring" validateConnections="true" doc:name="VM"/>
+    <flow name="eventLogMonitorLoadFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <schedulers:cron-scheduler expression="0 0 16 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="Trigger Daily Event Log MonitorLoad Job" doc:name="Set Payload : Daily Event Log Monitor Load"/>
+        </poll>
+        <logger message="Enter Daily Event Log MonitorLoad" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer scope="session" doc:name="MP : Set Initialize required fields">
+            <add-message-property key="genericDataset" value="${eventlog.dataset.name}"/>
+            <add-message-property key="reportDataset" value="${eventlog.reportdataset.name}"/>
+            <add-message-property key="caseDataset" value="${eventlog.casedataset.name}"/>
+            <add-message-property key="toProceed" value="#[&quot;Y&quot;]"/>
+            <add-message-property key="retryCount" value="#[0]"/>
+        </message-properties-transformer>
+        <flow-ref name="EventLogDetailsflow" doc:name="EventLogDetailsflow"/>
+        <expression-filter expression="#[sessionVars.toProceed == &quot;Y&quot;]" doc:name="Expression"/>
+        <flow-ref name="genericDataIntoGenericDataSetFlow" doc:name="genericDataIntoGenericDataSetFlow"/>
+        <flow-ref name="reportDataIntoReportDataSetFlow" doc:name="reportDataIntoReportDataSetFlow"/>
+        <flow-ref name="loadCaseDataIntoDBFlow" doc:name="loadCaseDataintoDBFlow"/>
+        <flow-ref name="casePersonDataIntoCasePersonDataSetFlow" doc:name="casePersonDataIntoCasePersonDataSetFlow"/>
+        <logger message="Call for Archieve records" level="INFO" doc:name="Logger"/>
+		<set-payload doc:name="Set Payload" value="#['']"/>
+        <http:request config-ref="HTTP_Request_EM_Configuration" path="/archiveRecords" method="POST" doc:name="Archieve records"/>
+        <logger message="Response after archieve call : #[payload]" level="INFO" doc:name="Logger"/>
+        <logger message="Exit Daily Event Log MonitorLoad" level="INFO" doc:name="Logger"/>
+    </flow>
+    
+    <flow name="eventLogMonitorLoadFlow-Clone" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <schedulers:cron-scheduler expression="0 0 16 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="Trigger Daily Event Log MonitorLoad Job" doc:name="Set Payload : Daily Event Log Monitor Load"/>
+        </poll>
+        <logger message="Enter Daily Event Log MonitorLoad" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer scope="session" doc:name="MP : Set Initialize required fields">
+            <add-message-property key="genericDataset" value="${eventlog.dataset.name}"/>
+            <add-message-property key="reportDataset" value="${eventlog.reportdataset.name}"/>
+            <add-message-property key="caseDataset" value="${eventlog.casedataset.name}"/>
+            <add-message-property key="toProceed" value="#[&quot;Y&quot;]"/>
+            <add-message-property key="retryCount" value="#[0]"/>
+            <add-message-property key="batchNumber" value="#[Integer.parseInt(${batchStartsFrom})]"/>
+        </message-properties-transformer>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="event-monitoring-batch" connector-ref="VM-event-monitoring" doc:name="VM"/>
+        
+        
+        
+    </flow>
+    
+    <flow name="event_monitoring-processing-Flow" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="event-monitoring-processing" connector-ref="VM-event-monitoring" doc:name="VM"/>
+        <expression-component doc:name="Expression"><![CDATA[sessionVars.isComplete='false';
+sessionVars.batchNumber=sessionVars.batchNumber + 1;]]></expression-component>
+        <flow-ref name="EventLogDetailsflow" doc:name="EventLogDetailsflow"/>
+        <logger message="Event Log load completed." level="INFO" doc:name="Logger"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="event-monitoring-processing" connector-ref="VM-event-monitoring" doc:name="VM"/>
+    </flow>
+    <flow name="event_monitoringSub_Flow" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="event-monitoring-batch" connector-ref="VM-event-monitoring" doc:name="event-monitoring-batch"/>
+        <expression-component doc:name="Expression"><![CDATA[sessionVars.isComplete='false';
+sessionVars.batchNumber=sessionVars.batchNumber + 1;]]></expression-component>
+    	<flow-ref name="EventLogDetailsflow" doc:name="EventLogDetailsflow"/>
+        <expression-filter expression="#[sessionVars.toProceed == &quot;Y&quot;]" doc:name="Expression"/>
+        <flow-ref name="genericDataIntoGenericDataSetFlow" doc:name="genericDataIntoGenericDataSetFlow"/>
+        <flow-ref name="reportDataIntoReportDataSetFlow" doc:name="reportDataIntoReportDataSetFlow"/>
+        <flow-ref name="loadCaseDataIntoDBFlow" doc:name="loadCaseDataintoDBFlow"/>
+        <flow-ref name="casePersonDataIntoCasePersonDataSetFlow" doc:name="casePersonDataIntoCasePersonDataSetFlow"/>
+        <logger message="Call for Archieve records" level="INFO" doc:name="Logger"/>
+		<set-payload doc:name="Set Payload" value="#['']"/>
+        <http:request config-ref="HTTP_Request_EM_Configuration" path="/archiveRecords" method="POST" doc:name="Archieve records"/>
+        <logger message="Response after archieve call : #[payload]" level="INFO" doc:name="Logger"/>
+        <logger message="Exit Daily Event Log MonitorLoad" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.isComplete == 'false']">
+                <vm:outbound-endpoint exchange-pattern="one-way" path="event-monitoring-batch" connector-ref="VM-event-monitoring" doc:name="VM"/>
+
+            </when>
+            <otherwise>
+                <logger message="All Batches are complete" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </flow>
+
+    <flow name="EventLogDetailsflow">
+        <enricher doc:name="Message Enricher">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF121&quot;, &quot;InterfaceName&quot;: &quot;EventLog Files Data Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <logger message="EventLogDetails Query : Select ID, ISDELETED, CREATEDDATE, CREATEDBYID, LASTMODIFIEDDATE, LASTMODIFIEDBYID, SYSTEMMODSTAMP, EVENTTYPE, LOGDATE, LOGFILELENGTH, LOGFILECONTENTTYPE, APIVERSION, SEQUENCE, INTERVAL, LOGFILEFIELDNAMES, LOGFILEFIELDTYPES, BACKUPCREATEDDATE, BACKUPMODIFIEDDATE, MIGRATED_FLG, REPORT_LOAD_FLG, CASE_LOAD_FLG, GENERIC_LOAD_FLG from ${eventlog.schema}.eventlogfile WHERE EVENTTYPE IN ('URI','VisualforceRequest','Report','ReportExport')  AND INTERVAL = 'Daily' AND (MIGRATED_FLG IS NULL OR MIGRATED_FLG = 'N')" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer scope="session" doc:name="MP : Initialize counts">
+            <add-message-property key="logFilesCount" value="#[0]"/>
+            <add-message-property key="logFilesErrorCount" value="#[0]"/>
+            <add-message-property key="logFilesSuccessCount" value="#[0]"/>
+            <add-message-property key="genericExceptionMessage" value="#['']"/>
+            <add-message-property key="logfilesCollectionCount" value="#[0]"/>
+        </message-properties-transformer>
+        <until-successful maxRetries="1" doc:name="Until Successful" synchronous="true">
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getEventLogData" method="GET" doc:name="Get Log records from DB" doc:description="Get Log records from SF all records till Date">
+                <http:request-builder>
+                    <http:query-param paramName="query" value="Select ID, ISDELETED, CREATEDDATE, CREATEDBYID, LASTMODIFIEDDATE, LASTMODIFIEDBYID, SYSTEMMODSTAMP, EVENTTYPE, LOGDATE, LOGFILELENGTH, LOGFILECONTENTTYPE, APIVERSION, SEQUENCE, INTERVAL, LOGFILEFIELDNAMES, LOGFILEFIELDTYPES, BACKUPCREATEDDATE, BACKUPMODIFIEDDATE, MIGRATED_FLG, REPORT_LOAD_FLG, CASE_LOAD_FLG, GENERIC_LOAD_FLG from ${eventlog.schema}.eventlogfile WHERE EVENTTYPE IN ('URI','VisualforceRequest','Report','ReportExport')  AND INTERVAL = 'Daily' AND (MIGRATED_FLG IS NULL OR MIGRATED_FLG = 'N')"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+        <dw:transform-message doc:name="Event Log details Convert to Java List">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <set-session-variable variableName="logFilesCount" value="#[payload.size()]" doc:name="SV : logFilesCount"/>
+        <logger message=" EventLogDetails : Total Number of Log Files :  #[payload.size()]  Log File Data : #[payload]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[(payload.size() &gt; 0)]">
+                <message-properties-transformer scope="invocation" doc:name="MP : Event Log Details, Initialize VFPageMappingMissingList">
+                    <add-message-property key="EventLogDetails" value="#[payload]"/>
+                    <add-message-property key="VFPageMappingMissingList" value="#[dw(&quot;[]&quot;)]"/>
+                </message-properties-transformer>
+                <enricher source="#[flowVars.VFPageMap]" target="#[flowVars.VFPageMap]" doc:name="ME: Get VF Page Map">
+                    <flow-ref name="VFParamsLookupSub_Flow" doc:name="VFParamsLookupSub_Flow"/>
+                </enricher>
+                <foreach doc:name="For Each : Event Log File">
+                    <flow-ref name="parseAndLoadEventLogflow" doc:name="parseAndLoadEventLogflow"/>
+        		</foreach>
+                <!--<flow-ref name="event_monitoring_VFPageMappingMissingList_Notification_Sub_Flow" doc:name="event_monitoring_VFPageMappingMissingList_Notification_Sub_Flow"/> -->
+        		<logger message="EventLogDetails : Load completed" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message=" EventLogDetails : No records extracted from Database to process Event Monitoring" level="INFO" doc:name="Logger"/>
+                <set-session-variable variableName="isComplete" value="#['true']" doc:name="isComplete flag"/>
+
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF121&quot;, &quot;InterfaceName&quot;: &quot;EventLog Files Data Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.logFilesErrorCount == 0?'Success':(sessionVars.logFilesSuccessCount==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.logFilesCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.logFilesSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.logFilesErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.logFilesCount == 0 ? 'There are no records to Process.' : ( sessionVars.logFilesErrorCount == 0? '' : (sessionVars.logFilesSuccessCount==0?'All the records failed.'#[sessionVars.genericExceptionMessage]:''))]&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+		<catch-exception-strategy doc:name="Catch Exception Strategy">
+           <logger message="EventLogDetails : Exception Occurred while migrating data into Salesforce Mapping table" level="INFO" doc:name="Logger"/>
+           <choice doc:name="Choice">
+                  <when expression="#[message.inboundProperties.'http.status' >= 500]">
+                      <set-session-variable variableName="toProceed" value="#[&quot;N&quot;]" doc:name="SV : Set Proceed Flag"/>
+                  </when>
+                  <otherwise>
+                      <logger level="INFO" doc:name="Logger" message="EventLogDetails : #[exception.message]"/>
+                  </otherwise>
+              </choice>
+           <set-payload value="{&quot;InterfaceID&quot;: &quot;INF121&quot;, &quot;InterfaceName&quot;: &quot;EventLog Files Data Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.logFilesCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.logFilesSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.logFilesErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;Error Occurred while Event Log files Data Load into Salesforce mapping table. #[exception.message]&quot;,&quot;ExceptionType&quot;:&quot;System&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+           <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+       </catch-exception-strategy>
+    </flow>
+ 
+    <sub-flow name="VFParamsLookupSub_Flow">
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Comments__c,Field_API_to_be_queried__c,Object_API_Name__c,Query_Needed__c,URL_Attributes__c,VF_Page_Name__c from Event_Monitoring_VF_Mapping__c" doc:name="SF : Query VF params"/>
+                    <dw:transform-message doc:name="Get Page Mappings With VF PageName as Key and other attributes as Value" doc:description="Get a Map From the Consumer Iterator by executing a Lambda over all the elements of the Iterator">
+                         <dw:input-payload mimeType="application/java"/>
+                         <dw:set-variable variableName="VFPageMap"><![CDATA[%dw 1.0
+%output application/java
+---
+payload reduce ((val, acc = {}) -> acc ++ (( { ((lower val.VF_Page_Name__c) as :string) : ( { "QueryNeeded" : true when ((val.Query_Needed__c default "") == "Yes") otherwise false, "ObjectName" : val.Object_API_Name__c, "FieldName" : val.Field_API_to_be_queried__c, "URLAttribute" : val.URL_Attributes__c  } ) } )))]]></dw:set-variable>
+                    </dw:transform-message>	
+    </sub-flow>
+    
+    <flow name="parseAndLoadEventLogflow">
+        <set-variable variableName="eventLogFileId" value="#[flowVars.EventLogDetails[flowVars.counter - 1].Id]" doc:name="Variable : Set EventLogFileId"/>
+        <choice doc:name="Choice : Route to Processing according to Event type" doc:description="Route to Processing according to Event type">
+            <when expression="#[payload.Event_Type == 'VisualforceRequest']">
+                <logger message="VF Request" level="INFO" doc:name="Logger : VF Request"/>
+                <set-variable variableName="uniqueRecs" value="#[dw(&quot;[]&quot;)]" doc:name="Variable : Init Unique Recs"/>
+                <flow-ref name="getLogFileContentAsStream" doc:name="getLogFileContentAsStream" doc:description="Invoke getLogFileContentAsStream flow"/>
+                <foreach batchSize="100000" doc:name="For Each : Process Iterator">
+                	<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                  	<!--   <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                        <add-message-property key="numberOfVFRecords" value="#[dw(&quot;flowVars.numberOfVFRecords + (sizeOf (payload default []))&quot;)]"/>
+                    </message-properties-transformer> -->
+                    <dw:transform-message doc:name="Transform Data for DB">
+                    <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+( payload filter  ( ($.EVENT_TYPE == "VisualforceRequest") and (($.QUERY != null) and ($.QUERY != "")) )  map {
+	EVENT_TYPE__c : $.EVENT_TYPE,
+	TIMESTAMP_DERIVED__c : $.TIMESTAMP_DERIVED as :datetime,
+	URI_ID_DERIVED__c : $.URI_ID_DERIVED,
+	USER_ID_DERIVED__c : $.USER_ID_DERIVED,
+	URI__c : ($.URI default "") ++ ($.QUERY default ""),
+	PAGE_NAME__c : using ( pagename  = ($.PAGE_NAME splitBy "/")) pagename[(sizeOf pagename) - 1]
+}) 
+]]></dw:set-payload>
+                    </dw:transform-message>
+                    <enricher doc:name="ME">
+                        <flow-ref name="processVisualforceRequest" doc:name="processVisualforceRequest"/>
+                        <enrich source="#[flowVars.EnrichedVFRecords]" target="#[flowVars.EnrichedVFRecords]"/>
+                        <enrich source="#[flowVars.VFPageMappingMissingList]" target="#[flowVars.VFPageMappingMissingList]"/>
+                    </enricher>
+                    <!-- <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                        <add-message-property key="numberOfUsableVFRecords" value="#[dw(&quot;flowVars.numberOfUsableVFRecords + (sizeOf (flowVars.EnrichedVFRecords default []))&quot;)]"/>
+                    </message-properties-transformer> -->
+                    <dw:transform-message doc:name="Transform Data for Database">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-variable variableName="EnrichedVFRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.EnrichedVFRecords default []) distinctBy $.UNIQUE_ID__c ) filter ( not ( (flowVars.uniqueRecs default []) contains  $.UNIQUE_ID__c ) )
+]]></dw:set-variable>
+                    </dw:transform-message>
+                    <logger message="Iteration No. #[flowVars.counter] No. of records identified for this Iteration : #[flowVars.EnrichedVFRecords.size()]" level="INFO" doc:name="Logger"/>
+                    <dw:transform-message doc:name="TM : Unique Recs">
+                        <dw:set-variable variableName="uniqueRecs"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.uniqueRecs default []) ++ ((flowVars.EnrichedVFRecords default []) map $.UNIQUE_ID__c ) ) distinctBy $ 
+]]></dw:set-variable>
+                    </dw:transform-message>
+                    <choice doc:name="Choice : Check if any Records are present" doc:description="Check if any Records are present after VF Filtering">
+                        <when expression="#[dw(&quot;(flowVars.EnrichedVFRecords.URI_ID_DERIVED__c == null) or ((sizeOf flowVars.EnrichedVFRecords.URI_ID_DERIVED__c) == 0)&quot;)]">
+                            <logger message="No Records indetified after VF Filtering for this Iteration" level="INFO" doc:name="Logger"/>
+                        </when>
+                        <otherwise>
+                            <dw:transform-message doc:name="TM : Transpose data for Webservice">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"_salesforceId": (flowVars.EnrichedVFRecords.URI_ID_DERIVED__c default []) map ($[0..14] when (($ != null) and ($ != "")) otherwise ""  ),
+	"_eventLogFileId":flowVars.EnrichedVFRecords.EVENT_LOG_FILE_ID,
+	//"_recordName": [],
+	//"_objectName": [],
+	"_uri": flowVars.EnrichedVFRecords.URI__c,
+	"_userId": flowVars.EnrichedVFRecords.USER_ID_DERIVED__c,
+	//"_userName": [ ],
+	"_eventType": flowVars.EnrichedVFRecords.EVENT_TYPE__c,
+	"_recordAccessDateTime": flowVars.EnrichedVFRecords.TIMESTAMP_DERIVED__c,
+	"_pageName" : flowVars.EnrichedVFRecords.PAGE_NAME__c,
+	"_casePersonLoadFlag": flowVars.EnrichedVFRecords.CASE_PERSON_EVENT_FLAG
+}]]></dw:set-payload>
+                            </dw:transform-message>
+                            <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+                            <until-successful maxRetries="1" synchronous="true" doc:name="Until Successful" >
+                                <http:request config-ref="HTTP_Request_EM_Configuration" path="/insertProcessedEventLogData" method="POST" doc:name="Load Processed Log File Content into Database"/>
+                            </until-successful>
+                            <object-to-string-transformer doc:name="Object to String"/>
+                            <message-properties-transformer scope="invocation" doc:name="MP : Delete Variables for Next Iteration" doc:description="Delete Variables for Next Iteration">
+                                <delete-message-property key="EnrichedVFRecords"/>
+                            </message-properties-transformer>
+                        </otherwise>
+                    </choice>
+
+<!--                <sfdc:create-bulk config-ref="Salesforce__Basic_Authentication" type="EventLogFile_POC__c" doc:name="SF : Populate Parsed Event Log Data" doc:description="Database Primary Key will take care of Unique fields">
+                    <sfdc:objects ref="#[flowVars.EnrichedVFRecords]"/>
+                    </sfdc:create-bulk> -->
+                    
+                </foreach>
+<!--                 <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                    <add-message-property key="uniqueCount" value="#[dw(&quot;(flowVars.uniqueCount default 0) + (sizeOf (flowVars.uniqueRecs))&quot;)]"/>
+                </message-properties-transformer> -->
+                <remove-variable variableName="uniqueRecs" doc:name="Variable :Remove uniqueRecs"/>
+				<flow-ref name="MigratedFlagUpdateSub_Flow" doc:name="MigratedFlagUpdateSub_Flow"/>
+            </when>
+            <when expression="#[payload.Event_Type == 'Report']">
+                <logger message="Report Request" level="INFO" doc:name="Logger : Report Request"/>
+                <set-variable variableName="uniqueRecs" value="#[dw(&quot;[]&quot;)]" doc:name="Variable : Init Unique Recs"/>
+                <flow-ref name="getLogFileContentAsStream" doc:name="getLogFileContentAsStream" doc:description="Invoke getLogFileContentAsStream flow"/>
+                <foreach batchSize="100000" doc:name="For Each : Process Iterator">
+                	<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                    <!-- <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                        <add-message-property key="numberOfURIRecords" value="#[dw(&quot;flowVars.numberOfURIRecords + (sizeOf (payload default []))&quot;)]"/>
+                    </message-properties-transformer> -->
+                    <dw:transform-message doc:name="Transform Data for DB">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+( payload filter ( ( ($.EVENT_TYPE == "Report" ) and ( $.REPORT_ID_DERIVED != "") )  ) map {
+	UNIQUE_ID__c : ($.REPORT_ID_DERIVED default "") ++ $.USER_ID_DERIVED ++ (($.TIMESTAMP_DERIVED as :datetime  >> "America/New_York") as :date as :string {format : "yyyyMMdd"}),
+	EVENT_TYPE__c : $.EVENT_TYPE,
+	TIMESTAMP_DERIVED__c : $.TIMESTAMP_DERIVED as :datetime,
+	URI_ID_DERIVED__c : $.REPORT_ID_DERIVED,
+	USER_ID_DERIVED__c : $.USER_ID_DERIVED default "",
+	EVENT_LOG_FILE_ID : flowVars.eventLogFileId,
+	CASE_PERSON_EVENT_FLAG : "N"
+})
+]]></dw:set-payload>
+                    </dw:transform-message>
+                    <set-session-variable variableName="logfilesCollectionCount" value="#[sessionVars.logfilesCollectionCount +payload.size()]" doc:name="SV : Calc Total"/>
+<!--                <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                        <add-message-property key="numberOfUsableURIRecords" value="#[dw(&quot;flowVars.numberOfUsableURIRecords + (sizeOf (payload default []))&quot;)]"/>
+                    </message-properties-transformer> -->
+                    <dw:transform-message doc:name="TM : Get Distinct Records">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload  distinctBy $.UNIQUE_ID__c]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Get Distinct Records">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload  filter ( not (flowVars.uniqueRecs contains  $.UNIQUE_ID__c )) ]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Unique Recs">
+                        <dw:set-variable variableName="uniqueRecs"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.uniqueRecs default []) ++ ((payload default []) map $.UNIQUE_ID__c ) ) distinctBy $ 
+]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Transpose data for Webservice">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"_salesforceId": (payload.URI_ID_DERIVED__c default []) map ($[0..14] when (($ != null) and ($ != "")) otherwise ""  ),
+	"_eventLogFileId": payload.EVENT_LOG_FILE_ID,
+	//"_recordName": [ ],
+	//"_objectName": [],
+	"_uri": payload.URI__c,
+	"_userId": payload.USER_ID_DERIVED__c,
+	//"_userName": [ ],
+	"_eventType": payload.EVENT_TYPE__c,
+	"_recordAccessDateTime": payload.TIMESTAMP_DERIVED__c,
+	//"_pageName" : []
+	"_casePersonLoadFlag": payload.CASE_PERSON_EVENT_FLAG
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer doc:name="Object to String"/>
+                    <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+                    <until-successful maxRetries="1"  synchronous="true" doc:name="Until Successful">
+                        <http:request config-ref="HTTP_Request_EM_Configuration" path="/insertProcessedEventLogData" method="POST" doc:name="Load Processed Log File Content into DB"/>
+                    </until-successful>
+	                <object-to-string-transformer doc:name="Object to String"/>
+	                <logger message="Processing for this Iteration done!" level="INFO" doc:name="Logger"/>
+                </foreach>
+                <remove-variable variableName="uniqueRecs" doc:name="Variable :Remove uniqueRecs"/>
+                <flow-ref name="MigratedFlagUpdateSub_Flow" doc:name="MigratedFlagUpdateSub_Flow"/>
+            </when>
+            <when expression="#[payload.Event_Type == 'ReportExport']">
+                <logger message="ReportExport Request" level="INFO" doc:name="Logger : ReportExport Request"/>
+                <set-variable variableName="uniqueRecs" value="#[dw(&quot;[]&quot;)]" doc:name="Variable : Init Unique Recs"/>
+                <flow-ref name="getLogFileContentAsStream" doc:name="getLogFileContentAsStream" doc:description="Invoke getLogFileContentAsStream flow"/>
+                <foreach batchSize="100000" doc:name="For Each : Process Iterator">
+                	<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                    <!-- <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                        <add-message-property key="numberOfURIRecords" value="#[dw(&quot;flowVars.numberOfURIRecords + (sizeOf (payload default []))&quot;)]"/>
+                    </message-properties-transformer> -->
+                    <dw:transform-message doc:name="Transform Data for DB">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+( payload filter ( ( ($.EVENT_TYPE == "ReportExport" ) and ( $.URI_ID_DERIVED != "") )  ) map {
+	UNIQUE_ID__c : ($.URI_ID_DERIVED default "") ++ $.USER_ID_DERIVED ++ (($.TIMESTAMP_DERIVED as :datetime  >> "America/New_York") as :date as :string {format : "yyyyMMdd"}),
+	EVENT_TYPE__c : $.EVENT_TYPE,
+	TIMESTAMP_DERIVED__c : $.TIMESTAMP_DERIVED as :datetime,
+	URI_ID_DERIVED__c : $.URI_ID_DERIVED default "",
+	USER_ID_DERIVED__c : $.USER_ID_DERIVED default "",
+	EVENT_LOG_FILE_ID : flowVars.eventLogFileId,
+	CASE_PERSON_EVENT_FLAG : "N"
+})
+]]></dw:set-payload>
+                    </dw:transform-message>
+                    <set-session-variable variableName="logfilesCollectionCount" value="#[sessionVars.logfilesCollectionCount + payload.size()]" doc:name="SV : Calc Total"/>
+<!--                     <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                        <add-message-property key="numberOfUsableURIRecords" value="#[dw(&quot;flowVars.numberOfUsableURIRecords + (sizeOf (payload default []))&quot;)]"/>
+                    </message-properties-transformer> -->
+                    <dw:transform-message doc:name="TM : Get Distinct Records">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload  distinctBy $.UNIQUE_ID__c]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Get Distinct Records">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload  filter ( not (flowVars.uniqueRecs contains  $.UNIQUE_ID__c )) ]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Unique Recs">
+                        <dw:set-variable variableName="uniqueRecs"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.uniqueRecs default []) ++ ((payload default []) map $.UNIQUE_ID__c ) ) distinctBy $ 
+]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Transpose data for Webservice">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"_salesforceId": (payload.URI_ID_DERIVED__c default []) map ($[0..14] when (($ != null) and ($ != "")) otherwise ""  ),
+	"_eventLogFileId": payload.EVENT_LOG_FILE_ID,
+	//"_recordName": [ ],
+	//"_objectName": [],
+	"_uri": payload.URI__c,
+	"_userId": payload.USER_ID_DERIVED__c,
+	//"_userName": [ ],
+	"_eventType": payload.EVENT_TYPE__c,
+	"_recordAccessDateTime": payload.TIMESTAMP_DERIVED__c,
+	//"_pageName" : []
+	"_casePersonLoadFlag": payload.CASE_PERSON_EVENT_FLAG	
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer doc:name="Object to String"/>
+                    <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+                    <until-successful maxRetries="1"  synchronous="true" doc:name="Until Successful">
+                        <http:request config-ref="HTTP_Request_EM_Configuration" path="/insertProcessedEventLogData" method="POST" doc:name="Load Processed Log File Content into Database"/>
+                    </until-successful>
+                   	<object-to-string-transformer doc:name="Object to String"/>
+					<logger message="Processing for this Iteration done!" level="INFO" doc:name="Logger"/>
+                </foreach>
+                <remove-variable variableName="uniqueRecs" doc:name="Variable :Remove uniqueRecs"/>
+                <flow-ref name="MigratedFlagUpdateSub_Flow" doc:name="MigratedFlagUpdateSub_Flow"/>
+            </when>            
+            <when expression="#[payload.Event_Type == 'URI']">
+                <logger message="URI Request" level="INFO" doc:name="Logger : URI Request"/>
+                <set-variable variableName="uniqueRecs" value="#[dw(&quot;[]&quot;)]" doc:name="Variable : Init Unique Recs"/>
+                <flow-ref name="getLogFileContentAsStream" doc:name="getLogFileContentAsStream" doc:description="Invoke getLogFileContentAsStream flow"/>
+                <foreach batchSize="100000" doc:name="For Each : Process Iterator">
+                	<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                    <!-- <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                        <add-message-property key="numberOfURIRecords" value="#[dw(&quot;flowVars.numberOfURIRecords + (sizeOf (payload default []))&quot;)]"/>
+                    </message-properties-transformer> -->
+                    <dw:transform-message doc:name="Transform Data for DB">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+( payload filter ( ( ($.EVENT_TYPE == "URI" ) and ( $.URI_ID_DERIVED != "") ) or ($.EVENT_TYPE == "VisualforceRequest" ) ) map {
+	//REQUEST_ID__c : $.REQUEST_ID,
+	//SESSION_KEY__c : $.SESSION_KEY,
+	UNIQUE_ID__c : ($.URI_ID_DERIVED default "") ++ $.USER_ID_DERIVED ++ (($.TIMESTAMP_DERIVED as :datetime  >> "America/New_York") as :datetime as :string {format: "yyyyMMddHHmmss"}),
+	EVENT_TYPE__c : $.EVENT_TYPE,
+	TIMESTAMP_DERIVED__c : $.TIMESTAMP_DERIVED as :datetime,
+	URI_ID_DERIVED__c : $.URI_ID_DERIVED,
+	USER_ID_DERIVED__c : $.USER_ID_DERIVED,
+	URI__c : $.URI default "",
+	EVENT_LOG_FILE_ID : flowVars.eventLogFileId,
+	CASE_PERSON_EVENT_FLAG : "N"
+	//"_pageName" : null,
+	//"_userName": null,
+	//"_recordName" : null,
+	//"_objectName": null
+})
+]]></dw:set-payload>
+                    </dw:transform-message>
+                    <set-session-variable variableName="logfilesCollectionCount" value="#[sessionVars.logfilesCollectionCount + payload.size()]" doc:name="SV : Calc Total"/>
+<!--                     <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP">
+                        <add-message-property key="numberOfUsableURIRecords" value="#[dw(&quot;flowVars.numberOfUsableURIRecords + (sizeOf (payload default []))&quot;)]"/>
+                    </message-properties-transformer> -->
+                    <dw:transform-message doc:name="TM : Get Distinct Records">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload  distinctBy $.UNIQUE_ID__c]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Unique Recs">
+                        <dw:set-variable variableName="uniqueRecs"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.uniqueRecs default []) ++ ((payload default []) map $.UNIQUE_ID__c ) ) distinctBy $ 
+]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Transpose data for Webservice">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"_salesforceId": (payload.URI_ID_DERIVED__c default []) map ($[0..14] when (($ != null) and ($ != "")) otherwise ""  ),
+	"_eventLogFileId": payload.EVENT_LOG_FILE_ID,
+	//"_recordName": payload."_recordName",
+	//"_objectName": payload."_objectName",
+	"_uri": payload.URI__c,
+	"_userId": payload.USER_ID_DERIVED__c,
+	//"_userName": payload."_userName",
+	"_eventType": payload.EVENT_TYPE__c,
+	"_recordAccessDateTime": payload.TIMESTAMP_DERIVED__c,
+	//"_pageName" : payload."_pageName",
+	"_casePersonLoadFlag": payload.CASE_PERSON_EVENT_FLAG
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+                    <until-successful maxRetries="1"  synchronous="true" doc:name="Until Successful">
+                        <http:request config-ref="HTTP_Request_EM_Configuration" path="/insertProcessedEventLogData" method="POST" doc:name="Load Processed Log File Content into Database"/>
+                    </until-successful>
+                    <object-to-string-transformer doc:name="Object to String"/>                    
+                    <logger message="Iteration No. #[flowVars.counter] No. of records identified for this Iteration " level="INFO" doc:name="Logger"/>
+                </foreach>
+                <remove-variable variableName="uniqueRecs" doc:name="Variable :Remove uniqueRecs"/>
+                <flow-ref name="MigratedFlagUpdateSub_Flow" doc:name="MigratedFlagUpdateSub_Flow"/>
+            </when>
+            <otherwise>
+                <logger message="No valid Request identified" level="INFO" doc:name="Logger : No valid Request identified"/>
+            </otherwise>
+        </choice>
+        <logger message="parseAndLoadEventLog : Data Loaded into Salesforce Mapping table. Count : #[sessionVars.logfilesCollectionCount]" level="INFO" doc:name="Logger"/>
+        <set-session-variable variableName="logFilesSuccessCount" value="#[sessionVars.logFilesSuccessCount = sessionVars.logFilesSuccessCount + 1]" doc:name="SV : Increment Success Count"/>
+	        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger level="INFO" doc:name="Logger" message="parseAndLoadEventLog : Deleting Inserted records from Event Log table in case of failures. #[exception.message] "/>
+            <choice doc:name="Choice">
+                   <when expression="#[message.inboundProperties.'http.status' >= 500]">
+                       <set-session-variable variableName="toProceed" value="#[&quot;N&quot;]" doc:name="SV : Set Proceed Flag"/>
+                   </when>
+                   <otherwise>
+                       <logger level="INFO" doc:name="Logger" message="parseAndLoadEventLog : #[exception.message]"/>
+                   </otherwise>
+               </choice>
+            <set-session-variable variableName="genericExceptionMessage" value="#[sessionVars.genericExceptionMessage == null ? &quot;&quot; + exception.message : sessionVars.genericExceptionMessage + exception.message]" doc:name="Session Variable"/>
+            <dw:transform-message doc:name="TM : DeleteData">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"Table": "SalesforceMapping",
+	"Condition": "EVENTLOGFILEID = '" ++ flowVars.eventLogFileId ++ "'"
+} ]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer doc:name="Object to String"/>
+            <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+            <until-successful maxRetries="1"  synchronous="true" doc:name="Until Successful">
+                <http:request config-ref="HTTP_Request_EM_Configuration" path="/deleteRecords" method="POST" doc:name="HTTP : Delete Event Log file records."/>
+            </until-successful>
+            <set-session-variable variableName="logFilesErrorCount" value="#[sessionVars.logFilesErrorCount = sessionVars.logFilesErrorCount +1]" doc:name="SV : Increment Error Count"/>
+        </catch-exception-strategy>
+    </flow>
+    
+    <sub-flow name="getLogFileContentAsStream">
+        <!-- <flow-ref name="retrieveSessionIDSub_Flow" doc:name="retrieveSessionIDSub_Flow"/> -->
+        <set-variable variableName="fileQuery" value="SELECT LOGFILE from ${eventlog.schema}.eventlogfile where Id = '#[flowVars.EventLogDetails[flowVars.counter - 1].Id]'" doc:name="Variable : Set Query" doc:description="Set Query"/>
+        <logger message="fileQuery : #[flowVars.fileQuery] , Currently Processing File : #[flowVars.counter] , Current Count Overall URI : #[flowVars.numberOfURIRecords] , Current Count Overall VF : #[flowVars.numberOfVFRecords]" level="INFO" doc:name="Logger"/>
+        <logger message="Current Count USable URI : #[flowVars.numberOfUsableURIRecords] , Current Count VF : #[flowVars.numberOfUsableVFRecords] , Unique Count : #[flowVars.uniqueCount]" level="INFO" doc:name="Logger"/>
+        <logger message="/services/data/v38.0/sobjects/EventLogFile/#[flowVars.EventLogDetails[flowVars.counter - 1].Id]/LogFile" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="1" millisBetweenRetries="120000" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getCLOBEventLogFile" method="GET" doc:name="Get Log File Content from DB">
+                <http:request-builder>
+                    <http:query-param paramName="query" value="#[flowVars.fileQuery]"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <set-property propertyName="Content-Type" value="application/csv" doc:name="Property"/>
+        <set-payload value="#[ new org.apache.commons.codec.binary.Base64InputStream(payload) ]" mimeType="application/csv" doc:name="Set Payload from Log File Stream"/>
+        <logger message="Processing #[flowVars.EventLogDetails[flowVars.counter - 1].Id] which is of Length #[flowVars.EventLogDetails[flowVars.counter - 1].LogFileLength]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Java Iterator from Input Stream containing CSV">
+            <dw:input-payload mimeType="application/csv"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+    </sub-flow>
+
+    <sub-flow name="processVisualforceRequest">
+		<set-variable variableName="EnrichedVFRecords" value="#[dw(&quot;[]&quot;)]" doc:name="Variable : Initiallze VF Records Enriched List"/>
+        <dw:transform-message doc:name="TM : Records with Missing VF Page Mapping">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-variable variableName="VFPageMappingMissingList"><![CDATA[%dw 1.0
+            
+%output application/java
+--- 
+(flowVars.VFPageMappingMissingList default []) ++ ((payload filter (flowVars.VFPageMap[lower $.PAGE_NAME__c] == null)) default [])
+]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM : Records having VF Page Mapping but also Valid Mapping">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ( (flowVars.VFPageMap[lower $.PAGE_NAME__c] != null)  and (flowVars.VFPageMap[lower $.PAGE_NAME__c].URLAttribute != null) )]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Group By VF Page Name">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload groupBy (lower $.PAGE_NAME__c)]]></dw:set-payload>
+        </dw:transform-message>
+        <set-session-variable variableName="logfilesCollectionCount" value="#[sessionVars.logfilesCollectionCount + payload.size()]" doc:name="SV : Calc Total"/>
+        <foreach doc:name="For Each : Iterate each VF Page Group" collection="#[payload]">
+            <remove-variable variableName="rootMessage" doc:name="Variable : remove Root Message"/>
+            <dw:transform-message doc:name="TM : Prepare Query">
+                <dw:input-payload mimeType="application/java"/>
+                    <dw:set-variable variableName="targetParamValue"><![CDATA[%dw 1.0
+%output application/java
+---
+parseQuery(payload[0].URI__c,((flowVars.VFPageMap[flowVars.key]).URLAttribute))  ]]></dw:set-variable>
+                </dw:transform-message>
+			<choice doc:name="Choice : Check whether Query is needed or not" doc:description="Check whether Query is needed or not">
+            <when expression="#[dw(&quot;( ( lower ((flowVars.VFPageMap[flowVars.key]).URLAttribute default '') ) != 'id' )&quot;)]">
+                    <foreach doc:name="For Each VF Page Category">
+                        <dw:transform-message doc:name="TM : Prepare Query">
+                        <dw:input-payload mimeType="application/java"/>
+                            <dw:set-variable variableName="targetParamValue"><![CDATA[%dw 1.0
+%output application/java
+---
+parseQuery(payload.URI__c,((flowVars.VFPageMap[flowVars.key]).URLAttribute))  ]]></dw:set-variable>
+                        </dw:transform-message>
+                        <logger message="Query Required : Select Id from #[(flowVars.VFPageMap[flowVars.key])['ObjectName']] where #[(flowVars.VFPageMap[flowVars.key])['FieldName']] = '#[flowVars.targetParamValue]'" level="INFO" doc:name="Logger"/>
+			 <choice doc:name="Choice">
+                            <when expression="flowVars.targetParamValue != null">   
+                        <enricher source="#[payload]" target="#[flowVars.URI]" doc:name="ME">
+                            <until-successful maxRetries="5" synchronous="true" doc:name="Until Successful">
+                                <sfdc:query-single config-ref="Salesforce__Basic_Authentication" query="Select Id from #[(flowVars.VFPageMap[flowVars.key])['ObjectName']] where #[(flowVars.VFPageMap[flowVars.key])['FieldName']] = '#[flowVars.targetParamValue]'" doc:name="SF : Object Details using VF Page Mapping"/>
+                            </until-successful>
+                        </enricher>
+                        <dw:transform-message doc:name="Add to Enriched VF Records">
+                        <dw:input-payload mimeType="application/java"/>
+                            <dw:set-variable variableName="EnrichedVFRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.EnrichedVFRecords when (flowVars.URI == null) otherwise (flowVars.EnrichedVFRecords ++ ([payload] map {
+	(($ - "URI_ID_DERIVED__c") ++ ({ "EVENT_LOG_FILE_ID" : flowVars.eventLogFileId,	CASE_PERSON_EVENT_FLAG : "N", "URI_ID_DERIVED__c" : (flowVars.URI.Id ) , "UNIQUE_ID__c" : ((flowVars.URI.Id default "" ) ++ $.USER_ID_DERIVED__c ++ (($.TIMESTAMP_DERIVED__c as :datetime  >> "America/New_York") as :date as :string {format : "yyyyMMdd"}))}))
+}))]]></dw:set-variable>
+                    </dw:transform-message>
+                	<remove-variable variableName="URI" doc:name="Variable : Remove Temp Variable"/>
+			</when>
+                            <otherwise>
+                                <logger message="id is null" level="INFO" doc:name="Logger"/>
+                            </otherwise>
+                        </choice>	    
+            	</foreach>
+			</when>
+			<otherwise>
+                 <dw:transform-message doc:name="Add to Enriched VF Records">
+                 	<dw:input-payload mimeType="application/java"/>
+                    	<dw:set-variable variableName="EnrichedVFRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.EnrichedVFRecords when (flowVars.URI == null) otherwise (flowVars.EnrichedVFRecords ++ ([payload] map {
+	(($ - "URI_ID_DERIVED__c") ++ ({ "EVENT_LOG_FILE_ID" : flowVars.eventLogFileId , CASE_PERSON_EVENT_FLAG : "N", "URI_ID_DERIVED__c" : (flowVars.URI.Id ) , "UNIQUE_ID__c" : ((flowVars.URI.Id default "" ) ++ $.USER_ID_DERIVED__c ++ (($.TIMESTAMP_DERIVED__c as :datetime  >> "America/New_York") as :date as :string {format : "yyyyMMdd"})  )  }) )
+}))]]></dw:set-variable>
+                        </dw:transform-message>  
+            </otherwise>
+		</choice>
+        </foreach>
+    </sub-flow>
+
+    <sub-flow name="processURIRequest">
+        <dw:transform-message doc:name="Filter Required records and enrich with Type">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload default []) map {
+	(
+		($) 
+		   ++
+	 	(	
+	 		{ 
+	 			"Type" : ( flowVars.IdObjectMap[(($."SALESFORCE_ID" default "")[0..2])]).apiName default ""	
+	 		}
+	 	 )
+	)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Group By Type">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-variable variableName="temp"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload groupBy $.Type) - ""]]></dw:set-variable>
+        </dw:transform-message>
+        <set-variable variableName="URIMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initiallze URI Map"/>
+        <foreach doc:name="For Each : Iterate each Group" collection="#[flowVars.temp]">
+            <remove-variable variableName="rootMessage" doc:name="Variable : remove Root Message"/>
+            <foreach batchSize="150" doc:name="For Each">
+                <flow-ref name="dynamicObjectNameFlow" doc:name="dynamicObjectNameFlow"/>
+                <dw:transform-message doc:name="Add to URI map">
+                    <dw:input-payload mimeType="application/java"/>
+                    <dw:set-variable variableName="URIMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.URIMap default {}) ++ ( (payload default []) reduce ((val, acc = {}) -> acc ++ ({ ((val.Id as :string)[0..14]) : ((val - "type") pluck $)[1] default (val.Id[0..14])  }) ) )]]></dw:set-variable>
+                </dw:transform-message>
+            </foreach>
+        </foreach>
+    </sub-flow>
+    
+    <sub-flow name="URI_Object_Lookup_Sub_Flow">
+        <sfdc:describe-global config-ref="Salesforce__Basic_Authentication" doc:name="SF : Describe Global Schema to get all Sobjects in the Organization"/>
+        <dw:transform-message doc:name="TM : Create URI to Object Lookup">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-variable variableName="IdObjectMap"><![CDATA[%dw 1.0
+%output application/java
+---
+((payload.sobjects) filter (($.keyPrefix != null) and ($.keyPrefix != "") ) ) reduce ((val, acc = {}) -> acc ++ (( { (val.keyPrefix as :string) : {"apiName" : val.name, "label" : val.label} } )))
+]]></dw:set-variable>
+        </dw:transform-message>
+    </sub-flow>
+    <sub-flow name="retrieveApplicationIdFromDataSetSub_Flow">
+
+        <dw:transform-message doc:name="TM : Get Application ID">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-variable variableName="datasetAppSfdcID"><![CDATA[%dw 1.0
+%output application/java
+---
+"SharedApp"]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="App ID : #[flowVars.datasetAppSfdcID]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+<!-- **************************************************DATABASE TO SALEFORCE ANALYTICS*****************************************************   -->    
+    <flow name="genericDataIntoGenericDataSetFlow">
+        <message-properties-transformer doc:name="MP : Initialize UID, distinct EvenLogFileIds" scope="session">
+            <add-message-property key="genericRootId" value="#[java.util.UUID.randomUUID().toString()]"/>
+            <add-message-property key="genericData" value="#[dw(&quot;[]&quot;)]"/>
+            <add-message-property key="genericRecordCount" value="#[0]"/>
+            <add-message-property key="genericProcessedCount" value="#[0]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF122&quot;, &quot;InterfaceName&quot;: &quot;Generic DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.genericRootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+
+    	<enricher source="#[flowVars.IdObjectMap]" target="#[flowVars.IdObjectMap]" doc:name="ME : Get Id Object Map">
+            <flow-ref name="URI_Object_Lookup_Sub_Flow" doc:name="URI_Object_Lookup_Sub_Flow"/>
+        </enricher>
+        <flow-ref name="retrieveApplicationIdFromDataSetSub_Flow" doc:name="retrieveApplicationIdFromDataSetSub_Flow"/>
+		<logger message="GenericDataIntoGenericDataSet Query : SELECT SALESFORCE_ID, EVENTLOGFILEID, RECORD_NAME,OBJECT_NAME, URI, USER_ID, USER_NAME, EVENT_TYPE, RECORD_ACCESS_DATE_TIME, PAGE_NAME, DIVISION_STAFF, INTAKE_CASE_PROV_NUM, INTAKE_CASE_PROV_NAME, CASE_INTAKE_DIV, MASTER_ENTITY  FROM ${eventlog.schema}.event_log_view A, ${eventlog.schema}.eventlogfile B WHERE A.EVENTLOGFILEID = B.ID  AND (B.GENERIC_LOAD_FLG IS NULL OR B.GENERIC_LOAD_FLG = 'N') AND ( A.EVENT_TYPE = 'URI' OR A.EVENT_TYPE = 'VisualforceRequest')" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="1" millisBetweenRetries="60000" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getProcessedEventLogData" method="GET" doc:name="Get Generic records from DB" responseTimeout="1200000">
+                <http:request-builder>
+                    <http:query-param paramName="query" value="SELECT SALESFORCE_ID, EVENTLOGFILEID, RECORD_NAME,OBJECT_NAME, URI, USER_ID, USER_NAME, EVENT_TYPE, RECORD_ACCESS_DATE_TIME, PAGE_NAME, DIVISION_STAFF, INTAKE_CASE_PROV_NUM, INTAKE_CASE_PROV_NAME, CASE_INTAKE_DIV, MASTER_ENTITY  FROM ${eventlog.schema}.event_log_view A, ${eventlog.schema}.eventlogfile B WHERE A.EVENTLOGFILEID = B.ID  AND (B.GENERIC_LOAD_FLG IS NULL OR B.GENERIC_LOAD_FLG = 'N') AND ( A.EVENT_TYPE = 'URI' OR A.EVENT_TYPE = 'VisualforceRequest')"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <!--<logger message="GenericDataIntoGenericDataSet Payload : #[payload]" level="INFO" doc:name="Logger"/>-->
+		<dw:transform-message doc:name="TM : Convert to List">
+        	<dw:input-payload mimeType="application/json"/>
+            	<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+        </dw:transform-message>
+        <!--<logger message="GenericDataIntoGenericDataSet : Genric Total Count #[payload.size()]" level="INFO" doc:name="Logger"/>-->
+        <set-session-variable variableName="genericRecordCount" value="#[payload.size()]" doc:name="SV : Generic Total"/>
+        <choice doc:name="Choice : Check if any data was pulled from DB" doc:description="Check if any data was pulled from Database">
+            <when expression="#[(payload.size() &gt; 0) &amp;&amp; (flowVars.datasetAppSfdcID != null)]">
+
+	            <dw:transform-message doc:name="TM : Distinct Generic Data">
+                    <dw:set-session-variable variableName="genericData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload distinctBy $.EVENTLOGFILEID map $.EVENTLOGFILEID]]></dw:set-session-variable>
+
+                </dw:transform-message>
+                <logger message="GenericDataIntoGenericDataSet : Data Set Creation started  #[sessionVars.genericData]" level="INFO" doc:name="Logger"/>
+     			<enricher source="#[payload]" target="#[flowVars.datasetid]" doc:name="ME : Get Data Set ID">
+                    <sfdc-analytics:create-data-set config-ref="Salesforce_Analytics_Cloud__Basic_authentication" operation="UPSERT" description="Create a Dataset for Upserting data to the already present set" label="#[sessionVars.genericDataset]" dataSetName="#[sessionVars.genericDataset]" edgemartContainer="#[flowVars.datasetAppSfdcID]" type="EventLogSampleDashboard.json:RELATIVE" doc:name="SF Analytics Cloud : Create Upsert dataset" doc:description="Create a Dataset for appending data to the already present set"/>
+                </enricher>
+                <set-variable variableName="distinctRecords" value="#[dw(&quot;[]&quot;)]" doc:name="Variable : Initialize Distinct records List" doc:description="Initialize Distinct records List"/>
+                <logger message="GenericDataIntoGenericDataSet : DataSet Created with ID #[flowVars.datasetid]" level="INFO" doc:name="Logger"/>
+                <foreach batchSize="10000" doc:name="For Each">
+                    <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                    <flow-ref name="processURIRequest" doc:name="processURIRequest"/>
+                    <set-variable variableName="userMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initialize User Map"/>
+                    <dw:transform-message doc:name="TM : Get User/Worker ID">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-variable variableName="userIDList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload."USER_ID" filter (($ default "") != "")]]></dw:set-variable>
+                    </dw:transform-message>
+                    <foreach collection="#[flowVars.userIDList]" batchSize="150" doc:name="For Each : User">
+                        <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                        <dw:transform-message doc:name="TM : Prepare Query">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload.*payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-payload>
+                        </dw:transform-message>
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Name from User where Id IN (#[payload])" doc:name="SF : Query User Details"/>
+                        <dw:transform-message doc:name="TM : Add to User Map">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-variable variableName="userMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.userMap) ++ ( (payload default []) reduce ((val, acc = {}) -> acc ++ ({ (val.Id as :string) : val.Name  }) ) )]]></dw:set-variable>
+                        </dw:transform-message>
+                    </foreach>
+                    <dw:transform-message doc:name="TM : Enrich Wave Data Set with Name of the User and Object accessed">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map {
+      "Date" : ($."RECORD_ACCESS_DATE_TIME" as :datetime  >> "America/New_York") as :datetime {format: "MM/dd/yyyy HH:mm:ss a"},
+      "URI" :  $."URI",
+      "Salesforce_ID" : $."SALESFORCE_ID",
+      "Page_Name" : $.PAGE_NAME,
+      "User_ID" : $."USER_ID",
+      "Event_Type" : $."Event_Type",
+      "Division_Staff" : $."DIVISION_STAFF",
+      "Intake_Case_Provider_ID" : $."INTAKE_CASE_PROV_NUM",
+      "Intake_Case_Provider_Name" : $."INTAKE_CASE_PROV_NAME",
+      "Case_Intake_Div" : $."CASE_INTAKE_DIV",
+      "Entity_Name" : $."MASTER_ENTITY",
+      "Object_Name" : ( flowVars.IdObjectMap[(($."SALESFORCE_ID" default "")[0..2])]).label,
+      "Record_Name" : ( ((flowVars.URIMap[$."SALESFORCE_ID"]) default "" ) when (($."SALESFORCE_ID" != null) and ($."SALESFORCE_ID" != "") ) otherwise "" ) replace "\"" with  "\"\"",
+      "User_Name" : (flowVars.userMap[$."USER_ID"] default "") replace "\"" with  "\"\"",
+      "External_Id" : ($."SALESFORCE_ID" default "") ++ ($."USER_ID" default "") ++ (($."RECORD_ACCESS_DATE_TIME" as :datetime  >> "America/New_York") as :datetime as :string {format: "MM/dd/yyyy HH:mm:ss a"})
+} ) distinctBy $.External_Id]]></dw:set-payload>
+                    </dw:transform-message>
+					<!--<logger message="PAYLOAD : #[payload]" level="INFO" doc:name="Logger"/>-->
+                    <dw:transform-message doc:name="TM : Filter for Distinct Values">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ( not ( flowVars.distinctRecords contains $.External_Id ) )]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Append Distinct Values">
+                        <dw:set-variable variableName="distinctRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.distinctRecords) ++ (payload.External_Id default [])]]></dw:set-variable>
+                    </dw:transform-message>
+                    <set-session-variable variableName="genericProcessedCount" value="#[sessionVars.genericProcessedCount + payload.size()]" doc:name="SV : Processed Count"/>
+					<logger message="GenericDataIntoGenericDataSet : Size of This Data Part #[payload.size()]  Current Total Processed Count : #[sessionVars.genericProcessedCount]" level="INFO" doc:name="Logger"/>
+                    <choice doc:name="Choice">
+                        <when expression="#[payload.size() &gt; 0]">
+                            <sfdc-analytics:upload-external-data config-ref="Salesforce_Analytics_Cloud__Basic_authentication" type="EventLogSampleDashboard.json:RELATIVE" dataSetId="#[flowVars.datasetid]" doc:name="SF Analytics Cloud : Create DataSet Part">
+                                <sfdc-analytics:payload ref="#[payload]"/>
+                            </sfdc-analytics:upload-external-data>
+                        </when>
+                        <otherwise>
+                            <logger message="There are no records to process generic data in current iteration." level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+                    <message-properties-transformer scope="invocation" doc:name="MP : Delete Variables for Next Iteration" doc:description="Delete Variables for Next Iteration">
+                        <delete-message-property key="userMap"/>
+                        <delete-message-property key="URIMap"/>
+                        <delete-message-property key="userIDList"/>
+                    </message-properties-transformer>
+
+                    <logger message="GenericDataIntoGenericDataSet : Processing done for this Iteration. Distinct Records Count #[flowVars.distinctRecords.size()] " level="INFO" doc:name="Logger"/>
+                </foreach>
+
+  				<sfdc-analytics:start-data-processing config-ref="Salesforce_Analytics_Cloud__Basic_authentication" dataSetId="#[flowVars.datasetid]" doc:name="SF Analytics Cloud : Start Data Processing"/>
+                <remove-variable variableName="distinctRecords" doc:name="Variable : Remove Distinct Values List" doc:description="Remove Distinct Values List"/>
+                <logger message="GenericDataIntoGenericDataSet : Genric DataSet Data Parts Processing triggered." level="INFO" doc:name="Logger"/>
+                <foreach collection="#[sessionVars.genericData]" batchSize="1000" doc:name="For Each">
+                    <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                    <logger message="GenericDataIntoGenericDataSet : Input distinct Payload : #[payload]" level="INFO" doc:name="Logger"/>
+	                <dw:transform-message doc:name="TM : Collect Generic EventLogFileIds">
+		            	<dw:set-variable variableName="genericEventLogFileIds"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload.*payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-variable>
+                </dw:transform-message>
+                <dw:transform-message doc:name="TM : Update Generic Data Load Flag">
+		    		<dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"Fields": {
+		"GENERIC_LOAD_FLG": "Y"
+	},
+	"Condition": "ID IN (" ++ flowVars.genericEventLogFileIds ++ ")"
+}]]></dw:set-payload> 
+				</dw:transform-message>
+				<object-to-string-transformer doc:name="Object to String"/>
+
+                <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+                    <until-successful maxRetries="1"  synchronous="true" doc:name="Until Successful">
+                        <http:request config-ref="HTTP_Request_EM_Configuration" path="/updateEventLogFileTable" method="POST" doc:name="Update Generic Load Flag to Y"/>
+                    </until-successful>
+		        <logger message="Generic Load Flag Updated on #[flowVars.genericEventLogFileIds]" level="INFO" doc:name="Logger"/>
+                </foreach>
+            </when>
+            <otherwise>
+                <logger message="GenericDataIntoGenericDataSet : No records extracted from Database or Application for Dataset is not identified" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF122&quot;, &quot;InterfaceName&quot;: &quot;Generic DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.genericRootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.genericRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.genericRecordCount]&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.genericRecordCount == 0 ? &quot;No records to Process&quot; : &quot;&quot;]&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+      	<catch-exception-strategy doc:name="Catch Exception Strategy">
+           <logger message="GenericDataIntoGenericDataSet : Exception Occurred while Loading Generic Data into GenericDataSet #[exception.message]" level="INFO" doc:name="Logger"/>
+           <choice doc:name="Choice">
+	           <when expression="#[message.inboundProperties.'http.status' >= 500]">
+	               <set-session-variable variableName="toProceed" value="#[&quot;N&quot;]" doc:name="SV : Set Proceed Flag"/>
+	           </when>
+	           <otherwise>
+	               <logger level="INFO" doc:name="Logger" message="GenericDataIntoGenericDataSet :  #[exception.message]"/>
+	           </otherwise>
+           </choice>
+           <set-payload value="{&quot;InterfaceID&quot;: &quot;INF122&quot;, &quot;InterfaceName&quot;: &quot;Generic DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.genericRootId]&quot;,&quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.genericRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.genericRecordCount]&quot;,&quot;ErrorDescription&quot;:&quot;Error Occurred while loading Genric Data into GenericDataSet. #[exception.message]&quot;,&quot;ExceptionType&quot;:&quot;System&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+           <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+      	</catch-exception-strategy>
+    </flow>
+
+    <sub-flow name="event_monitoring_VFPageMappingMissingList_Notification_Sub_Flow">
+        <choice doc:name="Choice : check if any VF Page was missing in Lookup">
+            <when expression="#[flowVars.VFPageMappingMissingList.size() &gt; 0]">
+                <logger message="VF Page Mapping Miss found" level="INFO" doc:name="Logger"/>
+                <foreach collection="#[flowVars.VFPageMappingMissingList]" batchSize="200" doc:name="For Each">
+				<dw:transform-message doc:name="TM : Deserialize Payload">
+                    <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.*payload
+]]></dw:set-payload>
+                </dw:transform-message>
+<!--                     <dw:transform-message doc:name="TM : Convert Payload to usable form">
+                    <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+-
+payload.*payload map (($ - "Id" - "type" - "TIMESTAMP_DERIVED__c" - "REQUEST_ID__c") ++ {"TIMESTAMP_DERIVED__c" : $.TIMESTAMP_DERIVED__c as :datetime} )]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Event_Log_VF__c" doc:name="SF : Add ignored VF records to Database">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:create> -->
+                </foreach>
+                <dw:transform-message doc:name="TM : Generate Notification message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+"Event Monitoring Job : VF Page Mapping is not available for the below VF pages:  \r\n" 
+++ "\r\n"
+++ (((flowVars.VFPageMappingMissingList.PAGE_NAME__c distinctBy $) joinBy "," ) when (flowVars.VFPageMappingMissingList.PAGE_NAME__c != null) otherwise ((flowVars.VFPageMappingMissingList.*payload.PAGE_NAME__c distinctBy $) joinBy "," )  ) 
+++ "\r\n"
+++ "\r\nThe corresponding Event Log records will be ignored for this run." 
+]]></dw:set-payload>
+                </dw:transform-message>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+                <cloudhub:create-notification config-ref="Cloudhub__Basic_Auth_Authentication" domain="${cloudhub.domain}" message="#[payload]" priority="WARN" doc:name="Cloudhub : Create Notification">
+
+                </cloudhub:create-notification>
+            </when>
+            <otherwise>
+                <logger message="No VF Page Mapping Miss found" level="INFO" doc:name="Logger"/>
+                <dw:transform-message doc:name="TM : Generate Notification message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+"Event Monitoring Job : No VF Page Mapping Miss found"  
+]]></dw:set-payload>
+                </dw:transform-message>
+                <cloudhub:create-notification config-ref="Cloudhub__Basic_Auth_Authentication" domain="${cloudhub.domain}" message="#[payload]" priority="WARN" doc:name="Cloudhub : Create Notification">
+                    <cloudhub:custom-properties>
+                        <cloudhub:custom-property key="VF Page Mapping">VF Page Mapping</cloudhub:custom-property>
+                    </cloudhub:custom-properties>
+                </cloudhub:create-notification>
+                
+            </otherwise>
+        </choice>
+    </sub-flow>
+<!-- <sub-flow name="loadToWaveSub_Flow">
+        <sfdc-analytics:upload-external-data config-ref="" type="" dataSetId="" doc:name="SF Analytics Cloud">
+            <sfdc-analytics:payload ref="#[payload]"/>
+        </sfdc-analytics:upload-external-data>
+    </sub-flow> -->
+
+    <flow name="dynamicObjectNameFlow" processingStrategy="synchronous">
+             <dw:transform-message doc:name="TM : Prepare Query">
+                    <dw:input-payload mimeType="application/java"/>
+                    <dw:set-variable variableName="query"><![CDATA[%dw 1.0
+%output application/java
+%var NameFieldMap = {
+	"Dashboard" : "Title",
+	"Task" : "Subject"
+}
+---
+"Select Id," ++ ( NameFieldMap[flowVars.key] default "Name" ) ++ " from " ++ flowVars.key ++ " where Id IN (" ++ ((payload map ("'" ++ $."SALESFORCE_ID" ++ "'")) joinBy ",") ++ ")"]]></dw:set-variable>
+                </dw:transform-message>
+                <logger message="Query #[flowVars.query]" level="INFO" doc:name="Logger"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="#[flowVars.query]" doc:name="SF : Retrieve Name"/>
+        <dw:transform-message doc:name="TM : Consume Payload">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+        </dw:transform-message>
+        <catch-exception-strategy doc:name="Catch Exception Strategy" enableNotifications="false" logException="false">
+            <dw:transform-message doc:name="TM : Prepare Query where clause">
+                <dw:input-payload mimeType="application/java"/>
+                <dw:set-variable variableName="query"><![CDATA[%dw 1.0
+%output application/java
+---
+" from " ++ flowVars.key ++ " where Id IN (" ++ ((flowVars.rootMessage.payload map ("'" ++ $."SALESFORCE_ID" ++ "'")) joinBy ",") ++ ")"]]></dw:set-variable>
+            </dw:transform-message>
+            <sfdc:describe-sobject config-ref="Salesforce__Basic_Authentication" type="#[flowVars.key]" doc:name="SF : Describe SObject"/>
+            <dw:transform-message doc:name="TM : Prepare Query">
+                <dw:input-payload mimeType="application/java"/>
+                <dw:set-variable variableName="query"><![CDATA[%dw 1.0
+%output application/java
+%var NameField = ((payload.fields filter ($.nameField == true))[0]).name default "Id"
+---
+(("Select Id," ++ NameField) when (NameField != "Id") otherwise "Select Id ") ++ flowVars.query]]></dw:set-variable>
+            </dw:transform-message>
+            <logger message="Corrected Query : #[flowVars.query]" level="INFO" doc:name="Logger"/>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="#[flowVars.query]" doc:name="SF : Retrieve Name"/>
+            <dw:transform-message doc:name="TM : Consume Payload">
+            	<dw:input-payload mimeType="application/java"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+            </dw:transform-message>
+        </catch-exception-strategy>
+    </flow>
+
+    <sub-flow name="MigratedFlagUpdateSub_Flow">
+		<dw:transform-message doc:name="TM : Update Migrated Flag">
+		    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+ "Fields": {
+  "MIGRATED_FLG": "Y"
+ },
+ "Condition": "ID IN ('" ++ flowVars.eventLogFileId ++ "')"
+}]]></dw:set-payload> 
+		</dw:transform-message>
+		<object-to-string-transformer doc:name="Object to String"/>
+        <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+        <logger message="Migrate Flag update Payload : #[payload]" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="1"  synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/updateEventLogFileTable" method="POST" doc:name="Update Migrated Flag to Y"/>
+        </until-successful>
+        <logger message="Migrated Flag Updated on #[flowVars.eventLogFileId]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+	
+	
+</mule>

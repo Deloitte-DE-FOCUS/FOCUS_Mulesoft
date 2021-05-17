@@ -1,0 +1,101 @@
+#%RAML 0.8
+---
+title: MCI Webservice
+version: v1.0
+
+
+/searchIndividual:
+  displayName: Search for MCI details 
+  description: Search for MCI details
+  post:
+    description: Search for MCI details in MCI system
+    responses:
+      200:
+        body:
+          application/json:
+      400:
+        body:
+          application/json:          
+      404:
+        body:
+          application/json: 
+          
+/registerLinkIndividual:
+  displayName: Link MCI Details
+  description: Link MCI Details
+  post:
+    description: Link MCI Details
+    responses:
+      200:
+        body:
+          application/json:
+      400:
+        body:
+          application/json:          
+      404:
+        body:
+          application/json:
+          
+/createIndividual:
+  displayName: Create Individual Request 
+  description: Create Individual Request
+  post:
+    description: Create Individual Request
+    responses:
+      200:
+        body:
+          application/json:
+      400:
+        body:
+          application/json:          
+      404:
+        body:
+          application/json:
+          
+/getDemographicInformation:
+  displayName: Get Demographics Information 
+  description: Get Demographics Information
+  post:
+    description: Get Demographics Information details
+    responses:
+      200:
+        body:
+          application/json:
+      400:
+        body:
+          application/json:          
+      404:
+        body:
+          application/json:
+          
+/getContacts:
+  displayName: Get Contacts Information 
+  description: Get Contacts Information
+  post:
+    description: Get Contacts Information
+    responses:
+      200:
+        body:
+          application/json:
+      400:
+        body:
+          application/json:          
+      404:
+        body:
+          application/json: 
+          
+/getCaseHistory:
+  displayName: Get Case History Details 
+  description: Get Case History Details
+  post:
+    description: Get Case History Details
+    responses:
+      200:
+        body:
+          application/json:
+      400:
+        body:
+          application/json:          
+      404:
+        body:
+          application/json:

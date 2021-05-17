@@ -1,0 +1,685 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:sfdc-analytics="http://www.mulesoft.org/schema/mule/sfdc-analytics"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/sfdc-analytics http://www.mulesoft.org/schema/mule/sfdc-analytics/current/mule-sfdc-analytics.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	
+	<spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans> 
+   	<spring:beans>
+		<spring:import resource="classpath:/queryframework.xml" />
+	</spring:beans>
+    <flow name="loadCaseDataIntoDBFlow">
+        <message-properties-transformer doc:name="MP : Initialize UID, distinct EvenLogFileIds" scope="session">
+            <add-message-property key="caseRootId" value="#[java.util.UUID.randomUUID().toString()]"/>
+            <add-message-property key="caseData" value="#[dw(&quot;[]&quot;)]"/>
+            <add-message-property key="caseRecordCount" value="#[0]"/>
+            <add-message-property key="caseProcessedCount" value="#[0]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF124&quot;, &quot;InterfaceName&quot;: &quot;Case Person Data Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.caseRootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <enricher source="#[flowVars.IdObjectMap]" target="#[flowVars.IdObjectMap]" doc:name="ME : Get Id Object Map">
+            <flow-ref name="URI_Object_Lookup_Sub_Flow" doc:name="URI_Object_Lookup_Sub_Flow"/>
+        </enricher>
+		<logger message="loadCaseDataIntoDB Query : SELECT SALESFORCE_ID, EVENTLOGFILEID, RECORD_NAME,OBJECT_NAME, URI, USER_ID, USER_NAME , EVENT_TYPE , RECORD_ACCESS_DATE_TIME , PAGE_NAME,  DIVISION_STAFF, INTAKE_CASE_PROV_NAME, INTAKE_CASE_PROV_NUM ,
+CASE_INTAKE_DIV, MASTER_ENTITY  FROM ${eventlog.schema}.event_log_view WHERE (EVENT_TYPE = 'URI' OR EVENT_TYPE = 'VisualforceRequest') AND (CASE_PERSON_LOAD_FLG IS NULL OR CASE_PERSON_LOAD_FLG = 'N')" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getProcessedEventLogData" method="GET" doc:name="Get Case records from DB">
+                <http:request-builder>
+                    <http:query-param paramName="query" value="SELECT SALESFORCE_ID, EVENTLOGFILEID, RECORD_NAME,OBJECT_NAME, URI, USER_ID, USER_NAME , EVENT_TYPE , RECORD_ACCESS_DATE_TIME , PAGE_NAME,  DIVISION_STAFF, INTAKE_CASE_PROV_NAME, INTAKE_CASE_PROV_NUM ,
+CASE_INTAKE_DIV, MASTER_ENTITY  FROM ${eventlog.schema}.event_log_view WHERE (EVENT_TYPE = 'URI' OR EVENT_TYPE = 'VisualforceRequest') AND (CASE_PERSON_LOAD_FLG IS NULL OR CASE_PERSON_LOAD_FLG = 'N')"/>
+
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+            <dw:transform-message doc:name="TM : Convert to List">
+                <dw:input-payload mimeType="application/json"/>
+                	<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="loadCaseDataIntoDB : Case retreival count #[payload.size()]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice : Check if data pulled from DB" doc:description="Check if any data was pulled from Database">
+            <when expression="#[(payload.size() &gt; 0) ]">
+				<dw:transform-message doc:name="Filter Required records and enrich with Type">
+        			<dw:input-payload mimeType="application/java"/>
+            			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload default []) map {
+	(
+		($) 
+		   ++
+	 	(	
+	 		{ 
+	 			"Type" : ( flowVars.IdObjectMap[(($."SALESFORCE_ID" default "")[0..2])]).apiName default ""	
+	 		}
+	 	 )
+	)
+}]]></dw:set-payload>
+        </dw:transform-message>
+ 
+	<dw:transform-message doc:name="Filter Case records">
+        <dw:input-payload mimeType="application/java"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.MASTER_ENTITY == "Case" or $.MASTER_ENTITY == "Intake")]]></dw:set-payload>
+                    <dw:set-session-variable variableName="nonCaseSFIds"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Type != "DEL_Case__c")
+]]></dw:set-session-variable>
+        </dw:transform-message>
+        <set-session-variable variableName="caseRecordCount" value="#[payload.size()]" doc:name="SV : Case Total"/>
+		<dw:transform-message doc:name="TM : Distinct Case SF Ids">
+                    <dw:set-session-variable variableName="caseData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload distinctBy $.SALESFORCE_ID map $.SALESFORCE_ID]]></dw:set-session-variable>
+                    <dw:set-session-variable variableName="nonCaseSFIds"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.nonCaseSFIds distinctBy $.SALESFORCE_ID map $.SALESFORCE_ID]]></dw:set-session-variable>
+                </dw:transform-message>
+                <logger message="loadCaseDataIntoDB : Case EventLogFileIds :#[sessionVars.caseData]" level="INFO" doc:name="Logger"/>
+		<set-variable variableName="URIMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initiallze URI Map"/>
+		<set-variable variableName="key" value="DEL_Case__c" doc:name="Variable : Set Key as Case Object" doc:description="Set Key as Case Object"/>
+                <foreach collection="#[payload]" doc:name="For Each" batchSize="2000">
+                    <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message" doc:description="Remove Root Message"/>
+                    <dw:transform-message doc:name="TM : Deserialize payload">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                    </dw:transform-message>
+                <!-- <logger message="Deserialize payload:#[payload]" level="INFO" doc:name="Logger"/>    -->
+                <foreach batchSize="150" doc:name="For Each">
+                    <flow-ref name="dynamicObjectNameFlow" doc:name="dynamicObjectNameFlow"/>
+                    <dw:transform-message doc:name="Add to URI map">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-variable variableName="URIMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.URIMap default {}) ++ ( (payload default []) reduce ((val, acc = {}) -> acc ++ ({ ((val.Id as :string)[0..14]) : ((val - "type") pluck $)[1] default (val.Id[0..14])  }) ) )]]></dw:set-variable>
+                    </dw:transform-message>
+                </foreach>
+                
+                    <set-variable variableName="userMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initialize User Map"/>
+                    <dw:transform-message doc:name="TM : Get User/Worker ID">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-variable variableName="userIDList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload."USER_ID" filter (($ default "") != "")]]></dw:set-variable>
+                    </dw:transform-message>
+                    <foreach collection="#[flowVars.userIDList]" batchSize="150" doc:name="For Each : User">
+                        <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                        <logger message="Log Record #[payload[0]]" level="INFO" doc:name="Logger"/>
+                        <dw:transform-message doc:name="TM : Prepare Query">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-payload>
+                        </dw:transform-message>
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Name from User where Id IN (#[payload])" doc:name="SF : Query User Details"/>
+                        <dw:transform-message doc:name="TM : Consume Payload">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+                        </dw:transform-message>
+                        <dw:transform-message doc:name="TM : Add to User Map">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-variable variableName="userMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.userMap) ++ ( (payload default []) reduce ((val, acc = {}) -> acc ++ ({ (val.Id as :string) : val.Name  }) ) )]]></dw:set-variable>
+                        </dw:transform-message>
+                    </foreach>                        
+        <set-variable variableName="CaseDetailsMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initiallze Case Details Map"/>
+        <set-variable variableName="IntakeDetailsMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initiallze Intake Details Map"/>
+            <foreach batchSize="1500" doc:name="For Each" collection="#[payload]">
+                <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                        <dw:transform-message doc:name="Transform Message : DeSerailize Payload">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                        </dw:transform-message>
+                        
+                        <choice doc:name="Choice">
+                       <when expression="#[dw('((sizeOf (payload filter $.&quot;MASTER_ENTITY&quot; == &quot;Intake&quot;)) != 0) and ((sizeOf (payload filter $.&quot;MASTER_ENTITY&quot; == &quot;Case&quot;)) != 0)')]">
+                        	<dw:transform-message doc:name="TM : Prepare Query">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-variable variableName="CaseQuery"><![CDATA[%dw 1.0
+%output application/java
+---
+("SELECT Id,Name, (SELECT Id,Role__c,Case_Person_Status__c,Person_PID__c,Person__r.Name FROM Person_Cases__r ) from DEL_CASE__c")  
+ ++ " where Id IN (" ++ 
+ (((payload filter ($.SALESFORCE_ID !=null and $.MASTER_ENTITY == "Case") distinctBy $.SALESFORCE_ID)  map ("'" ++ $.SALESFORCE_ID ++ "'")) joinBy ",") ++ ")"
+]]></dw:set-variable>
+				<dw:set-variable variableName="IntakeQuery"><![CDATA[%dw 1.0
+%output application/java
+---
+("SELECT Id, Name, (SELECT Id,Role__c, Intake_Status__c,Validated_PID__c,Validated_Person_Name__r.Name FROM Intake_Persons__r ) from DEL_Intake__C") 
+ ++ " where Id IN (" ++ 
+ (((payload filter ($.SALESFORCE_ID !=null and $.MASTER_ENTITY == "Intake") distinctBy $.SALESFORCE_ID)  map ("'" ++ $.SALESFORCE_ID ++ "'")) joinBy ",") ++ ")"
+]]></dw:set-variable>
+                        </dw:transform-message>
+                        </when>
+						<otherwise>
+							<dw:transform-message doc:name="TM : Prepare Query">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-variable variableName="CaseQuery"><![CDATA[%dw 1.0
+%output application/java
+---
+("SELECT Id,Name, (SELECT Id,Role__c,Case_Person_Status__c,Person_PID__c,Person__r.Name FROM Person_Cases__r ) from DEL_CASE__c")  
+ ++ " where Id IN ('')"
+]]></dw:set-variable>
+                            <dw:set-variable variableName="IntakeQuery"><![CDATA[%dw 1.0
+%output application/java
+---
+("SELECT Id, Name, (SELECT Id,Role__c, Intake_Status__c,Validated_PID__c,Validated_Person_Name__r.Name FROM Intake_Persons__r ) from DEL_Intake__C") 
+ ++ " where Id IN ('')"
+]]></dw:set-variable>
+                        </dw:transform-message>
+						</otherwise>
+                        </choice>
+                        <!--<logger message="Log Record #[payload]" level="INFO" doc:name="Logger"/>-->
+
+                <logger message="Case Query #[flowVars.CaseQuery]" level="INFO" doc:name="Logger"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="#[flowVars.CaseQuery]" doc:name="SF : Retrieve Case Name"/>
+                
+        <dw:transform-message doc:name="Consume Payload">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map { 
+	Id : $.Id,
+	Name : $.Name,
+	Person_r : $.Person_Cases__r
+	//Client_PID : $.Person_Cases__r.Person_PID__c default [],
+	//Client_Name : (($.Person_Cases__r.Person__r.Name) default []),
+	//Status : $.Person_Cases__r.Case_Person_Status__c  default [],
+	//Role : $.Person_Cases__r.Role__c  default []
+}]]></dw:set-payload>
+        </dw:transform-message>	
+                <dw:transform-message doc:name="TM : Group Records">
+                <dw:input-payload mimeType="application/java"/>
+                    <dw:set-variable variableName="CaseDetailsMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload default []) reduce ((val,acc = flowVars.CaseDetailsMap) -> acc ++ { ((val.Id as :string)[0..14]) : (val) } )
+]]></dw:set-variable>
+                </dw:transform-message>
+                <logger message="Intake Query #[flowVars.IntakeQuery]" level="INFO" doc:name="Logger"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="#[flowVars.IntakeQuery]" doc:name="SF : Retrieve Intake Name"/>
+        <dw:transform-message doc:name="Consume Payload">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+Id : $.Id,
+Name : $.Name,
+Person_r : $.Intake_Persons__r
+//Client_PID : $.Intake_Persons__r.Validated_PID__c default [],
+//Client_Name : (($.Intake_Persons__r.Validated_Person_Name__r.Name) default []) ,
+//Status : $.Intake_Persons__r.Intake_Status__c  default [],
+//Role : $.Intake_Persons__r.Role__c  default []
+}]]></dw:set-payload>
+        </dw:transform-message>	
+                <dw:transform-message doc:name="TM : Group Records">
+                <dw:input-payload mimeType="application/java"/>
+                    <dw:set-variable variableName="IntakeDetailsMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload default []) reduce ((val,acc = flowVars.IntakeDetailsMap) -> acc ++ { ((val.Id as :string)[0..14]) : (val) } )
+]]></dw:set-variable>
+                </dw:transform-message>
+                <dw:transform-message doc:name="Merge Case and Intake Payload">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-variable variableName="CaseIntakeMap"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.IntakeDetailsMap default [] ++ flowVars.CaseDetailsMap default []]]></dw:set-variable>
+        </dw:transform-message>	
+        </foreach>
+                    <set-session-variable variableName="caseProcessedCount" value="#[sessionVars.caseProcessedCount + payload.size()]" doc:name="SV : Processed Count"/>
+                    <logger message="loadCaseDataIntoDB : Total case person records #[payload.size()] Current Total Processed Count : #[sessionVars.caseProcessedCount]" level="INFO" doc:name="Logger"/>
+
+                    <dw:transform-message doc:name="TM : Enrich Wave Data Set with Username and Case Details">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload default []) reduce ((val, acc = []) -> acc ++ (
+	(flowVars.CaseIntakeMap[val.SALESFORCE_ID].Person_r default [{}]) map {
+			( 
+				{
+					"Event_Type" : val.Event_Type,
+					"Object_Name" : ( flowVars.IdObjectMap[((val.SALESFORCE_ID default "")[0..2])]).label,
+					"Salesforce_ID" : val.SALESFORCE_ID,
+					"Record_Name" : (flowVars.CaseIntakeMap[val.SALESFORCE_ID].Name default "") replace "\"" with  "\"\"",
+					"Page_Name" : val.PAGE_NAME,
+					"Date" : ((val.RECORD_ACCESS_DATE_TIME as :localdatetime {format : "yyyy-MM-dd'T'HH:mm:ss"})  >> "America/New_York"),
+					"URI" : val.URI,
+					"User_ID" : val.USER_ID,						
+					"User_Name" : (flowVars.userMap[val.USER_ID] default "") replace "\"" with  "\"\"",
+					"EventLogFileId" : val.EVENTLOGFILEID,
+					"CASE_INTAKE_DIV" : val.CASE_INTAKE_DIV,
+					"DIVISION_STAFF" : val.DIVISION_STAFF,
+					"INTAKE_CASE_PROV_NAME" : val.INTAKE_CASE_PROV_NAME,
+					"INTAKE_CASE_PROV_NUM" : val.INTAKE_CASE_PROV_NUM,
+					"MASTER_ENTITY" : val.MASTER_ENTITY
+				} 
+					++
+				{
+					"Client_PID" : $.Validated_PID__c when ($.Validated_PID__c !=null) otherwise $.Person_PID__c default "",
+					"Client_Name" : (($.Validated_Person_Name__r.Name) when ($.Validated_Person_Name__r.Name != null) otherwise $.Person__r.Name default "")  replace "\"" with  "\"\"",
+					"Status" : $.Intake_Status__c when ($.Intake_Status__c != null) otherwise $.Case_Person_Status__c default "",
+					"Role" : $.Role__c default ""
+				}
+			)
+		}
+	)
+  )]]></dw:set-payload>
+                    </dw:transform-message>
+					<!--<logger message="#[payload]" level="INFO" doc:name="Logger"/>-->
+                <dw:transform-message doc:name="TM : Transpose Data for Webservice">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"_EVENTLOGFILEID" : payload.EventLogFileId,
+	"_TIMESTAMP_DERIVED": payload.Date,
+	"_CASE_ID": payload.Record_Name,
+	"_CLIENT_PID": payload.Client_PID,
+	"_CLIENT_NAME": payload.Client_Name,
+	"_CASE_PERSON_STATUS": payload.Status,
+	"_CASE_PERSON_ROLE": payload.Role,
+	"_USERNAME": payload.User_Name,
+	"_USERID": payload.User_ID,
+	"_RECORDID": payload.Salesforce_ID,
+	"_URI": payload.URI,
+	"_DIVISION_STAFF" : payload.DIVISION_STAFF,
+	"_INTAKE_CASE_PROV_NUM" : payload.INTAKE_CASE_PROV_NUM,
+	"_INTAKE_CASE_PROV_NAME" : payload.INTAKE_CASE_PROV_NAME,
+	"_CASE_INTAKE_DIV" : payload.CASE_INTAKE_DIV,
+	"_MASTER_ENTITY" : payload.MASTER_ENTITY
+}]]></dw:set-payload>
+                </dw:transform-message>
+				<!--<logger message="#[payload]" level="INFO" doc:name="Logger"/>-->
+                	<object-to-string-transformer doc:name="Object to String"/>
+					<!--<logger message="#[payload]" level="INFO" doc:name="Logger"/>-->
+                	<set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime as text/plain" doc:description="Property : Set Mime as text/plain"/>
+                    <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+                        <http:request config-ref="HTTP_Request_EM_Configuration" path="/insertCasePersonData" method="POST" doc:name="HTTP : Insert Case Person Records"/>
+                    </until-successful>
+                	<logger message="loadCaseDataIntoDB : Processing Complete for This batch" level="INFO" doc:name="Logger"/>
+                </foreach>
+
+			</when>
+            <otherwise>
+                <logger message="No records extracted from Database or Application for Dataset is not identified" level="INFO" doc:name="Logger"/>
+            </otherwise> 
+        </choice>
+        <logger message="loadCaseDataIntoDB : Case person data load completed" level="INFO" doc:name="Logger"/>
+        <foreach collection="#[sessionVars.caseData]" batchSize="1000" doc:name="For Each">
+			<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+            <logger message="Case SalesforceIds in update loop : #[payload]" level="INFO" doc:name="Logger"/>
+        	<dw:transform-message doc:name="TM : Collect Case SF Ids">
+                <dw:set-variable variableName="caseSFIds"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-variable>
+
+                </dw:transform-message>
+            <dw:transform-message doc:name="TM : Set Case Person load flag Status">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"Fields": {
+		"CASE_PERSON_LOAD_FLG": "Y"
+	},
+	"Condition": "SALESFORCE_ID IN (" ++ flowVars.caseSFIds ++ ")"
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer doc:name="Object to String"/>
+            <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+            <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+                <http:request config-ref="HTTP_Request_EM_Configuration" path="/updateSalesForceMappingTable" method="POST" doc:name="HTTP : Update Case Person Migration Flag to Y"/>
+            </until-successful>
+            <logger message="loadCaseDataIntoDB : Case Person Load Flag Updated on #[flowVars.caseSFIds]" level="INFO" doc:name="Logger"/>
+        </foreach>
+        <async doc:name="Async">
+            <flow-ref name="event_monitoring_case_ignore_data_loadFlow" doc:name="event_monitoring_case_ignore_data_loadFlow"/>
+        </async>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF124&quot;, &quot;InterfaceName&quot;: &quot;Case Person Data Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.caseRootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.caseRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.caseRecordCount]&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.caseRecordCount == 0 ? &quot;No records to Process&quot; : &quot;&quot;]&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+		<catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="loadCaseDataIntoDB : Exception Occurred while Loading Case Person Data. #[exception.message] " level="INFO" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                   <when expression="#[message.inboundProperties.'http.status' >= 500]">
+                       <set-session-variable variableName="toProceed" value="#[&quot;N&quot;]" doc:name="SV : Set Proceed Flag"/>
+                   </when>
+                   <otherwise>
+                       <logger level="INFO" doc:name="Logger" message="loadCaseDataIntoDB : #[exception.message]"/>
+                   </otherwise>
+               </choice>
+            <foreach collection="#[sessionVars.caseData]" batchSize="1000" doc:name="For Each">
+				<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+        		<dw:transform-message doc:name="TM : Collect Case EventLogFileIds">
+                	<dw:set-variable variableName="deleteCaseEventLogFileIds"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.EVENTLOGFILEID ++ "'")) joinBy ","]]></dw:set-variable>
+                </dw:transform-message>
+            	<dw:transform-message doc:name="TM : Case Person Data">
+                	<dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"Table": "CasePerson",
+	"DeleteCondition": "salesforce_id IN (" ++ flowVars.deleteCaseEventLogFileIds ++ ")"
+}]]></dw:set-payload>
+            	</dw:transform-message>
+            	<object-to-string-transformer doc:name="Object to String"/>
+                <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+                <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+                    <http:request config-ref="HTTP_Request_EM_Configuration" path="/deleteRecords" method="POST" doc:name="HTTP : Delete Case person records."/>
+                </until-successful>
+            	<logger message="loadCaseDataIntoDB : Deleted records from Event Case person using eventLogFileIds #[flowVars.deleteCaseEventLogFileIds]" level="INFO" doc:name="Logger"/>
+            </foreach>
+            <set-payload value="{&quot;InterfaceID&quot;: &quot;INF124&quot;, &quot;InterfaceName&quot;: &quot;Case Person Data Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.caseRootId]&quot;,&quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.caseRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.caseRecordCount]&quot;,&quot;ErrorDescription&quot;:&quot;Error Occurred while loading Case Data into Event Case person table. #[exception.message] &quot;,&quot;ExceptionType&quot;:&quot;System&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        </catch-exception-strategy>
+    </flow>
+
+    <flow name="casePersonDataIntoCasePersonDataSetFlow">
+        <message-properties-transformer doc:name="MP : Initialize UID, distinct EvenLogFileIds" scope="session">
+            <add-message-property key="casePersonRootId" value="#[java.util.UUID.randomUUID().toString()]"/>
+            <add-message-property key="casePersonData" value="#[dw(&quot;[]&quot;)]"/>
+            <add-message-property key="casePersonRecordCount" value="#[0]"/>
+            <add-message-property key="casePersonProcessedCount" value="#[0]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF125&quot;, &quot;InterfaceName&quot;: &quot;Case Person DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.casePersonRootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+		<enricher source="#[flowVars.IdObjectMap]" target="#[flowVars.IdObjectMap]" doc:name="ME : Get Id Object Map">
+            <flow-ref name="URI_Object_Lookup_Sub_Flow" doc:name="URI_Object_Lookup_Sub_Flow"/>
+        </enricher>
+        <flow-ref name="retrieveApplicationIdFromCaseDataSetSub_Flow" doc:name="retrieveApplicationIdFromCaseDataSetSub_Flow"/>
+		<logger message="CasePersonDataIntoCasePersonDataSet Query : SELECT EVENTLOGFILEID, TIMESTAMP_DERIVED, MASTER_ENTITY, INTAKE_CASE_PROV_NUM, INTAKE_CASE_PROV_NAME, CASE_INTAKE_DIV, CLIENT_PID, CASE_ID, CLIENT_NAME, CASE_PERSON_STATUS, CASE_PERSON_ROLE, USERNAME, USERID, RECORDID, URI FROM ${eventlog.schema}.EVENT_CASEPERSON_VIEW A, ${eventlog.schema}.eventlogfile B WHERE A.EVENTLOGFILEID = B.ID AND (B.CASE_LOAD_FLG IS NULL OR B.CASE_LOAD_FLG = 'N')" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="HTTP_Request_EM_Configuration" path="/getCasePersonData" method="GET" doc:name="Get Case Person data from DB" doc:description="Get Consolidated case records from Database">
+                <http:request-builder>
+                    <http:query-param paramName="query" value="SELECT * FROM ${eventlog.schema}.EVENT_CASEPERSON_VIEW A, ${eventlog.schema}.eventlogfile B WHERE A.EVENTLOGFILEID = B.ID AND (B.CASE_LOAD_FLG IS NULL OR B.CASE_LOAD_FLG = 'N')"/>
+
+
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+		<!--<logger message="CasePersonDataIntoCasePersonDataSet : #[payload]" level="INFO" doc:name="Logger"/>-->
+ 		<dw:transform-message doc:name="TM : Convert to List">
+			<dw:input-payload mimeType="application/json"/>
+				<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="CasePersonDataIntoCasePersonDataSet : Case person retreival count : #[payload.size()]" level="INFO" doc:name="Logger"/>
+        <set-session-variable variableName="casePersonRecordCount" value="#[payload.size()]" doc:name="SV : Case Person Total"/>
+        <choice doc:name="Choice : Check if any data was pulled from Database" doc:description="Check if any data was pulled from Database">
+            <when expression="#[(payload.size() &gt; 0) &amp;&amp; (flowVars.datasetAppSfdcID != null)]">
+                <dw:transform-message doc:name="TM : Collect Case Person EventLogFileIds">
+                    <dw:set-session-variable variableName="casePersonData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload distinctBy $."_EVENTLOGFILEID" map $."_EVENTLOGFILEID"]]></dw:set-session-variable>
+
+                </dw:transform-message>
+				<logger message="casePersonDataIntoCasePersonDataSet : Data Set Creation process Initiated. Case Person DataSet count #[payload.size()] #[sessionVars.casePersonData]" level="INFO" doc:name="Logger"/>
+    			<enricher source="#[payload]" target="#[flowVars.datasetid]" doc:name="ME : Get Data Set ID">
+                    <sfdc-analytics:create-data-set config-ref="Salesforce_Analytics_Cloud__Basic_authentication" operation="APPEND" description="Create a Case related Dataset for appending data to the already present set" label="#[sessionVars.caseDataset]" dataSetName="#[sessionVars.caseDataset]" edgemartContainer="#[flowVars.datasetAppSfdcID]" type="EventLogCasePerson.json:RELATIVE" doc:name="SF Analytics Cloud : Create Append dataset" doc:description="Create a Dataset for appending data to the already present set"/>
+                </enricher>
+                <logger message="CasePersonDataIntoCasePersonDataSet : DataSet Created with ID #[flowVars.datasetid]" level="INFO" doc:name="Logger"/>
+                <foreach batchSize="10000" doc:name="For Each">
+                    <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                    <dw:transform-message doc:name="TM : Enrich Wave Data Set with Username and Case Details">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	"Event_Type" : "",
+	"Object_Name" : "Case",
+	"Salesforce_ID" : $."_RECORDID",
+	"Record_Name" : ($."_CASE_ID" default "") replace "\"" with  "\"\"",
+	"Page_Name" : "",
+	"Date" : (($."_TIMESTAMP_DERIVED" as :datetime)  >> "America/New_York") as :date,
+	"URI" : $."_URI",
+	"User_ID" : $."_USERID",
+	"User_Name" : ($."_USERNAME" default "") replace "\"" with  "\"\"",
+	"Client_PID" : $."_CLIENT_PID",
+	"Client_Name" : (($."_CLIENT_NAME") default "")  replace "\"" with  "\"\"",
+	"Status" : $."_CASE_PERSON_STATUS",
+	"Role" : $."_CASE_PERSON_ROLE",
+	"Division_Staff" : $."DIVISION_STAFF",
+    "Intake_Case_Prov_Num" : $."INTAKE_CASE_PROV_NUM",
+    "Intake_Case_Prov_Name" : $."INTAKE_CASE_PROV_NAME",
+    "Case_Intake_Div" : $."CASE_INTAKE_DIV",
+    "Master_Entity" : $."MASTER_ENTITY"
+	//"Case_Div.Division__c": "",
+	//"Case_Div.Name": "",
+	//"User_Relatiobship.Division": "",
+	//"User_Relatiobship.Id": ""
+}
+]]></dw:set-payload>
+				    </dw:transform-message>
+                    <set-session-variable variableName="casePersonProcessedCount" value="#[sessionVars.casePersonProcessedCount + payload.size()]" doc:name="SV : Processed Count"/>
+				    <logger message="CasePersonDataIntoCasePersonDataSet : Size of This Data Part #[payload.size()] Current Total Processed Count : #[sessionVars.casePersonProcessedCount]" level="INFO" doc:name="Logger"/>
+					<!--<logger message="PAYLOAD #[payload]" level="INFO" doc:name="Logger"/>-->
+				    <sfdc-analytics:upload-external-data config-ref="Salesforce_Analytics_Cloud__Basic_authentication" type="EventLogCasePerson.json:RELATIVE" dataSetId="#[flowVars.datasetid]" doc:name="SF Analytics Cloud : Create DataSet Part">
+				        <sfdc-analytics:payload ref="#[payload]"/>
+				    </sfdc-analytics:upload-external-data>
+				    <message-properties-transformer scope="invocation" doc:name="MP : Delete Variables for Next Iteration" doc:description="Delete Variables for Next Iteration">
+				        <delete-message-property key="userMap"/>
+				        <delete-message-property key="URIMap"/>
+				        <delete-message-property key="userIDList"/>
+				        <delete-message-property key="CaseDetailsMap"/>
+				    </message-properties-transformer>
+				    <logger message="casePersonDataIntoCasePersonDataSet : Processing done for this Iteration" level="INFO" doc:name="Logger"/>
+                </foreach>
+                <sfdc-analytics:start-data-processing config-ref="Salesforce_Analytics_Cloud__Basic_authentication" dataSetId="#[flowVars.datasetid]" doc:name="SF Analytics Cloud : Start Data Processing"/>
+                <logger message="casePersonDataIntoCasePersonDataSet : Data Parts Processing triggered. " level="INFO" doc:name="Logger"/>
+                <foreach collection="#[sessionVars.casePersonData]" batchSize="1000" doc:name="For Each">
+					<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                    </dw:transform-message>
+                    <logger message="CasePersonDataIntoCasePersonDataSet : Case Person Dataset Flag Input : #[payload]" level="INFO" doc:name="Logger"/>
+	                <dw:transform-message doc:name="TM : Collect Case Person EventLogFileIds">
+		            	<dw:set-variable variableName="casePersonEventLogFileIds"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-variable>
+                </dw:transform-message>
+                <dw:transform-message doc:name="TM : Update Case Person Flag">
+		    		<dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"Fields": {
+		"CASE_LOAD_FLG": "Y"
+	},
+	"Condition": "ID IN (" ++ flowVars.casePersonEventLogFileIds ++ ")"
+}]]></dw:set-payload> 
+					</dw:transform-message>
+					<object-to-string-transformer doc:name="Object to String"/>
+	                <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+                    <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+                        <http:request config-ref="HTTP_Request_EM_Configuration" path="/updateEventLogFileTable" method="POST" doc:name="Update Case Load Flag to Y"/>
+                    </until-successful>
+			        <logger message="Case Person Load Flag Updated on #[flowVars.casePersonEventLogFileIds]" level="INFO" doc:name="Logger"/>
+                </foreach>
+            </when>
+            <otherwise>
+                <logger message="casePersonDataIntoCasePersonDataSet : No records extracted from Database or Application for Dataset is not identified" level="INFO" doc:name="Logger"/>
+                <logger message="casePersonDataIntoCasePersonDataSet : Application ID : #[flowVars.datasetAppSfdcID]" level="INFO" doc:name="Logger"/>
+                <logger message="casePersonDataIntoCasePersonDataSet : Size Of Payload #[dw(&quot;sizeOf (payload default [])&quot;)]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF125&quot;, &quot;InterfaceName&quot;: &quot;Case Person DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.casePersonRootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.casePersonRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.casePersonRecordCount]&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.casePersonRecordCount == 0 ? &quot;No records to Process&quot; : &quot;&quot;]&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="CasePersonDataIntoCasePersonDataSet : Exception Occurred while Loading Case Person Data into CasePersonDataSet. #[exception.message] " level="INFO" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                   <when expression="#[message.inboundProperties.'http.status' >= 500]">
+                       <set-session-variable variableName="toProceed" value="#[&quot;N&quot;]" doc:name="SV : Set Proceed Flag"/>
+                   </when>
+                   <otherwise>
+                       <logger level="INFO" doc:name="Logger" message="CasePersonDataIntoCasePersonDataSet : #[exception.message]"/>
+                   </otherwise>
+               </choice>
+            <set-payload value="{&quot;InterfaceID&quot;: &quot;INF125&quot;, &quot;InterfaceName&quot;: &quot;Case Person DataSet Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[sessionVars.casePersonRootId]&quot;,&quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.casePersonRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.casePersonRecordCount]&quot;,&quot;ErrorDescription&quot;:&quot;Error Occurred while loading Case Person Data into CasePersonDataSet. #[exception.message] &quot;,&quot;ExceptionType&quot;:&quot;System&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP : Set JSON payload for logging Framework"/>
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        </catch-exception-strategy>
+    </flow>
+
+    <sub-flow name="processCaseRecords">
+        <dw:transform-message doc:name="Filter Required records and enrich with Type">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload  default []) map {
+	(
+		($) 
+		   ++
+	 	(	
+	 		{ 
+	 			"Type" : ( flowVars.IdObjectMap[(($.URI_ID_DERIVED default "")[0..2])]).apiName default ""	
+	 		}
+	 	 )
+	)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Filter records of type Case">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Type == "DEL_Case__c")]]></dw:set-payload>
+        </dw:transform-message>		
+        <set-variable variableName="CaseDetailsMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initiallze Case Details Map"/>
+        <set-variable variableName="IntakeDetailsMap" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initiallze Case Details Map"/>
+            <foreach batchSize="150" doc:name="For Each">
+                <remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+                <dw:transform-message doc:name="TM : Prepare Query">
+                    <dw:input-payload mimeType="application/java"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+"SELECT Id,Name, (SELECT Id,Role__c,Case_Person_Status__c,Person_PID__c,Person__r.Name FROM Person_Cases__r ) from DEL_CASE__c" ++ " where Id IN (" ++ ((payload map ("'" ++ $.URI_ID_DERIVED__c ++ "'")) joinBy ",") ++ ")"]]></dw:set-payload>
+                </dw:transform-message>
+                <logger message="Query #[payload]" level="INFO" doc:name="Logger"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="#[payload]" doc:name="SF : Retrieve Name"/>
+        <dw:transform-message doc:name="Consume Payload">
+        <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+        </dw:transform-message>	
+                <dw:transform-message doc:name="TM : Group Records">
+                <dw:input-payload mimeType="application/java"/>
+                    <dw:set-variable variableName="CaseDetailsMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload default []) reduce ((val,acc = flowVars.CaseDetailsMap) -> acc ++ { (val.Id as :string) : (val) } )
+]]></dw:set-variable>
+                </dw:transform-message>
+        </foreach>
+    </sub-flow>
+
+    <sub-flow name="retrieveApplicationIdFromCaseDataSetSub_Flow">
+        <sfdc:query-single config-ref="Salesforce__Basic_Authentication" query="Select id,EdgemartAlias,EdgemartContainer,EdgemartLabel,Status,Action,isDeleted,StatusMessage,LastModifiedDate  from InsightsExternalData where EdgemartAlias = '#[sessionVars.caseDataset]' order by LastModifiedDate asc" doc:name="SF : Query DataSet Details"/>
+        <dw:transform-message doc:name="TM : Get Application ID">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-variable variableName="datasetAppSfdcID"><![CDATA[%dw 1.0
+%output application/java
+---
+"SharedApp"]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="App ID for Case Dataset : #[flowVars.datasetAppSfdcID]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    
+    <flow name="event_monitoring_case_ignore_data_loadFlow">
+    	<foreach collection="#[sessionVars.nonCaseSFIds]" batchSize="1000" doc:name="For Each">
+			<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message"/>
+            <logger message="Non Case Type SalesforceIds in update loop : #[payload]" level="INFO" doc:name="Logger"/>
+        	<dw:transform-message doc:name="TM : Collect Case SF Ids">
+                <dw:set-variable variableName="nonCaseSFIds"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-variable>
+                </dw:transform-message>
+            <dw:transform-message doc:name="TM : Set Case Person load flag Status">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json indent=false
+---
+{
+	"Fields": {
+		"CASE_PERSON_LOAD_FLG": "I"
+	},
+	"Condition": "SALESFORCE_ID IN (" ++ flowVars.nonCaseSFIds ++ ")"
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer doc:name="Object to String"/>
+            <set-property propertyName="Content-Type" value="text/plain" doc:name="Property : Set Mime to text/plain" doc:description=" Set Mime to text/plain"/>
+            <until-successful maxRetries="3"  synchronous="true" doc:name="Until Successful">
+                <http:request config-ref="HTTP_Request_EM_Configuration" path="/updateSalesForceMappingTable" method="POST" doc:name="HTTP : Update Case Person Migration Flag to Y"/>
+            </until-successful>
+            <logger message="loadCaseDataIntoDB : Case Person Load Flag Updated on #[flowVars.caseSFIds]" level="INFO" doc:name="Logger"/>
+        </foreach>
+    </flow>
+
+</mule>
+	

@@ -1,0 +1,3 @@
+<ns0:SoapFault xmlns:ns0="http://MCICommon.MasterClientIndexFault">
+  <Error>SystemID in the SOAP Request Header is Invalid: ABCUAT.DSCYF.FOCUS</Error>
+</ns0:SoapFault>

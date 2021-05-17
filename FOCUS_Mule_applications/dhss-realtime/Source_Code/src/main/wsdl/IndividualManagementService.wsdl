@@ -1,0 +1,767 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions name="BizTalkServiceInstance" targetNamespace="http://DHSS/DataServiceHub/MCI/IndividualManagement" xmlns:msc="http://schemas.microsoft.com/ws/2005/12/wsdl/contract" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:tns="http://DHSS/DataServiceHub/MCI/IndividualManagement" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsa10="http://www.w3.org/2005/08/addressing" xmlns:wsam="http://www.w3.org/2007/05/addressing/metadata" xmlns:wsap="http://schemas.xmlsoap.org/ws/2004/08/addressing/policy" xmlns:wsaw="http://www.w3.org/2006/05/addressing/wsdl" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:wsp="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" xmlns:wsx="http://schemas.xmlsoap.org/ws/2004/09/mex" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+<wsdl:documentation>
+		<CreationInfo Created="2016-12-01 13:00:38Z"/>
+	</wsdl:documentation>
+    <wsp:Policy wsu:Id="WSHttpBinding_ITwoWayAsync_policy">
+		<wsp:ExactlyOne>
+			<wsp:All>
+				<wsaw:UsingAddressing/>
+			</wsp:All>
+		</wsp:ExactlyOne>
+	</wsp:Policy>
+  <wsdl:types>
+    <xs:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/Message" xmlns:tns="http://schemas.microsoft.com/Message" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+			<xs:complexType name="MessageBody">
+				<xs:sequence>
+					<xs:any maxOccurs="unbounded" minOccurs="0" namespace="##any"/>
+				</xs:sequence>
+			</xs:complexType>
+		</xs:schema>
+    <xs:schema targetNamespace="http://DHSS/DataServiceHub/MCI/IndividualManagement/Imports" xmlns:tns="http://DHSS/DataServiceHub/MCI/IndividualManagement/Imports" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+			<xs:import namespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+			<xs:import namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+			<xs:import namespace="http://schemas.microsoft.com/2003/10/Serialization/Arrays"/>
+			<xs:import namespace="http://schemas.datacontract.org/2004/07/System"/>
+			<xs:import namespace="http://DHSS/DataServiceHub/MCI/IndividualManagement"/>
+		</xs:schema>
+    <xs:schema attributeFormDefault="qualified" elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:b="http://schemas.microsoft.com/BizTalk/2003" xmlns:tns="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+			<xs:element name="anyType" nillable="true" type="xs:anyType"/>
+			<xs:element name="anyURI" nillable="true" type="xs:anyURI"/>
+			<xs:element name="base64Binary" nillable="true" type="xs:base64Binary"/>
+			<xs:element name="boolean" nillable="true" type="xs:boolean"/>
+			<xs:element name="byte" nillable="true" type="xs:byte"/>
+			<xs:element name="dateTime" nillable="true" type="xs:dateTime"/>
+			<xs:element name="decimal" nillable="true" type="xs:decimal"/>
+			<xs:element name="double" nillable="true" type="xs:double"/>
+			<xs:element name="float" nillable="true" type="xs:float"/>
+			<xs:element name="int" nillable="true" type="xs:int"/>
+			<xs:element name="long" nillable="true" type="xs:long"/>
+			<xs:element name="QName" nillable="true" type="xs:QName"/>
+			<xs:element name="short" nillable="true" type="xs:short"/>
+			<xs:element name="string" nillable="true" type="xs:string"/>
+			<xs:element name="unsignedByte" nillable="true" type="xs:unsignedByte"/>
+			<xs:element name="unsignedInt" nillable="true" type="xs:unsignedInt"/>
+			<xs:element name="unsignedLong" nillable="true" type="xs:unsignedLong"/>
+			<xs:element name="unsignedShort" nillable="true" type="xs:unsignedShort"/>
+			<xs:element name="char" nillable="true" type="tns:char"/>
+			<xs:simpleType name="char">
+				<xs:restriction base="xs:int"/>
+			</xs:simpleType>
+			<xs:element name="duration" nillable="true" type="tns:duration"/>
+			<xs:simpleType name="duration">
+				<xs:restriction base="xs:duration">
+					<xs:pattern value="\-?P(\d*D)?(T(\d*H)?(\d*M)?(\d*(\.\d*)?S)?)?"/>
+					<xs:minInclusive value="-P10675199DT2H48M5.4775808S"/>
+					<xs:maxInclusive value="P10675199DT2H48M5.4775807S"/>
+				</xs:restriction>
+			</xs:simpleType>
+			<xs:element name="guid" nillable="true" type="tns:guid"/>
+			<xs:simpleType name="guid">
+				<xs:restriction base="xs:string">
+					<xs:pattern value="[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}"/>
+				</xs:restriction>
+			</xs:simpleType>
+			<xs:attribute name="FactoryType" type="xs:QName"/>
+			<xs:attribute name="Id" type="xs:ID"/>
+			<xs:attribute name="Ref" type="xs:IDREF"/>
+		</xs:schema>
+    <xs:schema elementFormDefault="qualified" targetNamespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities" xmlns:b="http://schemas.microsoft.com/BizTalk/2003" xmlns:ser="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:tns="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+			<xs:import namespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+			<xs:annotation>
+				<xs:appinfo>
+					<references xmlns="http://schemas.microsoft.com/BizTalk/2003">
+						<reference targetNamespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+					</references>
+				</xs:appinfo>
+			</xs:annotation>
+			<xs:complexType name="IndividualCreate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="Age" nillable="true" type="xs:int"/>
+					<xs:element minOccurs="0" name="CitizenshipCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="DateOfBirth" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="DateOfDeath" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="DeathVerification" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="FirstName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="MaritalStatusCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="MiddleName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SchoolCode" nillable="true" type="xs:int"/>
+					<xs:element minOccurs="0" name="SexCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SuffixName" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="IndividualCreate" nillable="true" type="tns:IndividualCreate"/>
+			<xs:complexType name="ArrayOfRaceCreate">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="RaceCreate" nillable="true" type="tns:RaceCreate"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfRaceCreate" nillable="true" type="tns:ArrayOfRaceCreate"/>
+			<xs:complexType name="RaceCreate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PrimaryFlag" type="xs:boolean"/>
+					<xs:element minOccurs="0" name="RaceCode" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="RaceCreate" nillable="true" type="tns:RaceCreate"/>
+			<xs:complexType name="SocialSecurityNumberCreate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PrimaryFlag" type="xs:boolean"/>
+					<xs:element minOccurs="0" name="SSAVerification" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SSN" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="SocialSecurityNumberCreate" nillable="true" type="tns:SocialSecurityNumberCreate"/>
+			<xs:complexType name="ArrayOfPhoneCreate">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="PhoneCreate" nillable="true" type="tns:PhoneCreate"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfPhoneCreate" nillable="true" type="tns:ArrayOfPhoneCreate"/>
+			<xs:complexType name="PhoneCreate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PhoneNumber" nillable="true" type="xs:unsignedLong"/>
+					<xs:element minOccurs="0" name="PhoneType" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="PhoneCreate" nillable="true" type="tns:PhoneCreate"/>
+			<xs:complexType name="EmailCreate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="EmailAddress" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="EmailType" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="EmailCreate" nillable="true" type="tns:EmailCreate"/>
+			<xs:complexType name="ArrayOfAddressCreate">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="AddressCreate" nillable="true" type="tns:AddressCreate"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfAddressCreate" nillable="true" type="tns:ArrayOfAddressCreate"/>
+			<xs:complexType name="AddressCreate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="AddressLine1" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="AddressLine2" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="AddressType" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="AddressValidationFlag" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="AptNo" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="City" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="CountyCode" nillable="true" type="xs:int"/>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="State" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="ZipCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="ZipSuffix" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="AddressCreate" nillable="true" type="tns:AddressCreate"/>
+			<xs:complexType name="UpdateResult">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="MciNumber" type="xs:unsignedLong"/>
+					<xs:element minOccurs="0" name="Result" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="UpdateResult" nillable="true" type="tns:UpdateResult"/>
+			<xs:complexType name="Individual">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="Age" nillable="true" type="xs:int"/>
+					<xs:element minOccurs="0" name="CitizenshipCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="CorrectMCINumber" nillable="true" type="xs:unsignedLong"/>
+					<xs:element minOccurs="0" name="CreateDate" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="DateOfBirth" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="DateOfDeath" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="DeathVerification" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="FirstName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastUpdatedDate" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="LastWorkerID" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="MCINumber" nillable="true" type="xs:unsignedLong"/>
+					<xs:element minOccurs="0" name="MaritalStatusCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="MiddleName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PointedMCISwitch" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SchoolCode" nillable="true" type="xs:int"/>
+					<xs:element minOccurs="0" name="SexCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SuffixName" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="Individual" nillable="true" type="tns:Individual"/>
+			<xs:complexType name="ArrayOfRace">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="Race" nillable="true" type="tns:Race"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfRace" nillable="true" type="tns:ArrayOfRace"/>
+			<xs:complexType name="Race">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="CreateDate" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastUpdatedDate" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="LastWorkerID" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PrimaryFlag" nillable="true" type="xs:boolean"/>
+					<xs:element minOccurs="0" name="RaceCode" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="Race" nillable="true" type="tns:Race"/>
+			<xs:complexType name="ArrayOfSocialSecurityNumber">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="SocialSecurityNumber" nillable="true" type="tns:SocialSecurityNumber"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfSocialSecurityNumber" nillable="true" type="tns:ArrayOfSocialSecurityNumber"/>
+			<xs:complexType name="SocialSecurityNumber">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="CreateDate" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastUpdatedDate" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="LastWorkerID" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PrimaryFlag" nillable="true" type="xs:boolean"/>
+					<xs:element minOccurs="0" name="PrimaryKey" type="ser:guid"/>
+					<xs:element minOccurs="0" name="SSAVerification" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SSN" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="SocialSecurityNumber" nillable="true" type="tns:SocialSecurityNumber"/>
+			<xs:complexType name="ArrayOfAlternativeName">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="AlternativeName" nillable="true" type="tns:AlternativeName"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfAlternativeName" nillable="true" type="tns:ArrayOfAlternativeName"/>
+			<xs:complexType name="AlternativeName">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="CreateDate" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="CreateWorker" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="FirstName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastUpdatedDate" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="LastWorkerID" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="MiddleName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="NameTypeCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PrimaryKey" type="ser:guid"/>
+					<xs:element minOccurs="0" name="Suffix" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="AlternativeName" nillable="true" type="tns:AlternativeName"/>
+			<xs:complexType name="IndividualUpdate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="Age" nillable="true" type="xs:int"/>
+					<xs:element minOccurs="0" name="CitizenshipCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="DateOfBirth" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="DateOfDeath" nillable="true" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="DeathVerification" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="FirstName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastWorkerID" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="MCINumber" nillable="true" type="xs:unsignedLong"/>
+					<xs:element minOccurs="0" name="MaritalStatusCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="MiddleName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SchoolCode" nillable="true" type="xs:int"/>
+					<xs:element minOccurs="0" name="SexCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SuffixName" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="IndividualUpdate" nillable="true" type="tns:IndividualUpdate"/>
+			<xs:complexType name="ArrayOfRaceUpdate">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="RaceUpdate" nillable="true" type="tns:RaceUpdate"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfRaceUpdate" nillable="true" type="tns:ArrayOfRaceUpdate"/>
+			<xs:complexType name="RaceUpdate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="LastWorkerID" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PrimaryFlag" type="xs:boolean"/>
+					<xs:element minOccurs="0" name="RaceCode" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="RaceUpdate" nillable="true" type="tns:RaceUpdate"/>
+			<xs:complexType name="ArrayOfSocialSecurityNumberUpdate">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="SocialSecurityNumberUpdate" nillable="true" type="tns:SocialSecurityNumberUpdate"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfSocialSecurityNumberUpdate" nillable="true" type="tns:ArrayOfSocialSecurityNumberUpdate"/>
+			<xs:complexType name="SocialSecurityNumberUpdate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="LastWorkerID" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PrimaryFlag" nillable="true" type="xs:boolean"/>
+					<xs:element minOccurs="0" name="PrimaryKey" nillable="true" type="ser:guid"/>
+					<xs:element minOccurs="0" name="SSAVerification" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="SSN" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="SocialSecurityNumberUpdate" nillable="true" type="tns:SocialSecurityNumberUpdate"/>
+			<xs:complexType name="ArrayOfAlternativeNameUpdate">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="AlternativeNameUpdate" nillable="true" type="tns:AlternativeNameUpdate"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfAlternativeNameUpdate" nillable="true" type="tns:ArrayOfAlternativeNameUpdate"/>
+			<xs:complexType name="AlternativeNameUpdate">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="FirstName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="LastWorkerID" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="MiddleName" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="NameTypeCode" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="PrimaryKey" type="ser:guid"/>
+					<xs:element minOccurs="0" name="Suffix" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="AlternativeNameUpdate" nillable="true" type="tns:AlternativeNameUpdate"/>
+			<xs:complexType name="ArrayOfHistory">
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="History" nillable="true" type="tns:History"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfHistory" nillable="true" type="tns:ArrayOfHistory"/>
+			<xs:complexType name="History">
+				<xs:sequence>
+					<xs:element minOccurs="0" name="ChangedBy" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="ChangedFrom" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="ChangedOn" type="xs:dateTime"/>
+					<xs:element minOccurs="0" name="ChangedTo" nillable="true" type="xs:string"/>
+					<xs:element minOccurs="0" name="FieldName" nillable="true" type="xs:string"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="History" nillable="true" type="tns:History"/>
+		</xs:schema>
+    <xs:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/2003/10/Serialization/Arrays" xmlns:b="http://schemas.microsoft.com/BizTalk/2003" xmlns:ser="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:tns="http://schemas.microsoft.com/2003/10/Serialization/Arrays" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+			<xs:import namespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+			<xs:annotation>
+				<xs:appinfo>
+					<references xmlns="http://schemas.microsoft.com/BizTalk/2003">
+						<reference targetNamespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+					</references>
+				</xs:appinfo>
+			</xs:annotation>
+			<xs:complexType name="ArrayOfKeyValueOfintguid">
+				<xs:annotation>
+					<xs:appinfo>
+						<IsDictionary xmlns="http://schemas.microsoft.com/2003/10/Serialization/">true</IsDictionary>
+					</xs:appinfo>
+				</xs:annotation>
+				<xs:sequence>
+					<xs:element maxOccurs="unbounded" minOccurs="0" name="KeyValueOfintguid">
+						<xs:complexType>
+							<xs:sequence>
+								<xs:element name="Key" type="xs:int"/>
+								<xs:element name="Value" type="ser:guid"/>
+							</xs:sequence>
+						</xs:complexType>
+					</xs:element>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="ArrayOfKeyValueOfintguid" nillable="true" type="tns:ArrayOfKeyValueOfintguid"/>
+		</xs:schema>
+    <xs:schema elementFormDefault="qualified" targetNamespace="http://schemas.datacontract.org/2004/07/System" xmlns:b="http://schemas.microsoft.com/BizTalk/2003" xmlns:tns="http://schemas.datacontract.org/2004/07/System" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+			<xs:import namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+			<xs:import namespace="http://schemas.microsoft.com/2003/10/Serialization/Arrays"/>
+			<xs:annotation>
+				<xs:appinfo>
+					<references xmlns="http://schemas.microsoft.com/BizTalk/2003">
+						<reference targetNamespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<reference targetNamespace="http://schemas.microsoft.com/2003/10/Serialization/Arrays"/>
+						<reference targetNamespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+					</references>
+				</xs:appinfo>
+			</xs:annotation>
+			<xs:complexType name="TupleOfIndividualArrayOfRaceArrayOfSocialSecurityNumberArrayOfAlternativeName_PT_SJCMXe">
+				<xs:annotation>
+					<xs:appinfo>
+						<GenericType Name="TupleOf{0}{1}{2}{3}{#}" Namespace="http://schemas.datacontract.org/2004/07/System" xmlns="http://schemas.microsoft.com/2003/10/Serialization/">
+							<GenericParameter Name="Individual" Namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+							<GenericParameter Name="ArrayOfRace" Namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+							<GenericParameter Name="ArrayOfSocialSecurityNumber" Namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+							<GenericParameter Name="ArrayOfAlternativeName" Namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						</GenericType>
+					</xs:appinfo>
+				</xs:annotation>
+				<xs:sequence>
+					<xs:element name="m_Item1" nillable="true" type="q1:Individual" xmlns:q1="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					<xs:element name="m_Item2" nillable="true" type="q2:ArrayOfRace" xmlns:q2="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					<xs:element name="m_Item3" nillable="true" type="q3:ArrayOfSocialSecurityNumber" xmlns:q3="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					<xs:element name="m_Item4" nillable="true" type="q4:ArrayOfAlternativeName" xmlns:q4="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="TupleOfIndividualArrayOfRaceArrayOfSocialSecurityNumberArrayOfAlternativeName_PT_SJCMXe" nillable="true" type="tns:TupleOfIndividualArrayOfRaceArrayOfSocialSecurityNumberArrayOfAlternativeName_PT_SJCMXe"/>
+			<xs:complexType name="TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ">
+				<xs:annotation>
+					<xs:appinfo>
+						<GenericType Name="TupleOf{0}{1}{#}" Namespace="http://schemas.datacontract.org/2004/07/System" xmlns="http://schemas.microsoft.com/2003/10/Serialization/">
+							<GenericParameter Name="UpdateResult" Namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+							<GenericParameter Name="ArrayOfKeyValueOf{0}{1}{#}" Namespace="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+								<GenericParameter Name="int" Namespace="http://www.w3.org/2001/XMLSchema"/>
+								<GenericParameter Name="guid" Namespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+							</GenericParameter>
+						</GenericType>
+					</xs:appinfo>
+				</xs:annotation>
+				<xs:sequence>
+					<xs:element name="m_Item1" nillable="true" type="q5:UpdateResult" xmlns:q5="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					<xs:element name="m_Item2" nillable="true" type="q6:ArrayOfKeyValueOfintguid" xmlns:q6="http://schemas.microsoft.com/2003/10/Serialization/Arrays"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ" nillable="true" type="tns:TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ"/>
+			<xs:complexType name="TupleOfUpdateResultArrayOfKeyValueOfintguidArrayOfKeyValueOfintguidbTW3gn3V">
+				<xs:annotation>
+					<xs:appinfo>
+						<GenericType Name="TupleOf{0}{1}{2}{#}" Namespace="http://schemas.datacontract.org/2004/07/System" xmlns="http://schemas.microsoft.com/2003/10/Serialization/">
+							<GenericParameter Name="UpdateResult" Namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+							<GenericParameter Name="ArrayOfKeyValueOf{0}{1}{#}" Namespace="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+								<GenericParameter Name="int" Namespace="http://www.w3.org/2001/XMLSchema"/>
+								<GenericParameter Name="guid" Namespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+							</GenericParameter>
+							<GenericParameter Name="ArrayOfKeyValueOf{0}{1}{#}" Namespace="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+								<GenericParameter Name="int" Namespace="http://www.w3.org/2001/XMLSchema"/>
+								<GenericParameter Name="guid" Namespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+							</GenericParameter>
+						</GenericType>
+					</xs:appinfo>
+				</xs:annotation>
+				<xs:sequence>
+					<xs:element name="m_Item1" nillable="true" type="q7:UpdateResult" xmlns:q7="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					<xs:element name="m_Item2" nillable="true" type="q8:ArrayOfKeyValueOfintguid" xmlns:q8="http://schemas.microsoft.com/2003/10/Serialization/Arrays"/>
+					<xs:element name="m_Item3" nillable="true" type="q9:ArrayOfKeyValueOfintguid" xmlns:q9="http://schemas.microsoft.com/2003/10/Serialization/Arrays"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="TupleOfUpdateResultArrayOfKeyValueOfintguidArrayOfKeyValueOfintguidbTW3gn3V" nillable="true" type="tns:TupleOfUpdateResultArrayOfKeyValueOfintguidArrayOfKeyValueOfintguidbTW3gn3V"/>
+			<xs:complexType name="TupleOfunsignedLongArrayOfHistoryeGKO5UHU">
+				<xs:annotation>
+					<xs:appinfo>
+						<GenericType Name="TupleOf{0}{1}{#}" Namespace="http://schemas.datacontract.org/2004/07/System" xmlns="http://schemas.microsoft.com/2003/10/Serialization/">
+							<GenericParameter Name="unsignedLong" Namespace="http://www.w3.org/2001/XMLSchema"/>
+							<GenericParameter Name="ArrayOfHistory" Namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						</GenericType>
+					</xs:appinfo>
+				</xs:annotation>
+				<xs:sequence>
+					<xs:element name="m_Item1" type="xs:unsignedLong"/>
+					<xs:element name="m_Item2" nillable="true" type="q10:ArrayOfHistory" xmlns:q10="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+				</xs:sequence>
+			</xs:complexType>
+			<xs:element name="TupleOfunsignedLongArrayOfHistoryeGKO5UHU" nillable="true" type="tns:TupleOfunsignedLongArrayOfHistoryeGKO5UHU"/>
+		</xs:schema>
+    <xs:schema elementFormDefault="qualified" targetNamespace="http://DHSS/DataServiceHub/MCI/IndividualManagement" xmlns:b="http://schemas.microsoft.com/BizTalk/2003" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+			<xs:import namespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+			<xs:import namespace="http://schemas.datacontract.org/2004/07/System"/>
+			<xs:annotation>
+				<xs:appinfo>
+					<b:references>
+						<b:reference targetNamespace="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<b:reference targetNamespace="http://schemas.microsoft.com/2003/10/Serialization/Arrays"/>
+						<b:reference targetNamespace="http://schemas.datacontract.org/2004/07/System"/>
+						<b:reference targetNamespace="http://schemas.microsoft.com/2003/10/Serialization/"/>
+					</b:references>
+				</xs:appinfo>
+			</xs:annotation>
+			<xs:element name="CreateIndividual">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="individual" nillable="true" type="q1:IndividualCreate" xmlns:q1="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="raceList" nillable="true" type="q2:ArrayOfRaceCreate" xmlns:q2="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="ssn" nillable="true" type="q3:SocialSecurityNumberCreate" xmlns:q3="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="phoneList" nillable="true" type="q4:ArrayOfPhoneCreate" xmlns:q4="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="email" nillable="true" type="q5:EmailCreate" xmlns:q5="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="addressList" nillable="true" type="q6:ArrayOfAddressCreate" xmlns:q6="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="CreateIndividualResponse">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="CreateIndividualResult" nillable="true" type="q7:UpdateResult" xmlns:q7="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="GetDemographicInformation">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="mciNumber" type="xs:unsignedLong"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="GetDemographicInformationResponse">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="GetDemographicInformationResult" nillable="true" type="q8:TupleOfIndividualArrayOfRaceArrayOfSocialSecurityNumberArrayOfAlternativeName_PT_SJCMXe" xmlns:q8="http://schemas.datacontract.org/2004/07/System"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="UpdateDemographicInformation1">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="individual" nillable="true" type="q9:IndividualUpdate" xmlns:q9="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="raceList" nillable="true" type="q10:ArrayOfRaceUpdate" xmlns:q10="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="ssnList" nillable="true" type="q11:ArrayOfSocialSecurityNumberUpdate" xmlns:q11="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="UpdateDemographicInformation1Response">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="UpdateDemographicInformation1Result" nillable="true" type="q12:TupleOfUpdateResultArrayOfKeyValueOfintguidrTcpw0EZ" xmlns:q12="http://schemas.datacontract.org/2004/07/System"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="UpdateDemographicInformation2">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="individual" nillable="true" type="q13:IndividualUpdate" xmlns:q13="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="raceList" nillable="true" type="q14:ArrayOfRaceUpdate" xmlns:q14="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="ssnList" nillable="true" type="q15:ArrayOfSocialSecurityNumberUpdate" xmlns:q15="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+						<xs:element minOccurs="0" name="alternativeNameList" nillable="true" type="q16:ArrayOfAlternativeNameUpdate" xmlns:q16="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="UpdateDemographicInformation2Response">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="UpdateDemographicInformation2Result" nillable="true" type="q17:TupleOfUpdateResultArrayOfKeyValueOfintguidArrayOfKeyValueOfintguidbTW3gn3V" xmlns:q17="http://schemas.datacontract.org/2004/07/System"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="PointMCIRecord">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="inCorrectMciNumber" type="xs:unsignedLong"/>
+						<xs:element minOccurs="0" name="correctMciNumber" type="xs:unsignedLong"/>
+						<xs:element minOccurs="0" name="lastWorkerId" nillable="true" type="xs:string"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="PointMCIRecordResponse">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="PointMCIRecordResult" nillable="true" type="q18:UpdateResult" xmlns:q18="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="UnpointMCIRecord">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="inCorrectMciNumber" type="xs:unsignedLong"/>
+						<xs:element minOccurs="0" name="lastWorkerId" nillable="true" type="xs:string"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="UnpointMCIRecordResponse">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="UnpointMCIRecordResult" nillable="true" type="q19:UpdateResult" xmlns:q19="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="GetClientHistory">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="mciNumber" type="xs:unsignedLong"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="GetClientHistoryResponse">
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element minOccurs="0" name="GetClientHistoryResult" nillable="true" type="q20:TupleOfunsignedLongArrayOfHistoryeGKO5UHU" xmlns:q20="http://schemas.datacontract.org/2004/07/System"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+		</xs:schema>
+  </wsdl:types>
+  <wsdl:message name="IndividualManagementService_CreateIndividual_InputMessage">
+    <wsdl:part name="part" element="tns:CreateIndividual">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_CreateIndividual_OutputMessage">
+    <wsdl:part name="part" element="tns:CreateIndividualResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_GetDemographicInformation_InputMessage">
+    <wsdl:part name="part" element="tns:GetDemographicInformation">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_GetDemographicInformation_OutputMessage">
+    <wsdl:part name="part" element="tns:GetDemographicInformationResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_UpdateDemographicInformation1_InputMessage">
+    <wsdl:part name="part" element="tns:UpdateDemographicInformation1">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_UpdateDemographicInformation1_OutputMessage">
+    <wsdl:part name="part" element="tns:UpdateDemographicInformation1Response">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_UpdateDemographicInformation2_InputMessage">
+    <wsdl:part name="part" element="tns:UpdateDemographicInformation2">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_UpdateDemographicInformation2_OutputMessage">
+    <wsdl:part name="part" element="tns:UpdateDemographicInformation2Response">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_PointMCIRecord_InputMessage">
+    <wsdl:part name="part" element="tns:PointMCIRecord">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_PointMCIRecord_OutputMessage">
+    <wsdl:part name="part" element="tns:PointMCIRecordResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_UnpointMCIRecord_InputMessage">
+    <wsdl:part name="part" element="tns:UnpointMCIRecord">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_UnpointMCIRecord_OutputMessage">
+    <wsdl:part name="part" element="tns:UnpointMCIRecordResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_GetClientHistory_InputMessage">
+    <wsdl:part name="part" element="tns:GetClientHistory">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IndividualManagementService_GetClientHistory_OutputMessage">
+    <wsdl:part name="part" element="tns:GetClientHistoryResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:portType name="IndividualManagementService">
+<wsdl:documentation/>
+    <wsdl:operation name="CreateIndividual">
+<wsdl:documentation/>
+      <wsdl:input message="tns:IndividualManagementService_CreateIndividual_InputMessage">
+    </wsdl:input>
+      <wsdl:output message="tns:IndividualManagementService_CreateIndividual_OutputMessage">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetDemographicInformation">
+<wsdl:documentation/>
+      <wsdl:input message="tns:IndividualManagementService_GetDemographicInformation_InputMessage">
+    </wsdl:input>
+      <wsdl:output message="tns:IndividualManagementService_GetDemographicInformation_OutputMessage">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="UpdateDemographicInformation1">
+<wsdl:documentation/>
+      <wsdl:input message="tns:IndividualManagementService_UpdateDemographicInformation1_InputMessage">
+    </wsdl:input>
+      <wsdl:output message="tns:IndividualManagementService_UpdateDemographicInformation1_OutputMessage">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="UpdateDemographicInformation2">
+<wsdl:documentation/>
+      <wsdl:input message="tns:IndividualManagementService_UpdateDemographicInformation2_InputMessage">
+    </wsdl:input>
+      <wsdl:output message="tns:IndividualManagementService_UpdateDemographicInformation2_OutputMessage">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="PointMCIRecord">
+<wsdl:documentation/>
+      <wsdl:input message="tns:IndividualManagementService_PointMCIRecord_InputMessage">
+    </wsdl:input>
+      <wsdl:output message="tns:IndividualManagementService_PointMCIRecord_OutputMessage">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="UnpointMCIRecord">
+<wsdl:documentation/>
+      <wsdl:input message="tns:IndividualManagementService_UnpointMCIRecord_InputMessage">
+    </wsdl:input>
+      <wsdl:output message="tns:IndividualManagementService_UnpointMCIRecord_OutputMessage">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetClientHistory">
+<wsdl:documentation/>
+      <wsdl:input message="tns:IndividualManagementService_GetClientHistory_InputMessage">
+    </wsdl:input>
+      <wsdl:output message="tns:IndividualManagementService_GetClientHistory_OutputMessage">
+    </wsdl:output>
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="WSHttpBinding_ITwoWayAsync" type="tns:IndividualManagementService">
+    <wsp:PolicyReference URI="#WSHttpBinding_ITwoWayAsync_policy"/>
+    <soap12:binding transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="CreateIndividual">
+<wsdl:documentation/>
+      <soap12:operation soapAction="CreateIndividual" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetDemographicInformation">
+<wsdl:documentation/>
+      <soap12:operation soapAction="GetDemographicInformation" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="UpdateDemographicInformation1">
+<wsdl:documentation/>
+      <soap12:operation soapAction="UpdateDemographicInformation1" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="UpdateDemographicInformation2">
+<wsdl:documentation/>
+      <soap12:operation soapAction="UpdateDemographicInformation2" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="PointMCIRecord">
+<wsdl:documentation/>
+      <soap12:operation soapAction="PointMCIRecord" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="UnpointMCIRecord">
+<wsdl:documentation/>
+      <soap12:operation soapAction="UnpointMCIRecord" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetClientHistory">
+<wsdl:documentation/>
+      <soap12:operation soapAction="GetClientHistory" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" encodingStyle="http://www.w3.org/2003/05/soap-encoding"/>
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="BizTalkServiceInstance">
+    <wsdl:port name="WSHttpBinding_ITwoWayAsync" binding="tns:WSHttpBinding_ITwoWayAsync">
+      <soap12:address location="https://testws.state.de.us:1406/dhss/sitcr/IndividualManagementService"/>
+    <wsa10:EndpointReference>
+				<wsa10:Address>https://testws.state.de.us:1406/dhss/sitcr/IndividualManagementService</wsa10:Address>
+			</wsa10:EndpointReference>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>

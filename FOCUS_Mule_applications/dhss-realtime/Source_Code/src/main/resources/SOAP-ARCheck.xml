@@ -1,0 +1,83 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:kids="http://kids.delaware.gov/">
+   <soapenv:Header>
+      <kids:AuthCredentials>
+         <!--Optional:-->
+         <kids:Username>user</kids:Username>
+         <!--Optional:-->
+         <kids:Password>password</kids:Password>
+      </kids:AuthCredentials>
+   </soapenv:Header>
+   <soapenv:Body>
+      <kids:RequestCheck>
+         <!--Optional:-->
+         <kids:request>
+            <!--Optional:-->
+            <kids:RequestID></kids:RequestID>
+            <!--Optional:-->
+            <kids:FirstName1>test</kids:FirstName1>
+            <!--Optional:-->
+            <kids:MiddleName1> </kids:MiddleName1>
+            <!--Optional:-->
+            <kids:LastName1>test</kids:LastName1>
+            <!--Optional:-->
+            <kids:FirstName2> </kids:FirstName2>
+            <!--Optional:-->
+            <kids:MiddleName2> </kids:MiddleName2>
+            <!--Optional:-->
+            <kids:LastName2> </kids:LastName2>
+            <!--Optional:-->
+            <kids:FirstName3> </kids:FirstName3>
+            <!--Optional:-->
+            <kids:MiddleName3> </kids:MiddleName3>
+            <!--Optional:-->
+            <kids:LastName3> </kids:LastName3>
+            <!--Optional:-->
+            <kids:FirstName4> </kids:FirstName4>
+            <!--Optional:-->
+            <kids:MiddleName4> </kids:MiddleName4>
+            <!--Optional:-->
+            <kids:LastName4> </kids:LastName4>
+            <!--Optional:-->
+            <kids:FirstName5> </kids:FirstName5>
+            <!--Optional:-->
+            <kids:MiddleName5> </kids:MiddleName5>
+            <!--Optional:-->
+            <kids:LastName5> </kids:LastName5>
+            <!--Optional:-->
+            <kids:SSN>123456789</kids:SSN>
+            <!--Optional:-->
+            <kids:BirthDate>02/02/1990</kids:BirthDate>
+            <!--Optional:-->
+            <kids:Sex> </kids:Sex>
+            <!--Optional:-->
+            <kids:Race> </kids:Race>
+            <!--Optional:-->
+            <kids:Ethnicity> </kids:Ethnicity>
+            <!--Optional:-->
+            <kids:AgencyName> </kids:AgencyName>
+            <!--Optional:-->
+            <kids:AgencyType> </kids:AgencyType>
+            <!--Optional:-->
+            <kids:AgencyAddrStreet1> </kids:AgencyAddrStreet1>
+            <!--Optional:-->
+            <kids:AgencyAddrStreet2> </kids:AgencyAddrStreet2>
+            <!--Optional:-->
+            <kids:AgencyAddrCity> </kids:AgencyAddrCity>
+            <!--Optional:-->
+            <kids:AgencyAddrState> </kids:AgencyAddrState>
+            <!--Optional:-->
+            <kids:AgencyAddrZip> </kids:AgencyAddrZip>
+            <!--Optional:-->
+            <kids:ContactName> </kids:ContactName>
+            <!--Optional:-->
+            <kids:ContactPhone> </kids:ContactPhone>
+            <!--Optional:-->
+            <kids:ContactExtension> </kids:ContactExtension>
+            <!--Optional:-->
+            <kids:ContactFax> </kids:ContactFax>
+            <!--Optional:-->
+            <kids:ContactEmail> </kids:ContactEmail>
+         </kids:request>
+      </kids:RequestCheck>
+   </soapenv:Body>
+</soapenv:Envelope>

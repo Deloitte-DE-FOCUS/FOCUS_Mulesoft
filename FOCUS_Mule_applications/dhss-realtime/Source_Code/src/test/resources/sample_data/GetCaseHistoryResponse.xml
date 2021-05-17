@@ -1,0 +1,18 @@
+<ns0:GetCaseHistoryResponse xmlns:ns0="http://DHSS/DataServiceHub/MCI/CaseManagement" xmlns:ns3="http://schemas.microsoft.com/2003/10/Serialization/Arrays" xmlns:ns1="http://schemas.datacontract.org/2004/07/System" xmlns:ns2="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:ns4="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+			<ns0:GetCaseHistoryResult>
+				<ns1:m_Item1>3235</ns1:m_Item1>
+				<ns1:m_Item2>
+				
+					<ns1:Program>
+						<PrimaryKey>1234</PrimaryKey>
+						<Department>DSCYF</Department>
+						<DivisionCode>CY</DivisionCode>
+					</ns1:Program>
+					<ns1:Program>
+						<PrimaryKey>12345</PrimaryKey>
+						<Department>DSCYF</Department>
+						<DivisionCode>CYF</DivisionCode>
+					</ns1:Program>
+				</ns1:m_Item2>
+			</ns0:GetCaseHistoryResult>
+		</ns0:GetCaseHistoryResponse>

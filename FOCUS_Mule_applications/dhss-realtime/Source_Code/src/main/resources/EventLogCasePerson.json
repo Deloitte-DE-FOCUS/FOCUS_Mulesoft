@@ -1,0 +1,131 @@
+{
+	"fileFormat": {
+		"charsetName": "UTF-8",
+		"fieldsDelimitedBy": ",",
+		"fieldsEnclosedBy": "\"",
+		"linesTerminatedBy": "\r\n",
+		"numberOfLinesToIgnore" : 1
+	},
+	"objects": [
+		{
+			"connector": "CSV",
+			"fullyQualifiedName": "Eventlog_Caseperson_Dataset_CR0760_csv",
+			"label": "Eventlog_Caseperson_Dataset_CR0760.csv",
+			"name": "Eventlog_Caseperson_Dataset_CR0760_csv",
+			"fields": [
+				{
+					"fullyQualifiedName": "Event_Type",
+					"name": "Event_Type",
+					"type": "Text",
+					"label": "Event_Type"
+				},
+				{
+					"fullyQualifiedName": "Date",
+					"name": "Date",
+					"type": "Date",
+					"label": "Date",
+					"format": "MM/dd/yyyy",
+					"firstDayOfWeek" : -1,
+					"fiscalMonthOffset" : 0,
+					"isYearEndFiscalYear" : true
+				},
+				{
+					"fullyQualifiedName": "URI",
+					"name": "URI",
+					"type": "Text",
+					"label": "URI"
+				},
+				{
+					"fullyQualifiedName": "Salesforce_ID",
+					"name": "Salesforce_ID",
+					"type": "Text",
+					"label": "Salesforce_ID"
+				},
+				{
+					"fullyQualifiedName": "User_ID",
+					"name": "User_ID",
+					"type": "Text",
+					"label": "User_ID"
+				},
+				{
+					"fullyQualifiedName": "User_Name",
+					"name": "User_Name",
+					"type": "Text",
+					"label": "User_Name"
+				},
+				{
+					"fullyQualifiedName": "Page_Name",
+					"name": "Page_Name",
+					"type": "Text",
+					"label": "Page_Name"
+				},
+				{
+					"fullyQualifiedName": "Record_Name",
+					"name": "Record_Name",
+					"type": "Text",
+					"label": "Record_Name"
+				},
+				{
+					"fullyQualifiedName": "Object_Name",
+					"name": "Object_Name",
+					"type": "Text",
+					"label": "Object_Name"
+				},
+				{
+					"fullyQualifiedName": "Client_PID",
+					"name": "Client_PID",
+					"type": "Text",
+					"label": "Client_PID"
+				},
+				{
+					"fullyQualifiedName": "Client_Name",
+					"name": "Client_Name",
+					"type": "Text",
+					"label": "Client_Name"
+				},
+				{
+					"fullyQualifiedName": "Role",
+					"name": "Role",
+					"type": "Text",
+					"label": "Role"
+				},
+				{
+					"fullyQualifiedName": "Status",
+					"name": "Status",
+					"type": "Text",
+					"label": "Status"
+				},
+				{
+					"fullyQualifiedName": "Division_Staff",
+					"name": "Division_Staff",
+					"type": "Text",
+					"label": "Division_Staff"
+				},
+				{
+					"fullyQualifiedName": "Intake_Case_Prov_Num",
+					"name": "Intake_Case_Prov_Num",
+					"type": "Text",
+					"label": "Intake_Case_Prov_Num"
+				},
+				{
+					"fullyQualifiedName": "Intake_Case_Prov_Name",
+					"name": "Intake_Case_Prov_Name",
+					"type": "Text",
+					"label": "Intake_Case_Prov_Name"
+				},
+				{
+					"fullyQualifiedName": "Case_Intake_Div",
+					"name": "Case_Intake_Div",
+					"type": "Text",
+					"label": "Case_Intake_Div"
+				},
+				{
+					"fullyQualifiedName": "Master_Entity",
+					"name": "Master_Entity",
+					"type": "Text",
+					"label": "Master_Entity"
+				}
+			]
+		}
+	]
+}

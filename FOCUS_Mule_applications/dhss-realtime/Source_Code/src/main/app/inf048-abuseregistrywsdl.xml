@@ -1,0 +1,943 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:cxf="http://www.mulesoft.org/schema/mule/cxf" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"	    
+	 
+    xmlns:ss="http://www.springframework.org/schema/security"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/cxf http://www.mulesoft.org/schema/mule/cxf/current/mule-cxf.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/3.1/mule-spring-security.xsd
+http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd">
+  <mulexml:namespace-manager includeConfigNamespaces="true">
+     <mulexml:namespace prefix="s" uri="http://dbcs.delaware.gov/services/"/>
+    <mulexml:namespace prefix="kids" uri="http://kids.delaware.gov/"/>
+    <mulexml:namespace prefix="a" uri="http://schemas.datacontract.org/2004/07/Dhss.Ltcrp.Bcc.ServiceLibrary.Kids"/>
+    
+  </mulexml:namespace-manager>
+   
+    <http:listener-config name="HTTP_Listener_Configuration-check"  host="0.0.0.0" port="${http.port}" basePath="ABRExternalWebService" doc:name="HTTP Listener Configuration">
+        </http:listener-config>
+        <http:listener-config name="HTTP_Listener_Configuration"  host="0.0.0.0" port="${https.port}"  doc:name="HTTP Listener Configuration" protocol="HTTPS" connectionIdleTimeout="120000">
+        <tls:context>
+            <tls:key-store path="clientkeystore.jks" keyPassword="password" password="password"/>
+        </tls:context>
+ 
+        </http:listener-config>
+    <cxf:configuration name="CXF_Configuration" enableMuleSoapHeaders="true" initializeStaticBusInstance="true" doc:name="CXF Configuration"/>
+    <http:request-config name="HTTP_Request_Configuration" host="0.0.0.0" port="${http.port}" basePath="ABRExternalWebService" doc:name="HTTP Request Configuration" >
+        <http:basic-authentication username="#[flowVars.UserId]" password="#[flowVars.Password]" preemptive="true"/>
+        
+    </http:request-config>
+    
+    <spring:beans>
+    <ss:authentication-manager alias="authenticationManager">
+      <ss:authentication-provider>
+        <ss:user-service id="userService">
+          <ss:user name="${abuse.username}" password="${abuse.password}" authorities="ROLE_ADMIN" />
+          <ss:user name="${focus.mci.username}" password="${focus.mci.password}" authorities="ROLE_ADMIN" />
+        </ss:user-service>
+      </ss:authentication-provider>
+    </ss:authentication-manager>
+  </spring:beans>
+ 
+  <mule-ss:security-manager name="muleSecurityManager" doc:name="Spring Security Provider">
+      <mule-ss:delegate-security-provider name="memory-provider" delegate-ref="authenticationManager" />
+  </mule-ss:security-manager>
+   <!--  <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.user}" password="${sfdc.password}" url="${sfdc.url}" doc:name="Salesforce: Basic Authentication" disableSessionInvalidation="true"/> -->
+    <validation:config name="Validation_Configuration" doc:name="Validation Configuration"/>
+    <ws:consumer-config name="DHSS_Abuse_Registry_Notify_Results" wsdlLocation="Abuse_Registry_Outbound.wsdl" service="DscyfService" port="BasicHttpBinding_IDscyfService" serviceAddress="${dhss.abuse.registry.notify.results.url}" doc:name="Web Service Consumer"/>
+    <ws:consumer-config name="Web_Service_Consumer1" wsdlLocation="abuse.wsdl" service="ABRExWS" port="ABRExWSSoap" serviceAddress="http://dhss-realtime.cloudhub.io/ABRExternalWebService/ABRExWS" doc:name="Web Service Consumer"/>
+ 
+	    
+ 
+ 
+    
+    <flow name="soap-on-db-Flow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/ABRExternalWebService/ABRExWS" doc:name="ReceiveHttpRequest"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+             <add-message-property key="UserId" value="#[xpath3('//kids:Username')]"/>
+            <add-message-property key="Password" value="#[xpath3('//kids:Password')]"/>
+             <add-message-property key="SOAPaction" value="#[message.inboundProperties.soapaction]"/>
+            <add-message-property key="OrgPayload" value="#[payload]"/>
+            <add-message-property key="Received" value="#[server.dateTime]"/>
+            <add-message-property key="Status" value="Success"/>
+        </message-properties-transformer>
+        <logger message="Request Received: #[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="RequestAttachment"><![CDATA[%dw 1.0
+%output application/xml	
+%namespace ns0 http://kids.delaware.gov/
+---
+payload.Envelope.Body]]></dw:set-variable>
+        </dw:transform-message>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="AbuseOperation" value="#[flowVars.SOAPaction.substring((flowVars.SOAPaction.lastIndexOf('/') + 1),(flowVars.SOAPaction.length() - 1))]"/>
+            <add-message-property key="TransAttachment" value="#[flowVars.RequestAttachment]"/>
+        </message-properties-transformer>
+
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF048&quot;, &quot;InterfaceName&quot;: &quot;Abuse Registry&quot;, &quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Extension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;#[sessionVars.AbuseOperation]&quot;, &quot;CompletedFilename&quot;: &quot;Request&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}" mimeType="application/json" doc:name="Set Payload"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf048_LOVInbound_Abuse_Subflow" doc:name="inf048_LOVInbound_Abuse_Subflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf048_LOVOutbound_Abuse_Subflow" doc:name="inf048_LOVOutbound_Abuse_Subflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturnedOut]"/>
+        </enricher>
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <flow-ref name="Authenticate" doc:name="Authenticate"/>
+        <logger message="Calling Soap" level="INFO" doc:name="Logger"/>
+ 
+        <!-- <set-property propertyName="soap.security"
+             value="&quot;&lt;wsse:Security xmlns:wsse=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd&quot; xmlns:wsu=&quot;http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd&quot; soap:mustUnderstand=&quot;1&quot;&gt;&lt;wsse:UsernameToken&gt;&lt;wsse:Username&gt;abc&lt;/Username&gt;&lt;wsse:Password&gt;def&lt;/Password&gt;&lt;/wsse:UsernameToken&gt;&lt;/wsse:Security&gt;&quot;"
+             doc:name="Property" /> -->
+        <cxf:proxy-service doc:name="Process SOAP request" namespace="http://kids.delaware.gov/" payload="body" service="ABRExWS" wsdlLocation="abuse.wsdl" configuration-ref="CXF_Configuration" soapVersion="1.2" validationEnabled="true">
+             <cxf:ws-security>
+        <cxf:ws-config>
+        </cxf:ws-config>
+    </cxf:ws-security> 
+    
+        </cxf:proxy-service>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <set-variable variableName="Success" value="True" doc:name="Variable"/>
+        <logger message="#[flowVars.SOAPaction]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        <set-variable variableName="FinalPayload" value="#[payload]" mimeType="application/xml" doc:name="Variable"/>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="ErrorAttachment" value="#[payload]"/>
+            <delete-message-property key="TransAttachment"/>
+        </message-properties-transformer>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF048&quot;, &quot;InterfaceName&quot;: &quot;Abuse Registry&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.Status]&quot;,&quot;RecordCount&quot;:&quot;1&quot;,&quot;RecordSuccess&quot;:&quot;1&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.ErrorDescription != null?flowVars.ErrorDescription:'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.Exception != null?flowVars.ErrorType:'']&quot;,&quot;Extension&quot;:&quot;txt&quot;,&quot;Operation&quot;:&quot;#[sessionVars.AbuseOperation]&quot;,&quot;ErrorFilename&quot;:&quot;Response&quot;,&quot;ErrorExtension&quot;:&quot;txt&quot;}" doc:name="Set Payload"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <set-payload value="#[flowVars.FinalPayload]" doc:name="Set Payload" mimeType="application/xml"/>
+        <logger message="Sending Response:  #[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="Interface-Exception-Strategy-AbuseRegistry" doc:name="Reference Exception Strategy"/>
+        
+    </flow>
+    <sub-flow name="CheckSOAPaction">
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.SOAPaction=='&quot;http://kids.delaware.gov/SimpleTest&quot;']">
+                <flow-ref name="SimpleTest" doc:name="SimpleTest"/>
+            </when>
+            <when expression="#[flowVars.SOAPaction=='&quot;http://kids.delaware.gov/Test&quot;']">
+                <flow-ref name="Test" doc:name="Test"/>
+            </when>
+            <when expression="#[flowVars.SOAPaction=='&quot;http://kids.delaware.gov/RequestCheck&quot;']">
+                <flow-ref name="ARCheckRequest" doc:name="ARCheckRequest"/>
+            </when>
+            <when expression="#[flowVars.SOAPaction=='&quot;http://kids.delaware.gov/RequestCheckStatus&quot;']">
+                <flow-ref name="ARCheckRequestStatus" doc:name="ARCheckRequestStatus"/>
+            </when>
+            <when expression="#[flowVars.SOAPaction=='&quot;http://kids.delaware.gov/RequestCheckOutcome&quot;']">
+                <flow-ref name="RequestCheckOutcome" doc:name="RequestCheckOutcome"/>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	
+		ARError: {
+			ErrorType:'Unknown' when flowVars.ErrorType != null otherwise flowVars.ErrorType,
+			ErrorMessage:'An unknown error occurred.' when flowVars.ErrorDescription != null otherwise flowVars.ErrorDescription
+		}
+		
+		
+}			]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer doc:name="Object to String"/>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <flow name="Authenticate">
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.SOAPaction=='&quot;http://kids.delaware.gov/SimpleTest&quot;']">
+                <logger message="Simple Test" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <http:request config-ref="HTTP_Request_Configuration" path="check" method="POST" doc:name="Invoke usernameToken"/>
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="RequestCheckOutcome">
+        <logger message="RequestCheckOutcome Received : #[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="RequestID" value="#[xpath3('//kids:requestID')]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.RequestID != null and flowVars.RequestID != '' and flowVars.ErrorType == null ]">
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Match_Found__c, Response_Answer__c, Determination_Outcome__c,Processed_Sys_flag__c  from DEL_Child_Protection_Registry__c where External_Request_ID__c='#[flowVars.RequestID]'" doc:name="Salesforce"/>
+                <dw:transform-message metadata:id="1f65ba01-63d0-489e-b10e-a2ad2fb4bb2b" doc:name="Transform Message">
+                    <dw:input-payload mimeType="application/java"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function changeYN(string2) ("Y") when string2 == 'Yes'  otherwise "N" when string2 =='No' otherwise ''
+%function changeReg(string2) ("EL") when string2 == 'Eligible'  otherwise "IE" when string2 =='Ineligible' otherwise ''
+%function changeProcess(string2) ("True") when string2 == 'true'  otherwise "False" when string2 =='false' otherwise ''
+---
+payload map {
+	IsProcessingCompleted:( $.Processed_Sys_flag__c as :boolean) default "",
+	FindingStatus: flowVars.LOVReturnedOut[("MATCH_FOUND-" ++ $.Response_Answer__c)][0] default "N",
+	RegistryStatus: flowVars.LOVReturnedOut[("REGISTRY_STATUS-" ++ $.Determination_Outcome__c)][0] default ""
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <set-variable variableName="OutcomeCPR" value="#[payload]" doc:name="Variable"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Additional_Information__c,CPR_Name__c,Level__c,Notes__c,Number_of_Cases__c,Type__c from DEL_CPR_Match_Data__c where CPR_Name__r.External_Request_ID__c='#[flowVars.RequestID]'" doc:name="Salesforce"/>
+                <dw:transform-message doc:name="RequestCheckOutcomeResponse">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml skipNullOn="everywhere"
+---
+{
+	RequestCheckOutcomeResponse @(xmlns: "http://kids.delaware.gov/"): {
+		RequestCheckOutcomeResult: {
+		IsSuccessful:true as :boolean,
+		ErrorMessages:'',
+		IsProcessingCompleted:flowVars.OutcomeCPR[0].IsProcessingCompleted when flowVars.OutcomeCPR[0].IsProcessingCompleted != null otherwise '' ,
+		FindingStatus:flowVars.OutcomeCPR[0].FindingStatus when flowVars.OutcomeCPR[0].FindingStatus != null otherwise '' ,
+		RegistryStatus:flowVars.OutcomeCPR[0].RegistryStatus when flowVars.OutcomeCPR[0].RegistryStatus != null otherwise '' ,
+			StatusDetails : {( payload map
+				ARStatusDetail: {
+				NumberOfCases:$.Number_of_Cases__c as :number as :string {format:"#"} when $.Number_of_Cases__c != null otherwise '',
+				Type:flowVars.LOVReturnedOut[("TYPE_OF_CASE-" ++ $.Type__c)][0] default "",
+				Level:flowVars.LOVReturnedOut[("LEVEL_OF_CASE-" ++ $.Level__c)][0] default "",
+				Additional:flowVars.LOVReturnedOut[("ADDITIONAL_INFO-" ++ $.Additional_Information__c)][0] default ""
+			})}
+			
+		//Notes:payload[0].Notes__c when payload[0].Notes__c != null otherwise ''
+			
+}
+}
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+            </when>
+            <otherwise>
+                <logger message="Request ID not defined." level="INFO" doc:name="Logger"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml skipNullOn="everywhere"
+
+---
+{
+	RequestCheckOutcomeResponse @(xmlns: "http://kids.delaware.gov/"): {
+		RequestCheckOutcomeResult: {
+		IsSuccessful:false as :boolean,
+		ARError:{
+							ErrorType:'InvalidInput' when flowVars.ErrorType == null otherwise flowVars.ErrorType,
+							ErrorMessage:'An input field is the wrong format or the required field is empty/missing.' when flowVars.ErrorDescription == null otherwise flowVars.ErrorDescription 
+						} 
+			}
+}
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+                <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                    <add-message-property key="ErrorPayload" value="#[payload]"/>
+                    <add-message-property key="Status" value="Error"/>
+                </message-properties-transformer>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="ErrorAttachment" value="#[payload]"/>
+                    <delete-message-property key="TransAttachment"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF048&quot;, &quot;InterfaceName&quot;: &quot;Abuse Registry&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.Status]&quot;,&quot;RecordCount&quot;:&quot;1&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;1&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.ErrorDescription != null?flowVars.ErrorDescription:'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.Exception != null?flowVars.ErrorType:'']&quot;,&quot;ErrorFilename&quot;:&quot;Response&quot;,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;Operation&quot;:&quot;RequestCheckOutcome&quot;}" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+                <set-payload value="#[flowVars.ErrorPayload]" doc:name="Set Payload"/>
+                <expression-filter expression="#[false]" doc:name="Expression"/>
+            </otherwise>
+        </choice>
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+    </flow>
+    <flow name="ARCheckRequestStatus">
+        <logger message="CheckRequestStatus Received :: #[payload]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="RequestID" value="#[xpath3('//kids:requestID')]"/>
+            
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.RequestID != '' and flowVars.ErrorType == null]">
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:Select Processed_Sys_flag__c,DHSS_Response_Ready__c,External_Request_ID__c from DEL_Child_Protection_Registry__c where External_Request_ID__c='#[flowVars.RequestID]'" doc:name="Salesforce"/>
+                <dw:transform-message doc:name="ARCheckRequestStatusReturn" metadata:id="d017054c-7d65-43d8-bc08-7326bdd996ce">
+                    <dw:input-payload mimeType="application/java"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://kids.delaware.gov/
+%namespace xsi http://www.w3.org/2001/XMLSchema-instance 
+%namespace xsd http://www.w3.org/2001/XMLSchema
+%namespace soap http://www.w3.org/2003/05/soap-envelope
+---
+ {
+	RequestCheckStatusResponse @(xmlns: "http://kids.delaware.gov/"): { 
+		RequestCheckStatusResult: {
+		IsSuccessful:true as :boolean,
+		ErrorMessages :'',
+		Status:'Complete' when payload[0].DHSS_Response_Ready__c =='Completed' or payload[0].DHSS_Response_Ready__c =='Sent' otherwise ('InProcess' when (payload[0].DHSS_Response_Ready__c =='In Process' and payload[0].Processed_Sys_flag__c == 'true') otherwise ('InQueue' when (payload[0].DHSS_Response_Ready__c =='In Process' and payload[0].Processed_Sys_flag__c =='false') otherwise 'NotFound'))
+}
+}
+}
+]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer doc:name="Object to String"/>
+            </when>
+            <otherwise>
+                <logger message="No Request ID in Request" level="INFO" doc:name="Logger"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://kids.delaware.gov/
+---
+{
+	ARRequestCheckStatusReturn @(xmlns: "http://kids.delaware.gov/"): {
+		IsSuccessful:false as :boolean,
+		ARError:{
+							ErrorType:'InvalidInput' when flowVars.ErrorType == null otherwise flowVars.ErrorType,
+							ErrorMessage:'An input field is the wrong format or the required field is empty/missing.' when flowVars.ErrorDescription == null otherwise flowVars.ErrorDescription 
+						} 
+		
+			
+}
+
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+                <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                    <add-message-property key="ErrorPayload" value="#[payload]"/>
+                    <add-message-property key="Status" value="Error"/>
+                </message-properties-transformer>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="ErrorAttachment" value="#[payload]"/>
+                    <delete-message-property key="TransAttachment"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF048&quot;, &quot;InterfaceName&quot;: &quot;Abuse Registry&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.Status]&quot;,&quot;RecordCount&quot;:&quot;1&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;1&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.ErrorDescription != null?flowVars.ErrorDescription:'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.Exception != null?flowVars.ErrorType:'']&quot;,&quot;ErrorFilename&quot;:&quot;Response&quot;,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;Operation&quot;:&quot;RequestCheckStatus&quot;}" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+                <set-payload value="#[flowVars.ErrorPayload]" doc:name="Set Payload"/>
+                <expression-filter expression="#[false]" doc:name="Expression"/>
+            </otherwise>
+        </choice>
+
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+    </flow>
+    <flow name="ARCheckRequest">
+        <logger message="CheckRequest Received : #[payload]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.ErrorType == null ]">
+                <validation:all doc:name="Validation">
+                    <validation:validations>
+
+                        <validation:is-not-empty value="#[xpath3('//kids:FirstName1')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:AgencyType')] "/>
+                        <validation:is-not-empty value="#[xpath3('//kids:AgencyName')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:LastName1')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:Sex')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:Race')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:SSN')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:ContactPhone')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:AgencyAddrCity')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:AgencyAddrState')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:ContactName')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:AgencyAddrStreet1')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:AgencyType')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:AgencyAddrZip')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:RequestID')]"/>
+                        <validation:is-not-empty value="#[xpath3('//kids:BirthDate')]"/>
+                    </validation:validations>
+                </validation:all>
+                <dw:transform-message metadata:id="5f0d935d-d3b0-4e20-8d6b-fde06b986e6f" doc:name="Transform Message">
+                    <dw:input-payload mimeType="application/xml"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace ns0 http://kids.delaware.gov/
+---
+[{
+	External_Request_ID__c: payload.ns0#RequestCheck.ns0#request.ns0#RequestID ,
+	Last_Name_1__c: payload.ns0#RequestCheck.ns0#request.ns0#LastName1,
+	First_Name_1__c: payload.ns0#RequestCheck.ns0#request.ns0#FirstName1,
+	Middle_Name_1__c: payload.ns0#RequestCheck.ns0#request.ns0#MiddleName1,
+	SSN__c: payload.ns0#RequestCheck.ns0#request.ns0#SSN,
+	DOB__c: payload.ns0#RequestCheck.ns0#request.ns0#BirthDate as :date {format : "yyyyMMdd"} ,
+	Gender__c: flowVars.LOVReturned[("GENDER-" ++ payload.ns0#RequestCheck.ns0#request.ns0#Sex)][0] default "",
+	Race_Primary__c: flowVars.LOVReturned[("RACE-" ++ payload.ns0#RequestCheck.ns0#request.ns0#Race)][0] default "",
+	Ethnicity__c: flowVars.LOVReturned[("ETHNICITY-" ++ payload.ns0#RequestCheck.ns0#request.ns0#Ethnicity)][0] default "",
+	Agency_Name__c: payload.ns0#RequestCheck.ns0#request.ns0#AgencyName,
+	Agency_Type__c: flowVars.LOVReturned[("AGENCY_TYPE-" ++ payload.ns0#RequestCheck.ns0#request.ns0#AgencyType)][0] default "",
+	Contact_Name__c: payload.ns0#RequestCheck.ns0#request.ns0#ContactName,
+	Contact_Phone__c: payload.ns0#RequestCheck.ns0#request.ns0#ContactPhone,
+	Contact_Email_Address__c: payload.ns0#RequestCheck.ns0#request.ns0#ContactEmail,
+	First_Name_2__c: payload.ns0#RequestCheck.ns0#request.ns0#FirstName2,
+	First_Name_3__c: payload.ns0#RequestCheck.ns0#request.ns0#FirstName3,
+	First_Name_4__c: payload.ns0#RequestCheck.ns0#request.ns0#FirstName4,
+	First_Name_5__c: payload.ns0#RequestCheck.ns0#request.ns0#FirstName5,
+	Last_Name_2__c: payload.ns0#RequestCheck.ns0#request.ns0#LastName2,
+	Last_Name_3__c: payload.ns0#RequestCheck.ns0#request.ns0#LastName3,
+	Last_Name_4__c: payload.ns0#RequestCheck.ns0#request.ns0#LastName4,
+	Last_Name_5__c: payload.ns0#RequestCheck.ns0#request.ns0#LastName5,
+	Middle_Name_2__c: payload.ns0#RequestCheck.ns0#request.ns0#MiddleName2,
+	Middle_Name_3__c: payload.ns0#RequestCheck.ns0#request.ns0#MiddleName3,
+	Middle_Name_4__c: payload.ns0#RequestCheck.ns0#request.ns0#MiddleName4,
+	Middle_Name_5__c: payload.ns0#RequestCheck.ns0#request.ns0#MiddleName5,
+	Source__c:'DHSS',
+	Received_Date__c: flowVars.Received as :datetime,
+	Preferred_Response_Method__c:'External Interface' ,
+	Contact_Fax_Number__c: payload.ns0#RequestCheck.ns0#request.ns0#ContactFax,
+	Contact_Extension__c: payload.ns0#RequestCheck.ns0#request.ns0#ContactExtension,
+	Agency_Address__c: payload.ns0#RequestCheck.ns0#request.ns0#AgencyAddrStreet1
+++ ',' ++ payload.ns0#RequestCheck.ns0#request.ns0#AgencyAddrStreet2
+++ ',' ++ payload.ns0#RequestCheck.ns0#request.ns0#AgencyAddrCity
+++ ',' ++ payload.ns0#RequestCheck.ns0#request.ns0#AgencyAddrState
+++ ',' ++ payload.ns0#RequestCheck.ns0#request.ns0#AgencyAddrZip
+}]]]></dw:set-payload>
+                </dw:transform-message>
+                <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                    <add-message-property key="FirstName" value="#[payload[0].First_Name_1__c]"/>
+                    <add-message-property key="LastName" value="#[payload[0].Last_Name_1__c]"/>
+                    <add-message-property key="DOB" value="#[payload[0].DOB__c]"/>
+                    <add-message-property key="RequestID" value="#[payload[0].External_Request_ID__c]"/>
+                </message-properties-transformer>
+                <sfdc:create config-ref="Salesforce__Basic_Authentication" type="DEL_Child_Protection_Registry__c" doc:name="Salesforce">
+                    <sfdc:objects ref="#[payload]"/>
+                </sfdc:create>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+                <dw:transform-message metadata:id="45591dba-f924-4a3e-94d2-2c34171c7a05" doc:name="ARCheckRequestReturn">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml skipNullOn="everywhere"
+---
+{
+RequestCheckResponse @(xmlns: "http://kids.delaware.gov/"): {
+	RequestCheckResult:{
+				IsSuccessful: true as :boolean  when payload[0].Id != null otherwise false as :boolean,
+				ARError:{
+							ErrorType:'Unknown',
+							ErrorMessage:'An unknown error occurred. ' ++ payload[0].errors[0].message
+						} when payload[0].Id == null otherwise '',
+				RequestReciept: payload[0].Id ,
+				FirstName1: flowVars.FirstName,
+				LastName1: flowVars.LastName,
+				BirthDate: flowVars.DOB as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"}
+			}
+}}
+]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer doc:name="Object to String"/>
+            </when>
+            <otherwise>
+                <dw:transform-message metadata:id="45591dba-f924-4a3e-94d2-2c34171c7a05" doc:name="ARCheckRequestReturn">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml skipNullOn="everywhere"
+---
+{
+RequestCheckResponse @(xmlns: "http://kids.delaware.gov/"): {
+	RequestCheckResult:{
+				IsSuccessful:false as :boolean,
+				ARError:{
+							ErrorType:'InvalidInput' when flowVars.ErrorType == null otherwise flowVars.ErrorType,
+							ErrorMessage:'An input field is the wrong format or the required field is empty/missing.' when flowVars.ErrorDescription == null otherwise flowVars.ErrorDescription 
+						} 
+			}
+}}
+]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+                <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                    <add-message-property key="ErrorPayload" value="#[payload]"/>
+                    <add-message-property key="Status" value="Error"/>
+                </message-properties-transformer>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="ErrorAttachment" value="#[payload]"/>
+                    <delete-message-property key="TransAttachment"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF048&quot;, &quot;InterfaceName&quot;: &quot;Abuse Registry&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.Status]&quot;,&quot;RecordCount&quot;:&quot;1&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;1&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.ErrorDescription != null?flowVars.ErrorDescription:'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.Exception != null?flowVars.ErrorType:'']&quot;,&quot;ErrorFilename&quot;:&quot;Response&quot;,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;Operation&quot;:&quot;Request Check&quot;}" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+                <set-payload value="#[flowVars.ErrorPayload]" doc:name="Set Payload"/>
+                <expression-filter expression="#[false]" doc:name="Expression"/>
+            </otherwise>
+        </choice>
+
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+    </flow>
+    <flow name="inf048-abuseregistrywsdlFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <fixed-frequency-scheduler frequency="60" timeUnit="MINUTES"/>
+            <set-payload value="INF048" doc:name="Set Payload"/>
+
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="Variable"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Name, External_Request_ID__c,DHSS_Response_Ready__c from DEL_Child_Protection_Registry__c where DHSS_Response_Ready__c='Completed' and source__c ='DHSS'" doc:name="Salesforce"/>
+        <dw:transform-message metadata:id="312d6a77-6b3d-40f2-9609-316258861bb1" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+	ID: $.Id,
+	Name: $.Name,
+	Response:$.DHSS_Response_Ready__c,
+	ExternalID:$.External_Request_ID__c
+}
+	]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression"/>
+
+        <message-properties-transformer scope="invocation" doc:name="MP: Save Payload">
+            <add-message-property key="PayloadForID" value="#[payload]"/>
+        </message-properties-transformer>
+        <logger message="calling SimpleTest" level="INFO" doc:name="Logger"/>
+        <ws:consumer config-ref="DHSS_Abuse_Registry_Notify_Results" operation="SimpleTest" doc:name="Web Service Consumer_Call SimpleTest"/>
+
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[xpath3('//s:SimpleTestResult') contains &quot;Request successful&quot;]">
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://dbcs.delaware.gov/services/
+%namespace ns1 http://schemas.datacontract.org/2004/07/Dhss.Ltcrp.Bcc.ServiceLibrary
+---
+{
+	ns0#Test: {
+		ns0#authCredentials: {
+			ns1#Password: p('dhss.abuse.registry.notify.results.password'),
+			ns1#Username: p('dhss.abuse.registry.notify.results.username')
+		}
+	}
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <ws:consumer config-ref="DHSS_Abuse_Registry_Notify_Results" operation="Test" doc:name="Web Service Consumer_Call Test"/>
+                <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+                <logger message="TEST::#[payload]" level="INFO" doc:name="Logger"/>
+                <choice doc:name="Choice">
+                    <when expression="#[xpath3('//a:IsSuccessful') == &quot;true&quot;]">
+                        <logger message="Test: Choice Router Passed : #[xpath3('//a:IsSuccessful')]" level="INFO" doc:name="Logger"/>
+                        <set-payload value="#[flowVars.PayloadForID]" mimeType="application/java" doc:name="Set Payload"/>
+                        <logger message="IDS #[payload]" level="INFO" doc:name="Logger"/>
+
+                    </when>
+                    <otherwise>
+                        <logger message="#['Test: Choice Router Failed']" level="INFO" doc:name="Logger"/>
+                        <logger message="#[xpath3('//a:IsSuccessful')]" level="INFO" doc:name="Logger"/>
+                        <message-properties-transformer scope="session" doc:name="MP: Set Error Details">
+                    <add-message-property key="ErrorDescription" value="DHSS Credentials either expired or Invalid"/>
+                    <add-message-property key="DHSS_Operation" value="Test"/>
+                </message-properties-transformer>
+                <flow-ref name="inf048-abuseregistry_LogException" doc:name="inf048-abuseregistry_LogException"/>
+                <expression-filter expression="#[false]" doc:name="Expression"/>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <logger message="#['SimpleTest: Choice Router Failed ']" level="INFO" doc:name="Logger"/>
+
+                <message-properties-transformer scope="session" doc:name="MP: Set Error Details">
+                    <add-message-property key="ErrorDescription" value="Unable to Connect DHSS Abuse Registry endpoint URL"/>
+                    <add-message-property key="DHSS_Operation" value="SimpleTest"/>
+                </message-properties-transformer>
+                <flow-ref name="inf048-abuseregistry_LogException" doc:name="inf048-abuseregistry_LogException"/>
+                <expression-filter expression="#[false]" doc:name="Expression"/>
+            </otherwise>
+        </choice>
+
+        <foreach doc:name="For Each" collection="#[payload]">
+            <logger message="Calling Notify Result #[payload]" level="INFO" doc:name="Logger"/>
+            <message-properties-transformer scope="invocation" doc:name="MP: Store FOCUS IDs">
+                <add-message-property key="SFDCID" value="#[payload.ID]"/>
+                <add-message-property key="SFDCNAME" value="#[payload.Name]"/>
+            </message-properties-transformer>
+            <logger message="SFDCID #[flowVars.SFDCID] :: SFDCNAME #[flowVars.SFDCNAME]" level="INFO" doc:name="Logger"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://dbcs.delaware.gov/services/
+%namespace ns1 http://schemas.datacontract.org/2004/07/Dhss.Ltcrp.Bcc.ServiceLibrary
+%namespace ns2 http://schemas.datacontract.org/2004/07/Dhss.Ltcrp.Bcc.ServiceLibrary.Kids
+---
+{
+	ns0#NotifyResultReady: {
+		ns0#authCredentials: {
+			ns1#Password: p('dhss.abuse.registry.notify.results.password'),
+			ns1#Username: p('dhss.abuse.registry.notify.results.username')
+		},
+		ns0#resultReady: {
+			ns2#RequestID: payload.ExternalID
+		}
+	}
+}]]></dw:set-payload>
+                <dw:set-variable variableName="NotifyRequestPayload"><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://dbcs.delaware.gov/services/
+%namespace ns1 http://schemas.datacontract.org/2004/07/Dhss.Ltcrp.Bcc.ServiceLibrary
+%namespace ns2 http://schemas.datacontract.org/2004/07/Dhss.Ltcrp.Bcc.ServiceLibrary.Kids
+---
+{
+	ns0#NotifyResultReady: {
+		ns0#authCredentials: {
+			ns1#Password: "***********",
+			ns1#Username: p('dhss.abuse.registry.notify.results.username')
+		},
+		ns0#resultReady: {
+			ns2#RequestID: payload.ExternalID
+		}
+	}
+}]]></dw:set-variable>
+            </dw:transform-message>
+
+            <logger message="Notify Request #[payload]" level="INFO" doc:name="Logger"/>
+
+            <ws:consumer config-ref="DHSS_Abuse_Registry_Notify_Results" operation="NotifyResultReady" doc:name="Web Service Consumer"/>
+            <enricher doc:name="Message Enricher">
+                <flow-ref name="NotifyResult_LogTransaction_In_Progress" doc:name="NotifyResult_LogTransaction_In_Progress"/>
+                <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            </enricher>
+            <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+            <logger message="Notify Result:: #[payload]" level="INFO" doc:name="Logger"/>
+
+            <choice doc:name="Choice">
+                <when expression="#[xpath3('//a:IsSuccessful') == &quot;true&quot;]">
+                    <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+                    <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties">
+                        <add-message-property key="Success" value="#[1]"/>
+                        <add-message-property key="Status" value="Success"/>
+                        <add-message-property key="Error" value="#[0]"/>
+                        <add-message-property key="ErrorDescription" value="#['']"/>
+                        <add-message-property key="NotifyResponsePayload" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <dw:transform-message doc:name="TM: Prepare FOCUS Update message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	Id:flowVars.SFDCID,
+	Name: flowVars.SFDCNAME
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Concatinate FOCUS Payload">
+                        <dw:set-variable variableName="FOCUSPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.FOCUSPayload default {}) ++ (payload default {})]]></dw:set-variable>
+                    </dw:transform-message>
+                </when>
+                <otherwise>
+                    <logger message="Not Succesful" level="INFO" doc:name="Logger"/>
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                        <add-message-property key="Success" value="#[0]"/>
+                        <add-message-property key="Status" value="Error"/>
+                        <add-message-property key="Error" value="#[1]"/>
+                        <add-message-property key="ErrorDescription" value="Transaction was not successfull, check the response file for more details."/>
+                        <add-message-property key="NotifyResponsePayload" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+            <enricher doc:name="Message Enricher">
+                <flow-ref name="NotifyResult_LogTransaction_Complete" doc:name="NotifyResult_LogTransaction_Complete"/>
+                <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            </enricher>
+
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </foreach>
+        <foreach collection="#[flowVars.FOCUSPayload]" batchSize="200" doc:name="For Each">
+            <dw:transform-message doc:name="TM: Convert Consumer Iterator to JAVA">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.*payload]]></dw:set-payload>
+            </dw:transform-message>
+            <set-variable variableName="BeforeUpdatePayload" value="#[payload]" mimeType="application/java" doc:name="FV: Save Before Update Payload"/>
+            <dw:transform-message doc:name="TM: Final Payload without Name field">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+	Id:$.Id,
+	DHSS_Response_Ready__c:'Sent'
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <logger message="Before Salesforce Update #[payload]" level="INFO" doc:name="Logger"/>
+            <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Child_Protection_Registry__c" doc:name="Salesforce">
+                <sfdc:objects ref="#[payload]"/>
+            </sfdc:update>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header = false
+---
+payload map
+{
+	FOCUSID: flowVars.BeforeUpdatePayload[$$].Name,
+	ErrorDescription: $.errors[0].message
+} filter ($.ErrorDescription != null and $.ErrorDescription != "")]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer doc:name="Object to String"/>
+            <logger message="After Salesforce Update Step #[payload]" level="INFO" doc:name="Logger"/>
+            <set-variable variableName="AddErrorOutput" value="#[((payload != null &amp;&amp; payload != &quot;&quot;) &amp;&amp; (flowVars.AddErrorOutput != null &amp;&amp; flowVars.AddErrorOutput != &quot;&quot;))  ? (payload + flowVars.AddErrorOutput) : (payload != null &amp;&amp; payload != &quot;&quot; ? payload : flowVars.AddErrorOutput)]" mimeType="application/csv" doc:name="Variable"/>
+        </foreach>
+        <logger message="After for each update #[payload] FlowVars Result #[[flowVars.AddErrorOutput ]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.AddErrorOutput != null &amp;&amp; flowVars.AddErrorOutput != &quot;&quot;]">
+                <message-properties-transformer scope="session" doc:name="Message Properties">
+                    <add-message-property key="ErrorAttachment" value="#[&quot;CPR Record Name, Error Description&quot; + &quot;\n&quot; + flowVars.AddErrorOutput]"/>
+                    <add-message-property key="DHSS_Operation" value="NotifyResults"/>
+                    <add-message-property key="ErrorDescription" value="See Attached file for more details"/>
+                </message-properties-transformer>
+                <logger message="session Var Error Attachment #[sessionVars.ErrorAttachment] #[payload]" level="INFO" doc:name="Logger"/>
+                <flow-ref name="inf048-abuseregistry_LogException" doc:name="inf048-abuseregistry_LogException"/>
+            </when>
+            <otherwise>
+                <logger message="Either NotifyResults transaction is failed or all records status is updated successfully" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+    <sub-flow name="inf048-abuseregistry_LogException">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF048&quot;, &quot;InterfaceName&quot;: &quot;Abuse Registry&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId + '_1']&quot;,&quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.ErrorDescription]&quot;,&quot;ExceptionType&quot;:&quot;System&quot;,&quot;Operation&quot;:&quot;#[sessionVars.DHSS_Operation]&quot;} " mimeType="application/json" doc:name="Set Payload"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="After creating Transaction #[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <flow name="Test">
+        <dw:transform-message doc:name="Test">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace soap http://kids.delaware.gov/
+---
+{
+	TestResponse: {
+		IsSuccessful:true as :boolean,
+		ARError:{
+							ErrorType:'' when flowVars.ErrorType == null otherwise flowVars.ErrorType,
+							ErrorMessage:'' when flowVars.ErrorDescription == null otherwise flowVars.ErrorDescription 
+						} 
+		
+			
+}
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="Test :: #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="SimpleTest">
+       <dw:transform-message doc:name="SimpleTest">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace soap http://kids.delaware.gov/
+%namespace xsi http://www.w3.org/2001/XMLSchema-instance 
+%namespace xsd http://www.w3.org/2001/XMLSchema
+---
+{
+	SimpleTestResponse: {
+		SimpleTestResult:'True'
+			
+}
+
+}]]></dw:set-payload>
+                </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+                <logger message="Simple Test :: #[payload]" level="INFO" metadata:id="9db6e51d-18b7-47f5-9d37-3086e82ac384" doc:name="Logger"/>
+    </flow>
+    <flow name="wsdl-abuseFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration-check" path="/check" allowedMethods="POST" doc:name="HTTP"/>
+        <http:basic-security-filter realm="mule-realm"/>
+        <logger level="INFO" doc:name="Logger" message="&quot;Login Succesfull&quot; #[payload]"/>
+    </flow>
+    <choice-exception-strategy name="Interface-Exception-Strategy-AbuseRegistry">
+        <catch-exception-strategy when="#[exception.causedBy(org.springframework.security.authentication.BadCredentialsException)]" doc:name="SocketTimeout Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unavailable"/>
+                <add-message-property key="ErrorDescription" value="The system is not available."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error Generated : #[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.extension.validation.api.MultipleValidationException)]" doc:name="Validation Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="InvalidInput"/>
+                <add-message-property key="ErrorDescription" value="An input field is the wrong format or the required field is empty/missing."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error Generated :: #[flowVars.ErrorType] + '\n' +  #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload" mimeType="application/xml"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(java.io.IOException)]" doc:name="FileAlreadyException Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unknown"/>
+                <add-message-property key="ErrorDescription" value="An unknown error occurred."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error Generated :: #[flowVars.ErrorType] + '\n' +  #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.api.ConnectionException)]" doc:name="SFDC Connection Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unavailable"/>
+                <add-message-property key="ErrorDescription" value="The system is not available."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error Generated ::  #[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(com.mulesoft.weave.mule.exception.WeaveExecutionException)]" doc:name="Dataweave Exception Strategy">
+           <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Invalid Input"/>
+                <add-message-property key="ErrorDescription" value="An input field is the wrong format or the required field is empty/missing."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.NotAcceptableException)]" doc:name="406">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unknown"/>
+                <add-message-property key="ErrorDescription" value="An unknown error occurred."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' +  #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.BadRequestException)]" doc:name="400">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unknown"/>
+                <add-message-property key="ErrorDescription" value="An unknown error occurred."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="#[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.http.internal.request.ResponseValidatorException)]" doc:name="401">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="AuthenticationError"/>
+                <add-message-property key="ErrorDescription" value="Authentication header was missing, username or password in header is missing or username and password is invalid or unauthorized."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.NotFoundException)]" doc:name="404">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unknown"/>
+                <add-message-property key="ErrorDescription" value="An unknown error occurred."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.MethodNotAllowedException)]" doc:name="415">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unknown"/>
+                <add-message-property key="ErrorDescription" value="An unknown error occurred."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.UnsupportedMediaTypeException)]" doc:name="405">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unavailable"/>
+                <add-message-property key="ErrorDescription" value="The system is not available."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.modules.salesforce.exception.SalesforceException)]" doc:name="SFDC Internal Connection Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unavailable"/>
+                <add-message-property key="ErrorDescription" value="The system is not available."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' + #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.xml.sax.SAXParseException)]" doc:name="XML Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Invalid Input"/>
+                <add-message-property key="ErrorDescription" value="An input field is the wrong format or the required field is empty/missing."/>
+                <add-message-property key="Status" value="Error"/>
+
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' +  #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload != null?flowVars.OrgPayload:payload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+
+        </catch-exception-strategy>
+        <catch-exception-strategy  doc:name="General Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ErrorType" value="Unknown"/>
+                <add-message-property key="ErrorDescription" value="An unknown error occurred."/>
+                <add-message-property key="Status" value="Error"/>
+            </message-properties-transformer>
+            <logger message="Error:Generated :: #[flowVars.ErrorType] + '\n' +  #[flowVars.ErrorDescription]" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.OrgPayload != null?flowVars.OrgPayload:payload]" doc:name="Set Payload"/>
+            <flow-ref name="CheckSOAPaction" doc:name="CheckSOAPaction"/>
+        </catch-exception-strategy>
+
+    </choice-exception-strategy>
+<sub-flow name="inf048_LOVInbound_Abuse_Subflow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'GENDER','RACE','ETHNICITY','AGENCY_TYPE'&quot;}" mimeType="application/json" doc:name="Set Payload : Picklist values and direction"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+    <sub-flow name="inf048_LOVOutbound_Abuse_Subflow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'MATCH_FOUND','REGISTRY_STATUS','TYPE_OF_CASE','LEVEL_OF_CASE','ADDITIONAL_INFO'&quot;}" mimeType="application/json" doc:name="Set Payload : Picklist values and direction"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>  
+      <sub-flow name="NotifyResult_LogTransaction_In_Progress">
+        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+            <add-message-property key="TransAttachment" value="#[flowVars.NotifyRequestPayload]"/>
+        </message-properties-transformer>
+        <set-payload doc:name="Set Payload" value="{&quot;InterfaceID&quot;: &quot;INF048&quot;, &quot;InterfaceName&quot;: &quot;Abuse Registry&quot;, &quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Extension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;NotifyResult&quot;, &quot;CompletedFilename&quot;: &quot;NotifyRequest&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="TID after In Progress :::#[sessionVars.TID]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="NotifyResult_LogTransaction_Complete">
+        <message-properties-transformer  scope="session" doc:name="Message Properties" overwrite="true">
+            <add-message-property key="TID" value="#[sessionVars.TID]"/>
+            <add-message-property key="ErrorAttachment" value="#[flowVars.NotifyResponsePayload]"/>
+        </message-properties-transformer>
+        <logger message="TID::#[sessionVars.TID] ::: TID :::#[sessionVars.TID] before completed" level="INFO" doc:name="Logger"/>
+        <set-payload doc:name="Set Payload" value="{&quot;InterfaceID&quot;: &quot;INF048&quot;, &quot;InterfaceName&quot;: &quot;Abuse Registry&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.Status]&quot;,&quot;RecordCount&quot;:&quot;1&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.Success]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.Error]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.ErrorDescription]&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.Exception != null?flowVars.ErrorType:'']&quot;,&quot;Extension&quot;:&quot;txt&quot;,&quot;Operation&quot;:&quot;NotifyResultReady&quot;,&quot;ErrorFilename&quot;:&quot;NotifyResponse&quot;,&quot;ErrorExtension&quot;:&quot;txt&quot;}"/>
+        <logger message="JSON : #[payload]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+    </sub-flow>   
+</mule>

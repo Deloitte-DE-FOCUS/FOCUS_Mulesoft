@@ -1,0 +1,45 @@
+{
+	"fileFormat": {
+      "charsetName": "UTF-8",
+      "fieldsDelimitedBy": ",",
+      "fieldsEnclosedBy": "\"",
+      "linesTerminatedBy": "\r\n",
+      "numberOfLinesToIgnore": 1
+	},
+	"objects": [{
+		"connector": "CSV",
+		"fullyQualifiedName": "EventTypeDashboard_csv",
+		"label": "EventTypeDashboard.csv",
+		"name": "EventTypeDashboard_csv",
+		"fields": [{
+			"fullyQualifiedName": "Report_Name",
+			"name": "Report_Name",
+			"type": "Text",
+			"label": "Report Name"
+		}, {
+			"fullyQualifiedName": "User_Name",
+			"name": "User_Name",
+			"type": "Text",
+			"label": "User Name"
+		}, {
+			"fullyQualifiedName": "Date",
+			"name": "Date",
+			"type": "Date",
+			"label": "Date",
+			"format": "MM/dd/yyyy",
+            "firstDayOfWeek" : -1,
+            "fiscalMonthOffset" : 0,
+            "isYearEndFiscalYear" : true
+		}, {
+			"fullyQualifiedName": "URI",
+			"name": "URI",
+			"type": "Text",
+			"label": "URI"
+		}, {
+			"fullyQualifiedName": "Event_Type",
+			"name": "Event_Type",
+			"type": "Text",
+			"label": "Event Type"
+		}]
+	}]
+}

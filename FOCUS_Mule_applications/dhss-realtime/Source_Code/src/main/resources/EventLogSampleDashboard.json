@@ -1,0 +1,108 @@
+{
+	"fileFormat": {
+		"charsetName": "UTF-8",
+		"fieldsDelimitedBy": ",",
+		"fieldsEnclosedBy": "\"",
+		"linesTerminatedBy": "\r\n",
+		"numberOfLinesToIgnore" : 1
+	},
+	"objects": [
+		{
+			"connector": "CSV",
+			"fullyQualifiedName": "Eventlog_Dataset_csv",
+			"label": "Eventlog_Dataset.csv",
+			"name": "Eventlog_Dataset_csv",
+			"fields": [
+				{
+					"fullyQualifiedName": "External_Id",
+					"name": "External_Id",
+					"type": "Text",
+					"label": "External Id",
+					"isUniqueId" : true
+				},
+				{
+					"fullyQualifiedName": "Date",
+					"name": "Date",
+					"type": "Date",
+					"label": "Date",
+					"format": "MM/dd/yyyy hh:mm:ss a",
+					"firstDayOfWeek" : -1,
+					"fiscalMonthOffset" : 0,
+					"isYearEndFiscalYear" : true
+				},
+				{
+					"fullyQualifiedName": "URI",
+					"name": "URI",
+					"type": "Text",
+					"label": "URI"
+				},
+				{
+					"fullyQualifiedName": "Salesforce_ID",
+					"name": "Salesforce_ID",
+					"type": "Text",
+					"label": "Salesforce ID"
+				},
+				{
+					"fullyQualifiedName": "Page_Name",
+					"name": "Page_Name",
+					"type": "Text",
+					"label": "Page Name "
+				},
+				{
+					"fullyQualifiedName": "User_ID",
+					"name": "User_ID",
+					"type": "Text",
+					"label": "User ID"
+				},
+				{
+					"fullyQualifiedName": "Event_Type",
+					"name": "Event_Type",
+					"type": "Text",
+					"label": "Event Type"
+				},
+				{
+					"fullyQualifiedName": "Object_Name",
+					"name": "Object_Name",
+					"type": "Text",
+					"label": "Object Name"
+				},
+				{
+					"fullyQualifiedName": "Record_Name",
+					"name": "Record_Name",
+					"type": "Text",
+					"label": "Record Name"
+				},
+				{
+					"fullyQualifiedName": "User_Name",
+					"name": "User_Name",
+					"type": "Text",
+					"label": "User Name"
+				},
+				{
+					"fullyQualifiedName": "Entity_Name",
+					"name": "Entity_Name",
+					"type": "Text",
+					"label": "Entity Name"
+				},
+				{
+					"fullyQualifiedName": "Intake_Case_Provider_ID",
+					"name": "Intake_Case_Provider_ID",
+					"type": "Text",
+					"label": "Intake/Case/Provider ID"
+				},
+				{
+					"fullyQualifiedName": "Intake_Case_Provider_Name",
+					"name": "Intake_Case_Provider_Name",
+					"type": "Text",
+					"label": "Intake/Case/Provider Name"
+				},
+				{
+					"fullyQualifiedName": "Division_Staff",
+					"name": "Division_Staff",
+					"type": "Text",
+					"label": "Division Staff"
+				}
+			]
+		}
+	]
+}

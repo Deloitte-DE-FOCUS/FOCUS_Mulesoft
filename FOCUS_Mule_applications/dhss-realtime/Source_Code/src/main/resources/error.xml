@@ -1,0 +1,7 @@
+<ns0:ARReturn xmlns:ns0="http://kids.delaware.gov/" xmlns="http://kids.delaware.gov/">
+   <IsSuccessful>False</IsSuccessful>
+   <ARError>
+      <ErrorType>AuthenticationError</ErrorType>
+      <ErrorMessage>Authentication header was missing, username or password in header is missing or username and password is invalid or unauthorized.</ErrorMessage>
+   </ARError>
+</ns0:ARReturn>

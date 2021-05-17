@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "IndividCaseMgmtServiceConsumer",
+            "typeId": "AddCaseHistory"
+        }
+    },
+    "id": "622eda8a-a2ad-44b8-9bba-d522a32ed3f0",
+    "version": "5.2.0.0"
+}

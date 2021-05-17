@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ns0:GetDemographicInformationResponse xmlns:ns0="http://DHSS/DataServiceHub/MCI/IndividualManagement" xmlns:a="http://www.w3.org/2005/08/addressing" xmlns:ns1="http://schemas.microsoft.com/2003/10/Serialization/" xmlns:ns2="http://schemas.microsoft.com/2003/10/Serialization/Arrays" xmlns:ns3="http://schemas.datacontract.org/2004/07/System" xmlns:ns4="http://schemas.datacontract.org/2004/07/Dhss.Common.MasterClientIndex.Services.BusinessEntities" xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+   <ns0:GetDemographicInformationResult>
+      <ns3:m_Item1>
+         <ns4:Age>67</ns4:Age>
+         <ns4:CitizenshipCode>C</ns4:CitizenshipCode>
+         <ns4:CorrectMCINumber xsi:nil="true" />
+         <ns4:CreateDate>1993-01-20T00:00:00</ns4:CreateDate>
+         <ns4:CreateWorker>HSOAU13</ns4:CreateWorker>
+         <ns4:DateOfBirth>1949-09-09T00:00:00</ns4:DateOfBirth>
+         <ns4:DateOfDeath xsi:nil="true" />
+         <ns4:DeathVerification xsi:nil="true" />
+         <ns4:FirstName>PRISCILLA</ns4:FirstName>
+         <ns4:LastName>ORTIZ</ns4:LastName>
+         <ns4:LastUpdatedDate>2014-10-21T00:00:00</ns4:LastUpdatedDate>
+         <ns4:LastWorkerID>KDOPO01</ns4:LastWorkerID>
+         <ns4:MCINumber>737754</ns4:MCINumber>
+         <ns4:MaritalStatusCode>D</ns4:MaritalStatusCode>
+         <ns4:MiddleName xsi:nil="true" />
+         <ns4:PointedMCISwitch xsi:nil="true" />
+         <ns4:SchoolCode xsi:nil="true" />
+         <ns4:SexCode>F</ns4:SexCode>
+         <ns4:SuffixName xsi:nil="true" />
+      </ns3:m_Item1>
+      <ns3:m_Item2>
+         <ns4:Race>
+            <ns4:CreateDate>1993-01-20T00:00:00</ns4:CreateDate>
+            <ns4:CreateWorker>HSOAU13</ns4:CreateWorker>
+            <ns4:LastUpdatedDate>2014-10-21T00:00:00</ns4:LastUpdatedDate>
+            <ns4:LastWorkerID>KDOPO01</ns4:LastWorkerID>
+            <ns4:PrimaryFlag>true</ns4:PrimaryFlag>
+            <ns4:RaceCode>HS</ns4:RaceCode>
+         </ns4:Race>
+      </ns3:m_Item2>
+      <ns3:m_Item3>
+         <ns4:SocialSecurityNumber>
+            <ns4:CreateDate>1993-01-20T00:00:00</ns4:CreateDate>
+            <ns4:CreateWorker>XHSOAU1</ns4:CreateWorker>
+            <ns4:LastUpdatedDate>1993-01-20T00:00:00</ns4:LastUpdatedDate>
+            <ns4:LastWorkerID>XHSOAU1</ns4:LastWorkerID>
+            <ns4:PrimaryFlag>true</ns4:PrimaryFlag>
+            <ns4:PrimaryKey>00000000-0000-0000-0000-000000000000</ns4:PrimaryKey>
+            <ns4:SSAVerification xsi:nil="true" />
+            <ns4:SSN>100529908</ns4:SSN>
+         </ns4:SocialSecurityNumber>
+      </ns3:m_Item3>
+      <ns3:m_Item4 />
+   </ns0:GetDemographicInformationResult>
+</ns0:GetDemographicInformationResponse>
