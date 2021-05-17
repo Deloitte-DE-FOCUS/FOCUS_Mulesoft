@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "StudentInfo53"
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "62030c49-ea5b-4485-b0d6-1a7bd0332421",
+    "version": "5.2.0.0"
+}

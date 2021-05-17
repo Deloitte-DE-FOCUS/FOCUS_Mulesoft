@@ -1,0 +1,24 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "DOEStarsLoadMap"
+        },
+        "flowVariables": {
+            "BeforeQueryPayload": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "DOEStarsLoadMap"
+            }
+        }
+    },
+    "outputMessageMetadata": {
+        "flowVariables": {
+            "FinalXML": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "StarsLoadXML"
+            }
+        }
+    },
+    "id": "ec2684ff-3f6b-4b89-91ff-038304b638ce",
+    "version": "5.2.0.0"
+}

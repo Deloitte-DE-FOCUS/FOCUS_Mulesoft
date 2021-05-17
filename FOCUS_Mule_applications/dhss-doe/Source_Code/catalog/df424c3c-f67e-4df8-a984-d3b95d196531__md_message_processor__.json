@@ -1,0 +1,17 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "CSV"
+        },
+        "flowVariables": {
+            "MCImissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "CSV"
+            }
+        }
+    },
+    "id": "df424c3c-f67e-4df8-a984-d3b95d196531",
+    "version": "5.2.0.0"
+}

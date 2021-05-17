@@ -1,0 +1,625 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/objectstore
+http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd">
+
+	<configuration doc:name="Configuration">
+    <expression-language>
+     	<global-functions> def matchSoundexCode(string1,string2) {
+     		org.apache.commons.codec.language.Soundex soundexInstance = new org.apache.commons.codec.language.Soundex();
+			return ( (string1 != null) &amp;&amp; (string2 != null) &amp;&amp; (soundexInstance.soundex(string1)).equals( soundexInstance.soundex(string2) ));
+		}
+		def phoneticMatch(string1,string2) {
+			org.apache.lucene.search.spell.LevenshteinDistance levenshteinDistance = new org.apache.lucene.search.spell.LevenshteinDistance();
+
+			return ( (string1 != null) &amp;&amp; (string2 != null) &amp;&amp;  (java.lang.Math.round( ( (java.lang.Math.max(string1.length(), string2.length())) - ( (java.lang.Math.max(string1.length(), string2.length())) *  ( levenshteinDistance.getDistance(string1,string2) ) ) )) &lt;=2) )
+		}
+		
+		def firstDateOfMonth(date)
+		{
+			java.util.Calendar cal = java.util.Calendar.getInstance();
+			cal.setTime(date);
+        	cal.set(java.util.Calendar.DAY_OF_MONTH, cal.getActualMinimum(java.util.Calendar.DAY_OF_MONTH));
+        	return cal.getTime();
+		}
+
+		def lastDateOfMonth(date)
+		{
+			java.util.Calendar cal = java.util.Calendar.getInstance();
+			cal.setTime(date);
+        	cal.set(java.util.Calendar.DAY_OF_MONTH, cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH));
+        	return cal.getTime();
+		}
+		def isDateInDST(date,TimeZoneID) { return java.util.TimeZone.getTimeZone(TimeZoneID).inDaylightTime(date);  }
+     	</global-functions> 
+    </expression-language>  
+    </configuration>
+
+<!-- 	<spring:beans>
+		<spring:bean id="Solr-Duplicate-Id-Report_Object_Store"
+			class="org.mule.util.store.SimpleMemoryObjectStore"></spring:bean>
+		<spring:bean id="Solr-Duplicate-Id-Report_Error_Object_Store"
+			class="org.mule.util.store.SimpleMemoryObjectStore"></spring:bean>
+	</spring:beans> -->
+
+<!-- 	<objectstore:config name="Solr-Duplicate-Id-Report_Object_Store__Connector"
+		doc:name="ObjectStore: Connector" objectStore-ref="Solr-Inititial-Load_Object_Store" />
+	<objectstore:config name="Solr-Duplicate-Id-Report_Error_Object_Store__Connector"
+		doc:name="ObjectStore: Connector" objectStore-ref="Solr-Inititial-Load_Error_Object_Store" />
+ -->
+
+<!--     <http:request-config name="HTTP_temp_configuration" host="dhss-realtime.cloudhub.io" port="443" 
+		doc:name="HTTP Temp Configuration" protocol="HTTPS" responseTimeout="180000"/> -->
+
+	<http:request-config name="HTTP_Request_Solr_Configuration"
+		host="${solr.host}" port="${solr.port}" basePath="${solr.path}"
+		doc:name="HTTP Request Configuration" protocol="HTTPS">
+		<http:basic-authentication username="${solr.dss.auth.userName}"
+			password="${solr.dss.auth.pwd}" preemptive="true" />
+	</http:request-config>
+
+    <sub-flow name="duplicate_id_reporting_webservice_find_duplicates_on_personset_SubFlow">
+
+                    <set-variable variableName="reportResultData" value="#[dw(&quot;[]&quot;)]" doc:name="Initialize Final Result variable" doc:description="Initialize Final Result variable"/>
+                    <set-variable variableName="duplicatePersonCount" value="#[dw(&quot;0 as :number&quot;)]" doc:name="Variable : Initialize Count of Duplicate Persons" doc:description="Initialize Count of Duplicate Persons"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate over each Contact of the Month">
+            			<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message" doc:description="Remove Root Message to avid unneccessary Serialization"/>
+                        <flow-ref name="duplicate_id_reporting_webservice_find_duplicates_per_person_SubFlow" doc:name="duplicate_id_reporting_webservice_find_duplicates_per_person_SubFlow" doc:description="Invoke Flow which will find duplicates person"/>
+        			</foreach>
+                    <choice doc:name="Choice : Check If Any Records are present" doc:description="Check if any records are present">
+                        <when expression="#[dw(&quot; (sizeOf flowVars.reportResultData) == 0 &quot;)]">
+                            <logger message="No Duplicates found in this Batch" level="INFO" doc:name="Logger"/>
+                        </when>
+                        <otherwise>
+                            <logger message="Generating CSV #[flowVars.counter]" level="INFO" doc:name="Logger"/>
+                            <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Update Counters" doc:description="Update Counters">
+                                <add-message-property key=" duplicatePersonCount" value="#[dw(&quot;flowVars.duplicatePersonCount + (sizeOf flowVars.reportResultData)&quot;)]"/>
+                            </message-properties-transformer>
+                            <dw:transform-message doc:name="Transform Message : Obtain CSV">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv quoteValues = true
+---
+flowVars.reportResultData]]></dw:set-payload>
+                            </dw:transform-message>
+                            <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                            <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Store File Data">
+                                <add-message-property key="reportResultData" value="#[payload]"/>
+                            </message-properties-transformer>
+                            <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                                <dw:input-payload mimeType="application/java"/>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+	ParentId: flowVars.duplicateIdParams.SalesforceRecordID, 
+	Name: "FOCUS-Duplicate ID Report:" ++ ((now >> "America/New_York") as :string {format:"yyyy-MM-dd HH:mm:ss"}) ++ "_" ++ flowVars.fileNameTrailer ,
+	Description: "FOCUS Duplicate ID Report",
+	Body: flowVars.reportResultData
+	}
+] ]]></dw:set-payload>
+                            </dw:transform-message>
+                            <until-successful maxRetries="5" synchronous="true" doc:name="Until Successful">
+                                <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce Attach Main File" doc:description="Attach Duplicate ID Report in the Salesforce Record">
+                                    <sfdc:objects ref="#[payload]"/>
+                                </sfdc:create>
+                            </until-successful>-->
+				<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : "FOCUS-Duplicate ID Report:" ++ ((now >> "America/New_York") as :string {format:"yyyy-MM-dd HH:mm:ss"}) ++ "_" ++ flowVars.fileNameTrailer,
+             Title : "FOCUS-Duplicate ID Report:" ++ ((now >> "America/New_York") as :string {format:"yyyy-MM-dd HH:mm:ss"}) ++ "_" ++ flowVars.fileNameTrailer,
+             VersionData : flowVars.reportResultData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+		<until-successful maxRetries="5" synchronous="true" doc:name="Until Successful">
+			<sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+				<sfdc:objects ref="#[payload]"/>
+			</sfdc:create>
+		</until-successful>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.duplicateIdParams.SalesforceRecordID
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+			
+                <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Delete Final Variable for Next Iteration" doc:description="Delete Final Variable for Next Iteration">
+                    <delete-message-property key="reportResultData"/>
+                </message-properties-transformer>
+                            <logger message="#[payload]" level="INFO" doc:name="Log Salesforce Attachment Response" doc:description="Log Salesforce Attachment Response"/>
+                        </otherwise>
+                    </choice>
+
+    </sub-flow>
+    <sub-flow name="duplicate_id_reporting_webservice_find_duplicates_per_person_SubFlow">
+
+            <dw:transform-message doc:name="Transform Message : Prepare Query data for Solr">
+                <dw:input-payload mimeType="application/java"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  "query": "((FIRST_NM:" ++ payload.FirstName ++ " ^250) OR (LAST_NM:" ++ payload.LastName ++ " ^250) OR (FIRST_NM_S:" ++ payload.FirstName ++ " ^250) OR (LAST_NM_S:" ++ payload.LastName ++ " ^250)) OR ((FIRST_NM:" ++ payload.FirstName ++ " *100) OR (LAST_NM:" ++ payload.LastName ++ " *100) OR (FIRST_NM_S:" ++ payload.FirstName ++ " *100) OR (LAST_NM_S:" ++ payload.LastName ++ " *100)) OR ((FIRST_NM:" ++ payload.FirstName ++ "~1) OR (LAST_NM:" ++ payload.LastName ++ "~1) OR (FIRST_NM_S:" ++ payload.FirstName ++ "~1) OR (LAST_NM_S:" ++ payload.LastName ++ "~1))",
+  "limit": 10000
+}]]></dw:set-payload>
+                <dw:set-variable variableName="contactRecord"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+            </dw:transform-message>
+        <logger message="Dup Count : #[flowVars.reportResultData.size()] Current PID #[flowVars.contactRecord.DEL_PID__c]" level="INFO" doc:name="Logger : Number of Duplicates upto now" doc:description="Log  Number of Duplicates upto now"/>
+            <until-successful maxRetries="5" synchronous="true" doc:name="Until Successful " doc:description="Using Until Successfull for Retry">
+                <http:request config-ref="HTTP_Request_Solr_Configuration" path="${solr.person.core}/select" method="POST" doc:name="HTTP : Query Apache Solr" doc:description="Query Apache Solr to get possible duplicates using Person's LastName and First Name"/>
+            </until-successful>
+            <dw:transform-message doc:name="Transform Message : Consume and Parse Solr Response">
+                <dw:input-payload mimeType="application/json"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.response.docs]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message : Filter Validated Persons and Assign Scores">
+                <dw:input-payload doc:sample="sample_data\json.json"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+---
+payload filter (($.DEL_PID != null) and ($.DEL_PID != flowVars.contactRecord.DEL_PID__c)) map {
+	"RecordId" : $.CLNT_ID,
+	"PID" : $.DEL_PID,
+	"Suffix" : $.SUFFIX,
+	"First Name" : $.FIRST_NM,
+	"Middle Name" : $.MIDDLE_NM,
+	"Last Name" : $.LAST_NM,
+	"DOB" : (($.DOB as :datetime as :string {format : "MM/dd/yyyy"}) ) when ($.DOB != null) otherwise "",
+	"Gender" : $.SEX_CD,
+	"Race" : $.RACE,
+	"Ethnicity" : $.ETHNICITY,
+	"SSN" : $.DEL_SSN_Text,
+	"MCI" : $.DEL_MCI,
+	//"Created Date" : flowVars.contactRecord.CreatedDate as :datetime as :string {format : "MM/dd/yyyy HH:mm:ss a"},
+	//"Worker" : flowVars.contactRecord.CreatedBy.Name,
+	//"Division" : flowVars.contactRecord.CreatedBy.Division,
+	//"Supervisor" : flowVars.contactRecord.CreatedBy.Manager.Name,
+	"Scores" : {
+		"F" : 15 when ($.FIRST_NM == flowVars.contactRecord.FirstName ) otherwise (5 when (($.FIRST_NM default "") contains flowVars.contactRecord.FirstName ) otherwise ( 10 when (phoneticMatch($.FIRST_NM,flowVars.contactRecord.FirstName) or
+		phoneticMatch($.FIRST_NM_S,flowVars.contactRecord.FirstName)) otherwise 0)  ),  
+		"L" : 30 when ($.LAST_NM == flowVars.contactRecord.LastName ) otherwise (20 when ($.LAST_NM contains  flowVars.contactRecord.LastName) otherwise ( 25 when (phoneticMatch($.LAST_NM,flowVars.contactRecord.LastName) or
+		phoneticMatch($.FIRST_NM_S,flowVars.contactRecord.LastName)) otherwise 0)  ) , 
+		"DOB" : 15 when ( (flowVars.contactRecord.Birthdate != null and $.DOB != null) and ((flowVars.contactRecord.Birthdate ++ "T00:00:00Z") == $.DOB)) otherwise 0,
+		"M" : 5 when ( (flowVars.contactRecord.MiddleName default "")  == ($.MIDDLE_NM default "" ) ) otherwise 0,
+		"S" : 5 when ( (flowVars.contactRecord.DEL_Suffix__c default "") == ($.SUFFIX default "") ) otherwise 0,
+		"G" :  10 when ((flowVars.contactRecord.DEL_Gender__c default "" ) == ($.SEX_CD default "" )) otherwise 0,
+		"R" : 10 when ( (flowVars.contactRecord.DEL_Race_Primary__c default "") == ($.RACE default "" ) ) otherwise 0,
+		"E" : 10 when ( (flowVars.contactRecord.DEL_Ethnicity__c default "") == ($.ETHNICITY default "")) otherwise 0
+		}
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Filter Records having Score greater than the requested Percentage">
+                <dw:input-payload mimeType="application/java"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ((sum ($.Scores pluck $)) >= flowVars.duplicateIdParams.Percentage)]]></dw:set-payload>
+            </dw:transform-message>
+            <choice doc:name="Choice : Check if Duplicates are available" doc:description="Check if Duplicates are available, flow control is passed to different routes based on this">
+                <when expression="#[dw(&quot;( (sizeOf payload) &gt; 0)&quot;)]">
+                    <dw:transform-message doc:name="Transform Message : Prepare Data for Report">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+---
+([{	
+	"Criteria" : "",
+	"Score" : "",
+	"RecordId" : flowVars.contactRecord.Id,
+	"PID" : flowVars.contactRecord.DEL_PID__c,
+	"Suffix" : flowVars.contactRecord.DEL_Suffix__c,
+	"First Name" : flowVars.contactRecord.FirstName,
+	"Middle Name" : flowVars.contactRecord.MiddleName,
+	"Last Name" : flowVars.contactRecord.LastName,
+	"DOB" : ((flowVars.contactRecord.Birthdate as :date as :string {format: "MM/dd/yyyy"}) ) when (flowVars.contactRecord.Birthdate != null) otherwise "",
+	"Gender" : flowVars.contactRecord.DEL_Gender__c,
+	"Race" : flowVars.contactRecord.DEL_Race_Primary__c,
+	"Ethnicity" : flowVars.contactRecord.DEL_Ethnicity__c,
+	"SSN" : flowVars.contactRecord.DEL_SSN_Text__c,
+	"MCI" : flowVars.contactRecord.DEL_MCI__c
+	//"Created Date" : flowVars.contactRecord.CreatedDate as :datetime as :string {format : "MM/dd/yyyy HH:mm:ss a"},
+	//"Worker" : flowVars.contactRecord.CreatedBy.Name,
+	//"Division" : flowVars.contactRecord.CreatedBy.Division,
+	//"Supervisor" : flowVars.contactRecord.CreatedBy.Manager.Name												
+}] 
+++
+(  (payload map {
+	"Criteria" :   (($.Scores filter ($ > 0)) pluck ($$ as :string)) joinBy "/" ,
+	"Score" : (sum ($.Scores pluck $)),
+	($ - "Scores")
+} ) orderBy (100 - $.Score) )   ) when ((payload != null) and ( (sizeOf payload) > 0) ) otherwise []]]></dw:set-payload>
+                    </dw:transform-message>
+                    <set-variable variableName="additionalDetails" value="#[dw(&quot;{}&quot;)]" doc:name="Variable : Initialize Additional Details " doc:description="Initialize Additional details variable"/>
+                    <foreach collection="#[payload]" batchSize="200" doc:name="For Each : Iterate over 200 records at a time" doc:description="Iterate over 200 records at a time, this is done so that dynamic where clause generated doesn't pass the SOQL limitations of 4000 charcters">
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties : Delete Root Message" doc:description="Delete Root Message to avoid unnessary Serialization">
+                            <delete-message-property key="rootMessage"/>
+                        </message-properties-transformer>
+                        <dw:transform-message doc:name="Transform Message : Prepare Data for Query">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+((payload distinctBy ($.RecordId )) map ("'" ++ $.RecordId ++ "'")) joinBy ","]]></dw:set-payload>
+                        </dw:transform-message>
+                        <until-successful maxRetries="5" synchronous="true" doc:name="Until Successful">
+                            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, CreatedDate, CreatedBy.Name,CreatedBy.Division,CreatedBy.Manager.Name from Contact where Id IN (#[payload])" doc:name="Salesforce : Get Worker and Supervisor details" doc:description="Get Worker and Supervisor details"/>
+                        </until-successful>
+                        <dw:transform-message doc:name="Transform Message : Consume Message">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+                        </dw:transform-message>
+                        <dw:transform-message doc:name="Transform Message : Group Additional Details by Person Record ID">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-variable variableName="additionalDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.additionalDetails ++ (payload groupBy $.Id)]]></dw:set-variable>
+                        </dw:transform-message>
+                    </foreach>
+                    <dw:transform-message doc:name="Transform Message : Enrich Record with Additional Details">
+                        <dw:input-payload mimeType="application/java"/>
+                        <dw:set-variable variableName="reportResultData"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.reportResultData)  ++ (payload map {
+	($ - "RecordId"),
+	"Created Date" : (flowVars.additionalDetails[$.RecordId][0].CreatedDate as :datetime as :string {format : "MM/dd/yyyy HH:mm:ss a"}) when ((flowVars.additionalDetails[$.RecordId][0] != null) and (flowVars.additionalDetails[$.RecordId][0].CreatedDate != null) ) otherwise "",
+	"Worker" : flowVars.additionalDetails[$.RecordId][0].CreatedBy.Name,
+	"Division" : flowVars.additionalDetails[$.RecordId][0].CreatedBy.Division,
+	"Supervisor" : flowVars.additionalDetails[$.RecordId][0].CreatedBy.Manager.Name			
+})]]></dw:set-variable>
+                    </dw:transform-message>
+                    <logger message="Duplicate(s) found for #[flowVars.contactRecord.DEL_PID__c]" level="INFO" doc:name="Log Check Result"/>
+                </when>
+                <otherwise>
+                    <logger message="No Duplicates found for #[flowVars.contactRecord.DEL_PID__c]" level="INFO" doc:name="Log Check Result"/>
+                </otherwise>
+            </choice>
+
+    </sub-flow>
+
+
+    <flow name="duplicate_id_reporting_webserviceFlow" doc:description="This flow will trigger the process which will handle identification of Duplicate Person records from focus system">
+        <!-- <http:listener config-ref="HTTP_Listener_Configuration" path="/DuplicatePersonIdentificationService" doc:name="HTTP"/> -->
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String : Consume Payload" doc:description="Consume Payload"/>
+        <logger message="Duplicate ID Request #[payload]" level="INFO" doc:name="Log Request" doc:description="Log Request"/>
+        <dw:transform-message doc:name="Transform Message : Get Report Params Provided from the Request">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-variable variableName="duplicateIdParams"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"DateAfter" : payload."Date Created From",
+	"DateTill" : payload."Date Created To",
+	"Percentage" : payload."Percentage Match" as :number,
+	"SalesforceRecordID" : payload."Salesforce Record ID"
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <async doc:name="Async">
+            <flow-ref name="duplicate_id_reporting_webserviceSub_Flow" doc:name="duplicate_id_reporting_webserviceSub_Flow" doc:description="Invoke flow which will handle identification of Duplicate Person records from focus system"/>
+        </async>
+        <dw:transform-message doc:name="Transform Message : Set Dummy Response">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"status" : "Pending"
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="ParentID" value="#[flowVars.duplicateIdParams.SalesforceRecordID]"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+        <dw:transform-message doc:name="Transform Message : Prepare Update Request">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"Id" : flowVars.ParentID,
+	"Status__c" : "Error",
+	"Error_Description__c" : flowVars.Exception.Message
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:update-single config-ref="Salesforce__Basic_Authentication" type="DEL_Duplicate_Report_Request__c" doc:name="Salesforce : Update Status" doc:description="Update Status"/>
+
+        </catch-exception-strategy>
+    </flow>
+    <sub-flow name="duplicate_id_reporting_webserviceSub_Flow" doc:description="This flow will handle identification of Duplicate Person records from focus system">
+
+        <dw:transform-message doc:name="Transform Message : Generate Date Ranges for Report">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var DateAfter = flowVars.duplicateIdParams.DateAfter
+%var DateTill = flowVars.duplicateIdParams.DateTill
+%function getIntermediateDates(arr,sinceDate,toDate) (
+	(   getIntermediateDates(arr ++ [{
+			start : sinceDate as :string,
+			end : ( (lastDateOfMonth(sinceDate) as :date) as :string) when ((toDate as :date) > lastDateOfMonth(sinceDate) ) otherwise (toDate as :date as :string)
+		}], ((lastDateOfMonth(sinceDate) + |P1D| ) as :date), toDate as :date )
+	) when ( (toDate as :date) > (lastDateOfMonth(sinceDate) as :date) ) 
+	otherwise (arr + {
+		start : sinceDate as :string,
+		end : toDate as :date as :string
+	})
+)
+---
+//(getIntermediateDates([], flowVars.duplicateIdParams.DateAfter as :date )) when ((flowVars.duplicateIdParams.DateAfter as :date) <= (now as :date)) otherwise []
+(getIntermediateDates([], DateAfter as :date, DateTill as :date )) when ((DateTill as :date) <= (now as :date)) otherwise (getIntermediateDates([], DateAfter as :date, now as :date ))
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <choice doc:name="Choice : Route to Processing Paths Based on Percentage" doc:description="Route to Processing Paths Based on Percentage.
+This is done since lower percentage have very high number of matches compared to higher matches, thus they are processed seprately.">
+            <when expression="#[dw(&quot;(flowVars.duplicateIdParams.Percentage &gt;= 60) and (flowVars.duplicateIdParams.Percentage &lt; 70) &quot;)]">
+                <logger message="60 or 65 Percent Matching" level="INFO" doc:name="60, 65 Percent"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate over Each Month's Contacts" doc:description="Iterate over Each Month's Contacts and Check in Apache Solr">
+                    <dw:transform-message doc:name="Transform Message : Set Start Date for this Iteration">
+                        <dw:set-variable variableName="startDate"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.start as :date]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="Transform Message : Create DST adjusted datetime range">
+                        <dw:set-variable variableName="currentstart"><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (((standarddatetime >> "US/Eastern") ) - |PT1H|) when (not (isDateInDST(((standarddatetime >> "US/Eastern") >> "US/Eastern") as :date,"US/Eastern") == true)) otherwise (standarddatetime >> "US/Eastern")
+---
+(getDSTAdjustedDatetime((payload.start ++ "T00:00:00.000-04:00") as :datetime)) as :string]]></dw:set-variable>
+                        <dw:set-variable variableName="currentend"><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (((standarddatetime >> "US/Eastern") ) - |PT1H|) when (not (isDateInDST(((standarddatetime >> "US/Eastern") >> "US/Eastern") as :date,"US/Eastern") == true)) otherwise (standarddatetime >> "US/Eastern")
+---
+(getDSTAdjustedDatetime((payload.end ++ "T23:59:59.000-04:00") as :datetime)) as :string]]></dw:set-variable>
+                    </dw:transform-message>
+                    <logger message="Select Id, DEL_PID__c, DEL_Suffix__c , FirstName, MiddleName, LastName, Birthdate, DEL_Gender__c,DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_SSN_Text__c, DEL_MCI__c, CreatedDate from Contact where (DEL_Person_Validated__c = true) AND (CreatedDate &gt;= #[flowVars.currentstart] ) AND (CreatedDate &lt;= #[flowVars.currentend] )" level="INFO" doc:name="Logger : Query"/>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, DEL_PID__c, DEL_Suffix__c , FirstName, MiddleName, LastName, Birthdate, DEL_Gender__c,DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_SSN_Text__c, DEL_MCI__c, CreatedDate from Contact where (DEL_Person_Validated__c = true) AND (CreatedDate &gt;= #[flowVars.currentstart] ) AND (CreatedDate &lt;= #[flowVars.currentend] ) order by CreatedDate" doc:name="Salesforce : Query Contacts after a the Date provided" doc:description="Query Contacts after a the Date provided"/>
+
+                    <dw:transform-message doc:name="Transform Message : Consume Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map $) ]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="Transform Message : Calculate number of child Batches Required">
+                        <dw:set-variable variableName="batchesRequired"><![CDATA[%dw 1.0
+%output application/java
+---
+true when (
+	(
+		(ceil  ((sizeOf payload) /  400)) when ((sizeOf payload) > 0) otherwise 0
+	) > 1
+) otherwise false]]></dw:set-variable>
+                    </dw:transform-message>
+                    <foreach collection="#[payload]" batchSize="400" doc:name="For Each : Create a Report for Each 400 records" doc:description="Create a Report for Each 400 records">
+						<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message" doc:description="Remove Root Message to avid unneccessary Serialization"/>
+                        <logger message="Sub Batch #[flowVars.counter]" level="INFO" doc:name="Logger"/>
+                        <dw:transform-message doc:name="Transform Message : Set Attachment Name Trailer">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                            <dw:set-variable variableName="fileNameTrailer"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.startDate as :date as :string {format : "MMM_yy"})
+ ++ ( ("_Part_" ++ flowVars.counter) when (flowVars.batchesRequired == true) otherwise "")
+ ++ ".csv"
+]]></dw:set-variable>
+                        </dw:transform-message>
+                        <flow-ref name="duplicate_id_reporting_webservice_find_duplicates_on_personset_SubFlow" doc:name="duplicate_id_reporting_webservice_find_duplicates_on_personset_SubFlow" doc:description="Invoke flow which will find duplicates of a List of Persons"/>
+                        <logger message="Sub Batch Completed" level="INFO" doc:name="Logger"/>
+                    </foreach>
+                </foreach>
+                
+            </when>
+            <when expression="#[dw(&quot;(flowVars.duplicateIdParams.Percentage &gt;= 70) and (flowVars.duplicateIdParams.Percentage &lt; 80) &quot;)]">
+                <logger message="70 or 75 Percent Matching" level="INFO" doc:name="70, 75 Percent"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate over Each Month's Contacts" doc:description="Iterate over Each Month's Contacts and Check in Apache Solr">
+                    <dw:transform-message doc:name="Transform Message : Set Start Date for this Iteration">
+                        <dw:set-variable variableName="startDate"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.start as :date]]></dw:set-variable>
+                    </dw:transform-message>
+
+                    <dw:transform-message doc:name="Transform Message : Create DST adjusted datetime range">
+                        <dw:set-variable variableName="currentstart"><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (((standarddatetime >> "US/Eastern") ) - |PT1H|) when (not (isDateInDST(((standarddatetime >> "US/Eastern") >> "US/Eastern") as :date,"US/Eastern") == true)) otherwise (standarddatetime >> "US/Eastern")
+---
+(getDSTAdjustedDatetime((payload.start ++ "T00:00:00.000-04:00") as :datetime)) as :string]]></dw:set-variable>
+                        <dw:set-variable variableName="currentend"><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (((standarddatetime >> "US/Eastern") ) - |PT1H|) when (not (isDateInDST(((standarddatetime >> "US/Eastern") >> "US/Eastern") as :date,"US/Eastern") == true)) otherwise (standarddatetime >> "US/Eastern")
+---
+(getDSTAdjustedDatetime((payload.end ++ "T23:59:59.000-04:00") as :datetime)) as :string]]></dw:set-variable>
+                    </dw:transform-message>
+                    <logger message="Select Id, DEL_PID__c, DEL_Suffix__c , FirstName, MiddleName, LastName, Birthdate, DEL_Gender__c,DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_SSN_Text__c, DEL_MCI__c, CreatedDate from Contact where (DEL_Person_Validated__c = true) AND (CreatedDate &gt;= #[flowVars.currentstart] ) AND (CreatedDate &lt;= #[flowVars.currentend] )" level="INFO" doc:name="Logger : Query"/>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, DEL_PID__c, DEL_Suffix__c , FirstName, MiddleName, LastName, Birthdate, DEL_Gender__c,DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_SSN_Text__c, DEL_MCI__c, CreatedDate from Contact where (DEL_Person_Validated__c = true) AND (CreatedDate &gt;= #[flowVars.currentstart] ) AND (CreatedDate &lt;= #[flowVars.currentend] ) order by CreatedDate" doc:name="Salesforce : Query Contacts after a the Date provided" doc:description="Query Contacts after a the Date provided"/>
+
+                    <dw:transform-message doc:name="Transform Message : Consume Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map $) ]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="Transform Message : Calculate number of child Batches Required">
+                        <dw:set-variable variableName="batchesRequired"><![CDATA[%dw 1.0
+%output application/java
+---
+true when (
+	(
+		(ceil  ((sizeOf payload) /  1000)) when ((sizeOf payload) > 0) otherwise 0
+	) > 1
+) otherwise false]]></dw:set-variable>
+                    </dw:transform-message>
+                    <foreach collection="#[payload]" batchSize="1000" doc:name="For Each : Create a Report for Each 1000 records" doc:description="Create a Report for Each 400 records">
+						<remove-variable variableName="rootMessage" doc:name="Variable : Remove Root Message" doc:description="Remove Root Message to avid unneccessary Serialization"/>
+                        <logger message="Sub Batch #[flowVars.counter]" level="INFO" doc:name="Logger"/>
+                        <dw:transform-message doc:name="Transform Message : Set Attachment Name Trailer">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                            <dw:set-variable variableName="fileNameTrailer"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.startDate as :date as :string {format : "MMM_yy"})
+ ++ ( ("_Part_" ++ flowVars.counter) when (flowVars.batchesRequired == true) otherwise "")
+ ++ ".csv"
+]]></dw:set-variable>
+                        </dw:transform-message>
+                        <flow-ref name="duplicate_id_reporting_webservice_find_duplicates_on_personset_SubFlow" doc:name="duplicate_id_reporting_webservice_find_duplicates_on_personset_SubFlow" doc:description="Invoke flow which will find duplicates of a List of Persons"/>
+                        <logger message="Batch Completed" level="INFO" doc:name="Logger"/>
+                    </foreach>
+                </foreach>
+
+
+            </when>
+            <otherwise>
+                <logger message="80 or Above Matching" level="INFO" doc:name="80 and Above : No Further Chunking"/>
+                <foreach collection="#[payload]" doc:name="For Each : Iterate over Each Month's Contacts" doc:description="Iterate over Each Month's Contacts and Check in Apache Solr">
+                    <dw:transform-message doc:name="Transform Message : Set Start Date for this Iteration">
+                        <dw:set-variable variableName="startDate"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.start as :date]]></dw:set-variable>
+                    </dw:transform-message>
+
+                    <dw:transform-message doc:name="Transform Message : Create DST adjusted datetime range">
+                        <dw:set-variable variableName="currentstart"><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (((standarddatetime >> "US/Eastern") ) - |PT1H|) when (not (isDateInDST(((standarddatetime >> "US/Eastern") >> "US/Eastern") as :date,"US/Eastern") == true)) otherwise (standarddatetime >> "US/Eastern")
+---
+(getDSTAdjustedDatetime((payload.start ++ "T00:00:00.000-04:00") as :datetime)) as :string]]></dw:set-variable>
+                        <dw:set-variable variableName="currentend"><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (((standarddatetime >> "US/Eastern") ) - |PT1H|) when (not (isDateInDST(((standarddatetime >> "US/Eastern") >> "US/Eastern") as :date,"US/Eastern") == true)) otherwise (standarddatetime >> "US/Eastern")
+---
+(getDSTAdjustedDatetime((payload.end ++ "T23:59:59.000-04:00") as :datetime)) as :string]]></dw:set-variable>
+                    </dw:transform-message>
+                    <logger message="Select Id, DEL_PID__c, DEL_Suffix__c , FirstName, MiddleName, LastName, Birthdate, DEL_Gender__c,DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_SSN_Text__c, DEL_MCI__c, CreatedDate from Contact where (DEL_Person_Validated__c = true) AND (CreatedDate &gt;= #[flowVars.currentstart] ) AND (CreatedDate &lt;= #[flowVars.currentend] )" level="INFO" doc:name="Logger : Query"/>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, DEL_PID__c, DEL_Suffix__c , FirstName, MiddleName, LastName, Birthdate, DEL_Gender__c,DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_SSN_Text__c, DEL_MCI__c, CreatedDate from Contact where (DEL_Person_Validated__c = true) AND (CreatedDate &gt;= #[flowVars.currentstart] ) AND (CreatedDate &lt;= #[flowVars.currentend] ) order by CreatedDate" doc:name="Salesforce : Query Contacts after a the Date provided" doc:description="Query Contacts after a the Date provided"/>
+
+
+                    <dw:transform-message doc:name="Transform Message : Consume Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map $) ]]></dw:set-payload>
+                    </dw:transform-message>
+
+                   <dw:transform-message doc:name="Transform Message : Set Attachment Name">
+                        <dw:set-variable variableName="fileNameTrailer"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.startDate as :date as :string {format : "MMM_yy"}) ++ ".csv"]]></dw:set-variable>
+                    </dw:transform-message>
+                    
+                    <flow-ref name="duplicate_id_reporting_webservice_find_duplicates_on_personset_SubFlow" doc:name="duplicate_id_reporting_webservice_find_duplicates_on_personset_SubFlow" doc:description="Invoke flow which will find duplicates of a List of Persons"/>
+                    <logger message="Batch Completed" level="INFO" doc:name="Logger"/>
+                </foreach>
+            </otherwise>
+        </choice>
+        <logger message="After Choice" level="INFO" doc:name="After Choice"/>
+
+        <logger message="All Batches Completed : With Number of CSV Rows #[flowVars.duplicatePersonCount]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message : Prepare Update Request">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	"Id" : flowVars.duplicateIdParams.SalesforceRecordID,
+	"Status__c" : "Completed"
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:update-single config-ref="Salesforce__Basic_Authentication" type="DEL_Duplicate_Report_Request__c" doc:name="Salesforce : Update Status" doc:description="Update Status"/>
+
+    </sub-flow>
+
+
+    
+<!--     <flow name="duplicate_id_reporting_webservice_PersonSearchFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/queryPerson" doc:name="HTTP"/>
+
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Property : ContentType"/>
+        <logger level="INFO" doc:name="Logger"/>
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.person.core}/select" method="POST"
+			doc:name="HTTP : Retrieve person details">
+		</http:request>
+			<byte-array-to-string-transformer
+			mimeType="application/json" doc:name="Byte Array to String" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+-
+payload.response.docs
+]]></dw:set-payload>
+		</dw:transform-message>
+
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property" />
+	</flow> -->
+<!--     <flow name="duplicate_id_reporting_webservice_deleteObjectStoreEntryFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/DuplicatePersonIdentificationService/clearAppData" doc:name="HTTP"/>
+        <flow-ref name="duplicate_id_reporting_webservice_deleteObjectStoreEntrySub_Flow" doc:name="duplicate_id_reporting_webservice_deleteObjectStoreEntrySub_Flow"/>
+        <set-payload value="#['Enteries Deleted']" doc:name="Set Payload : Set Response" doc:description="Set Response"/>
+    </flow>  
+
+    <sub-flow name="duplicate_id_reporting_webservice_deleteObjectStoreEntrySub_Flow">
+        <objectstore:retrieve-all-keys config-ref="Solr-Duplicate-Id-Report_Object_Store__Connector" doc:name="ObjectStore : Get All Keys" doc:description="Get All Keys"/>
+        <foreach collection="#[payload]" doc:name="For Each">
+            <objectstore:remove config-ref="Solr-Duplicate-Id-Report_Object_Store__Connector" key="#[payload]" doc:name="ObjectStore : Remove Entry" doc:description="Remove Entry"/>
+        </foreach>
+    </sub-flow> -->
+      
+</mule>

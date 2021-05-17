@@ -1,0 +1,832 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sqs="http://www.mulesoft.org/schema/mule/sqs" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:quartz="http://www.mulesoft.org/schema/mule/quartz" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/quartz/current/mule-quartz.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/sqs http://www.mulesoft.org/schema/mule/sqs/current/mule-sqs.xsd">
+    <objectstore:config name="DOE_Information_Load" partition="DOE_Information_Load" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="DOE_InformationLoad_Error" partition="DOE_InformationLoad_Error" doc:name="ObjectStore: Connector"/>
+   <!--  <mulerequester:config name="Mule_Requester" doc:name="Mule Requester"/> -->
+  <!--   <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}" url="${sfdc.url}" doc:name="Salesforce: Basic Authentication" disableSessionInvalidation="true">
+        <reconnect count="5"/>
+    </sfdc:config>-->
+    <!-- <mulerequester:config name="Mule_Requester1" doc:name="Mule Requester"/> -->
+    <flow name="INF053_DOE_Information_Load_Interface" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="The Poll connector will trigger the job/flow as per the business requirement. The DOE  Load will run every day from Sunday to Saturday at 09:15 AM EST.">
+            <schedulers:cron-scheduler expression="0 15 9 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF053" doc:name="Set Payload to Interface ID" doc:description="Set payload with Interface Id i.e. INF053 The reason why we set with Interface Id, in case job fails just after the first step, this payload will help creating an Error Transaction in FOCUS interface dashboard."/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Save the Interface Id payload in an variable because Payload variable will be overwritten by the other details in the later steps."/>
+       <enricher doc:name="Message Enricher" doc:description="Call the query framework to map the picklist values in a variable, through message enricher so that the original payload is not changed">
+            <flow-ref name="inf053-doe-information-load-Call-LOV-flow" doc:name="inf053-doe-information-load-Call-LOV-flow" doc:description="Call the query framework to map the picklist values in a variable"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <flow-ref name="inf053-doe-information-load-StudentInfo" doc:name="inf053-doe-information-load-StudentInfo" doc:description="Call inf053-doe-information-load-StudentInfo to Pick up StudentInfo File from SFTP"/>
+        <flow-ref name="INF053_DOE_Information_Load_Transaction2_SubFlow" doc:name="INF053_DOE_Information_Load_Transaction2_SubFlow" doc:description="Call Login framework again to Attach all three Files in Interface Dashboard ."/>
+        <dw:transform-message doc:name="TM:GraduationInfoAbsent and SpecialInfoAbsent">
+        <!-- <dw:transform-message doc:name="TM:Combine Private and Public Records">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+-
+(flowVars.StudentInfoPublic default {} ) + (flowVars.StudentInfoPrivate default {})]]></dw:set-payload> -->
+            <dw:set-variable variableName="GraduationInfoAbsent"><![CDATA[%dw 1.0
+//Create Error Report if the Updation Call has errored out
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.StudentInfoArray map {
+	Error: 'Data Warning' when (flowVars.GraduationArray[$.STI][0].STI == null) otherwise '',
+	Field_Name_in_Error: 'Graduation File',
+	Field_Value_in_Error:"STI : " ++ ( $.STI default "") ,
+	Error_Description:"Client present in 'Student Info' file but can not be found in the Graduation File"
+} filter ($.Error != '' )]]></dw:set-variable>
+            <dw:set-variable variableName="SpecialInfoAbsent"><![CDATA[%dw 1.0
+//Create Error Report if the Updation Call has errored out
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.StudentInfoArray map {
+	Error: 'Data Warning' when (flowVars.SpecialEducationArray[$.STI][0].STI == null) otherwise '',
+	Field_Name_in_Error: 'Special Education File',
+	Field_Value_in_Error:"STI : " ++ ( $.STI default "") ,
+	Error_Description:"Client present in 'Student Info' file but can not be found in the Special  Education File"
+} filter ($.Error != '' )]]></dw:set-variable>
+        </dw:transform-message>
+        <set-payload value="#[flowVars.StudentInfoArray]" doc:name="Set Payload to StudentInfo Array"/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set SkippedRecordCount">
+            <add-message-property key="RecordSkippedCount" value="#[payload.size() + sessionVars.MandatoryCount]"/>
+        </message-properties-transformer>
+        <choice doc:name="Check if records exist" doc:description="Check if Records Exist in Payload after applying filter condition.">
+            <when expression="#[payload.size()]">
+                <batch:execute name="inf053-doe-information-loadBatch" doc:name="inf053-doe-information-loadBatch" doc:description="Call inf053-doe-information-loadBatch to Execute the Batch Load"/>
+            </when>
+            <otherwise>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF053&quot;, &quot;InterfaceName&quot;: &quot;DOE Information Load&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records found&quot;,&quot;ExceptionType&quot;:&quot;System&quot;, &quot;ErrorExtension&quot;:&quot;&quot;, &quot;CompletedExtension&quot;:&quot;&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;}" doc:name="Set Payload to Log Exception" doc:description="Set payload to JSON with Status= 'Error' for Logging Framework."/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This step is used to call the Logging Transaction framework to log the error message &quot;Export date in the file is less than today's date&quot; in the FOCUS interface dashboard."/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <batch:job name="inf053-doe-information-loadBatch" doc:description="Batch Load step to Load Records in parallel">
+        <batch:process-records>
+            <batch:step name="Batch_Step" accept-expression="#[payload.Summary_District_Id == &quot;97&quot;]" doc:description="Process all records with Summary_District_Id == &quot;97&quot;">
+                <batch:commit size="25" doc:name="Batch Commit" doc:description="Process 100 records at a time to avoid exceeding Where Clause Character limit.">
+                    <message-properties-transformer scope="invocation" doc:name="MP:Save Incoming BatchArray" doc:description="Save incoming array in variable">
+                        <add-message-property key="BatchArrayPublic" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <dw:transform-message doc:name="TM: Create Where Clause with External ID">
+                        <dw:set-payload><![CDATA[//Create Where Clause with External ID
+%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.ExternalIDPublic ++ "'")) joinBy ","]]></dw:set-payload>
+                    </dw:transform-message>
+                    <logger message="Select Id,Client_Name_Lk__r.Del_STI__c from Del_Case__c where DOE_Information_Interface_Case_Unique_ID__c  in (#[payload])" level="INFO" doc:name="Logger"/>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Client_Name_Lk__r.DEL_STI__c,Client_Name_Lk__r.DEL_PID__c,Status__c,DOE_Information_Interface_Case_Unique_ID__c,RecordType.Name from Del_Case__c where DOE_Information_Interface_Case_Unique_ID__c  in (#[payload])" doc:name="SFDC : Query Records" doc:description="Query SFDC Records based on External ID"/>
+                    <dw:transform-message doc:name="TM:Convert Query output to Array">
+                        <dw:set-session-variable variableName="ClientIDList"><![CDATA[//Create Array from Query output.
+%dw 1.0
+%output application/java
+---
+payload map {
+ Id:$.Id,
+ STI:$.Client_Name_Lk__r.DEL_STI__c,
+ PID:$.Client_Name_Lk__r.DEL_PID__c,
+ Status:$.Status__c,
+ RecordType:$.RecordType.Name,
+ ExternalID:$.DOE_Information_Interface_Case_Unique_ID__c as :string
+} 
+]]></dw:set-session-variable>
+                    </dw:transform-message>
+
+                    <dw:transform-message doc:name="TM:Filter Client ID list">
+                        <dw:set-variable variableName="ActiveCaseError"><![CDATA[%dw 1.0
+%output application/java
+---
+(sessionVars.ClientIDList filter (($.Status != 'Open') or ($.RecordType != 'Education Enrollment') ) ) distinctBy $.PID]]></dw:set-variable>
+                        <dw:set-variable variableName="ClientIDPresent"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.ClientIDList groupBy $.STI]]></dw:set-variable>
+
+                        <dw:set-session-variable variableName="ClientIDList"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.ClientIDList filter (($.Status == 'Open' ) and ($.RecordType == 'Education Enrollment'))]]></dw:set-session-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM:Group ClientID List by STI">
+
+                        <dw:set-session-variable variableName="ClientIDList"><![CDATA[//Group ClientID List by STI
+%dw 1.0
+%output application/java
+---
+sessionVars.ClientIDList groupBy $.STI]]></dw:set-session-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM:Create Final Array for Update">
+                        <dw:set-payload><![CDATA[//Create Final Array for Update
+%dw 1.0
+%output application/java
+---
+//flowVars.StudentInfoPublic map {
+flowVars.BatchArrayPublic map {
+	Id:(sessionVars.ClientIDList[$.STI] default [{}])[0].Id,
+	Diploma__c:true when ((flowVars.GraduationArray[$.STI] default [{}])[0].Hs_Graduation_Date != null) otherwise false,
+	Diploma_Date__c:(flowVars.GraduationArray[$.STI] default [{}])[0].Hs_Graduation_Date as :date default "",
+	IEP_Start_Date__c:(flowVars.SpecialEducationArray[$.STI] default [{}])[0].Iep_Initial_Date as :date default "",
+	IEP_End_Date__c:(flowVars.SpecialEducationArray[$.STI] default [{}])[0].Iep_End_Date as :date default "",
+	Related_Services__c:(( flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd1 ++ " " ++ flowVars.LOVReturned[("DOE_RELATIVE_SERVICE_CODE-" ++ flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd1)][0] default "") ++ ","
+	++			( flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd2 ++ " " ++ flowVars.LOVReturned[("DOE_RELATIVE_SERVICE_CODE-" ++ flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd2)][0] default "" ) ++ ","
+	++			( flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd3 ++ " " ++ flowVars.LOVReturned[("DOE_RELATIVE_SERVICE_CODE-" ++ flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd3)][0] default "" ) ++ ","
+	++			( flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd4 ++ " " ++ flowVars.LOVReturned[("DOE_RELATIVE_SERVICE_CODE-" ++ flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd4)][0] default "" ) ++ ","
+	++			( flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd5 ++ " " ++ flowVars.LOVReturned[("DOE_RELATIVE_SERVICE_CODE-" ++ flowVars.SpecialEducationArray[$.STI][0].Relative_Service_Cd5)][0] default "" ) ++ ",") when flowVars.SpecialEducationArray[$.STI] != null otherwise "",
+    IDEA_Primary__c:( flowVars.SpecialEducationArray[$.STI] default [{}])[0].Primary_Disability_Cd ++ " " ++ flowVars.LOVReturned[("DOE_PRIMARY_DISABILITY-" ++ (flowVars.SpecialEducationArray[$.STI] default [{}])[0].Primary_Disability_Cd)][0] default "",
+    IDEA_Secondary__c:( flowVars.SpecialEducationArray[$.STI] default [{}])[0].Secondary_Disability_Cd ++ " " ++ flowVars.LOVReturned[("DOE_PRIMARY_DISABILITY-" ++ (flowVars.SpecialEducationArray[$.STI] default [{}])[0].Secondary_Disability_Cd)][0] default "",
+    ESR_Date__c:(flowVars.SpecialEducationArray[$.STI] default [{}])[0].Last_Evaluation_Date as :date default "",
+	Special_Ed_Exit_Date__c:(flowVars.SpecialEducationArray[$.STI] default [{}])[0].Special_Education_Exit_Date as :date default "",
+	Special_Ed_Exit_Reason__c:( flowVars.SpecialEducationArray[$.STI] default [{}])[0].Special_Education_Exit_Reason_Cd ++ " " ++ flowVars.LOVReturned[("DOE_SPECIAL_REASON_CODE-" ++ (flowVars.SpecialEducationArray[$.STI] default [{}])[0].Special_Education_Exit_Reason_Cd)][0] default "",
+	STI:(sessionVars.ClientIDList[$.STI] default [{}])[0].STI
+ } filter ($.Id != null)
+ 
+ ]]></dw:set-payload>
+                        <dw:set-variable variableName="MismatchError"><![CDATA[%dw 1.0
+//Create Error Report if the Updation Call has errored out
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+//flowVars.StudentInfoPublic map {
+flowVars.BatchArrayPublic map {
+	Error: 'Data Error' when ((flowVars.ClientIDPresent[$.STI] default [{}])[0].Id == null) otherwise '',
+	Field_Name_in_Error: 'STI/First Name/Last Name/Date of Birth/Gender',
+	Field_Value_in_Error:"STI : " ++ ( $.STI default "") ++ "|" ++ "First Name : " ++  ($.First_Name default "" ) ++ "|" ++ "Last Name: " ++ ($.Last_Name default "") ++ "|" ++ "BirthDate: " ++  ($.Birth_Date default "") ++ "|" ++ "Gender: " ++ ($.Gender_Desc default "" ), //++ "|" ++ "Race : " ++ ( $.Race_Desc default ""),
+	Error_Description:'Client STI number cannot be found in FOCUS or Client cannot be matched in FOCUS based on the First Name or Last Name or Date of Birth or Gender' //or Ethnicity'
+} filter ($.Error != '' )]]></dw:set-variable>
+                        <dw:set-variable variableName="ActiveCaseError"><![CDATA[%dw 1.0
+//Create Error Report if the Updation Call has errored out
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.ActiveCaseError map {
+	Error: 'Data Error' when ((sessionVars.ClientIDList[$.STI] default [{}])[0].Id == null) otherwise '',
+	Field_Name_in_Error: 'Case Status',
+	Field_Value_in_Error: $.Status ,
+	Error_Description:'Client is not in an open DMSS Education Enrollment Case in FOCUS. STI = ' ++ ( $.STI default '') ++ (" PID: " ++ $.PID) when ($.PID != null) otherwise ""
+} filter ($.Error != '' )]]></dw:set-variable>
+                    </dw:transform-message>
+
+                    <dw:transform-message doc:name="TM:Remove STI from Payload">
+                        <dw:set-payload><![CDATA[//Remove STI from Payload
+%dw 1.0
+%output application/java
+---
+payload map $ - "STI"]]></dw:set-payload>
+                        <dw:set-variable variableName="ErrorMapping"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+                    </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Case__c" doc:name="SFDC: Update the Array" doc:description="Update the Person Type Record with the Payload">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                    <dw:transform-message doc:name="TM: Create Success and Error Output Records">
+                        <dw:set-variable variableName="UpdateError"><![CDATA[//Create Error Report if the Update call has error
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode,
+	Field_Name_in_Error: payload[$$].errors[0].fields[0],
+	Field_Value_in_Error: "STI: " ++ ( flowVars.ErrorMapping[$$].STI default ""),
+	Error_Description:payload[$$].errors[0].message
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+                        <dw:set-variable variableName="SuccessUpdate"><![CDATA[//Create Query Output as Array for Successful records 
+%dw 1.0
+%output application/java
+---
+payload map {
+	Id:$.Id
+} filter ($.Id != null )]]></dw:set-variable>
+
+                    </dw:transform-message>
+
+                    <message-properties-transformer scope="invocation" doc:name="MP: Create Success Count, Error Count and Error Attachment" doc:description="Create Success Count, Error Count and Error Attachment">
+                        <add-message-property key="SuccessUpdate" value="#[flowVars.SuccessUpdate.size()]"/>
+                        <add-message-property key="ErrorUpdateCount" value="#[(flowVars.UpdateError != '')?flowVars.UpdateError.split(&quot;\n&quot;).length:0]"/>
+                        <add-message-property key="MismatchErrorCount" value="#[(flowVars.MismatchError != '')?flowVars.MismatchError.split(&quot;\n&quot;).length:0]"/>
+                        <add-message-property key="Attachment" value="#[flowVars.UpdateError + flowVars.MismatchError + flowVars.ActiveCaseError]"/>
+                        <add-message-property key="ActiveCaseCount" value="#[flowVars.ActiveCaseError != ''?flowVars.ActiveCaseError.split(&quot;\n&quot;)length:0]"/>
+                    </message-properties-transformer>
+                    <objectstore:store config-ref="DOE_Information_Load" key="Error_ Update#[server.nanoTime()]" value-ref="#[flowVars.ErrorUpdateCount + flowVars.MismatchErrorCount + flowVars.ActiveCaseCount]" doc:name="OS:Store Error Count" doc:description="Store Error Count in Object store so that it is retained outside the scope of &quot;Batch Process&quot;"/>
+                    <objectstore:store config-ref="DOE_Information_Load" key="Success_ Update#[server.nanoTime()]" value-ref="#[flowVars.SuccessUpdate]" doc:name="OS:Store Success Count" doc:description="Store Success Count in Object store so that it is retained outside the scope of &quot;Batch Process&quot;"/>
+
+                    <objectstore:store config-ref="DOE_Information_Load" key="Attachment#[server.nanoTime()]" value-ref="#[flowVars.Attachment]" doc:name="OS: Create Error Attachment" doc:description="Store Error Attachment in Object store so that it is retained outside the scope of &quot;Batch Process&quot;"/>
+
+                    <set-payload value="#[[]]" doc:name="Set Payload to Empty Array" doc:description="Set Output of the Batch step to an empty array so that batch step doesnt throw a warning as output of a batch step should aways be an array."/>
+
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Batch_Step1" accept-expression="#[payload.Summary_District_Id != &quot;97&quot;]" doc:description="Process all records with Summary_District_Id == &quot;98&quot;">
+                <batch:commit doc:name="Batch Commit" size="25" doc:description="Batch Commit is used to process 250 records at a time.">
+                    <message-properties-transformer scope="invocation" doc:name="MP: Create Batch Array">
+                        <add-message-property key="BatchArrayPrivate" value="#[payload]"/>
+                    </message-properties-transformer>
+                   
+                        <dw:transform-message doc:name="TM: Create Where Clause">
+                            <dw:set-payload><![CDATA[//Create Where Clause
+%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.ExternalIDPrivate ++ "'")) joinBy ","]]></dw:set-payload>
+                        </dw:transform-message>
+                        <logger message="Select Id,Person__r.Del_PID__c,Person__r.Del_STI__c ,DOE_Information_Interface_PT_Unique_ID__c, ( Select Id from Person_Type__r  where RecordType.Name='Interagency Consent' ) , Person__r.DEL_DFS_Active_person_cases__c,Person__r.DEL_DMSS_Active_person_cases__c,Person__r.DEL_DPBHS_Active_person_cases__c,Person__r.DEL_DYRS_Active_person_cases__c from DEL_Person_Type__c where DOE_Information_Interface_PT_Unique_ID__c in (#[payload])" level="INFO" doc:name="Logger"/>
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Person__r.Del_PID__c,Person__r.Del_STI__c ,DOE_Information_Interface_PT_Unique_ID__c, ( Select Id from Person_Type__r  where RecordType.Name='Interagency Consent' ) , Person__r.DEL_DFS_Active_person_cases__c,Person__r.DEL_DPBHS_Active_person_cases__c,Person__r.DEL_DYRS_Active_person_cases__c from DEL_Person_Type__c where DOE_Information_Interface_PT_Unique_ID__c in (#[payload]) and RecordType.Name= 'Client'" doc:name="SFDC: Query Records based on External ID" doc:description="Query Records based on External ID"/>
+                        <dw:transform-message doc:name="TM: Convert Query output to Array">
+                        <dw:set-session-variable variableName="PrivateList"><![CDATA[//Convert Query output to Array
+%dw 1.0
+%output application/java
+---
+payload map {
+	ID:$.Id,
+	PID:$.Person__r.DEL_PID__c,
+	STI:$.Person__r.DEL_STI__c ,
+	ExternalID:$.DOE_Information_Interface_PT_Unique_ID__c,
+	DFSActive:$.Person__r.DEL_DFS_Active_person_cases__c as :number,	
+	PBHSActive:$.Person__r.DEL_DPBHS_Active_person_cases__c as :number,
+	DYRSActive:$.Person__r.DEL_DYRS_Active_person_cases__c as :number,
+	Case:$.Person_Type__r map {
+		ID:$.Id
+	} when ($.Person_Type__r != null  ) otherwise {}
+}]]></dw:set-session-variable>
+                        </dw:transform-message>
+
+
+                    
+                     <dw:transform-message doc:name="TM: GroupBy External ID">
+
+            <dw:set-variable variableName="ConsentErrorPrivate"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.PrivateList filter ((sizeOf $.Case) == 0)]]></dw:set-variable>
+                        <dw:set-variable variableName="PrivatePresent"><![CDATA[//GroupBy External ID
+%dw 1.0
+%output application/java
+---
+sessionVars.PrivateList groupBy $.ExternalID]]></dw:set-variable>
+                        <dw:set-session-variable variableName="PrivateList"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.PrivateList filter ((sizeOf $.Case) > 0)]]></dw:set-session-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Create Error Report">
+
+            <dw:set-variable variableName="CaseErrorPrivate"><![CDATA[//Create Case Error.
+%dw 1.0
+%output application/java
+---
+sessionVars.PrivateList filter (( $.DFSActive == 0) and ( $.PBHSActive == 0) and ( $.DYRSActive == 0 ) )]]></dw:set-variable>
+                        <dw:set-variable variableName="ConsentError"><![CDATA[//Create Consent Error.
+%dw 1.0
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.ConsentErrorPrivate map {
+	Error: 'Data Error' ,
+	Field_Name_in_Error: 'Active Consent',
+	Field_Value_in_Error: "STI : " ++ $.STI ++ "|" ++ ("PID :" ++ $.PID ) when ($.PID != null ) otherwise "",
+	Error_Description:"Client does not have an active Consent for 'Education Records' in FOCUS."
+}  ]]></dw:set-variable>
+                        <dw:set-session-variable variableName="PrivateList"><![CDATA[//Filter Valid records which have Active Case 
+%dw 1.0
+%output application/java
+---
+sessionVars.PrivateList filter (( $.DFSActive > 0) or ( $.PBHSActive > 0) or ( $.DYRSActive > 0) )]]></dw:set-session-variable>
+        </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Group filter Array with External ID">
+                        <dw:set-session-variable variableName="PrivateIDList"><![CDATA[//Group Array By External ID
+%dw 1.0
+%output application/java
+---
+sessionVars.PrivateList groupBy $.ExternalID]]></dw:set-session-variable>
+                    </dw:transform-message>
+        <dw:transform-message doc:name="TM: Add SFDC ID for Update">
+            <dw:set-payload><![CDATA[//Add SFDC ID for Update
+%dw 1.0
+%output application/java
+---
+//flowVars.StudentInfoPrivate map {
+flowVars.BatchArrayPrivate map {
+	Id: ((sessionVars.PrivateIDList[$.ExternalIDPrivate] default [{}])[0].ID) when sessionVars.PrivateIDList != null otherwise null,
+	Edu_School__c:flowVars.LOVReturned[("DOE_SCHOOL_CODE-" ++ $.School_Id)][0] default "" ,
+	Edu_Current_Grade__c:flowVars.LOVReturned[("DOE_GRADE_LEVEL_DESC-" ++ $.Grade_Level_Desc)][0] default "" ,
+	Diploma__c:true when (flowVars.GraduationArray[$.STI] default [{}])[0].Hs_Graduation_Date != null otherwise false,
+	Diploma_Date__c:(flowVars.GraduationArray[$.STI] default [{}])[0].Hs_Graduation_Date as :date default "",
+	STI:(sessionVars.PrivateIDList[$.ExternalIDPrivate] default [{}])[0].STI
+ } filter ($.Id != null)]]></dw:set-payload>
+                        <dw:set-variable variableName="MismatchError"><![CDATA[//Create Error Report if record is not found
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+//flowVars.StudentInfoPrivate map {
+flowVars.BatchArrayPrivate map {
+	Error: 'Data Error' when ((flowVars.PrivatePresent[$.ExternalIDPrivate] default [{}])[0].ID == null) otherwise '',
+	Field_Name_in_Error: 'STI/PID',
+	Field_Value_in_Error: "STI: " ++ $.STI ++ "|" ++ ("PID: " ++ ( $.PID default "")),
+	Error_Description:'STI number does not match FOCUS or Client PID not found in FOCUS'
+} filter ($.Error != '' )]]></dw:set-variable>
+                        <dw:set-variable variableName="CaseError"><![CDATA[//Create Error Report in Client is not in an Open Case.
+%dw 1.0
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.CaseErrorPrivate map {
+	Error: 'Data Error' ,
+	Field_Name_in_Error: 'STI/PID',
+	Field_Value_in_Error: "STI : " ++  $.STI ++ "|"  ++ (("PID: " ++ $.PID) default "" ) ,
+	Error_Description:"Client is not in an open DFS or YRS or PBH case." 
+} ]]></dw:set-variable>
+        </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Remove STI from Payload">
+                        <dw:set-payload><![CDATA[//Remove STI from Payload
+%dw 1.0
+%output application/java
+---
+payload map $ - "STI"]]></dw:set-payload>
+                        <dw:set-variable variableName="ErrorMapPrivate"><![CDATA[//Save payload for Error Report 
+%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+                    </dw:transform-message>
+
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Person_Type__c" doc:name="SFDC: Updafe Client Record">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+                    <dw:transform-message doc:name="TM: Create Success/ Error  records">
+                        <dw:set-variable variableName="UpdateError"><![CDATA[//Create Error Report if the Update call failed
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode,
+	Field_Name_in_Error: payload[$$].errors[0].fields[0],
+	Field_Value_in_Error: flowVars.ErrorMapPrivate[$$].STI,
+	Error_Description:payload[$$].errors[0].message
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+                        <dw:set-variable variableName="SuccessUpdate"><![CDATA[//Create Success record 
+%dw 1.0
+%output application/java
+---
+payload map {
+	Id:$.Id
+} filter ($.Id != null )]]></dw:set-variable>
+                    </dw:transform-message>
+
+                    <message-properties-transformer scope="invocation" doc:name="MP: Create Success/ Error Record Count" doc:description="Save Success/ Error Record Count">
+                        <add-message-property key="SuccessUpdate" value="#[flowVars.SuccessUpdate.size()]"/>
+                        <add-message-property key="ErrorUpdateCount" value="#[flowVars.UpdateError != '' ?flowVars.UpdateError.split(&quot;\n&quot;).length:0]"/>
+                        <add-message-property key="MismatchErrorCount" value="#[flowVars.MismatchError != '' ?flowVars.MismatchError.split(&quot;\n&quot;).length:0]"/>
+                        <add-message-property key="UpdateError" value="#[flowVars.UpdateError != ''?flowVars.UpdateError:'']"/>
+                        <add-message-property key="MismatchError" value="#[flowVars.MismatchError != ''?flowVars.MismatchError:'']"/>
+                        <add-message-property key="ConsentError" value="#[flowVars.ConsentError != ''?flowVars.ConsentError:'']"/>
+                        <add-message-property key="CaseError" value="#[flowVars.CaseError != ''?flowVars.CaseError:'']"/>
+                        <add-message-property key="ConsentErrorCount" value="#[flowVars.ConsentErrorPrivate.size()]"/>
+                        <add-message-property key="CaseErrorCount" value="#[flowVars.CaseErrorPrivate.size()]"/>
+                    </message-properties-transformer>
+<objectstore:store config-ref="DOE_Information_Load" key="Error_ Update#[server.nanoTime()]" value-ref="#[flowVars.ErrorUpdateCount + flowVars.MismatchErrorCount + flowVars.ConsentErrorCount + flowVars.CaseErrorCount]" doc:name="OS: Save Error Record Count" doc:description="Create Error Record Count for Bacth Step"/>
+                    <objectstore:store config-ref="DOE_Information_Load" key="Success_ Update#[server.nanoTime()]" value-ref="#[flowVars.SuccessUpdate]" doc:name="OS: Save Success Record Count" doc:description="Create Error Success Count for Bacth Step"/>
+                    <objectstore:store config-ref="DOE_Information_Load" key="Attachment#[server.nanoTime()]" value-ref="#[flowVars.UpdateError + flowVars.MismatchError + flowVars.ConsentError + flowVars.CaseError]" doc:name="OS: Save Error Attachment" doc:description="Create Error Attachment for Bacth Step"/>
+
+                      <set-payload value="#[[]]" doc:name="SP: Set Payload to Empty Array" doc:description="Set Payload to Empty Array to avoid error in &quot;Complete&quot; phase"/>
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload" doc:description="Set payload to the last exception."/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each" doc:description="For Each is used to process each error in a loop.">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>                    
+                    <objectstore:store config-ref="DOE_InformationLoad_Error" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="DOE_InformationLoad_Error" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+
+                </batch:commit>
+            </batch:step>
+           
+        </batch:process-records>
+        <batch:on-complete>
+                 <json:object-to-json-transformer doc:name="Object to JSON : Convert Batch Summary" doc:description="Parse the the Batch Summary into a JSON"/>
+
+            <message-properties-transformer scope="session" doc:name="MP: Set Error Count, Success Count.">
+                <add-message-property key="RecordSuccess" value="#[0]"/>
+                <add-message-property key="RecordError" value="#[sessionVars.MandatoryCount]"/>
+                <add-message-property key="RecordSkipped" value="#[sessionVars.RecordCount - sessionVars.RecordSkippedCount]"/>
+                <delete-message-property key="ErrorAttachment"/>
+            </message-properties-transformer>
+             <objectstore:retrieve-all-keys config-ref="DOE_InformationLoad_Error" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys"/>
+           <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>
+            <foreach doc:name="For Each : Iterate over Exception Keys" doc:description="For Each : Iterate over Exception Keys">
+                <choice doc:name="Choice" doc:description="Check if Batch had Errors.">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="DOE_InformationLoad_Error" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count"/>
+
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:description="Message Properties: Update Total SFDC Connection Error Count" doc:name="Message Properties: Update Total SFDC Connection Error Count">
+	                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+	                    </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="DOE_InformationLoad_Error" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details" doc:description="Exception ObjectStore : Retrive and Remove a record having Exception Details"/>
+		                <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+		                      <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+		                </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </foreach>
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if Exceptions occured" doc:description="Choice : Route to process Further if Exceptions occured
+If Exceptions occured flow is passed to a different branch which will handle clean up">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="DOE_InformationLoad_Error" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="For Each : Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="DOE_InformationLoad_Error" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Removes all the enteries and Clean Object Store"/>
+
+                    </foreach>
+                    <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow"/>
+              </when>
+              <otherwise>
+            <set-session-variable variableName="ErrorAttachment" value="#['Error,Field Name in Error,Field Value in Error,Error Description\n' + flowVars.MandatoryErrorCSV+ flowVars.SkippedAttachment + flowVars.SpecialErrorInfo + flowVars.GraduationErrorInfo + flowVars.SpecialInfoAbsent + flowVars.GraduationInfoAbsent]" doc:name="Session Variable" doc:description="Save Error Attachment"/>
+            <objectstore:retrieve-all-keys config-ref="DOE_Information_Load" doc:name="ObjectStore: Retrieve Stored Objects" doc:description="Retrieve the Error Messsage stored in the Object Store"/>
+            <foreach doc:name="For Each" doc:description="For Each For Parsing the Error Report from the Object store one by one">
+                <choice doc:name="Choice" doc:description="Route Message based on Object Store Key">
+                    <when expression="#[payload.contains('Success')]">
+                                <objectstore:remove config-ref="DOE_Information_Load" key="#[payload]" doc:name="ObjectStore:Update Success Records" doc:description="Remove Update Succes Count from Object Store"/>
+
+                        <message-properties-transformer scope="session" doc:name="MP: Update Success Count">
+                            <add-message-property key="RecordSuccess" value="#[(payload != null)?(sessionVars.RecordSuccess + payload):sessionVars.RecordSuccess]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <when expression="#[payload.contains('Error')]">
+                                <objectstore:remove config-ref="DOE_Information_Load" key="#[payload]" doc:name="ObjectStore: Update Error Records" doc:description="Remove Update Error Records from Object Store"/>
+
+                        <message-properties-transformer scope="session" doc:name="MP: Update Error Count" overwrite="true" doc:description="Update Error Count">
+                            <add-message-property key="RecordError" value="#[(payload != null or payload != '')?(sessionVars.RecordError + payload):sessionVars.RecordError]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="DOE_Information_Load" key="#[payload]" doc:name="ObjectStore: Read Stored Objects" doc:description="Remove the Error Report from the object store"/>
+                        <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Create Error Attachment" doc:description="Append the Error report retrieved from the object store into the ErrorAttachment variable">
+                            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment + payload]"/>
+
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+
+            </foreach>
+            <message-properties-transformer overwrite="true" scope="session" metadata:id="9109bd5b-8548-49c1-9c54-aeba7188f064" doc:name="MP: Update RecordCount,RecordError,RecordSuccess" doc:description="Update the Error Count, Success Count and the Total Count">
+
+                <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;)]"/>
+
+                <add-message-property key="ErrorDescription" value="#[sessionVars.RecordError != 0?('No. Of errors : '+sessionVars.RecordError+' See attached file for details'):('')]"/>
+
+                <delete-message-property key="TransAttachment"/>
+
+            </message-properties-transformer>
+
+             <set-payload value="{&quot;InterfaceID&quot;: &quot;INF053&quot;, &quot;InterfaceName&quot;: &quot;DOE Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_DOEInformation_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordSuccess==0?'Error':sessionVars.RecordError==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[(sessionVars.RecordCount - sessionVars.RecordSkipped) -sessionVars.RecordSuccess]&quot;,&quot;RecordSkipped&quot;:&quot;#[sessionVars.RecordSkipped]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.ErrorDescription]&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordError != 0 ?'Business':'']&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to JSON for Logging Framework" doc:description="Set the JSON payload for the Logging framework-Final call"/>
+
+            <choice doc:name="Choice" doc:description="Remove Error Attachment">
+                <when expression="#[(sessionVars.ErrorAttachment.split(&quot;\n&quot;).length) == 1]">
+                    <message-properties-transformer scope="session" doc:name="MP: Remove Error Attachment" doc:description="Remove Error Attachment">
+                        <delete-message-property key="ErrorAttachment"/>
+                    </message-properties-transformer>
+                </when>
+                <otherwise>
+                    <logger message="Business Error(s) Present" level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the Loggin framework"/>
+             <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Display the outcome of the logging framewok"/>
+       
+       </otherwise>
+       </choice>
+        </batch:on-complete>
+    </batch:job>
+    <sub-flow name="INF053_DOE_Information_Load_Transaction_SubFlow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF053&quot;, &quot;InterfaceName&quot;: &quot;DOE Information Load&quot;, &quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;#[sessionVars.CompletedFilename]&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}" doc:name="Set Payload to JSON for Logging Framework" doc:description="This step will set the Payload with properties required for logging In Progress transaction in FOCUS interface dashboard."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call &quot;Log Transaction&quot; framework to log &quot;In Progress&quot; transaction with payload created in the previous step. This step gets &quot;Transactio Id&quot; (TID) as output from the framework and is passed back to Message enricher."/>
+
+    </sub-flow>
+    <sub-flow name="INF053_DOE_Information_Load_Transaction2_SubFlow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF053&quot;, &quot;InterfaceName&quot;: &quot;DOE Information Load&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;ErrorFilename&quot;: &quot;${sftp.doeinfoload.archive.graduationfilename}&quot;, &quot;CompletedFilename&quot;: &quot;#[sessionVars.CompletedFilename]&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}" doc:name="Set Payload to JSON for Logging Framework" doc:description="This step will set the Payload with properties required for logging In Progress transaction in FOCUS interface dashboard."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call &quot;Log Transaction&quot; framework to log &quot;In Progress&quot; transaction with payload created in the previous step. This step gets &quot;Transactio Id&quot; (TID) as output from the framework and is passed back to Message enricher."/>
+
+    </sub-flow>
+
+    <sub-flow name="inf053-doe-information-load-StudentInfo">
+        <until-successful maxRetries="5" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful " doc:description="Retry mechanism for Intermittent Exceptions">
+			<mulerequester:request resource="sftp://${sftp.doeinfoload.transaction.student.username}:${sftp.doeinfoload.transaction.student.password}@${sftp.doeinfoload.transaction.student.host}:${sftp.doeinfoload.transaction.student.port}${sftp.doeinfoload.transaction.student.path}?connector=SFTP&amp;myfilename=${sftp.doeinfoload.transaction.studentfilename}" doc:name="MR: Get Student Info File" doc:description=" Mule Requestor connector is used to retrieve the file from Mule Requestor. It will get Student Info file"/>            
+        </until-successful>        
+        <validation:is-not-null config-ref="Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check Payload" doc:description="This step will validate if the file found in SFTP location or not. If not found, then will throw an error with message &quot;No File Found&quot;. This exception will be caught by Exception Handling and log an exception message in FOCUS interface dashboard."/>
+
+        <object-to-string-transformer mimeType="application/csv" doc:name="OtoS: Convert from ObjectStream to CSV" doc:description="This step converts Object stream to human readable text format."/>
+
+        <message-properties-transformer scope="session" doc:name="Save Incoming Flat File" doc:description="Set the &quot;Transaction Attachment&quot; with incoming file (also called payload) to write backup file into FOCUS interface dashboard as part of Logging &quot;In Progress&quot; transaction. Get the Total record count from the file to set the total count as part of &quot;Completed&quot; transaction on the interface dashboard." metadata:id="aa98e22c-d5df-4e5f-bb2e-793e0302ef6a">
+            <add-message-property key="StudentInfo" value="#[payload]"/>
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="CompletedFilename" value="${sftp.doeinfoload.archive.studentfilename}"/>
+            <add-message-property key="RecordCount" value="#[(payload.split(&quot;\n&quot;).length) - 1]"/>
+        </message-properties-transformer>
+
+        <enricher doc:name="Message Enricher" doc:description="Message enricher is used to retain the payload.">
+            <flow-ref name="INF053_DOE_Information_Load_Transaction_SubFlow" doc:name="INF053_DOE_Information_Load_Transaction_SubFlow" doc:description="Invoke DOE Stars Load In Progress sub flow to log &quot;In Progress&quot; transaction on the FOCUS interface dashboard."/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP" outputPattern="${sftp.doeinfoload.archive.studentfilename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.doeinfoload.archive.student.host}" port="${sftp.doeinfoload.archive.student.port}" path="${sftp.doeinfoload.archive.student.path}" user="${sftp.doeinfoload.archive.student.username}" password="${sftp.doeinfoload.archive.student.password}" responseTimeout="10000" doc:name="SFTP" doc:description="This step will copy incoming DOE stars load file in SFTP archive location with datetime added at the end of the file name. This is one of the DSCYF technical requirements. " duplicateHandling="overwrite"/>
+        <dw:transform-message doc:name="TM: Create StudentInfo Array" metadata:id="62030c49-ea5b-4485-b0d6-1a7bd0332421">
+            <dw:input-payload mimeType="application/csv"/>
+            <dw:set-variable variableName="StudentInfoArray"><![CDATA[//Create StudentInfo Array
+%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	STI: (pad('0',(6 - sizeOf (trim $[0]))) ++ (trim $[0])) when $[0] != null otherwise '',
+	Student_Key: $[1] ,
+	School_Year: $[2] ,
+	Summary_District_Id: $[3] as :string,
+	School_Id: $[4] ,
+	First_Name: $[5] ,
+	Middle_Name: $[6] ,
+	Last_Name: $[7] ,
+	Name_Suffix: $[8] ,
+	Race_Desc: $[9] ,
+	Grade_Level_Desc: capitalize $[10] default "",
+	Gender_Desc: $[11] ,
+	Birth_Date: $[12] ,	
+	EntryDate:$[15],
+	PID:$[24],
+	ExternalIDPublic:((((pad('0',(6 - sizeOf (trim $[0]))) ++ (trim $[0])) when $[0] != null otherwise "") ++ "-" ++ upper ($[5]  ++ "-" ++ $[7]  ++ "-" ++ (($[12] splitBy "/")[2] ++ "-" ++ ($[12] splitBy "/")[0] ++ "-" ++ ($[12] splitBy "/")[1]) ++ "-" ++ $[11]) default "") as :string) replace /([',\s])/ with "",
+	ExternalIDPrivate:((((pad('0',(6 - sizeOf (trim $[0]))) ++ (trim $[0])) when $[0] != null otherwise "") ++ "-" ++ $[24] default "" ) as :string ) 
+	}]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Create Mandatory Field Missing Error">
+            <dw:set-variable variableName="StudentInfoArray"><![CDATA[//Filter StudentInfo Array if Mandatory Field is missing
+%dw 1.0
+%output application/java
+---
+flowVars.StudentInfoArray filter (($.STI != '') and ($.Summary_District_Id != ''))]]></dw:set-variable>
+            <dw:set-variable variableName="MandatoryErrorCSV"><![CDATA[//Create Mandatory Field Missing Error
+%dw 1.0
+%output application/java
+---
+flowVars.StudentInfoArray filter (($.STI == '') or ($.Summary_District_Id == ''))]]></dw:set-variable>
+        </dw:transform-message>
+        <message-properties-transformer scope="session" doc:name="MP: Mandatory Field Missing Error Count" doc:description="Mandatory Field Missing Error Count">
+            <add-message-property key="MandatoryCount" value="#[flowVars.MandatoryErrorCSV.size()]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="TM: StudentInfoArray - Order Array by Date, MandatoryErrorCSV, StudentInfoGroup - Group By STI">
+            <dw:set-variable variableName="StudentInfoArray"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.StudentInfoArray orderBy ($.EntryDate as :date))[-1..0] ) distinctBy $.STI]]></dw:set-variable>
+            <dw:set-variable variableName="MandatoryErrorCSV"><![CDATA[//Create Error Report if Mandatory Field is missing 
+%dw 1.0
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.MandatoryErrorCSV map {
+	Error: 'Mandatory Field Missing Warning' ,
+	Field_Name_in_Error: 'STI' when $.STI == '' otherwise ( 'District ID' when $.Summary_District_Id == '' otherwise (
+	("STI and Disrict ID" when $.STI == '' and $.Summary_District_Id == null otherwise '')
+	)),
+	Field_Value_in_Error:"",
+	Error_Description:"Mandatory field is Missing. " ++ " STI : " ++ ( $.STI default "") ++ "|" ++ "First Name : " ++  ($.First_Name default "" ) ++ "|" ++ "Last Name: " ++ ($.Last_Name default "") ++ "|" ++ "BirthDate: " ++  ($.Birth_Date default "") ++ "|" ++ "Gender: " ++ ($.Gender_Desc default "" ) ++ "|" ++ "Race : " ++ ( $.Race_Desc default "")
+	 } ]]></dw:set-variable>
+            <dw:set-variable variableName="StudentInfoGroup"><![CDATA[//Skipped Records Group $.STI
+%dw 1.0
+%output application/java
+---
+flowVars.StudentInfoArray groupBy $.STI]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: SkippedRecords">
+            <!-- <dw:set-variable variableName="StudentInfoPublic"><![CDATA[//Filter StudentInfo Public records
+%dw 1.0
+%output application/java
+-
+flowVars.StudentInfoArray filter ($.Summary_District_Id == '97') map $]]></dw:set-variable>
+            <dw:set-variable variableName="StudentInfoPrivate"><![CDATA[//Filter StudentInfo Private records
+%dw 1.0
+%output application/java
+-
+flowVars.StudentInfoArray filter ($.Summary_District_Id != '97') map $]]></dw:set-variable>
+            <dw:set-variable variableName="StudentInfoGroup"><![CDATA[//Group By STI
+%dw 1.0
+%output application/java
+-
+flowVars.StudentInfoArray groupBy $.STI]]></dw:set-variable> -->
+            <dw:set-variable variableName="SkippedRecords"><![CDATA[//Filter Skipped Records
+%dw 1.0
+%output application/java
+---
+flatten (flowVars.StudentInfoGroup filter (sizeOf $) > 1 map $[1..-1] default [] )]]></dw:set-variable>
+        </dw:transform-message>
+        <flow-ref name="inf053-doe-information-load-SpecialEducation" doc:name="inf053-doe-information-load-SpecialEducation"/>
+    </sub-flow>
+    <sub-flow name="inf053-doe-information-load-SpecialEducation">
+        <until-successful maxRetries="5" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful " doc:description="Retry mechanism for Intermittent Exceptions">
+			<mulerequester:request resource="sftp://${sftp.doeinfoload.transaction.specialeducation.username}:${sftp.doeinfoload.transaction.specialeducation.password}@${sftp.doeinfoload.transaction.specialeducation.host}:${sftp.doeinfoload.transaction.specialeducation.port}${sftp.doeinfoload.transaction.specialeducation.path}?connector=SFTP&amp;myfilename=${sftp.doeinfoload.transaction.specialfilename}" doc:name="MR: Get Special Education File" doc:description=" Mule Requestor connector is used to retrieve the file from Mule Requestor. . It will read Special Education FIle"/>            
+        </until-successful>        
+        
+        <validation:is-not-null config-ref="Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check Payload" doc:description="This step will validate if the file found in SFTP location or not. If not found, then will throw an error with message &quot;No File Found&quot;. This exception will be caught by Exception Handling and log an exception message in FOCUS interface dashboard."/>
+
+        <object-to-string-transformer mimeType="application/csv" doc:name="OtoS: Convert from ObjectStream to CSV" doc:description="This step converts Object stream to human readable text format."/>
+        <message-properties-transformer scope="session" doc:name="Save Incoming Flat File" doc:description="Set the &quot;Transaction Attachment&quot; with incoming file (also called payload) to write backup file into FOCUS interface dashboard as part of Logging &quot;In Progress&quot; transaction. Get the Total record count from the file to set the total count as part of &quot;Completed&quot; transaction on the interface dashboard." metadata:id="43d9150d-3d4f-4c42-95d7-9ad232063e40">
+            <add-message-property key="SpecialEducation" value="#[payload]"/>
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+        </message-properties-transformer>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP" outputPattern="${sftp.doeinfoload.archive.specialfilename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.doeinfoload.archive.specialeducation.host}" port="${sftp.doeinfoload.archive.specialeducation.port}" path="${sftp.doeinfoload.archive.specialeducation.path}" user="${sftp.doeinfoload.archive.specialeducation.username}" password="${sftp.doeinfoload.archive.specialeducation.password}" responseTimeout="10000" doc:name="SFTP" doc:description="This step will copy incoming file in SFTP archive location with datetime added at the end of the file name. This is one of the DSCYF technical requirements. " duplicateHandling="overwrite"/>
+        <dw:transform-message doc:name="TM:Create Special Education Array" metadata:id="b5412b52-29cc-426c-a45d-290d81339f09">
+            <dw:input-payload mimeType="application/csv"/>
+            <dw:input-session-variable mimeType="application/csv" variableName="SpecialEducation"/>
+            <dw:set-variable variableName="SpecialEducationArray"><![CDATA[//Create Special Education Array
+%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	STI: (pad('0',(6 - sizeOf (trim $[0]))) ++ (trim $[0])) when $[0] != null otherwise '' , 
+	Iep_Review_Date: $[3] when ($[3] != null and (trim $[3] != '1753-01-01' and trim $[3] != '9999-12-31')) otherwise "", 
+	Iep_Initial_Date: $[4] when ($[4] != null and (trim $[4] != '1753-01-01' and trim $[4] != '9999-12-31')) otherwise "", 
+	Iep_End_Date: $[5] when ($[5] != null and (trim $[5] != '1753-01-01' and trim $[5] != '9999-12-31')) otherwise "", 
+	Last_Evaluation_Date: $[6] when ($[6] != null and (trim $[6] != '1753-01-01' and trim $[6] != '9999-12-31')) otherwise "", 
+	Primary_Disability_Cd: ($[7] as :number) when ($[7] != null and (trim $[7] != "") and (trim $[7] != "--")) otherwise "",
+	Secondary_Disability_Cd: ($[24] as :number) when ($[24] != null and (trim $[24] != "") and (trim $[24] != "--")) otherwise "", 
+	Relative_Service_Cd1: $[13] , 
+	Relative_Service_Cd2: $[14] , 
+	Relative_Service_Cd3: $[15] , 
+	Relative_Service_Cd4: $[16] , 
+	Relative_Service_Cd5: $[17] , 
+	Special_Education_Exit_Date: $[20] when ($[20] != null and (trim $[20] != '1753-01-01' and trim $[20] != '9999-12-31')) otherwise "", 
+	Special_Education_Exit_Reason_Cd:$[21]
+} orderBy $.Iep_End_Date]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Group by STI">
+            <dw:set-variable variableName="SpecialEducationArray"><![CDATA[//Group by STI number
+%dw 1.0
+%output application/java
+---
+(flowVars.SpecialEducationArray distinctBy $.STI) groupBy $.STI]]></dw:set-variable>
+            <dw:set-variable variableName="SpecialErrorInfo"><![CDATA[//Create Error Report if the record is not found in Student Info file
+%dw 1.0
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.SpecialEducationArray map {
+	Error: 'Data Warning' when (flowVars.StudentInfoGroup[$.STI].STI == null) otherwise '',
+	Field_Name_in_Error: 'Special Education File',
+	Field_Value_in_Error:"STI : " ++ $.STI,
+	Error_Description:"A file other than 'Student Info' file  contains a record with a District ID and STI Number that does not exist in the 'Student Info' file."
+} filter ($.Error != '' )]]></dw:set-variable>
+            <dw:set-variable variableName="SkippedAttachment"><![CDATA[//Skipped Rows Error
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.SkippedRecords map {
+	Error: 'Data Warning' ,
+	Field_Name_in_Error: 'STI',
+	Field_Value_in_Error: "STI : " ++ $.STI ++ "|" ++ ("PID :" ++ $.PID ) when ($.PID != null ) otherwise "",
+	Error_Description:"Duplicate STI found based on latest Entry Date."
+} ]]></dw:set-variable>
+
+        </dw:transform-message>
+        <flow-ref name="inf053-doe-information-load-Graduation" doc:name="inf053-doe-information-load-Graduation"/>
+    </sub-flow>
+    <sub-flow name="inf053-doe-information-load-Graduation">
+        <until-successful maxRetries="5" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful " doc:description="Retry mechanism for Intermittent Exceptions">
+            <mulerequester:request resource="sftp://${sftp.doeinfoload.transaction.gradutaion.username}:${sftp.doeinfoload.transaction.gradutaion.password}@${sftp.doeinfoload.transaction.gradutaion.host}:${sftp.doeinfoload.transaction.gradutaion.port}${sftp.doeinfoload.transaction.gradutaion.path}?connector=SFTP&amp;myfilename=${sftp.doeinfoload.transaction.graduationfilename}" doc:name="MR: Get Graduation File" doc:description=" Mule Requestor connector is used to retrieve the file from Mule Requestor. It will read Graduation FIle"/>
+        </until-successful>
+
+
+        <validation:is-not-null config-ref="Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check Payload" doc:description="This step will validate if the file found in SFTP location or not. If not found, then will throw an error with message &quot;No File Found&quot;. This exception will be caught by Exception Handling and log an exception message in FOCUS interface dashboard."/>
+
+        <object-to-string-transformer mimeType="application/csv" doc:name="OtoS: Convert from ObjectStream to CSV" doc:description="This step converts Object stream to human readable text format."/>
+
+        <message-properties-transformer scope="session" doc:name="Save Incoming Flat File" doc:description="Set the &quot;Transaction Attachment&quot; with incoming file (also called payload) to write backup file into FOCUS interface dashboard as part of Logging &quot;In Progress&quot; transaction.
+Get the Total record count from the file to set the total count as part of &quot;Completed&quot; transaction on the interface dashboard.">
+            <add-message-property key="Graduation" value="#[payload]"/>
+            <add-message-property key="TransAttachment" value="#[sessionVars.SpecialEducation]"/>
+            <add-message-property key="ErrorAttachment" value="#[payload]"/>
+            <add-message-property key="CompletedFilename" value="#['Special_Education_' + server.dateTime.format(&quot;MM/dd/yyyyy&quot;)]"/>
+        </message-properties-transformer>
+         <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP" outputPattern="${sftp.doeinfoload.archive.graduationfilename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.doeinfoload.archive.gradutaion.host}" port="${sftp.doeinfoload.archive.gradutaion.port}" path="${sftp.doeinfoload.archive.gradutaion.path}" user="${sftp.doeinfoload.archive.gradutaion.username}" password="${sftp.doeinfoload.archive.gradutaion.password}" responseTimeout="10000" doc:name="SFTP" doc:description="This step will copy incoming  file in SFTP archive location with datetime added at the end of the file name. This is one of the DSCYF technical requirements. " duplicateHandling="overwrite"/> 
+        <dw:transform-message doc:name="TM: Create Graduation Array" metadata:id="896a3844-6166-409b-82ac-1434fbf53e4f">
+            <dw:input-payload mimeType="application/csv"/>
+            <dw:set-variable variableName="GraduationArray"><![CDATA[//Create Graduation Array
+%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	STI:(pad('0',(6 - sizeOf (trim $[0]))) ++ (trim $[0])) when $[0] != null otherwise '',
+	Hs_Graduation_Date:$[4]
+} ]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Group by STI">
+            <dw:set-variable variableName="GraduationArray"><![CDATA[//Group by STI
+%dw 1.0
+%output application/java
+---
+flowVars.GraduationArray groupBy $.STI]]></dw:set-variable>
+            <dw:set-variable variableName="GraduationErrorInfo"><![CDATA[//Create Error Report if the Graduation Array has a record which Student Info File does not
+%dw 1.0
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+flowVars.GraduationArray map {
+	Error: 'Data Warning' when (flowVars.StudentInfoGroup[$.STI].STI == null) otherwise '',
+	Field_Name_in_Error: 'Graduation Education File',
+	Field_Value_in_Error:"STI : " ++ $.STI,
+	Error_Description:"A file other than 'Student Info' file  contains a record with a District ID and STI Number that does not exist in the 'Student Info' file."
+} filter ($.Error != '' )
+]]></dw:set-variable>
+        </dw:transform-message>
+     
+    </sub-flow>
+    <!-- <sub-flow name="inf053-doe-information-load-Grades">
+       <mulerequester:request resource="sftp://${sftp.doeinfoload.transaction.username}:${sftp.doeinfoload.transaction.password}@${sftp.doeinfoload.transaction.host}:${sftp.doeinfoload.transaction.port}${sftp.doeinfoload.transaction.path}?connector=SFTP&amp;myfilename=${sftp.doeinfoload.transaction.filename}" doc:name="Mule Requester" doc:description="1. Mule Requestor connector is used to retrieve the file with file name &quot;dieec_star_level_export.txt&quot; from the landing location"/>
+        <validation:is-not-null config-ref="Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check Payload" doc:description="This step will validate if the file found in SFTP location or not. If not found, then will throw an error with message &quot;No File Found&quot;. This exception will be caught by Exception Handling and log an exception message in FOCUS interface dashboard."/>
+
+        <object-to-string-transformer mimeType="application/csv" doc:name="OtoS: Convert from ObjectStream to CSV" doc:description="This step converts Object stream to human readable text format."/>
+
+        <message-properties-transformer scope="session" doc:name="Save Incoming Flat File" doc:description="Set the &quot;Transaction Attachment&quot; with incoming file (also called payload) to write backup file into FOCUS interface dashboard as part of Logging &quot;In Progress&quot; transaction.
+Get the Total record count from the file to set the total count as part of &quot;Completed&quot; transaction on the interface dashboard.">
+            <add-message-property key="Grades" value="#[payload]"/>
+        </message-properties-transformer>
+        <flow-ref name="inf053-doe-information-load-EntryWithdrawal" doc:name="inf053-doe-information-load-EntryWithdrawal"/>
+       
+    </sub-flow> -->
+    <!-- <sub-flow name="inf053-doe-information-load-EntryWithdrawal">
+        <mulerequester:request resource="sftp://${sftp.doeinfoload.transaction.username}:${sftp.doeinfoload.transaction.password}@${sftp.doeinfoload.transaction.host}:${sftp.doeinfoload.transaction.port}${sftp.doeinfoload.transaction.path}?connector=SFTP&amp;myfilename=${sftp.doeinfoload.transaction.filename}" doc:name="Mule Requester" doc:description="1. Mule Requestor connector is used to retrieve the file with file name &quot;dieec_star_level_export.txt&quot; from the landing location"/>
+        <validation:is-not-null config-ref="Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check Payload" doc:description="This step will validate if the file found in SFTP location or not. If not found, then will throw an error with message &quot;No File Found&quot;. This exception will be caught by Exception Handling and log an exception message in FOCUS interface dashboard."/>
+
+        <object-to-string-transformer mimeType="application/csv" doc:name="OtoS: Convert from ObjectStream to CSV" doc:description="This step converts Object stream to human readable text format."/>
+
+        <message-properties-transformer scope="session" doc:name="Save Incoming Flat File" doc:description="Set the &quot;Transaction Attachment&quot; with incoming file (also called payload) to write backup file into FOCUS interface dashboard as part of Logging &quot;In Progress&quot; transaction.
+Get the Total record count from the file to set the total count as part of &quot;Completed&quot; transaction on the interface dashboard.">
+            <add-message-property key="EntryWithdrawal" value="#[payload]"/>
+        </message-properties-transformer>
+        <flow-ref name="inf053-doe-information-load-Attendance" doc:name="inf053-doe-information-load-Attendance"/>
+        
+    </sub-flow> -->
+    <!-- <sub-flow name="inf053-doe-information-load-Attendance">
+        <mulerequester:request-collection resource="sftp://${sftp.doeinfoload.transaction.username}:${sftp.doeinfoload.transaction.password}@${sftp.doeinfoload.transaction.host}:${sftp.doeinfoload.transaction.port}${sftp.doeinfoload.transaction.path}?connector=SFTP&amp;myfilename=${sftp.doeinfoload.transaction.filename}" doc:name="Mule Requester" doc:description="1. Mule Requestor connector is used to retrieve the file with file name &quot;dieec_star_level_export.txt&quot; from the landing location"/>
+        <validation:is-not-null config-ref="Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check Payload" doc:description="This step will validate if the file found in SFTP location or not. If not found, then will throw an error with message &quot;No File Found&quot;. This exception will be caught by Exception Handling and log an exception message in FOCUS interface dashboard."/>
+
+        <object-to-string-transformer mimeType="application/csv" doc:name="OtoS: Convert from ObjectStream to CSV" doc:description="This step converts Object stream to human readable text format."/>
+
+        <message-properties-transformer scope="session" doc:name="Save Incoming Flat File" doc:description="Set the &quot;Transaction Attachment&quot; with incoming file (also called payload) to write backup file into FOCUS interface dashboard as part of Logging &quot;In Progress&quot; transaction.
+Get the Total record count from the file to set the total count as part of &quot;Completed&quot; transaction on the interface dashboard.">
+            <add-message-property key="Attendance" value="#[payload]"/>
+        </message-properties-transformer>
+        
+    </sub-flow> -->
+    <sub-flow name="inf053-doe-information-load-Call-LOV-flow" doc:description="This sub flow will call the LOV framework">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'DOE_ETHNICITY_DESC','DOE_RELATIVE_SERVICE_CODE','DOE_SPECIAL_REASON_CODE','DOE_PRIMARY_DISABILITY','DOE GENDER_DESC','DOE_GRADE_LEVEL_DESC','DOE_ENTRY_CODE','DOE_WITHDRAWAL_CODE','DOE_SCHOOL_CODE'&quot;}" doc:name="Set Payload to LOV framework JSON" doc:description="Set Payload to LOV framework JSON, with Name of all LOVs to be extracted from SFDC"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+    <flow name="Interface-handle-batch-errors-Flow" doc:description="This flow is used to catch Exceptions generated iside the batchLoad step">
+        <validation:custom-validator config-ref="Validation_Configuration" exceptionClass="org.mule.api.ConnectionException" class="gov.delaware.validation.DelawareValidator" doc:name="Validation" doc:description="Validation is used to stop the flow and generate Error if the flow has exception"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy" doc:description="Reference Error Handling Framework "/>
+    </flow>
+
+</mule>

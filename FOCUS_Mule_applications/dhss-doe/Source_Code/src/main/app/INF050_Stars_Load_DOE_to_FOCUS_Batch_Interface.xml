@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:quartz="http://www.mulesoft.org/schema/mule/quartz" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/quartz/current/mule-quartz.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd">
+   <!--  <mulerequester:config name="Mule_Requester" doc:name="Mule Requester"/> -->
+  <!--   <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}" url="${sfdc.url}" doc:name="Salesforce: Basic Authentication" disableSessionInvalidation="true">
+        <reconnect count="5"/>
+    </sfdc:config>
+   -->
+    <!-- <mulerequester:config name="Mule_Requester1" doc:name="Mule Requester"/> -->
+    <sftp:connector name="SFTP" validateConnections="true" 
+		doc:name="SFTP" >
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+    <validation:config name="Validation_Configuration" doc:name="Validation Configuration"/>
+    <sftp:connector name="SFTP_KeepFile" validateConnections="true" 
+		doc:name="SFTP" autoDelete="false">
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+    <flow name="INF050_Stars_Load_DOE_to_FOCUS_Batch_Interface" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="The Poll connector will trigger the job/flow as per the business requirement. The DOE Stars Load will run every day from Sunday to Saturday at 09:15 AM EST.">
+            <schedulers:cron-scheduler expression="0 15 9 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF050" doc:name="Set Payload to Interface ID" doc:description="Set payload with Interface Id i.e. INF050. The reason why we set with Interface Id, in case job fails just after the first step, this payload will help creating an Error Transaction in FOCUS interface dashboard."/>
+
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Save the Interface Id payload in an variable because Payload variable will be overwritten by the other details in the later steps."/>
+        <until-successful maxRetries="5" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
+            <mulerequester:request resource="sftp://${sftp.doestarsload.transaction.username}:${sftp.doestarsload.transaction.password}@${sftp.doestarsload.transaction.host}:${sftp.doestarsload.transaction.port}${sftp.doestarsload.transaction.path}?connector=SFTP_KeepFile&amp;myfilename=${sftp.doestarsload.transaction.filename}" doc:name="Mule Requester" doc:description="1. Mule Requestor connector is used to retrieve the file with file name &quot;dieec_star_level_export.txt&quot; from the landing location"/>
+        </until-successful>
+
+        <validation:is-not-null config-ref="Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check Payload" doc:description="This step will validate if the file found in SFTP location or not. If not found, then will throw an error with message &quot;No File Found&quot;. This exception will be caught by Exception Handling and log an exception message in FOCUS interface dashboard."/>
+
+        <object-to-string-transformer mimeType="application/csv" doc:name="OtoS: Convert from ObjectStream to CSV" doc:description="This step converts Object stream to human readable text format."/>
+
+        <message-properties-transformer scope="session" doc:name="Save Incoming Flat File" doc:description="Set the &quot;Transaction Attachment&quot; with incoming file (also called payload) to write backup file into FOCUS interface dashboard as part of Logging &quot;In Progress&quot; transaction.
+Get the Total record count from the file to set the total count as part of &quot;Completed&quot; transaction on the interface dashboard.">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="RecCount" value="#[payload.split(&quot;\n&quot;).length - 1]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Message enricher is used to retain the payload.">
+            <flow-ref name="DOEStarsLoad_LogInProgress_Transaction_SubFlow" doc:name="DOEStarsLoad_LogInProgress_Transaction_SubFlow" doc:description="Invoke DOE Stars Load In Progress sub flow to log &quot;In Progress&quot; transaction on the FOCUS interface dashboard."/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <remove-session-variable variableName="TransAttachment" doc:name="SV: Remove TransAttachment Payload" doc:description="Remove Transaction Attachment session variable as File is attached to the interface dashboard. If don't remove, System will upload the attachment when next time interface dashboard is called."/>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP" outputPattern="${sftp.doestarsload.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.doestarsload.archive.host}" port="${sftp.doestarsload.archive.port}" path="${sftp.doestarsload.archive.path}" user="${sftp.doestarsload.archive.username}" password="${sftp.doestarsload.archive.password}" responseTimeout="10000" doc:name="SFTP" doc:description="This step will copy incoming DOE stars load file in SFTP archive location with datetime added at the end of the file name. This is one of the DSCYF technical requirements. " duplicateHandling="addSeqNo"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="DOE_Stars_Load_Check_If_Records_Exists_in_the_file" doc:name="DOE_Stars_Load_Check_If_Records_Exists_in_the_file"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[sessionVars.RecCount &gt; 0]" doc:name="Expression" doc:description="Expression will check if there are any records to process further steps. In case of no records processing will be stopped here."/>
+        <dw:transform-message metadata:id="350fd812-16b1-4938-8420-2dde4c56ddba" doc:name="Convert CSV to Java">
+            <dw:input-payload mimeType="application/csv">
+                <dw:reader-property name="separator" value="|"/>
+            </dw:input-payload>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/csv
+%output application/java
+---
+payload filter ($.star_level as :string == "0" or $.star_level as :string == "1" or $.star_level as :string == "2" or $.star_level as :string == "3" or $.star_level as :string == "4" or $.star_level as :string == "5")  map 
+{
+	record: 
+	{
+		LicenseNumber: $.provider_idno default "" as :string,
+		name: $.provider_name default "",
+		level: $.star_level default "",
+		acf801: $.acf801 default "",
+		export_date: $.export_date default ""
+	}
+}]]></dw:set-payload>
+            <dw:set-variable variableName="ExportDate"><![CDATA[%dw 1.0
+%output application/java
+---
+payload[0].export_date as :string default ""]]></dw:set-variable>
+            <dw:set-variable variableName="InvalidStarRating"><![CDATA[%dw 1.0
+%output application/csv header = false, quoteValues = true
+---
+payload filter ($.star_level as :string != "0" and $.star_level as :string != "1" and $.star_level as :string != "2" and $.star_level as :string != "3" and $.star_level as :string != "4" and $.star_level as :string != "5")  map {
+	LicenseNumber: $.provider_idno default "" as :string,
+	name: $.provider_name default "",
+	level: $.star_level default "",
+	acf801: $.acf801 default "",
+	export_date: $.export_date default "",
+	Id: "",
+	ErrorCode: 'INVALID_STAR_RATING',
+	ErrorDesc: 'Star Rating must be either 0, 1, 2, 3, 4, or 5'
+}]]></dw:set-variable>
+        </dw:transform-message>
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties" doc:description="Read &quot;Export Date&quot; from File from the first record. ">
+            <add-message-property key="FinalDate" value="#[flowVars.ExportDate.substring(0, flowVars.ExportDate.indexOf(' '))]"/>
+            <add-message-property key="JavaPayload" value="#[payload]"/>
+        </message-properties-transformer>
+
+        <choice doc:name="Check Export Date is Today" doc:description="Business Rule# 2: The Export Date is to be used as a check in the program to ensure the scheduler does not process the same file twice.    At the time of the import, if the Export Date is less than the Current Date, then do not import and create an exception. ">
+            <when expression="#[flowVars.FinalDate == server.dateTime.format(&quot;M/d/yyyy&quot;)]">
+                <flow-ref name="DOE_Stars_Load_Update_Rating_Sub_Flow" doc:name="DOE_Stars_Load_Update_Rating_Sub_Flow" doc:description="Call Update Rating sub flow to Update Star Rating on OCCL Providers."/>
+				<choice doc:name="Choice">
+
+            <when expression="#[RecStatus == 'Success']">
+
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF050&quot;, &quot;InterfaceName&quot;: &quot;DOE Stars Load&quot;, &quot;TransactionID&quot;: &quot;#[TID]&quot;, &quot;Status&quot;:&quot;#[RecStatus]&quot;,&quot;RecordCount&quot;:&quot;#[RecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[SuCount]&quot;,&quot;RecordError&quot;:&quot;#[ErrCount]&quot;,&quot;ErrorDescription&quot;:&quot;&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;&quot;, &quot;ErrorExtension&quot;:&quot;&quot;, &quot;CompletedExtension&quot;:&quot;&quot;}" doc:name="SP with Transaction Success info" doc:description="At the end of the process we need to update the interface transaction appropriately with end status. In this step we will be setting the payload with &quot;Success&quot; status to update the &quot;In Progress&quot; transaction with &quot;Success&quot; status in the FOCUS Interface Dashboard"/>
+            </when>
+            <otherwise>
+                <message-properties-transformer scope="session" mimeType="application/csv" doc:name="MP: Completed with Errors" doc:description="Set Error Attachment with Error Payload to log any exceptions in the FOCUS interface dashboard.">
+                    <add-message-property key="ErrorAttachment" value="#[flowVars.ExceptionPayload]"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF050&quot;, &quot;InterfaceName&quot;: &quot;DOE Stars Load&quot;, &quot;TransactionID&quot;: &quot;#[TID]&quot;, &quot;Status&quot;:&quot;#[RecStatus]&quot;,&quot;RecordCount&quot;:&quot;#[RecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[SuCount]&quot;,&quot;RecordError&quot;:&quot;#[ErrCount]&quot;,&quot;ErrorDescription&quot;:&quot;Check attached file for Error details&quot;, &quot;ErrorFilename&quot;: &quot;Error/Warning_DOEStarsLoad_&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;ErrorExtension&quot;:&quot;csv&quot;, &quot;CompletedExtension&quot;:&quot;&quot;}" doc:name="SP with Transaction Complete info" doc:description="Set with Payload to log &quot;Completed with Errors&quot; status in the FOCUS Interface Dashboard"/>
+            </otherwise>
+        </choice>
+
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call Logging Framework to update the interface transaction with appropriate status."/>
+            </when>
+            <otherwise>
+
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF050&quot;, &quot;InterfaceName&quot;: &quot;DOE Stars Load&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;Export date in the file is less than today's date&quot;,&quot;ExceptionType&quot;:&quot;System&quot;, &quot;ErrorExtension&quot;:&quot;&quot;, &quot;CompletedExtension&quot;:&quot;&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;}" doc:name="Set Payload to Log Exception" doc:description="Set payload to log Error message &quot;Export date in the file is less than today's date&quot; in the FOCUS interface dashboard."/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This step is used to call the Logging Transaction framework to log the error message &quot;Export date in the file is less than today's date&quot; in the FOCUS interface dashboard."/>
+
+            </otherwise>
+        </choice>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+    <sub-flow name="DOEStarsLoad_LogInProgress_Transaction_SubFlow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF050&quot;, &quot;InterfaceName&quot;: &quot;DOE Stars Load&quot;, &quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;Backup_dieec_star_level_export&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}" doc:name="Set Payload" doc:description="This step will set the Payload with properties required for logging In Progress transaction in FOCUS interface dashboard."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call &quot;Log Transaction&quot; framework to log &quot;In Progress&quot; transaction with payload created in the previous step. This step gets &quot;Transactio Id&quot; (TID) as output from the framework and is passed back to Message enricher."/>
+    </sub-flow>
+    <sub-flow name="DOE_Stars_Load_Check_If_Records_Exists_in_the_file">
+        <choice doc:name="Choice" doc:description="Check if there are any records in the File (Except Header). If there are any records processing will continue otherwise Transaction in Interface dashboard will be updated with Status &quot;Error&quot; and Description &quot;No Records found in the File&quot;.">
+            <when expression="#[sessionVars.RecCount &lt;= 0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF050&quot;, &quot;InterfaceName&quot;: &quot;DOE Stars Load&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records found in the file&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;}" mimeType="text/json" doc:name="Set Payload" doc:description="Set Error Payload to log the error message"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This step is used to call the Logging Transaction framework to log the error message in the FOCUS interface dashboard."/>
+            </when>
+            <otherwise>
+                <logger message="---DOEStarsLoad: Records Exists----" level="INFO" doc:name="Logger" doc:description="As at least one connect must be there withing &quot;Default&quot; connector, we have added &quot;Logger&quot; step with text message &quot;---DOEStarsLoad: Records Exists----&quot;. this will help developer to understand that there are records in the file to proceed further with processing."/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="DOE_Stars_Load_Update_Rating_Sub_Flow" doc:description="Summary of the Interface:
+This interface receives and processes a file from the Department of Education (DOE) about DE Stars information in response to the DOE DE STARS Extract interface. Delaware Stars for Early Success is a Quality Rating and Improvement System (QRIS) for early care and education programs, used to assess, improve and communicate the level of quality. The Stars information is loaded to the OCCL Provider Type record and viewable from the FOCUS OCCL Provider Type information.
+
+1.	DOE sends a file of DE STARS Rating Data for FOCUS to retrieve in response to the pre-requisite DOE DE STARS Extract Interface
+2.	A scheduled process runs to retrieve the file from the landing location and import the DE STARS Rating Data to FOCUS
+3.	System copies DOE file to archive
+4.	An Exception Report is generated 
+5.	An error message should be generated to notify the MIS Administrator if an operational error has occurred with the extract processing.">
+        <foreach  doc:name="For Each" doc:description="As we cannot update more than 200 records in FOCUS (system limitation) at a time, we are using foreach loop to process 150 records at time. There is another limitation in FOCUS, Query where clause length cannot be more than 4000 characters. To be on safeside we have kept counter size as 150." batchSize="150">
+            <set-variable variableName="BeforeQueryPayload" value="#[payload]" mimeType="application/java" doc:name="FV: Store BeforeQuery Payload" doc:description="Store 150 records size payload in a variable which will be used in the later steps."/>
+            <dw:transform-message doc:name="TW: Get List of License Numbers">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload.*record map ("'" ++ $.LicenseNumber ++ "'")) joinBy "," ]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT ID, License_Number__c FROM DEL_Provider_Types__c WHERE RecordType.Name = 'OCCL' AND License_Number__c IN (#[payload])" doc:name="Query Salesforce with List of License#s" doc:description="Query FOCUS on OCCL Provider Type with List of License numbers to get the Id of the Provider type as we can update the records with Id or External Id only."/>
+            <choice doc:name="Choice" doc:description="Check if there is atleast one OCCL Provider record returned from Query">
+                <when expression="#[payload.size() != 0]">
+                    <dw:transform-message doc:name="Convert Salesforce Output to Java" metadata:id="006d48e2-9de4-433d-9c7c-cfeb4fc7b6b0">
+                        <dw:input-payload/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	record: 
+	{
+		Id: $.Id,
+		LicenseNumber: $.License_Number__c
+	}
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="Convert Final Java with Id" metadata:id="ec2684ff-3f6b-4b89-91ff-038304b638ce">
+                        <dw:input-payload doc:sample="sample_data\list_DOEStarsLoadMap_1.dwl" mimeType="application/java"/>
+                        <dw:input-variable doc:sample="sample_data\xml.xml" variableName="QueryOutput"/>
+                        <dw:input-variable doc:sample="sample_data\list_DOEStarsLoadMap.dwl" mimeType="application/java" variableName="BeforeQueryPayload"/>
+
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var data = {(payload.*record map {
+     ($.LicenseNumber) : $.Id default ""    
+     })}
+
+---
+flowVars.BeforeQueryPayload.*record map
+{
+	Star_Level__c: $.level as :string,
+	Id: data[$.LicenseNumber as :string] default ""
+}]]></dw:set-payload>
+                        <dw:set-variable variableName="AfterQueryPayload"><![CDATA[%dw 1.0
+%output application/java
+%var data = {(payload.*record map {
+     ($.LicenseNumber) : $.Id default ""    
+     })}
+---
+flowVars.BeforeQueryPayload.*record map
+{
+	record:
+	{
+		LicenseNumber: $.LicenseNumber as :string,
+		name: $.name as :string,
+		level: $.level as :string,
+		acf801: $.acf801 as :string,
+		export_date: $.export_date,
+		Id: data[$.LicenseNumber as :string] default ""	
+	}
+}]]></dw:set-variable>
+
+                    </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Provider_Types__c" doc:name="Update with Star Level" doc:description="Update OCCL Provider Type record with Star Rating.">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                    <dw:transform-message doc:name="TM: Check if any Exceptions" metadata:id="0e1837e2-56ea-4b67-965f-361a9ea26662">
+                        <dw:input-payload doc:sample="sample_data\list_SaveResult.dwl" mimeType="application/java"/>
+                        <dw:input-variable doc:sample="sample_data\list_map.dwl" variableName="AfterQueryPayload"/>
+                        <dw:input-variable variableName="FinalXML"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header = false, quoteValues = true
+---
+flowVars.AfterQueryPayload.*record map
+{
+	LicenseNumber: $.LicenseNumber,
+	name: $.name default "",
+	level: $.level default "",
+	acf801: $.acf801 default "",
+	export_date: $.export_date as :string,
+	Id: $.Id default "",
+	ErrorCode: 'INVALID_LICENSE_NUMBER' when (payload[$$].errors[0].statusCode != null and payload[$$].errors[0].statusCode as :string == 'MISSING_ARGUMENT') otherwise payload[$$].errors[0].statusCode,
+	ErrorDesc: 'License Number does not exist in FOCUS' when (payload[$$].errors[0].statusCode != null and payload[$$].errors[0].statusCode as :string == 'MISSING_ARGUMENT') otherwise ((payload[$$].errors[0].fields[0] ++ ":" ++ payload[$$].errors[0].message) when (payload[$$].errors[0].statusCode != null and payload[$$].errors[0].statusCode as :string == 'FIELD_FILTER_VALIDATION_EXCEPTION') otherwise payload[$$].errors[0].message)
+} filter ($.ErrorCode != null and $.ErrorCode != "")]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer mimeType="application/csv" doc:name="OtoS: Convert ObjectStream to CSV"/>
+                </when>
+                <otherwise>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header = false
+---
+flowVars.BeforeQueryPayload.*record map
+{
+	LicenseNumber: $.LicenseNumber,
+	name: $.name default "",
+	level: $.level default "",
+	acf801: $.acf801 default "",
+	export_date: $.export_date as :string,
+	Id: $.Id default "",
+	ErrorCode: "INVALID_LICENSE_NUMBER",
+	ErrorDesc: "License Number does not exist in FOCUS"
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+                </otherwise>
+            </choice>
+            <set-variable variableName="ExceptionPayload" value="#[(flowVars.ExceptionPayload != null and flowVars.ExceptionPayload != &quot;&quot; ? flowVars.ExceptionPayload + payload : payload)]" mimeType="application/csv" doc:name="FV: Store Exception Payload" doc:description="Store Final Exception file in Flow Variable. This variable will be used to log an expcetion file in the Interface Dashboard."/>
+        </foreach>
+
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties" doc:description="In this we will be getting Record Counts for 
+
+1. Number of records successfully processed 
+2. Number of records failed to process.
+3. What is the overall status?">
+
+            <add-message-property key="SuCount" value="#[sessionVars.RecCount - flowVars.ErrCount]"/>
+            <add-message-property key="RecStatus" value="#[RecCount == SuCount ? 'Success' : (RecCount == ErrCount ? 'Error' : 'Completed with Error(s)')]"/>
+            <add-message-property key="ErrCount" value="#[((flowVars.ExceptionPayload != &quot;&quot; &amp;&amp; flowVars.ExceptionPayload != null) &amp;&amp; (flowVars.InvalidStarRating != &quot;&quot; &amp;&amp; flowVars.InvalidStarRating != null)) ? (flowVars.ExceptionPayload.split(&quot;\n&quot;).length + flowVars.InvalidStarRating.split(&quot;\n&quot;).length) : ((flowVars.ExceptionPayload != &quot;&quot; &amp;&amp; flowVars.ExceptionPayload != null) ? flowVars.ExceptionPayload.split(&quot;\n&quot;).length : ((flowVars.InvalidStarRating != &quot;&quot; &amp;&amp; flowVars.InvalidStarRating != null) ? flowVars.InvalidStarRating.split(&quot;\n&quot;).length : 0))]"/>
+        </message-properties-transformer>
+        <message-properties-transformer scope="invocation" doc:name="MP: Get SuccessCount and Set Status">
+            <add-message-property key="SuCount" value="#[sessionVars.RecCount - flowVars.ErrCount]"/>
+            <add-message-property key="RecStatus" value="#[RecCount == SuCount ? 'Success' : (RecCount == ErrCount ? 'Error' : 'Completed with Error(s)')]"/>
+        </message-properties-transformer>
+        <set-variable variableName="ExceptionPayload" value="#[(ErrCount != 0 ? (&quot;LicenseNumber, name, level, acf801, export_date, Id, ErrorCode, ErrorDesc&quot; + &quot;\n&quot; + (((flowVars.ExceptionPayload != &quot;&quot; &amp;&amp; flowVars.ExceptionPayload != null) &amp;&amp; (flowVars.InvalidStarRating != &quot;&quot; &amp;&amp; flowVars.InvalidStarRating != null)) ? (flowVars.ExceptionPayload +  flowVars.InvalidStarRating) : ((flowVars.ExceptionPayload != &quot;&quot; &amp;&amp; flowVars.ExceptionPayload != null) ? flowVars.ExceptionPayload : flowVars.InvalidStarRating))) : &quot;&quot;)]" doc:name="FV: Add Exception Header" mimeType="application/csv" doc:description="Set the Header for the Exception File so that business can understand the meaning of each column in the CSV file."/>
+
+
+    </sub-flow>
+</mule>

@@ -1,0 +1,21 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "SpecialEducation53"
+        },
+        "sessionVariables": {
+            "StudentInfo": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "StudentInfo53"
+            },
+            "SpecialEducation": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "SpecialEducation53"
+            }
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "b5412b52-29cc-426c-a45d-290d81339f09",
+    "version": "5.2.0.0"
+}

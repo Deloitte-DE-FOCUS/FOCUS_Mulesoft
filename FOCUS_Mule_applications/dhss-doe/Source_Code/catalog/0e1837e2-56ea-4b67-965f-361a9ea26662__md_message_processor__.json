@@ -1,0 +1,22 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "Salesforce__Basic_Authentication",
+            "typeId": "com.sforce.soap.partner.SaveResult"
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "StarsLoadXML"
+        },
+        "flowVariables": {
+            "csvpayload": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "csv"
+            }
+        }
+    },
+    "id": "0e1837e2-56ea-4b67-965f-361a9ea26662",
+    "version": "5.2.0.0"
+}

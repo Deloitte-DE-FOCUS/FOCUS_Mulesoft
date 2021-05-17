@@ -1,0 +1,6 @@
+form: FIXEDWIDTH
+name: 'Header-fixed-width'
+values: 
+- { name: 'Identifier', usage: M, type: String, length: 1 }
+- { name: 'Date', usage: M, type: String, length: 8 }
+- { name: 'Filler', usage: M, type: String, length: 1824 }

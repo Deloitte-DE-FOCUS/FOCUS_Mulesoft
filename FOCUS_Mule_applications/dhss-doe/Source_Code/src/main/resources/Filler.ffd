@@ -1,0 +1,4 @@
+form: FIXEDWIDTH
+name: 'Filler'
+values: 
+- { name: 'Filler', usage: M, type: String, length: 1822 }

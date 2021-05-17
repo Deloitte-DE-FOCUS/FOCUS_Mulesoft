@@ -1,0 +1,49 @@
+#%RAML 1.0
+title : Interface API
+version: v1
+baseUri: http://api.samplehost.com/dscyfservices
+mediaType: [ application/xml, application/json ]
+securitySchemes:
+  basic:
+    description: |
+      This API supports Basic Authentication.
+    type: Basic Authentication
+securedBy: basic
+traits: 
+  hasNotFound:
+    responses:
+      404:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string
+  isNotAcceptable:
+    responses:
+      406:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string   
+
+/ConnectivityTest:
+  get:
+    displayName: Test Connectivity for Interfaces
+    description: Test Connectivity for Interfaces 
+#    is: [hasNotFound,isNotAcceptable]
+    responses:
+      200:
+        body:
+          application/json:
+/DuplicatePersonIdentificationService:
+  post:
+    displayName: Duplicate Person Identification Service
+    description: Duplicate Person Identification Service   
+#    is: [hasNotFound,isNotAcceptable]
+    body:
+      application/json:  
+    responses:
+      200:
+        body:
+          application/json:

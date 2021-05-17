@@ -1,0 +1,5 @@
+form: FIXEDWIDTH
+name: 'DOEEnrolment'
+values: 
+- { name: 'STI', usage: M, type: String, length: 6 }
+- { name: 'PID', usage: M, type: String, length: 10 }

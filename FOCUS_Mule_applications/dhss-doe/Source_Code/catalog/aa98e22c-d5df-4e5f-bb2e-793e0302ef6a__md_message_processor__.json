@@ -1,0 +1,13 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "sessionVariables": {
+            "StudentInfo": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "StudentInfo53"
+            }
+        }
+    },
+    "id": "aa98e22c-d5df-4e5f-bb2e-793e0302ef6a",
+    "version": "5.2.0.0"
+}

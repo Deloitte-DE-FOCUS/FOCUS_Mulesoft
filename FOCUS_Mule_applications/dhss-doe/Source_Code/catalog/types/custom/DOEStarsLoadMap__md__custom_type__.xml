@@ -1,0 +1,28 @@
+<custom__type__definition>
+  <version>5.2.0.0</version>
+  <typeName class="org.mule.common.metadata.DefaultMetaDataKey">
+    <id>DOEStarsLoadMap</id>
+    <displayName>DOEStarsLoadMap</displayName>
+    <category>DEFAULT</category>
+    <metaDataKeyPropertiesManager>
+      <properties>
+        <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+      </properties>
+    </metaDataKeyPropertiesManager>
+  </typeName>
+  <metadataModel class="org.mule.common.metadata.DefaultListMetaDataModel">
+    <dataType>LIST</dataType>
+    <metaDataModelPropertiesManager>
+      <properties/>
+    </metaDataModelPropertiesManager>
+    <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+      <dataType>MAP</dataType>
+      <metaDataModelPropertiesManager>
+        <properties/>
+      </metaDataModelPropertiesManager>
+      <fields/>
+      <name>DOEStarsLoadMap</name>
+    </model>
+    <isArray>false</isArray>
+  </metadataModel>
+</custom__type__definition>

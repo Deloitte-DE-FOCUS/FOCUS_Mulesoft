@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "Graduation53"
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "896a3844-6166-409b-82ac-1434fbf53e4f",
+    "version": "5.2.0.0"
+}

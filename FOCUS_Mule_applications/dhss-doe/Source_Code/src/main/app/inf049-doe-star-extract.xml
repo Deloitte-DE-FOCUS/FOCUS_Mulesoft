@@ -1,0 +1,720 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <!-- <file:connector name="File" outputPattern="*.csv" readFromDirectory="C:\Users\hharshvardhan\Desktop\NEW\Parent" autoDelete="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.user}" password="${sfdc.password}" url="${sfdc.url}" doc:name="Salesforce: Basic Authentication" disableSessionInvalidation="true" securityToken="${sfdc.token}">
+        <reconnect frequency="20000" count="5"/>
+    </sfdc:config> -->
+    
+     <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans> 
+   	  <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans> 
+   		  <spring:beans>
+         <spring:import resource="classpath:/queryframework.xml" /> 
+   	</spring:beans> 
+   	<objectstore:config name="DOE_ObjectStore__Connector" doc:name="ObjectStore: Connector" partition="DOE"/>
+    <objectstore:config name="DHSS_ObjectStore__Connector" partition="DHSS" doc:name="ObjectStore: Connector"/> 
+    
+    <flow name="inf006-dhss-ccmis-extractFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll-DHSS">
+            <schedulers:cron-scheduler expression="0 0 5 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF006" doc:name="Set Payload to Interface ID" doc:description="Set Interface ID as payload so it can be stored in a variable outside the scope of Poll."/>
+
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV : Set Interface ID" doc:description="Store the Interface ID recieved as payload in a flow variable"/>
+      <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload i.e. the query result.
+We save the Transaction ID (TID) , to use it for our final call to Logging framework.">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF006&quot;, &quot;InterfaceName&quot;: &quot;DHSS CCMIS Extract&quot;, &quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Extension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to JSON for Logging framework" doc:description="Payload is changed to a JSON for logging framework to create &quot;In-Progress&quot; transaction in Interface Transaction Dashboard"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the logging framework"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>  
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Provider__r.DEL_Provider_ID__c,Provider__r.DEL_First_Name__c,Provider__r.Name,OCCL_Facility_Type__c,Provider__r.Phone,Enforcement_Action__c,Lower_Age_Range__c,Upper_Age_Range__c,Capacity__c,Enrollment__c,Opens_At__c,Closes_At__c,CreatedDate,Issuance_Date__c,Expiration_Date__c,Special_Conditions__c,Regulated_Services__c,Financial_Arrangement__c , Prov_Type_Status__c ,Provider__c,Provider__r.DEL_Other_Phone_Formula__c, (SELECT Date_of_Visit__c from Provider_Actions__r where Date_of_Visit__c != null and Action_Status__c = 'Completed' ORDER BY Date_of_Visit__c desc limit 1), (SELECT Case_Close_Date__c FROM ProviderTypeCases__r where RecordType.Name='OCCL Standards Complaint' and Status__c='Closed' and Investigation_Outcome__c='Substantiated' order by Createddate desc limit 1) from DEL_Provider_Types__c where recordType.Name = 'OCCL' and OCCL_Facility_Type__c in ('Licensed Family Child Care','Licensed Child Care Center','Licensed Large Family Child Care') and Prov_Type_Status__c in('Active','Inactive','Renewal Denied') and Enforcement_Action__c not in ('Intent to Deny Application','Intent to Revoke','Application Denied') and  Issuance_Date__c &gt;= 2008-01-01 and Expiration_Date__c &gt;= 2008-01-01" doc:name="SFDC:Query to get provider data" doc:description="Query SFDC to get the OCCL Provider data where the Provider is ACTIVE or INACTIVE and has a License Start or License End Date equal or greater than January 1, 2008 and is of type: 
+	o	Licensed Family Child Care  (LCC)
+	o	Licensed Child Care Center (LDC)
+	o	Licensed Large Family Child Care  (LLF)"/>
+         <enricher doc:name="Message Enricher" doc:description="Message enricher is used to call the sub flow to check if data is extracted or not, without changing the original paylaod">
+            <flow-ref name="inf061-dhss-star-extract-NoPayload_Flow" doc:name="inf061-dhss-star-extract-NoPayload_Flow" doc:description="Call the subflow to check if records were extracted."/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>   
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression" doc:description="Stop the execution of flow if no records are extracted."/>
+        <enricher doc:name="Message Enricher" doc:description="Call the query framework to map the picklist values in a variable, through message enricher so that the original payload is not changed">
+            <flow-ref name="Call-LOV-flow" doc:name="Call-LOV-flow" doc:description="Call the query framework to map the picklist values in a variable"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <dw:transform-message  doc:name="TM: Create Array">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//Convert the salesforce query result into an array
+%dw 1.0
+%output application/java
+%function changeTime(string) (string[0] + string[1] + 12)
+---
+payload map {
+	ID: $.Provider__r.DEL_Provider_ID__c,
+	FirstName: $.Provider__r.DEL_First_Name__c,
+	LastName: $.Provider__r.Name,
+	OCCLFacilityType: flowVars.LOVReturned[("OCCL_PROVIDER_TYPE-" ++ $.OCCL_Facility_Type__c)][0],
+	Phone: (($.Provider__r.Phone replace "("  with "" replace ")"  with "" replace "("  with "" replace " "  with "" replace "-"  with "" ) ) when (($.Provider__r.Phone != null) and ((sizeOf $.Provider__r.Phone) > 13)) otherwise ($.Provider__r.Phone[0..9]) when (($.Provider__r.Phone != null) and ((sizeOf $.Provider__r.Phone) > 9)) otherwise (($.Provider__r.DEL_Other_Phone_Formula__c) when ($.Provider__r.DEL_Other_Phone_Formula__c != null) otherwise '') ,
+	EnforcementAction: flowVars.LOVReturned[("ENFORCEMENT_ACTION-" ++ $.Enforcement_Action__c)][0],
+	LowerAgeRange: $.Lower_Age_Range__c when $.Lower_Age_Range__c != null otherwise "",
+	UpperAgeRange: $.Upper_Age_Range__c when $.Upper_Age_Range__c != null otherwise "",
+	Capacity: $.Capacity__c as :number when $.Capacity__c != null otherwise '',
+	Enrollment: $.Enrollment__c as :number when $.Enrollment__c != null otherwise '',
+	OpensAt: $.Opens_At__c,
+	ClosesAt: $.Closes_At__c,
+	CreatedDate: $.CreatedDate as :datetime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"}
+     as :string {format: "yyyyMMdd"} default "",
+	IssuanceDate: ($.Issuance_Date__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"}) when ( $.Issuance_Date__c != null) otherwise "",
+	ExpirationDate: ($.Expiration_Date__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"}) when ( $.Expiration_Date__c != null ) otherwise "",
+	SpecialCondition:($.Special_Conditions__c splitBy ";" default [] ) ,
+	RegulatedService:($.Regulated_Services__c splitBy ";" default []),
+	FinancialArrangement:( $.Financial_Arrangement__c splitBy ";" default []) ,
+	Status: flowVars.LOVReturned[("OCCL_PROVIDER_LICENSE_STATUS-" ++ $.Prov_Type_Status__c)][0],
+	IDforAddress: $.Provider__c,
+	DOV:$.Provider_Actions__r[0].Date_of_Visit__c as :date as :string {format:"yyyyMMdd"} default "",
+    LS: $.ProviderTypeCases__r[0].Case_Close_Date__c as :date as :string {format:"yyyyMMdd"} default ""
+} ]]></dw:set-payload>
+        </dw:transform-message>
+
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Set RecordCount,RecordSuccess,RecordError" doc:description="Set RecordCount,RecordSuccess,RecordError,Header and Error Attachment">
+            <add-message-property key="InitialPayload" value="#[payload]"/>
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+            <add-message-property key="RecordError" value="#[0]"/>
+            <add-message-property key="SFTPCheck" value="DHSS"/>
+            <add-message-property key="Header" value="#[dw('&quot;HD|&quot; ++ (now &gt;&gt; &quot;America/New_York&quot;) as :datetime as :string {format:&quot;yyyyMMddHHmm&quot;} ++ &quot;\n&quot;')]"/>
+            <add-message-property key="Desc" value="#['']"/>
+            <add-message-property key="RecordSuccess" value="#[payload.size()]"/>
+            <add-message-property key="ErrorAttachment" value="#['Error Description' + '\n']"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Call sub flow info49-address-Sub-Flow to get the Address records for providers">
+            <flow-ref name="inf049-address-Sub_Flow" doc:name="inf049-address-Sub_Flow"/>
+            <enrich source="#[flowVars.Add]" target="#[flowVars.ProviderAddress]"/>
+        </enricher>
+
+        <enricher doc:name="Message Enricher" doc:description="Call sub flow inf049-NC-Sub_flow to get the Non Compliance data.">
+            <flow-ref name="inf049-NC-Sub_Flow" doc:name="inf049-NC-Sub_Flow"/>
+            <enrich source="#[flowVars.NC]" target="#[flowVars.NonCompliance]"/>
+        </enricher>
+
+
+          <flow-ref name="Poll_Data" doc:name="Poll_Data" doc:description="Call the main flow for transformation to create the final pipe delimited file."/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Create ErrorAttachment and Status" doc:description="Create ErrorAttachment and Status">
+            <add-message-property key="Status" value="#[sessionVars.RecordError == 0?'Success':(sessionVars.Success==0?'Error':'Completed with Error(s)')]"/>
+            <add-message-property key="ErrorAttachment" value="#[flowVars.AddressError + flowVars.PhoneError + flowVars.ZipError]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.ErrorAttachment.split(&quot;\n&quot;).length &lt; 2]">
+                <message-properties-transformer scope="session" doc:name="Message Properties">
+                    <delete-message-property key="ErrorAttachment"/>
+                </message-properties-transformer>
+            </when>
+            <otherwise>
+                <logger message="Warning/Error Present" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+              <set-payload value="{&quot;InterfaceID&quot;: &quot;INF006&quot;, &quot;InterfaceName&quot;: &quot;DHSS CCMIS Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_CCMISExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DHSS_STAR_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.Status]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.Exception != null?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.Exception != null?sessionVars.Exception:'']&quot;,&quot;Extension&quot;:&quot;txt&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload to JSON for logging framework" doc:description="Set payload to a JSON for logging framework for the final call."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the logging framework to complete the transaction."/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+      
+    </flow>
+ 
+    <flow name="inf049-doe-star-extractFlow" processingStrategy="synchronous" doc:description="Query SFDC to get the OCCL Provider data where the Provider is ACTIVE or INACTIVE and has a License Start or License End Date equal or greater than January 1, 2008 and is of type: 
+	o	Licensed Family Child Care  (LCC)
+	o	Licensed Child Care Center (LDC)
+	o	Licensed Large Family Child Care  (LLF)">
+        <poll doc:name="Poll-DOE" doc:description="Poll will start the flow every day at 6 AM">
+            <schedulers:cron-scheduler expression="0 0 6 1/1 * ? *"/>
+            <set-payload value="INF049" doc:name="Set Payload to Interface ID" doc:description="Set Interface ID as payload to save it as a variable in the next step since scope of Poll is limited"/>
+
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV : Set Interface ID" doc:description="Store the Interface ID in a flow variable since the scope of Poll is limited"/>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload i.e. the query result. We save the Transaction ID (TID) , to use it for our final call to Logging framework.">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF049&quot;, &quot;InterfaceName&quot;: &quot; DOE Stars Extract&quot;, &quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Extension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to JSON for Logging framework" doc:description="Payload is changed to a JSON for logging framework to create the &quot;In Progress&quot; transaction in Interface Dashboard"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the logging framework with &quot;In Progress&quot; JSON payload."/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Provider__r.DEL_Provider_ID__c,Provider__r.DEL_First_Name__c,Provider__r.Name,OCCL_Facility_Type__c,Provider__r.Phone,Enforcement_Action__c,Lower_Age_Range__c,Upper_Age_Range__c,Capacity__c,Enrollment__c,Opens_At__c,Closes_At__c,CreatedDate,Issuance_Date__c,Expiration_Date__c,Special_Conditions__c,Regulated_Services__c,Financial_Arrangement__c , Prov_Type_Status__c ,Provider__c,Provider__r.DEL_Other_Phone_Formula__c, (SELECT Date_of_Visit__c from Provider_Actions__r where Date_of_Visit__c != null and Action_Status__c = 'Completed' ORDER BY Date_of_Visit__c desc limit 1 ), (SELECT Case_Close_Date__c FROM ProviderTypeCases__r where RecordType.Name='OCCL Standards Complaint' and Status__c='Closed' and Investigation_Outcome__c='Substantiated' order by Createddate desc limit 1) from DEL_Provider_Types__c where recordType.Name = 'OCCL' and OCCL_Facility_Type__c in ('Licensed Family Child Care','Licensed Child Care Center','Licensed Large Family Child Care') and Prov_Type_Status__c in('Active','Inactive','Renewal Denied') and Enforcement_Action__c not in ('Intent to Deny Application','Intent to Revoke','Application Denied') and  Issuance_Date__c &gt;= 2008-01-01 and Expiration_Date__c &gt;= 2008-01-01" doc:name="SFDC:Query to get provider data" doc:description="Query SFDC to get the OCCL Provider data where the Provider is ACTIVE or INACTIVE and has a License Start or License End Date equal or greater than January 1, 2008 and is of type: 
+	o	Licensed Family Child Care  (LCC)
+	o	Licensed Child Care Center (LDC)
+	o	Licensed Large Family Child Care  (LLF)"/>
+        <enricher doc:name="Message Enricher" doc:description="Message enricher is used to call the sub flow to check if data is extracted or not, without changing the original paylaod">
+            <flow-ref name="inf049-doe-star-extract-NoPayload_Flow" doc:name="inf049-doe-star-extract-NoPayload_Flow" doc:description="Call the sub flow to check if records were extracted"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression: Stop the execution of flow if payload size = 0" doc:description="Stop the execution of flow if no records are extracted."/>
+        <enricher doc:name="Message Enricher" doc:description="Call the query framework to map the picklist values in a variable, through message enricher so that the original payload is not changed">
+            <flow-ref name="Call-LOV-flow" doc:name="Call-LOV-flow" doc:description="Call the query framework to map the picklist values in a variable"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <dw:transform-message doc:name="TM: Create Array">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//Convert the salesforce query result into an array
+%dw 1.0
+%output application/java
+%function changeTime(string) (string[0] + string[1] + 12)
+---
+payload map {
+	ID: $.Provider__r.DEL_Provider_ID__c,
+	FirstName: $.Provider__r.DEL_First_Name__c,
+	LastName: $.Provider__r.Name,
+	OCCLFacilityType: flowVars.LOVReturned[("OCCL_PROVIDER_TYPE-" ++ $.OCCL_Facility_Type__c)][0],
+	Phone: (($.Provider__r.Phone replace "("  with "" replace ")"  with "" replace "("  with "" replace " "  with "" replace "-"  with "" ) default "") when (($.Provider__r.Phone != null) and ((sizeOf $.Provider__r.Phone) > 13)) otherwise ($.Provider__r.Phone[0..9]) when (($.Provider__r.Phone != null) and ((sizeOf $.Provider__r.Phone) > 9)) otherwise (($.Provider__r.DEL_Other_Phone_Formula__c) when ($.Provider__r.DEL_Other_Phone_Formula__c != null) otherwise '') ,
+	EnforcementAction: flowVars.LOVReturned[("ENFORCEMENT_ACTION-" ++ $.Enforcement_Action__c)][0],
+	LowerAgeRange: $.Lower_Age_Range__c when $.Lower_Age_Range__c != null otherwise "",
+	UpperAgeRange: $.Upper_Age_Range__c when $.Upper_Age_Range__c != null otherwise "",
+	Capacity: $.Capacity__c as :number when $.Capacity__c != null otherwise '',
+	Enrollment: $.Enrollment__c as :number when $.Enrollment__c != null otherwise '',
+	OpensAt: $.Opens_At__c,
+	ClosesAt: $.Closes_At__c,
+	CreatedDate: $.CreatedDate as :datetime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"}
+     as :string {format: "yyyyMMdd"} default "",
+	IssuanceDate: ($.Issuance_Date__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"}) when ( $.Issuance_Date__c != null) otherwise "",
+	ExpirationDate: ($.Expiration_Date__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"}) when ( $.Expiration_Date__c != null ) otherwise "",
+	SpecialCondition:($.Special_Conditions__c splitBy ";" default [] ) ,
+	RegulatedService:($.Regulated_Services__c splitBy ";" default []),
+	FinancialArrangement:( $.Financial_Arrangement__c splitBy ";" default []) ,
+	Status: flowVars.LOVReturned[("OCCL_PROVIDER_LICENSE_STATUS-" ++ $.Prov_Type_Status__c)][0],
+	IDforAddress: $.Provider__c,
+	DOV:$.Provider_Actions__r[0].Date_of_Visit__c as :date as :string {format:"yyyyMMdd"} default "",
+    LS: $.ProviderTypeCases__r[0].Case_Close_Date__c as :date as :string {format:"yyyyMMdd"} default ""
+} ]]></dw:set-payload>
+        </dw:transform-message>
+
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Set RecordCount,RecordSuccess,RecordError" doc:description="Set RecordCount,RecordSuccess,RecordError,Header and Error Attachment">
+            <add-message-property key="InitialPayload" value="#[payload]"/>
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+            <add-message-property key="RecordError" value="#[0]"/>
+            <add-message-property key="SFTPCheck" value="DOE"/>
+            <add-message-property key="Header" value="#[dw('&quot;HD|&quot; ++ (now &gt;&gt; &quot;America/New_York&quot;) as :datetime as :string {format:&quot;yyyyMMddHHmm&quot;} ++ &quot;\n&quot;')]"/>
+            <add-message-property key="Desc" value="#['']"/>
+            <add-message-property key="RecordSuccess" value="#[payload.size()]"/>
+            <add-message-property key="ErrorAttachment" value="#['Error Description' + '\n']"/>
+        </message-properties-transformer>
+  <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload ">
+            <flow-ref name="inf049-address-Sub_Flow" doc:name="inf049-address-Sub_Flow" doc:description="Call the inf049-address-Sub-flow to extract the Address records for provider ."/>
+            <enrich source="#[flowVars.Add]" target="#[flowVars.ProviderAddress]"/>
+        </enricher>
+
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload ">
+            <flow-ref name="inf049-NC-Sub_Flow" doc:name="inf049-NC-Sub_Flow" doc:description="call inf049-NC-Sub_Flow to extract Non Compliance data for Provider Records."/>
+            <enrich source="#[flowVars.NC]" target="#[flowVars.NonCompliance]"/>
+        </enricher>
+
+          <flow-ref name="Poll_Data" doc:name="Poll_Data" doc:description="Call the main flow for transformation to create the final pipe delimited data."/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Create ErrorAttachment and Status" doc:description="Create ErrorAttachment and Status">
+            <add-message-property key="Status" value="#[sessionVars.RecordError == 0?'Success':(sessionVars.Success==0?'Error':'Completed with Error(s)')]"/>
+            <add-message-property key="ErrorAttachment" value="#[flowVars.AddressError + flowVars.PhoneError + flowVars.ZipError]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.ErrorAttachment.split(&quot;\n&quot;).length &lt; 2]">
+                <message-properties-transformer scope="session" doc:name="Message Properties">
+                    <delete-message-property key="ErrorAttachment"/>
+                </message-properties-transformer>
+            </when>
+            <otherwise>
+                <logger message="Warning/Error Present" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+              <set-payload value="{&quot;InterfaceID&quot;: &quot;INF049&quot;, &quot;InterfaceName&quot;: &quot;DOE Stars Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_DOEStarExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DE_STARS_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.Status]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.Exception != null?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.Exception != null?sessionVars.Exception:'']&quot;,&quot;Extension&quot;:&quot;txt&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload to JSON for logging framework" doc:description="Set payload to a JSON for logging framework for the Final call to the framework."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the logging framework to complete the transaction."/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+      
+    </flow>
+    <sub-flow name="Poll_Data">
+    <dw:transform-message doc:name="TM:Filter RE,SC,FA tags">
+
+            <dw:set-variable variableName="SC_Tag"><![CDATA[//Filter SC tags
+%dw 1.0
+%output application/java
+---
+payload filter ((sizeOf $.SpecialCondition ) > 0) map $]]></dw:set-variable>
+            <dw:set-variable variableName="FA_Tag"><![CDATA[//Filter FA tags
+%dw 1.0
+%output application/java
+---
+payload filter ((sizeOf $.FinancialArrangement ) > 0) map $]]></dw:set-variable>
+            <dw:set-variable variableName="RE_Tag"><![CDATA[//Filter RE tags
+%dw 1.0
+%output application/java
+---
+payload filter ((sizeOf $.RegulatedService ) > 0) map $]]></dw:set-variable>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Create Warnings">
+            <dw:set-variable variableName="AddressError"><![CDATA[%dw 1.0
+%output application/csv 
+---
+payload map {
+	"Error/Warning":"Site Address missing Warning" ,
+	"Field Name in Error/Warning":"Site Address",
+	"Field Value in Error/Warning":flowVars.ProviderAddress[$.IDforAddress][0].City default "",
+	"Error Description":"Site Address missing for Provider : " ++ $.ID		
+} filter ($."Field Value in Error/Warning" == '')]]></dw:set-variable>
+            <dw:set-variable variableName="PhoneError"><![CDATA[//Create Phone number missing warning for Active Provider.
+%dw 1.0
+%output application/csv header=false
+---
+payload filter ($.Phone == '' and $.Status == 'A') map {
+	"Error/Warning":"Phone number missing Warning" ,
+	"Field Name in Error/Warning":"Phone",
+	"Field Value in Error/Warning":$.Phone default "",
+	"Error Description":"Phone Number missing for Active Provider : " ++ $.ID		
+} ]]></dw:set-variable>
+            <dw:set-variable variableName="ZipError"><![CDATA[//Create Zip Warning
+%dw 1.0
+%output application/csv header=false
+---
+payload map {
+	"Error/Warning":"Zip missing/Improper Warning" ,
+	"Field Name in Error/Warning":"Site Address",
+	"Field Value in Error/Warning":flowVars.ProviderAddress[$.IDforAddress][0].Zip default "",
+	"Error Description":"Zip not proper for Provider : " ++ $.ID		
+} filter (((sizeOf $."Field Value in Error/Warning") != 5) and ((sizeOf $."Field Value in Error/Warning") != 9))]]></dw:set-variable>
+            <dw:set-variable variableName="SC_Tag"><![CDATA[//Create SC Tag
+%dw 1.0
+%output application/java
+---
+flatten (flowVars.SC_Tag  map using (CWDetails = $.ID) {
+	SP: $.SpecialCondition map  { 
+		SC: "SP|" ++ CWDetails ++ "|" ++ (flowVars.LOVReturned[("SPECIAL_CONDITION-" ++ $)][0] default "")
+	}
+})]]></dw:set-variable>
+            <dw:set-variable variableName="RE_Tag"><![CDATA[//Create RE Tag
+%dw 1.0
+%output application/java
+---
+flatten (flowVars.RE_Tag  map using (CWDetails = $.ID) {
+	SP: $.RegulatedService map  { 
+		SC: "RE|" ++ CWDetails ++ "|" ++ (flowVars.LOVReturned[("REGULATED_SERVICE-" ++ $)][0] default "" )
+	}
+})]]></dw:set-variable>
+            <dw:set-variable variableName="FA_Tag"><![CDATA[//Create FA Tag
+%dw 1.0
+%output application/java
+---
+flatten (flowVars.FA_Tag  map using (CWDetails = $.ID) {
+	SP: $.FinancialArrangement map  { 
+		SC:"FA|" ++  CWDetails ++ "|" ++ (flowVars.LOVReturned[("FINANCIAL_ARRANGEMENT-" ++ $)][0] default "")
+	}
+})]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Create SC,FA,RE,OpensAt,ClosesAt">
+            <dw:set-variable variableName="SC_Tag"><![CDATA[//Create Final SC Tag
+%dw 1.0
+%output application/java
+---
+flatten (flowVars.SC_Tag map $.SP.SC)]]></dw:set-variable>
+            <dw:set-variable variableName="RE_Tag"><![CDATA[//Create Final RE Tag
+%dw 1.0
+%output application/java
+---
+flatten (flowVars.RE_Tag map $.SP.SC)]]></dw:set-variable>
+            <dw:set-variable variableName="FA_Tag"><![CDATA[//Create Final FA Tag
+%dw 1.0
+%output application/java
+---
+flatten (flowVars.FA_Tag map $.SP.SC)]]></dw:set-variable>
+            <dw:set-variable variableName="OpensAt"><![CDATA[//Convert OpensAt and ClosesAt time format.
+%dw 1.0
+%output application/java
+%function suffix(name) name splitBy " "
+%function hours(name) name splitBy ":"
+---
+payload filter ($.OpensAt != null and $.ClosesAt != null) map {
+	OSuffix: suffix($.OpensAt)[1],
+	OHours:(hours($.OpensAt)[0] as :number) when $.OpensAt != null otherwise (''),
+	OMinutes: suffix(hours($.OpensAt)[1])[0],
+	CSuffix: suffix($.ClosesAt)[1],
+	CHours: (hours($.ClosesAt)[0] as :number) when $.ClosesAt != null otherwise (''),
+	CMinutes: suffix(hours($.ClosesAt)[1])[0],
+	ID:$.ID default ""
+} groupBy $.ID]]></dw:set-variable>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Create NC">
+            <dw:set-variable variableName="NC"><![CDATA[//Convert query output to Array
+%dw 1.0
+%output application/csv header = false , separator = "|"
+---
+flowVars.NonCompliance]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Create RS">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//Create RS Tag
+%dw 1.0
+%output application/csv header=false, separator="|"
+---
+ payload map  {
+ 	Header:'RS',
+	OCCL_Provider_ID: $.ID,
+	OCCL_Provider_Last_Name:$.LastName,
+	OCCL_Provider_First_Name: $.FirstName,
+	Program_Type: $.OCCLFacilityType,
+	Address_Street_1: flowVars.ProviderAddress[$.IDforAddress][0].Street1,
+	Address_Street_2: flowVars.ProviderAddress[$.IDforAddress][0].Street2,
+	Address_City: flowVars.ProviderAddress[$.IDforAddress][0].City,
+	Address_State: flowVars.ProviderAddress[$.IDforAddress][0].State,
+	Address_Zip:  (flowVars.ProviderAddress[$.IDforAddress][0].Zip when (((sizeOf flowVars.ProviderAddress[$.IDforAddress][0].Zip) == 5) or ((sizeOf flowVars.ProviderAddress[$.IDforAddress][0].Zip) == 9)) otherwise "") default "",
+	Address_County: flowVars.ProviderAddress[$.IDforAddress][0].County,
+	Phone:$.Phone when ((sizeOf $.Phone) == 10) otherwise "",
+	Enforcement_Action: $.EnforcementAction,
+	Age_Range: ("From" ++ " " ++ $.LowerAgeRange ++ " " ++ "to" ++ " " ++ $.UpperAgeRange) when ($.LowerAgeRange != "" and $.UpperAgeRange != "") otherwise "",
+	Capacity: $.Capacity,
+	Enrollment: $.Enrollment,
+	Open_Time:(flowVars.OpensAt[$.ID][0].OHours + 12 ++ flowVars.OpensAt[$.ID][0].OMinutes) 	when (flowVars.OpensAt[$.ID][0].OHours != null and flowVars.OpensAt[$.ID][0].OSuffix =="PM") otherwise (( "0" ++ flowVars.OpensAt[$.ID][0].OHours ++ flowVars.OpensAt[$.ID][0].OMinutes) 	when (flowVars.OpensAt[$.ID][0].OHours != null and flowVars.OpensAt[$.ID][0].OSuffix =="AM" and (flowVars.OpensAt[$.ID][0].OHours < 10) ) otherwise ((flowVars.OpensAt[$.ID][0].OHours ++ flowVars.OpensAt[$.ID][0].OMinutes) when (flowVars.OpensAt[$.ID][0].OHours != null and flowVars.OpensAt[$.ID][0].OSuffix =="AM" and flowVars.OpensAt[$.ID][0].OHours > 10) otherwise ""  )  ) ,
+	Close_Time:(flowVars.OpensAt[$.ID][0].CHours + 12 ++ flowVars.OpensAt[$.ID][0].CMinutes) when (flowVars.OpensAt[$.ID][0].CHours != null and flowVars.OpensAt[$.ID][0].CSuffix =="PM") otherwise (("0" ++ flowVars.OpensAt[$.ID][0].CHours ++ flowVars.OpensAt[$.ID][0].CMinutes) when (flowVars.OpensAt[$.ID][0].CHours != null and flowVars.OpensAt[$.ID][0].CSuffix =="AM" and (flowVars.OpensAt[$.ID][0].CHours < 10) ) otherwise ((flowVars.OpensAt[$.ID][0].CHours ++ flowVars.OpensAt[$.ID][0].CMinutes) when (flowVars.OpensAt[$.ID][0].CHours != null and flowVars.OpensAt[$.ID][0].CSuffix =="AM" and flowVars.OpensAt[$.ID][0].CHours > 10) otherwise ""  ) ) ,
+	Registration_Date: $.CreatedDate,
+	License_Status:$.Status,
+	License_Start_Date: $.IssuanceDate,
+	Expiration_Date: $.ExpirationDate,
+	Last_Substantiated_Complaints_Date:$.LS,
+	(Filler: "" ) when sessionVars.SFTPCheck  == "DHSS",
+	Last_Facility_Visit_Date:$.DOV
+}]]></dw:set-payload>
+
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-payload value="#[payload.split(&quot;\n&quot;)]" mimeType="application/java" doc:name="SP:Split RS tag by newline character" doc:description="Split RS tag by newline character"/>
+        <message-properties-transformer scope="invocation" doc:name="MP:Split NC tag by newline character" doc:description="Split NC tag by newline character">
+            <add-message-property key="NC" value="#[flowVars.NC.split(&quot;\n&quot;)]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="TM:Conver RE and NC tag to Hashmap">
+            <dw:set-payload><![CDATA[//Convert String Arraylist to Hashmap for RE tag (payload)
+%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+            <dw:set-variable variableName="NC"><![CDATA[//Convert String Arraylist to Hashmap for NC tag
+%dw 1.0
+%output application/java
+---
+flowVars.NC map $]]></dw:set-variable>
+        </dw:transform-message>
+ <message-properties-transformer scope="invocation" doc:name="MP:Combine RS,FA,SC and NC tag">
+            <add-message-property key="Tags" value="#[payload + flowVars.SC_Tag + flowVars.RE_Tag + flowVars.FA_Tag + flowVars.NC]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="TM:RemoveEmpty Lines">
+            <dw:set-variable variableName="Tags"><![CDATA[//Filter empty lines from final payload
+%dw 1.0
+%output application/java
+---
+(flowVars.Tags filter (((sizeOf $) as :string ) > "0"))]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Order Payload based on Provider Number">
+            <dw:set-payload><![CDATA[//Order Payload based on Provider Number
+%dw 1.0
+%output application/java
+---
+flowVars.Tags orderBy (($ splitBy "|")[1])
+]]></dw:set-payload>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Join Payload by newline character">
+            <dw:set-payload><![CDATA[//Join Payload by newline character
+%dw 1.0
+%output application/java
+---
+payload joinBy "\n"]]></dw:set-payload>
+        </dw:transform-message>
+
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Combine Payoad to Final File" doc:description="Add the created RS,FA,SC and NC tag to Header">
+            <add-message-property key="Header" value="#[sessionVars.Header +'\n' + payload]"/>
+        </message-properties-transformer>
+
+        <set-payload value="#[sessionVars.Header.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;)]" doc:name="Set Payload: to the Final pipe delimited file" doc:description="Set Payload to the Final pipe delimited file and remove empty lines"/>
+        <set-payload value="#[payload.split(System.lineSeparator())]" mimeType="application/java" doc:name="Set Payload: Remove empty lines" doc:description="Remove Empty lines between two records"/>
+        <dw:transform-message doc:name="TM:Remove Blank Lines">
+            <dw:set-payload><![CDATA[//Remove Blank Lines
+%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) > "0")) joinBy "\n"]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer scope="session" mimeType="application/csv" doc:name="MP:Set Transattachment" doc:description="Create TransAttachment">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+        </message-properties-transformer>
+
+        <choice doc:name="Choice" doc:description="Choice router to route the payload to DHSS or DOE based on the time the interface is initiated">
+            <when expression="#[sessionVars.SFTPCheck == &quot;DOE&quot;]">
+	        	<until-successful maxRetries="5" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful " doc:description="Retry mechanism for Intermittent Exceptions">
+	                <sftp:outbound-endpoint exchange-pattern="one-way" outputPattern="${sftp.doestarsextract.transaction.filename}" host="${sftp.doestarsextract.transaction.host}" port="${sftp.doestarsextract.transaction.port}" path="${sftp.doestarsextract.transaction.path}" user="${sftp.doestarsextract.transaction.username}" password="${sftp.doestarsextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP: Drop the file in Transaction Folder" doc:description="Drop the file in Transaction Folder" connector-ref="SFTP1">
+	                    <!-- <reconnect count="5"/> -->
+	                </sftp:outbound-endpoint>            
+	        	</until-successful>
+                <sftp:outbound-endpoint exchange-pattern="one-way" outputPattern="${sftp.doestarsextract.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.doestarsextract.archive.host}" port="${sftp.doestarsextract.archive.port}" path="${sftp.doestarsextract.archive.path}" user="${sftp.doestarsextract.archive.username}" password="${sftp.doestarsextract.archive.password}" responseTimeout="10000" doc:name="SFTP:Drop the file in Archive Folder" duplicateHandling="overwrite" doc:description="Drop the file in Archive Folder" connector-ref="SFTP1"/>
+            </when>
+            <when expression="#[sessionVars.SFTPCheck == &quot;DHSS&quot;]">
+				<until-successful maxRetries="5" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful " doc:description="Retry mechanism for Intermittent Exceptions">
+	               <sftp:outbound-endpoint exchange-pattern="one-way" outputPattern="${sftp.dhssextract.transaction.filename}" host="${sftp.dhssextract.transaction.host}" port="${sftp.dhssextract.transaction.port}" path="${sftp.dhssextract.transaction.path}" user="${sftp.dhssextract.transaction.username}" password="${sftp.dhssextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Drop the file in Transaction Folder" doc:description="Drop the file in Transaction Folder" connector-ref="SFTP1">
+	                   <!-- <reconnect count="5"/> -->
+                	</sftp:outbound-endpoint> 
+	            </until-successful>
+				<sftp:outbound-endpoint exchange-pattern="one-way" outputPattern="${sftp.dhssextract.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.dhssextract.archive.host}" port="${sftp.dhssextract.archive.port}" path="${sftp.dhssextract.archive.path}" user="${sftp.dhssextract.archive.username}" password="${sftp.dhssextract.archive.password}" responseTimeout="10000" doc:name="SFTP:Drop the file in Archive Folder" duplicateHandling="overwrite" doc:description="Drop the file in Archive Folder" connector-ref="SFTP1"/>
+            </when>
+            <otherwise>
+                <logger message="Error" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+	<sub-flow name="inf049-address-Sub_Flow" doc:description="Sub flow to Extract address for providers">
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Name,Street_1__c,Street_2__c,City__c,State__c,County__c,Provider__c,ZIP__c,Provider__r.DEL_Provider_ID__c  from DEL_Provider_Address__c where Provider__c in (SELECT Provider__c from DEL_Provider_Types__c where recordType.Name = 'OCCL' and OCCL_Facility_Type__c in ('Licensed Family Child Care','Licensed Child Care Center','Licensed Large Family Child Care') and Prov_Type_Status__c in('Active','Inactive','Renewal Denied') and Enforcement_Action__c not in ('Intent to Deny Application','Intent to Revoke','Application Denied') and  Issuance_Date__c &gt;= 2008-01-01 and Expiration_Date__c &gt;= 2008-01-01) and Address_Type__c='Site' and Status__c='Active'" doc:name="SFDC: Query SFDC Records" doc:description="Query 'Active' Address records for Provider"/>
+        <dw:transform-message doc:name="TM:Convert Query output to Array">
+            <dw:set-payload><![CDATA[//Convert Query Output to Array
+%dw 1.0
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	ProviderID:payload01.Provider__c,
+	ProviderName:payload01.Provider__r.DEL_Provider_ID__c,
+	City: payload01.City__c,
+	County: flowVars.LOVReturned[("ADDRESS_COUNTY-" ++ payload01.County__c)][0],
+	Street1: payload01.Street_1__c,
+	Street2: payload01.Street_2__c,
+	State: flowVars.LOVReturned[("STATECODE-" ++ payload01.State__c)][0],
+	Name: payload01.Name,
+	Zip:( payload01.ZIP__c replace "-" with "" ) default "" 
+} ) ]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Group Payload by Provider ID">
+            <dw:set-variable variableName="Add"><![CDATA[//Group Payload by Provider ID
+%dw 1.0
+%output application/java
+---
+(flowVars.Add default {} ) ++ (payload groupBy $.ProviderID)]]></dw:set-variable>
+        </dw:transform-message>
+
+
+    </sub-flow>
+   <!--  <sub-flow name="inf049-address-Sub_Flow">
+        <foreach batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+(payload map ("'" ++ $.IDforAddress ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Name,Street_1__c,Street_2__c,City__c,State__c,County__c,Provider__c,ZIP__c,Provider__r.DEL_Provider_ID__c  from DEL_Provider_Address__c where Provider__c in (#[payload]) and Address_Type__c='Site' and Status__c='Active' " doc:name="Salesforce"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[//Convert Query Output to Array
+%dw 1.0
+%output application/java
+
+payload map ((payload01 , indexOfPayload01) -> {
+	ProviderID:payload01.Provider__c,
+	ProviderName:payload01.Provider__r.DEL_Provider_ID__c,
+	City: payload01.City__c,
+	County: flowVars.LOVReturned[("ADDRESS_COUNTY-" ++ payload01.County__c)][0],
+	Street1: payload01.Street_1__c,
+	Street2: payload01.Street_2__c,
+	State: flowVars.LOVReturned[("MISTCD-" ++ payload01.State__c)][0],
+	Name: payload01.Name,
+	Zip:( payload01.ZIP__c replace "-" with "" ) default "" 
+} ) ]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-variable variableName="Add"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.Add default {}) ++ (payload groupBy $.ProviderID)]]></dw:set-variable>
+            </dw:transform-message>
+            <logger level="INFO" doc:name="Logger" message="#[payload]"/>
+        </foreach>
+    </sub-flow> -->
+
+    <!-- <sub-flow name="inf049-NC-Sub_Flow">
+        
+         <foreach batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-variable variableName="Clause"><![CDATA[%dw 1.0
+%output application/java
+
+(payload map ("'" ++ $.IDforAddress ++ "'")) joinBy ","]]></dw:set-variable>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Reg_Number__r.Reg_Number__c,Date_Corrected__c,CreatedDate,Status__c,Provider_Action__r.DEL_OCCL_Provider_Type__r.Provider__r.DEL_Provider_ID__c FROM DEL_Facility_Visit_Regulation__c WHERE Provider_Action__r.DEL_OCCL_Provider_Type__r.Provider__c in (#[flowVars.Clause]) and Status__c  = 'Non-Compliance' " doc:name="Salesforce"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-variable variableName="NC1"><![CDATA[//Convert Query Output to Array
+%dw 1.0
+%output application/java
+
+payload map {
+                Header:"NC",
+                ID: $.Provider_Action__r.DEL_OCCL_Provider_Type__r.Provider__r.DEL_Provider_ID__c,
+                Reg_No: $.Reg_Number__r.Reg_Number__c,
+                Date_Citied:$.CreatedDate as :datetime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"}
+     as :string {format: "yyyyMMdd"} default "",
+                Status:'P' when ($.Date_Corrected__c == null) otherwise ('C' when $.Date_Corrected__c != null otherwise ''),
+                Date_Corrected:($.Date_Corrected__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"}) when $.Date_Corrected__c != null otherwise ''
+                
+} ]]></dw:set-variable>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Regulation_Number__c, Date_Corrected__c, Date_Cited__c, Status__c, Provider_Type__r.Provider__r.DEL_Provider_ID__c FROM DEL_Regulation_Non_Compliance__c WHERE Provider_Type__r.Provider__c in (#[flowVars.Clause]) and Status__c  = 'Non-Compliance'  " doc:name="Salesforce"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-variable variableName="NC2"><![CDATA[//Convert Query Output to Array
+%dw 1.0
+%output application/java
+
+payload map 
+ {
+                Header:"NC",
+                ID: $.Provider_Type__r.Provider__r.DEL_Provider_ID__c,
+                Reg_No: $.Regulation_Number__c,
+                Date_Citied:$.Date_Cited__c as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"} default "",
+                Status:'P' when ($.Date_Corrected__c == null) otherwise ('C' when $.Date_Corrected__c != null otherwise ''),
+                Date_Corrected:($.Date_Corrected__c as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"}) when $.Date_Corrected__c != null otherwise ''
+} ]]></dw:set-variable>
+            </dw:transform-message>
+
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[//Convert Query Output to Array
+%dw 1.0
+%output application/java
+
+(flowVars.NC1 default {}) ++ (flowVars.NC2 default {})]]></dw:set-payload>
+            </dw:transform-message>
+
+
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-variable variableName="NC"><![CDATA[%dw 1.0
+%output application/java
+
+(flowVars.NC default {}) ++ (payload default {})
+
+
+]]></dw:set-variable>
+
+            </dw:transform-message>
+
+            </foreach>
+
+
+    </sub-flow> -->
+    <sub-flow name="inf049-NC-Sub_Flow" doc:description="NC-Sub_flow to create Non Compliance Data">
+        
+         <foreach batchSize="150" doc:name="For Each" doc:description="For Each is used to pass 150 records at a time so that where clause character limit of 4000 characters is not exceeded. ">
+            <dw:transform-message doc:name="TM:Create Where Clause">
+                <dw:set-variable variableName="Clause"><![CDATA[//Create where clause for the SFDC Query
+%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.IDforAddress ++ "'")) joinBy ","]]></dw:set-variable>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Reg_Number__r.Reg_Number__c,Date_Corrected__c,CreatedDate,Status__c,Provider_Action__r.DEL_OCCL_Provider_Type__r.Provider__r.DEL_Provider_ID__c FROM DEL_Facility_Visit_Regulation__c WHERE Provider_Action__r.DEL_OCCL_Provider_Type__r.Provider__c in (#[flowVars.Clause]) and Facility_Visit_Status__c = 'Completed'  and Status__c  = 'Non-Compliance' " doc:name="SFDC:Query NC Records" doc:description="Query Non Comliance Data from DEL_Facility_Visit_Regulation__c "/>
+            <dw:transform-message doc:name="TM:Convert Query Output to Array">
+                <dw:set-payload><![CDATA[//Convert Query Output to Array
+%dw 1.0
+%output application/java
+---
+payload map {
+                Header:"NC",
+                ID: $.Provider_Action__r.DEL_OCCL_Provider_Type__r.Provider__r.DEL_Provider_ID__c,
+                Reg_No: $.Reg_Number__r.Reg_Number__c,
+                Date_Citied:$.CreatedDate as :datetime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"}
+     as :string {format: "yyyyMMdd"} default "",
+                Status:'P' when ($.Date_Corrected__c == null) otherwise ('C' when $.Date_Corrected__c != null otherwise ''),
+                Date_Corrected:($.Date_Corrected__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"}) when $.Date_Corrected__c != null otherwise ''
+                
+} ]]></dw:set-payload>
+
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM:Add NC variables for all For-Each">
+                <dw:set-variable variableName="NC1"><![CDATA[//Concatenate NC variable
+%dw 1.0
+%output application/java
+---
+(flowVars.NC1 default {}) ++ (payload default {})
+
+
+]]></dw:set-variable>
+            </dw:transform-message>
+
+
+            </foreach>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Regulation_Number__c, Date_Corrected__c, Date_Cited__c, Status__c, Provider_Type__r.Provider__r.DEL_Provider_ID__c FROM DEL_Regulation_Non_Compliance__c WHERE Provider_Type__c in (SELECT Id from DEL_Provider_Types__c where recordType.Name = 'OCCL' and OCCL_Facility_Type__c in ('Licensed Family Child Care','Licensed Child Care Center','Licensed Large Family Child Care') and Prov_Type_Status__c in('Active','Inactive','Renewal Denied') and Enforcement_Action__c not in ('Intent to Deny Application','Intent to Revoke','Application Denied') and  Issuance_Date__c &gt;= 2008-01-01 and Expiration_Date__c &gt;= 2008-01-01) and Status__c  = 'Non-Compliance' " doc:name="SFDC:Query NC records" doc:description="Query NC records from DEL_Regulation_Non_Compliance__c"/>
+        <dw:transform-message doc:name="TM:Convert Query Output to Array">
+            <dw:set-variable variableName="NC2"><![CDATA[//Convert Query Output to Array
+%dw 1.0
+%output application/java
+---
+payload map 
+ {
+                Header:"NC",
+                ID: $.Provider_Type__r.Provider__r.DEL_Provider_ID__c,
+                Reg_No: $.Regulation_Number__c,
+                Date_Citied:$.Date_Cited__c as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"} default "",
+                Status:'P' when ($.Date_Corrected__c == null) otherwise ('C' when $.Date_Corrected__c != null otherwise ''),
+                Date_Corrected:($.Date_Corrected__c as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"}) when $.Date_Corrected__c != null otherwise ''
+} ]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Combine Both NC records">
+            <dw:set-variable variableName="NC"><![CDATA[//Combine both NC records
+%dw 1.0
+%output application/java
+---
+(flowVars.NC1 default {}) ++ (flowVars.NC2 default {})]]></dw:set-variable>
+        </dw:transform-message>
+
+
+    </sub-flow>
+
+    <sub-flow name="inf049-doe-star-extract-NoPayload_Flow" doc:description="This Subflow will check if records have been extracted or not.
+
+">
+        <choice doc:name="Choice" doc:description="Choice router will check if size of payload is greater than 0, if yes then the flow will continue otherwise it will create transaction with Status Error in Interface Dashboard">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF049&quot;, &quot;InterfaceName&quot;: &quot;DOE Star Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload: to No Records Found for Logging Framework" doc:description="Sey Payload to JSON for Logging framework to Create transaction with Status='Error'"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </when>
+            <otherwise>
+                <logger message="Records Succesfully Extract " level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="inf061-dhss-star-extract-NoPayload_Flow" doc:description="This Subflow will check if records have been extracted or not.">
+        <choice doc:name="Choice" doc:description="Choice router will check if size of payload is greater than 0, if yes then the flow will continue otherwise it will create transaction with Status Error in Interface Dashboard">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF006&quot;, &quot;InterfaceName&quot;: &quot;DHSS Star Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload: to No Records Found for Logging Framework" doc:description="Set payload to JSON for logging framework that will create transaction with Status &quot;Error&quot; in Interface Dashboard
+
+"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="Flow Reference"/>
+            </when>
+            <otherwise>
+                <logger message="Records Succesfully Extract " level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="Call-LOV-flow" doc:description="Call LOV Framework">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'OCCL_PROVIDER_TYPE','ADDRESS_COUNTY','ENFORCEMENT_ACTION','OCCL_PROVIDER_LICENSE_STATUS','FACILITY_VISIT_REG_STATUS','FINANCIAL_ARRANGEMENT','SPECIAL_CONDITION','REGULATED_SERVICE','STATECODE'&quot;}" doc:name="Set Payload to JSON for LOV Framework" doc:description="Set JSON payload for LOV framework with the LOVS used in the Interface"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow" doc:description=" Call LOV Framework"/>
+    </sub-flow>
+   
+
+    
+    </mule>

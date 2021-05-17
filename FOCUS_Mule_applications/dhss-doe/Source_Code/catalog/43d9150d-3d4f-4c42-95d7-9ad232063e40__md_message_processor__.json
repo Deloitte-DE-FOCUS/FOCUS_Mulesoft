@@ -1,0 +1,13 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "sessionVariables": {
+            "SpecialEducation": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "SpecialEducation53"
+            }
+        }
+    },
+    "id": "43d9150d-3d4f-4c42-95d7-9ad232063e40",
+    "version": "5.2.0.0"
+}

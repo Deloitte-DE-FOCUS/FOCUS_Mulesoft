@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "StarsLoadXML"
+        }
+    },
+    "id": "006d48e2-9de4-433d-9c7c-cfeb4fc7b6b0",
+    "version": "5.2.0.0"
+}

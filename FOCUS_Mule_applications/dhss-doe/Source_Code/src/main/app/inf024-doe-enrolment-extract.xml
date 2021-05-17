@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd">
+    <sftp:connector name="SFTP1" validateConnections="true" doc:name="SFTP" duplicateHandling="addSeqNo">
+        <reconnect count="5"/>
+    </sftp:connector>
+   	 
+   <!--  <sfdc:config name="Salesforce__Basic_Authentication1" username="Bbansal@state.de.us.focusdev" password="WelcomeYou%5" url="https://dscyfkidsfocusdev.cs32.my.salesforce.com/services/Soap/u/37.0" doc:name="Salesforce: Basic Authentication"/> -->
+   
+    
+   
+    <flow name="inf024-doe-enrolment-extract-Flow" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="This poll will trigger the mule flow every Thursday at 5 PM">
+            <schedulers:cron-scheduler expression="0 5 17 ? * MON,TUE,WED,THU,FRI *" timeZone="US/Eastern"/>
+            <set-payload value="INF024" doc:name="Set Payload to Interface ID" doc:description="Scope of poll is limited to itself, so set the Payload to the Interface Id so that it can be saved as a variable in the next step"/>
+
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Set the Interface Id recieved in Payload."/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Person__r.DEL_PID__c, Person__r.DEL_STI__c, (SELECT Id FROM Person_Type__r limit 1)  FROM DEL_Person_Type__c WHERE Record_Type_Name__c = 'Client' and Person__r.DEL_PID__C != null and Person__r.DEL_STI__C != null and (Person__r.DEL_DFS_Status__c = 'Active' or Person__r.DEL_DPBHS_Status__c = 'Active' or Person__r.DEL_DYRS_Status__c = 'Active' ) " doc:name="SFDC:Query Records" doc:description="This Query extracts all clients who have an end date in the last five years or end date is yet not pouplated in the Person Cases object and fulfill the below criteria
+a.	Client is in an &#8220;open&#8221; DFS, PBH, and / or YRS case.
+b.	There is an STI number on the client&#8217;s Person record.
+c.	The client has an active &#8220;Education Records&#8221; Consent in FOCUS with consent &#8220;Given&#8221;:
+	i.	Type: Interagency Consent
+	ii.	Agency: Department of Public Instruction
+	iii.	Consent: Given
+"/>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload i.e. the query result.
+We save the Transaction ID (TID) , to use it for our final call to Logging framework.">
+            <flow-ref name="In-Progress_Doe-enrolment-Extract" doc:name="In-Progress_Doe-enrolment-Extract" doc:description="This flow reference calls the sub flow In-Progres_Doe_enrolment-extrac to create the In-Progress transaction in SFDC interface tab."/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+<enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload i.e. the query result.
+">
+            <flow-ref name="inf024-doe-enrolment-extract-No-Payload-subflow" doc:name="inf024-doe-enrolment-extract-No-Payload-subflow" doc:description="This will call the sub-flow inf024-doe-enrolment-extract-No-Payload to check if records have been extracted or not"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+       <expression-filter expression="#[payload.size() != 0]" doc:name="Expression: Stop flow for 0 Records" doc:description="This Expression will stop the flow if No records are extracted ."/>
+
+
+
+
+
+
+
+
+
+
+        <dw:transform-message metadata:id="d42f62a7-56bf-4254-9425-ac3902c88a00" doc:name="TM:Convert Query to map">
+            <dw:input-payload doc:sample="sample_data\empty.xml" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//This dataweave code converts the SFDC query output to a array list
+%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map 
+{
+	STI:$.Person__r.DEL_STI__c,
+	PID: $.Person__r.DEL_PID__c ,
+	Consent:$.Person_Type__r[0].Id default ""
+} filter $.Consent != null and $.Consent != ""]]></dw:set-payload>
+
+        </dw:transform-message>
+        <logger message="payload Size:  #[payload.size()]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload.
+">
+            <flow-ref name="inf024-doe-enrolment-extract-No-Payload-subflow" doc:name="inf024-doe-enrolment-extract-No-Payload-subflow" doc:description="This will call inf024-doe-enrolment-extract-No-Payload to check if Payload size &gt; 0, after applying filter criteria. (Consent should be present for all Extracted Records)"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression: Stop flow for 0 Records" doc:description="This Expression will stop the flow if No records are extracted ."/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP:Set Record-Error,Count,Success " doc:description="This message property is used to set the total records, succesfull records and the records which errored out" metadata:id="32690d77-a9e8-4d27-a862-66e925480bfc">
+            <add-message-property key="RecordSuccess" value="#[payload.size()]"/>
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+            <add-message-property key="RecordError" value="#[0]"/>
+        </message-properties-transformer>
+        <logger message="Java Payload #[payload]" level="INFO" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="TM:Create FFD" metadata:id="74e5ed25-399b-4bd3-949c-875aa8be9b5b">
+            <dw:set-payload><![CDATA[//Create final CSV
+%dw 1.0
+%output application/csv separator = "|", lineSeparator="\r\n"
+---
+payload map {
+	PID:$.PID,
+	STI:$.STI	
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String" mimeType="text/plain" doc:description="Convert payload to String"/>
+        <logger message="FFD Payload: #[payload]" level="INFO" doc:name="Logger"/>
+
+
+
+        <flow-ref name="Write_to_SFTP-Doe-Enrolment" doc:name="Write_to_SFTP-Doe-Enrolment" doc:description="This flow reference is used to call the sub flow Write_to_SFTP-Doe-Enrolment which will write the final fixed width file to the SFTP server ."/>
+
+       <set-payload value="{&quot;InterfaceID&quot;: &quot;INF024&quot;, &quot;InterfaceName&quot;: &quot;DOE Enrollment Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_StudentList_Non97_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Weekly Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="This Set Payload is used to set the Payload to a JSON for the Logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This will call the Logging frmaework to complete the transaction in SFDC with appropriate status."/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+        
+        </flow>
+    <sub-flow name="In-Progress_Doe-enrolment-Extract" doc:description="This Sub flow will cleare &quot;In-Progress&quot; transaction in Interface Dashboard">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF024&quot;, &quot;InterfaceName&quot;: &quot;DOE Enrollment Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework" doc:description="This Set Payload is used to set the payload for the Logging Framework to a JSON to create the In-Progress Transaction."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This LogTransactionSubFlow i.e logging framework"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
+    </sub-flow>
+    <sub-flow name="Write_to_SFTP-Doe-Enrolment" doc:description="This sub flow will create the File in Transaction and Archive folder.">
+        <until-successful maxRetries="5" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful " doc:description="Retry mechanism for Intermittent Exceptions">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP1" outputPattern="${sftp.doeenrolmentextract.transaction.filename}" host="${sftp.doeenrolmentextract.transaction.host}" port="${sftp.doeenrolmentextract.transaction.port}" path="${sftp.doeenrolmentextract.transaction.path}" user="${sftp.doeenrolmentextract.transaction.username}" password="${sftp.doeenrolmentextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder" doc:description="This SFTP connector writes the final file to the SFTP Main folder location "/>
+        </until-successful>
+
+
+        <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment" overwrite="true" doc:description="This message property will set the TransAttachment and ErrorAttachment for the Logging Framework">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+
+        </message-properties-transformer>
+        <sftp:outbound-endpoint connector-ref="SFTP1" exchange-pattern="one-way" outputPattern="${sftp.doeenrolmentextract.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.doeenrolmentextract.archive.host}" port="${sftp.doeenrolmentextract.archive.port}" path="${sftp.doeenrolmentextract.archive.path}" user="${sftp.doeenrolmentextract.archive.username}" password="${sftp.doeenrolmentextract.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" doc:description="This SFTP connector writes the final file to the SFTP Archive location "/>
+
+       <!-- <set-payload value="#[sessionVars.InitialPayload]" doc:name="Set Payload: to Initial Payload for updating flag to true" encoding="UTF-8" metadata:id="ff2f6868-efb1-4038-8d95-6f380f192776" mimeType="application/csv"/>
+        <dw:transform-message metadata:id="b330c174-e4a9-4ded-85a4-250218ce87d4" doc:name="TM:Create Update Array for SFDC">
+            <dw:input-payload doc:sample="sample_data\list_csv.csv" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/csv
+%output application/java
+
+payload map ((payload01 , indexOfPayload01) -> {
+	Id: payload01.SFDCID,
+	Sent_To_Interface__c: "Interfaced to DHSS"
+})]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="View Success/Failure Message"/>
+         <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Child_Support_Application__c" doc:name="SFDC:Update Records with flag True">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+        <logger message="Salesforce update: #[payload]" level="INFO" doc:name="Salesforce Update Outcome"/> -->
+    </sub-flow>
+
+
+
+
+
+
+
+
+
+
+<sub-flow name="inf024-doe-enrolment-extract-No-Payload-subflow" doc:description="This Subflow will check if records have been extracted or not.">
+        <choice doc:name="Choice : Check if Payload has records" doc:description="Choice router will check if size of payload is greater than 0, if yes then the flow will continue otherwise it will create transaction with Status Error in Interface Dashboard">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF024&quot;, &quot;InterfaceName&quot;: &quot;DOE Enrollment Extract&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to No Records Found for Logging Framework" doc:description="Set payload to JSON for logging framework that will create transaction with Status &quot;Error&quot; in Interface Dashboard"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call Logging framework."/>
+            </when>
+            <otherwise>
+                <logger message="Records Extracted" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+
+
+
+    
+    </mule>
