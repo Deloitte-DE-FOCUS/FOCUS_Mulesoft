@@ -1,0 +1,18 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "Fixed-Width-Initial"
+        }
+    },
+    "outputMessageMetadata": {
+        "sessionVariables": {
+            "Error": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "Fixed-Wdith-Error"
+            }
+        }
+    },
+    "id": "0d32f9e7-cf30-48f6-a8f6-bca7d90d3382",
+    "version": "5.2.0.0"
+}

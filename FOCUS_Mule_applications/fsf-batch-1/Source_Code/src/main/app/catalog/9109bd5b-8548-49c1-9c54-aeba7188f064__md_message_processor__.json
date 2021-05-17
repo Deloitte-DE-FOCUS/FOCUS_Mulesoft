@@ -1,0 +1,13 @@
+{
+    "inputMessageMetadata": {
+        "sessionVariables": {
+            "RecordCount": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "RC"
+            }
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "9109bd5b-8548-49c1-9c54-aeba7188f064",
+    "version": "5.2.0.0"
+}

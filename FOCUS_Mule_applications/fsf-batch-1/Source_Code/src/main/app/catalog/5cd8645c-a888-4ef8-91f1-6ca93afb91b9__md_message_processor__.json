@@ -1,0 +1,21 @@
+{
+    "inputMessageMetadata": {
+        "sessionVariables": {
+            "RecordError": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "RE"
+            },
+            "RecordSuccess": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "RS"
+            },
+            "RecordCount": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "RC"
+            }
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "5cd8645c-a888-4ef8-91f1-6ca93afb91b9",
+    "version": "5.2.0.0"
+}

@@ -1,0 +1,23 @@
+form: FIXEDWIDTH
+name: 'FSFPaymentDetailData'
+values: 
+- { name: 'BusinessUnit', usage: M, type: String, length: 5 }
+- { name: 'Department', usage: M, type: String, length: 6 }
+- { name: 'Voucher-ID', usage: M, type: String, length: 8 }
+- { name: 'Vendor-ID', usage: M, type: String, length: 10 }
+- { name: 'Invoice-ID', usage: M, type: String, length: 30 }
+- { name: 'Invoice-Date', usage: M, type: String, length: 10 }
+- { name: 'Bank-SetID', usage: M, type: String, length: 5 }
+- { name: 'Bank-Code', usage: M, type: String, length: 5 }
+- { name: 'Bank-Account', usage: M, type: String, length: 4 }
+- { name: 'Payment-ID', usage: M, type: String, length: 10 }
+- { name: 'Payment-Reference', usage: M, type: String, length: 10 }
+- { name: 'Remit-Vendor', usage: M, type: String, length: 10 }
+- { name: 'Remit-Vendor-Location', usage: M, type: String, length: 10 }
+- { name: 'Payment-Date', usage: M, type: String, length: 10 }
+- { name: 'Payment-Amount', usage: M, type: String, length: 28 }
+- { name: 'Payment-Status', usage: M, type: String, length: 1 }
+- { name: 'Payment-Method', usage: M, type: String, length: 3 }
+- { name: 'Payment-Handling', usage: M, type: String, length: 2 }
+- { name: 'Cancel-Action', usage: M, type: String, length: 1 }
+- { name: 'Date-Cancelled', usage: M, type: String, length: 10 }

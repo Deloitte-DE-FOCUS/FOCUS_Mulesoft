@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<results>
+<result>
+		<errors>
+			<fields>FSF_Code__c</fields>
+			<message>Required fields are missing: [FSF_Code__c]</message>
+			<statusCode>REQUIRED_FIELD_MISSING</statusCode>
+		</errors>
+		<success>false</success>
+		<created>true</created>
+	</result>
+	<result>
+		<errors>
+			<fields>FSF_Code__c</fields>
+			<message>Required fields are missing: [FSF_Code__c]</message>
+			<statusCode>REQUIRED_FIELD_MISSING</statusCode>
+		</errors>
+		<success>false</success>
+		<created>true</created>
+	</result>
+	</results>

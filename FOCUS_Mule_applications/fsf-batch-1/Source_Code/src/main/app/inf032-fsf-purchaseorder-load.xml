@@ -1,0 +1,760 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <validation:config name="fsf_purchaseorder_Validation_Configuration" doc:name="Validation Configuration"/>
+    <sftp:connector name="SFTPPurchaseOrderOverride" validateConnections="true" duplicateHandling="addSeqNo"  doc:name="SFTP">
+        <reconnect count="5"/>
+    </sftp:connector>
+    <!--  <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans>
+   	 <spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans>  -->
+<!--    	<spring:beans>
+         <spring:import resource="classpath:/queryframework.xml" /> 
+   	</spring:beans> -->
+   	<configuration doc:name="Configuration">
+    	<expression-language>
+     	   <global-functions file = "GlobalUtilityFunctions.mvel">
+     	   		def isValidNumber(textNumber) { org.mule.util.NumberUtils.isNumber(textNumber) }
+           </global-functions> 
+    	</expression-language>
+    </configuration>
+
+    
+    <flow name="inf032-fsf-purchaseorder-loadFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <schedulers:cron-scheduler expression="0 20 7 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF032" doc:name="Set Payload"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="Variable : Set Interface ID"/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <mulerequester:request resource="sftp://${sftp.fsfpurchaseorderload.transaction.username}:${sftp.fsfpurchaseorderload.transaction.password}@${sftp.fsfpurchaseorderload.transaction.host}:${sftp.fsfpurchaseorderload.transaction.port}${sftp.fsfpurchaseorderload.transaction.path}?connector=SFTPOverride&amp;myfilename=${sftp.fsfpurchaseorderload.transaction.filename}" timeout="12000" doc:name="Mule Requester"/>
+        </until-successful>
+        <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation" config-ref="fsf_purchaseorder_Validation_Configuration"/>
+        <object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+        <message-properties-transformer scope="session" doc:name="MP:Set Original Payload">
+            <add-message-property key="FileName" value="#[message.payload.substring(48,message.payload.indexOf('\n'))]"/>
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+        </message-properties-transformer>
+ 
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="fsf-purchaseorder-InProgressTransaction_Sub_Flow" doc:name="fsf-purchaseorder-InProgressTransaction_Sub_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPPurchaseOrderOverride" outputPattern="${sftp.fsfpurchaseorderload.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.fsfpurchaseorderload.archive.host}" port="${sftp.fsfpurchaseorderload.archive.port}" path="${sftp.fsfpurchaseorderload.archive.path}" user="${sftp.fsfpurchaseorderload.archive.username}" password="${sftp.fsfpurchaseorderload.archive.password}" responseTimeout="10000" doc:name="SFTP : Archive File"/>
+        </until-successful>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="FSFPurchaseLoad_LOVDetailsSub_Flow" doc:name="FSFPurchaseLoad_LOVDetailsSub_Flow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <remove-session-variable variableName="TransAttachment" doc:name="Session Variable :  Remove Trans Attachment"/>
+        <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload : Split Records"/>
+        <dw:transform-message doc:name="Transform Message : Get Detail Records">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[1..-2]]]></dw:set-payload>
+        </dw:transform-message>
+        <set-session-variable variableName="TotalRecords" value="#[payload.size()]" doc:name="Session Variable : Set Total Records Count"/>
+        
+        <!--  <dw:transform-message doc:name="Transform Message : Filter Valid Records" metadata:id="843ea5cb-c04f-4ce5-851d-1b867c6af834">
+            <dw:input-payload doc:sample="sample_data\list_string.dwl"/>  -->
+            <dw:transform-message doc:name="Transform Message : Filter Valid Records">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) == "620")) joinBy "\n"]]></dw:set-payload>
+            <dw:set-session-variable variableName="ErrorPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) != "620")) joinBy "\n"]]></dw:set-session-variable>
+        </dw:transform-message><message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set Initial Payload">
+            <add-message-property key="TrimmedPayload" value="#[payload]"/>
+            <add-message-property key="RecordSuccess" value="#[0]"/>
+            <add-message-property key="RecordError" value="#[0]"/>
+            <add-message-property key="LenMisMatchRecs" value="#[sessionVars.ErrorPayload!= null and sessionVars.ErrorPayload != &quot;&quot; ? '******************INVALID WIDTH*******************' + '\n' + sessionVars.ErrorPayload.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) : &quot;&quot;]"/>
+            <add-message-property key="SalesforceErrors" value="#[&quot;&quot;]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="TM : Prepare java format records and req field missing errors">
+        	<dw:input-payload mimeType="text/plain" doc:sample="sample_data\string_2.dwl">
+                <dw:reader-property name="schemaPath" value="fsf-purchaseorder-fixedwidth.ffd"/>
+            </dw:input-payload>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload text/plain 
+%output application/java
+---
+payload filter  ($.Record_ID != null and $.Record_ID !='') and  ($.PO_Number != null and $.PO_Number !='') and ($.PO_Date != null and $.PO_Date !='') and ($.Vendor_ID != null and $.Vendor_ID !='') and ($.Vendor_Address != null and $.Vendor_Address !='') and ($.PO_LineNumber != null and $.PO_LineNumber !='') and ($.PO_Schedule_Number !='' and $.PO_Schedule_Number !=null) and ($.Distribution_Line_Number !=null and $.Distribution_Line_Number !='') and ($.Cleared_Amount !=null and $.Cleared_Amount !='') and ($.Outstanding_Amount !=null and $.Outstanding_Amount !='')    map ((payload01 , indexOfPayload01) -> {
+	Record_ID: payload01."Record_ID" ,
+	PO_Number: payload01."PO_Number",
+	PO_Date: payload01."PO_Date" as :date {format: "MM/dd/yyyy"}  as :string {format: "yyyy-MM-dd"} default false,
+	Vendor_ID: payload01."Vendor_ID",
+	Vendor_ShortName: payload01."Vendor_ShortName",
+	Vendor_Address: payload01."Vendor_Address",
+	PurchaseOrder_ExternalID: trim payload01."PO_Number",
+	PO_LineNumber: payload01."PO_LineNumber",
+	Item_ID: payload01."Item_ID",
+	Item_Description: payload01."Item_Description",
+	Quantity: payload01."Quantity",
+	Unit_of_Measure: payload01."Unit_of_Measure",
+	Category_Code: payload01."Category_Code",
+	Unit_Price: payload01."Unit_Price",
+	POLine_ExternalID: (trim payload01.PO_Number) ++ '-' ++ (trim  payload01."PO_LineNumber" default "" ),
+	PO_Schedule_Number: payload01."PO_Schedule_Number",
+	Ship_to_Location: payload01."Ship_to_Location",
+	POSchedule_ExternalID : (trim payload01.PO_Number) ++ '-' ++ (trim  payload01."PO_LineNumber" default "" ) ++ '-' ++ (trim  payload01."PO_Schedule_Number" default "" ),
+	Merchandise_Amount: payload01."Merchandise_Amount",
+	Distribution_Line_Number: payload01."Distribution_Line_Number",
+	GL_Business_Unit: payload01."GL_Business_Unit",
+	Budget_Reference: payload01."Budget_Reference",
+	Fund_Code: payload01."Fund_Code",
+	Appropriation: payload01."Appropriation",
+	Program_Code: payload01."Program_Code",
+	Project: payload01."Project",
+	Resource_Category: payload01."Resource_Category",
+	Activity: payload01."Activity",
+	Account: payload01."Account",
+	Department: payload01."Department",
+	AM_Business_Unit: payload01."AM_Business_Unit",
+	Asset_Profile_ID: payload01."Asset_Profile_ID",
+	Operating_Unit: payload01."Operating_Unit",
+	School_Code: payload01."School_Code",
+	PC_Business_Unit: payload01."PC_Business_Unit",
+	Cleared_Amount: payload01."Cleared_Amount",
+	Outstanding_Amount: payload01."Outstanding_Amount",
+	PODistribution_ExternalID: (trim payload01.PO_Number) ++ '-' ++ (trim  payload01."PO_LineNumber" default "" ) ++ '-' ++ (trim  payload01."PO_Schedule_Number" default "" ) ++ '-' ++ (trim  payload01."Distribution_Line_Number" default "" )
+}) filter $.PO_Date != false orderBy $.PO_Number]]></dw:set-payload>
+            <dw:set-session-variable variableName="ReqFieldMissingErrorFile"><![CDATA[%dw 1.0
+%input payload text/plain 
+%output application/java 
+---
+payload map {
+	Record_ID: $."Record_ID" ,
+	PO_Number: $."PO_Number",
+	PO_Date: $."PO_Date" ,
+	PO_Date_Valid : $."PO_Date" as :date {format: "MM/dd/yyyy"}  as :string {format: "yyyy-MM-dd"} default false,
+	Vendor_ID: $."Vendor_ID",
+	Vendor_ShortName: $."Vendor_ShortName",
+	Vendor_Address: $."Vendor_Address",
+	//PurchaseOrder_ExternalID: $."PO_Number",
+	PO_LineNumber: $."PO_LineNumber",
+	Item_ID: $."Item_ID",
+	Item_Description: $."Item_Description",
+	Quantity: $."Quantity",
+	Unit_of_Measure: $."Unit_of_Measure",
+	Category_Code: $."Category_Code",
+	Unit_Price: $."Unit_Price",
+	PO_Schedule_Number: $."PO_Schedule_Number",
+	Ship_to_Location: $."Ship_to_Location",
+	Merchandise_Amount: $."Merchandise_Amount",
+	Distribution_Line_Number: $."Distribution_Line_Number",
+	GL_Business_Unit: $."GL_Business_Unit",
+	Budget_Reference: $."Budget_Reference",
+	Fund_Code: $."Fund_Code",
+	Appropriation: $."Appropriation",
+	Program_Code: $."Program_Code",
+	Project: $."Project",
+	Resource_Category: $."Resource_Category",
+	Activity: $."Activity",
+	Account: $."Account",
+	Department: $."Department",
+	AM_Business_Unit: $."AM_Business_Unit",
+	Asset_Profile_ID: $."Asset_Profile_ID",
+	Operating_Unit: $."Operating_Unit",
+	School_Code: $."School_Code",
+	PC_Business_Unit: $."PC_Business_Unit",
+	Cleared_Amount: $."Cleared_Amount",
+	Outstanding_Amount: $."Outstanding_Amount",
+	Error: ( (( 'Record ID is Missing ' )  when  ($.Record_ID=='' or $.Record_ID==null)  otherwise '' ) ++ 
+	(('PO Number is Missing ' ) when  ($.PO_Number=='' or $.PO_Number==null) otherwise '' ) ++ 
+	(('PO Date is Missing ')  when ($.PO_Date=='' or $.PO_Date==null) otherwise ''  ) ++
+	(('PO Date is Invalid ')  when ($.PO_Date !='' and  $.PO_Date != null and ($."PO_Date" as :date {format: "MM/dd/yyyy"}  as :string {format: "yyyy-MM-dd"} default false) == false) otherwise ''  ) ++
+	(('Vendor ID is Missing ') when  ($.Vendor_ID=='' or $.Vendor_ID==null) otherwise '') ++
+	(('Vendor Address is Missing ') when  ($.Vendor_Address=='' or $.Vendor_Address==null) otherwise '') ++
+	(('PO Line Number Missing ') when  ($.PO_LineNumber=='' or $.PO_LineNumber==null) otherwise '') ++
+	(('PO Schedule Number is Missing ') when ($.PO_Schedule_Number==null or $.PO_Schedule_Number=='') otherwise '' ) ++
+    (('PO Distribution Line is Missing ') when ($.Distribution_Line_Number=='' or $.Distribution_Line_Number==null) otherwise '' ) ++
+	(('Cleared Amount is Missing ') when ($.Cleared_Amount==null or $.Cleared_Amount=='') otherwise '' ) ++
+	(('Outstanding Amount is Missing ') when ($.Outstanding_Amount==null or $.Outstanding_Amount=='') otherwise '' ) ) default 'No Error' 
+} filter ($.Record_ID=='' or $.Record_ID==null) or ($.PO_Number == null or $.PO_Number =='') or ($.PO_Date == null or $.PO_Date =='' or $.PO_Date_Valid == false ) or ($.Vendor_ID == null or $.Vendor_ID =='') or ($.Vendor_Address == null or $.Vendor_Address =='') or ($.PO_LineNumber == null or $.PO_LineNumber =='') or ($.PO_Schedule_Number =='' or $.PO_Schedule_Number ==null) or ($.Distribution_Line_Number ==null or $.Distribution_Line_Number =='') or ($.Cleared_Amount ==null or $.Cleared_Amount =='') or ($.Outstanding_Amount ==null or $.Outstanding_Amount =='')   ]]></dw:set-session-variable>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM : Prepare Req field missing csv file">
+            <dw:set-session-variable variableName="ReqFieldMissingErrorFile"><![CDATA[%dw 1.0
+%input payload text/plain 
+%output application/csv header = false , separator = "," , quoteValues=true
+---
+sessionVars.ReqFieldMissingErrorFile map {
+	Record_ID: $."Record_ID" ,
+	PO_Number: $."PO_Number",
+	PO_Date: $."PO_Date" ,
+	Vendor_ID: $."Vendor_ID",
+	Vendor_ShortName: $."Vendor_ShortName",
+	Vendor_Address: $."Vendor_Address",
+	//PurchaseOrder_ExternalID: $."PO_Number",
+	PO_LineNumber: $."PO_LineNumber",
+	Item_ID: $."Item_ID",
+	Item_Description: $."Item_Description",
+	Quantity: $."Quantity",
+	Unit_of_Measure: $."Unit_of_Measure",
+	Category_Code: $."Category_Code",
+	Unit_Price: $."Unit_Price",
+	PO_Schedule_Number: $."PO_Schedule_Number",
+	Ship_to_Location: $."Ship_to_Location",
+	Merchandise_Amount: $."Merchandise_Amount",
+	Distribution_Line_Number: $."Distribution_Line_Number",
+	GL_Business_Unit: $."GL_Business_Unit",
+	Budget_Reference: $."Budget_Reference",
+	Fund_Code: $."Fund_Code",
+	Appropriation: $."Appropriation",
+	Program_Code: $."Program_Code",
+	Project: $."Project",
+	Resource_Category: $."Resource_Category",
+	Activity: $."Activity",
+	Account: $."Account",
+	Department: $."Department",
+	AM_Business_Unit: $."AM_Business_Unit",
+	Asset_Profile_ID: $."Asset_Profile_ID",
+	Operating_Unit: $."Operating_Unit",
+	School_Code: $."School_Code",
+	PC_Business_Unit: $."PC_Business_Unit",
+	Cleared_Amount: $."Cleared_Amount",
+	Outstanding_Amount: $."Outstanding_Amount",
+	Error: $.Error
+}]]></dw:set-session-variable>
+        </dw:transform-message>
+        <foreach batchSize="200" doc:name="For Each">
+            <flow-ref name="inf032-fsf-poLoad-foreach" doc:name="inf032-fsf-poLoad-foreach"/>
+        </foreach>
+
+        <logger message="FSF Puchase Order Load : #[payload]" level="INFO" doc:name="Logger"/>
+         <message-properties-transformer scope="invocation" doc:name="MP : Store Error Counts">
+                <add-message-property key="SalesForceErrorCount" value="#[(sessionVars.SalesforceErrors != null and sessionVars.SalesforceErrors != &quot;&quot; ? sessionVars.SalesforceErrors.split(&quot;\n&quot;).length : 0)]"/>
+                <add-message-property key="ReqFieldsMissingCount" value="#[(sessionVars.ReqFieldMissingErrorFile != null and sessionVars.ReqFieldMissingErrorFile != &quot;&quot; ? sessionVars.ReqFieldMissingErrorFile.split(&quot;\n&quot;).length : 0)]"/>
+                <add-message-property key="InvalidLenRecCount" value="#[sessionVars.ErrorPayload!= null and sessionVars.ErrorPayload != &quot;&quot; ? sessionVars.ErrorPayload.split(&quot;\n&quot;).length : 0]"/>
+            </message-properties-transformer>
+            <set-session-variable variableName="RecordErrorCount" value="#[SalesForceErrorCount   + InvalidLenRecCount + ReqFieldsMissingCount ]" doc:name="SV: Add all Failed Record Counts"/>
+            <message-properties-transformer scope="session" doc:name="MP: Set Error Attachment and SuccessCount">
+                <add-message-property key="RecordSuccessCount" value="#[TotalRecords - RecordErrorCount]"/>
+                <add-message-property key="SalesforceErrors" value="#[sessionVars.ReqFieldMissingErrorFile + sessionVars.SalesforceErrors]"/>
+                <add-message-property key="ErrorAttachment" value="#[sessionVars.LenMisMatchRecs]"/>
+
+            </message-properties-transformer>
+
+            <message-properties-transformer scope="session" doc:name="MP : Error Attachments">
+                <add-message-property key="ErrorAttachment" value="#[(sessionVars.ErrorAttachment != null and  sessionVars.ErrorAttachment != &quot;&quot;) ?  sessionVars.ErrorAttachment + '\n' : sessionVars.ErrorAttachment]"/>
+                <add-message-property key="SalesforceErrors" value="#[sessionVars.SalesforceErrors != null and sessionVars.SalesforceErrors != &quot;&quot; ? (&quot;Record ID,PO Number,PO Date,Vendor ID,Vendor Short Name,Vendor Address,PO Line Number,Item ID,Item Description,Quantity,Unit of Measure,Category Code,Unit Price,PO Schedule Number,Ship To Location,Merchandise Amount,Distribution Line Number,GL Business Unit,Budget Reference,Fund Code,Appropriation,Program Code,Project,Resource Category,Activity,Account,Department,AM Business Unit,Asset Profile ID, Operating Unit,School Code,PC Business Unit,Cleared Amount,Outstanding Amount,SFDC Error&quot; + &quot;\n&quot; + sessionVars.SalesforceErrors) : &quot;&quot;]"/>
+            </message-properties-transformer>
+            <choice doc:name="Choice">
+                <when expression="#[((sessionVars.ErrorAttachment != null and  sessionVars.ErrorAttachment != &quot;&quot;) || (sessionVars.SalesforceErrors != null and  sessionVars.SalesforceErrors != &quot;&quot;)) ]">
+                    <set-session-variable variableName="ErrorAttachment" value="#[sessionVars.ErrorAttachment + sessionVars.SalesforceErrors]" doc:name="SV : Error Attachment + Slaesforce Errors"/>
+                </when>
+                <otherwise>
+                    <remove-session-variable variableName="ErrorAttachment" doc:name="SV : Remove Error Attachment"/>
+                </otherwise>
+            </choice>
+            <flow-ref name="fsf-purchaseorder-CompletedTransaction_Sub_Flow" doc:name="fsf-purchaseorder-CompletedTransaction_Sub_Flow"/>
+<message-properties-transformer scope="invocation" doc:name="Message Properties">
+			<delete-message-property key="InitialBatchPayload"/>
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			<delete-message-property key="InvalidLenRecCount"/>
+			<delete-message-property key="LOVReturned"/>
+			<delete-message-property key="PODistributionsBeforeLoad"/>
+			<delete-message-property key="POLinesBeforeLoad"/>
+			<delete-message-property key="POsBeforeLoad"/>
+			<delete-message-property key="POSchedulesBeforeLoad"/>
+			<delete-message-property key="ReqFieldsMissingCount"/>
+			<delete-message-property key="SalesForceErrorCount"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="exceptionRecordCount"/>
+			
+			<delete-message-property key="ValidBatchPayloadRecords"/>
+			<delete-message-property key="VendorExternalIdNameMap"/>
+			<delete-message-property key="VendorIDMissing"/>
+</message-properties-transformer>
+<message-properties-transformer scope="session" doc:name="Message Properties">
+			<delete-message-property key="ErrorAttachment"/>
+			<delete-message-property key="FileName"/>
+			<delete-message-property key="LenMisMatchRecs"/>
+			<delete-message-property key="ErrorPayload"/>
+			
+			<delete-message-property key="RecordError"/>
+			<delete-message-property key="RecordErrorCount"/>
+			<delete-message-property key="RecordSuccessCount"/>
+			<delete-message-property key="RecordSuccess"/>
+			<delete-message-property key="ReqFieldMissingErrorFile"/>
+			<delete-message-property key="TID"/>
+			<delete-message-property key="SalesforceErrors"/>
+			<delete-message-property key="TotalRecords"/>
+			<delete-message-property key="TrimmedPayload"/>
+					</message-properties-transformer>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="inf032-fsf-poLoad-foreach">
+        <set-variable variableName="ValidBatchPayloadRecords" value="#[payload]" doc:name="Variable"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.Vendor_ID ++ "'" )) joinBy ","]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id, Name, External_Interface_Id__c from DEL_Vendor__c where External_Interface_Id__c IN (#[payload]) " doc:name="Salesforce : Query For Vendors"/>
+        <dw:transform-message doc:name="TM:  Vendor ExternalId and ID Map">
+            <dw:set-variable variableName="VendorExternalIdNameMap"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+      VendorExternalID: $.External_Interface_Id__c,
+      SFId: $.Id,
+      VendorName: $.Name
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Payload with Valid Vendors">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var VendorSFId = {( flowVars.VendorExternalIdNameMap map (record, index) -> {
+            (record.VendorExternalID as :string) : record.SFId default ""
+})}
+---
+( flowVars.ValidBatchPayloadRecords filter VendorSFId[$.Vendor_ID] != null and VendorSFId[$.Vendor_ID] != "" )
+]]></dw:set-payload>
+            <dw:set-variable variableName="VendorIDMissing"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+%var VendorSFId = {( flowVars.VendorExternalIdNameMap map (record, index) -> {
+            (record.VendorExternalID as :string) : record.SFId default ""
+})}
+---
+flowVars.ValidBatchPayloadRecords filter VendorSFId[$.Vendor_ID] == null or VendorSFId[$.Vendor_ID] == "" map {
+	Record_ID: $.Record_ID,
+	PO_Number: $.PO_Number,
+	PO_Date: $.PO_Date,
+	Vendor_ID: $.Vendor_ID,
+	Vendor_ShortName: $.Vendor_ShortName,
+	Vendor_Address: $.Vendor_Address,
+	PO_LineNumber: $.PO_LineNumber,
+	Item_ID: $.Item_ID,
+	Item_Description: $.Item_Description,
+	Quantity: $.Quantity,
+	Unit_of_Measure: $.Unit_of_Measure,
+	Category_Code: $.Category_Code,
+	Unit_Price: $.Unit_Price,
+	PO_Schedule_Number: $.PO_Schedule_Number,
+	Ship_to_Location: $.Ship_to_Location,
+	Merchandise_Amount: $.Merchandise_Amount,
+	Distribution_Line_Number: $.Distribution_Line_Number,
+	GL_Business_Unit: $.GL_Business_Unit,
+	Budget_Reference: $.Budget_Reference,
+	Fund_Code: $.Fund_Code,
+	Appropriation: $.Appropriation,
+	Program_Code: $.Program_Code,
+	Project: $.Project,
+	Resource_Category: $.Resource_Category,
+	Activity: $.Activity,
+	Account: $.Account,
+	Department: $.Department,
+	AM_Business_Unit: $.AM_Business_Unit,
+	Asset_Profile_ID: $.Asset_Profile_ID,
+	Operating_Unit: $.Operating_Unit,
+	School_Code: $.School_Code,
+	PC_Business_Unit: $.PC_Business_Unit,
+	Cleared_Amount: $.Cleared_Amount,
+	Outstanding_Amount: $.Outstanding_Amount,
+	'SFDC Error': 'Vendor ID does not exist in FOCUS'
+} 
+]]></dw:set-variable>
+        </dw:transform-message>
+        <set-session-variable variableName="SalesforceErrors" value="#[(flowVars.VendorIDMissing != null &amp;&amp; flowVars.VendorIDMissing != &quot;&quot;) ? sessionVars.SalesforceErrors + flowVars.VendorIDMissing : sessionVars.SalesforceErrors]" mimeType="application/csv" doc:name="Session Variable"/>
+        <set-variable variableName="InitialBatchPayload" value="#[payload]" doc:name="Variable : Store Initial Payload"/>
+        <dw:transform-message doc:name="TM : Get only unique PO records">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload distinctBy $.PurchaseOrder_ExternalID]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Purchase Orders Data">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var VendorNameMap = {( flowVars.VendorExternalIdNameMap map (record, index) -> {
+            (record.VendorExternalID as :string) : record.VendorName default ""
+})}
+---
+payload map {
+	Name: $.PO_Number,
+	PO_Date__c: $.PO_Date as :date,
+	//Vendor__c: $.Vendor_ID,
+	Vendor_ID__c: $.Vendor_ID,
+	Vendor__r:
+	{		
+		type: "DEL_Vendor__c",
+		External_Interface_Id__c: ($.Vendor_ID as :string ) as :string
+	},
+	Vendor_Short_Name__c: $.Vendor_ShortName,
+	Vendor_Name__c: VendorNameMap[$.Vendor_ID],
+	Vendor_Address__c: $.Vendor_Address,
+	Interface_External_Id__c: $.PurchaseOrder_ExternalID
+}]]></dw:set-payload>
+            <dw:set-variable variableName="POsBeforeLoad"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="Interface_External_Id__c" type="DEL_Purchase_Order__c" doc:name="Salesforce : Upsert Purchase Orders">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:upsert>
+        <dw:transform-message doc:name="TM: POs Error Details">
+            <dw:set-payload><![CDATA[%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+//%function change(string3) ("PO Date") when string3 == 'PO_Date__c'  otherwise (("Vendor Address") when string3 == 'Vendor_Address__c' otherwise (("Vendor ID") when string3 =="External_Interface_Id__c " otherwise (("Effective Date") when string3=='FSF_Effective_Date__c' otherwise ('Effective Status' when string3=='FSF_Active__c' otherwise ('Record Name' when string3=='Chart_Types__c' otherwise ('External ID' when string3=='External_Chart_Id__c' otherwise string3 )) )))) 
+---
+payload map {
+	Record_ID: flowVars.POsBeforeLoad[$$].Record_ID,
+	PO_Number: flowVars.POsBeforeLoad[$$].PO_Number,
+	PO_Date: flowVars.POsBeforeLoad[$$].PO_Date,
+	Vendor_ID: flowVars.POsBeforeLoad[$$].Vendor_ID,
+	Vendor_ShortName: flowVars.POsBeforeLoad[$$].Vendor_ShortName,
+	Vendor_Address: flowVars.POsBeforeLoad[$$].Vendor_Address,
+	PO_LineNumber: flowVars.POsBeforeLoad[$$].PO_LineNumber,
+	Item_ID: flowVars.POsBeforeLoad[$$].Item_ID,
+	Item_Description: flowVars.POsBeforeLoad[$$].Item_Description,
+	Quantity: flowVars.POsBeforeLoad[$$].Quantity,
+	Unit_of_Measure: flowVars.POsBeforeLoad[$$].Unit_of_Measure,
+	Category_Code: flowVars.POsBeforeLoad[$$].Category_Code,
+	Unit_Price: flowVars.POsBeforeLoad[$$].Unit_Price,
+	PO_Schedule_Number: flowVars.POsBeforeLoad[$$].PO_Schedule_Number,
+	Ship_to_Location: flowVars.POsBeforeLoad[$$].Ship_to_Location,
+	Merchandise_Amount: flowVars.POsBeforeLoad[$$].Merchandise_Amount,
+	Distribution_Line_Number: flowVars.POsBeforeLoad[$$].Distribution_Line_Number,
+	GL_Business_Unit: flowVars.POsBeforeLoad[$$].GL_Business_Unit,
+	Budget_Reference: flowVars.POsBeforeLoad[$$].Budget_Reference,
+	Fund_Code: flowVars.POsBeforeLoad[$$].Fund_Code,
+	Appropriation: flowVars.POsBeforeLoad[$$].Appropriation,
+	Program_Code: flowVars.POsBeforeLoad[$$].Program_Code,
+	Project: flowVars.POsBeforeLoad[$$].Project,
+	Resource_Category: flowVars.POsBeforeLoad[$$].Resource_Category,
+	Activity: flowVars.POsBeforeLoad[$$].Activity,
+	Account: flowVars.POsBeforeLoad[$$].Account,
+	Department: flowVars.POsBeforeLoad[$$].Department,
+	AM_Business_Unit: flowVars.POsBeforeLoad[$$].AM_Business_Unit,
+	Asset_Profile_ID: flowVars.POsBeforeLoad[$$].Asset_Profile_ID,
+	Operating_Unit: flowVars.POsBeforeLoad[$$].Operating_Unit,
+	School_Code: flowVars.POsBeforeLoad[$$].School_Code,
+	PC_Business_Unit: flowVars.POsBeforeLoad[$$].PC_Business_Unit,
+	Cleared_Amount: flowVars.POsBeforeLoad[$$].Cleared_Amount,
+	Outstanding_Amount: flowVars.POsBeforeLoad[$$].Outstanding_Amount,
+	'SFDC Error': 'There was an error in the interface. The records failed for the following object: DEL_Purchase_Order__c. ' ++ $.errors[0].message default ""
+} filter $.'SFDC Error' != null and $.'SFDC Error' !=''
+
+
+]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Convert to CSV format"/>
+        <set-session-variable variableName="SalesforceErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot;) ? sessionVars.SalesforceErrors + payload : sessionVars.SalesforceErrors]" mimeType="application/csv" doc:name="Session Variable"/>
+        <dw:transform-message doc:name="TM : Get Distinct By">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.InitialBatchPayload distinctBy $.POLine_ExternalID]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Purchase Order Line Data">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Name: $.PO_LineNumber,
+	//Purchase_Order__c: null,
+	Purchase_Order__r:
+	{		
+		type: "DEL_Purchase_Order__c",
+		Interface_External_Id__c: $.PurchaseOrder_ExternalID as :string
+	},
+	Item_ID__c: $.Item_ID,
+	Item_Description__c: $.Item_Description,
+	Quantity__c: $.Quantity,
+	Unit_of_Measure__c: $.Unit_of_Measure,
+	Category_Code__c: $.Category_Code,
+	Unit_of_Price__c: $.Unit_Price,
+	Interface_External_Id__c: $.POLine_ExternalID
+}]]></dw:set-payload>
+            <dw:set-variable variableName="POLinesBeforeLoad"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="Interface_External_Id__c" type="DEL_Purchase_Order_Line_Item__c" doc:name="Salesforce : Upsert Purchase Order Line Items">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:upsert>
+        <dw:transform-message doc:name="TM: PO Line Error Details">
+            <dw:set-payload><![CDATA[%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+//%function change(string3) ("PO Date") when string3 == 'PO_Date__c'  otherwise (("Vendor Address") when string3 == 'Vendor_Address__c' otherwise (("Vendor ID") when string3 =="External_Interface_Id__c " otherwise (("Effective Date") when string3=='FSF_Effective_Date__c' otherwise ('Effective Status' when string3=='FSF_Active__c' otherwise ('Record Name' when string3=='Chart_Types__c' otherwise ('External ID' when string3=='External_Chart_Id__c' otherwise string3 )) )))) 
+---
+payload map {
+	Record_ID: flowVars.POLinesBeforeLoad[$$].Record_ID,
+	PO_Number: flowVars.POLinesBeforeLoad[$$].PO_Number,
+	PO_Date: flowVars.POLinesBeforeLoad[$$].PO_Date,
+	Vendor_ID: flowVars.POLinesBeforeLoad[$$].Vendor_ID,
+	Vendor_ShortName: flowVars.POLinesBeforeLoad[$$].Vendor_ShortName,
+	Vendor_Address: flowVars.POLinesBeforeLoad[$$].Vendor_Address,
+	PO_LineNumber: flowVars.POLinesBeforeLoad[$$].PO_LineNumber,
+	Item_ID: flowVars.POLinesBeforeLoad[$$].Item_ID,
+	Item_Description: flowVars.POLinesBeforeLoad[$$].Item_Description,
+	Quantity: flowVars.POLinesBeforeLoad[$$].Quantity,
+	Unit_of_Measure: flowVars.POLinesBeforeLoad[$$].Unit_of_Measure,
+	Category_Code: flowVars.POLinesBeforeLoad[$$].Category_Code,
+	Unit_Price: flowVars.POLinesBeforeLoad[$$].Unit_Price,
+	PO_Schedule_Number: flowVars.POLinesBeforeLoad[$$].PO_Schedule_Number,
+	Ship_to_Location: flowVars.POLinesBeforeLoad[$$].Ship_to_Location,
+	Merchandise_Amount: flowVars.POLinesBeforeLoad[$$].Merchandise_Amount,
+	Distribution_Line_Number: flowVars.POLinesBeforeLoad[$$].Distribution_Line_Number,
+	GL_Business_Unit: flowVars.POLinesBeforeLoad[$$].GL_Business_Unit,
+	Budget_Reference: flowVars.POLinesBeforeLoad[$$].Budget_Reference,
+	Fund_Code: flowVars.POLinesBeforeLoad[$$].Fund_Code,
+	Appropriation: flowVars.POLinesBeforeLoad[$$].Appropriation,
+	Program_Code: flowVars.POLinesBeforeLoad[$$].Program_Code,
+	Project: flowVars.POLinesBeforeLoad[$$].Project,
+	Resource_Category: flowVars.POLinesBeforeLoad[$$].Resource_Category,
+	Activity: flowVars.POLinesBeforeLoad[$$].Activity,
+	Account: flowVars.POLinesBeforeLoad[$$].Account,
+	Department: flowVars.POLinesBeforeLoad[$$].Department,
+	AM_Business_Unit: flowVars.POLinesBeforeLoad[$$].AM_Business_Unit,
+	Asset_Profile_ID: flowVars.POLinesBeforeLoad[$$].Asset_Profile_ID,
+	Operating_Unit: flowVars.POLinesBeforeLoad[$$].Operating_Unit,
+	School_Code: flowVars.POLinesBeforeLoad[$$].School_Code,
+	PC_Business_Unit: flowVars.POLinesBeforeLoad[$$].PC_Business_Unit,
+	Cleared_Amount: flowVars.POLinesBeforeLoad[$$].Cleared_Amount,
+	Outstanding_Amount: flowVars.POLinesBeforeLoad[$$].Outstanding_Amount,
+	'SFDC Error': "There was an error in the interface. The records failed for the following object: DEL_Purchase_Order_Line_Item__c. " ++ $.errors[0].message default ""
+} filter $.'SFDC Error' != null and $.'SFDC Error' !=''
+]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Convert to CSV format"/>
+        <set-session-variable variableName="SalesforceErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot;) ? sessionVars.SalesforceErrors + payload : sessionVars.SalesforceErrors]" mimeType="application/csv" doc:name="Session Variable"/>
+        <dw:transform-message doc:name="TM : Get Distinct By PO Schedules">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.InitialBatchPayload distinctBy $.POSchedule_ExternalID]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Purchase Order Schedules">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Name: $.PO_Schedule_Number,
+	Ship_to_Location__c: $.Ship_to_Location,
+	Interface_External_Id__c: $.POSchedule_ExternalID,
+	// Purchase_Order_Line_Item__c: null
+	Purchase_Order_Line_Item__r: {
+		type: "DEL_Purchase_Order_Line_Item__c",
+		Interface_External_Id__c: $.POLine_ExternalID as :string
+	}
+}]]></dw:set-payload>
+            <dw:set-variable variableName="POSchedulesBeforeLoad"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="Interface_External_Id__c" type="DEL_Purchase_Order_Schedule__c" doc:name="Salesforce : Upsert Purchase Order Schedules">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:upsert>
+
+        <dw:transform-message doc:name="TM: POs Schedules Details">
+            <dw:set-payload><![CDATA[%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+//%function change(string3) ("Chartfield") when string3 == 'FSF_Code__c'  otherwise (("Description") when string3 == 'FSF_Description__c' otherwise (("Record ID") when string3 =="FSF_Record_Id__c" otherwise (("Effective Date") when string3=='FSF_Effective_Date__c' otherwise ('Effective Status' when string3=='FSF_Active__c' otherwise ('Record Name' when string3=='Chart_Types__c' otherwise ('External ID' when string3=='External_Chart_Id__c' otherwise string3 )) )))) 
+---
+payload map {
+	Record_ID: flowVars.POSchedulesBeforeLoad[$$].Record_ID,
+	PO_Number: flowVars.POSchedulesBeforeLoad[$$].PO_Number,
+	PO_Date: flowVars.POSchedulesBeforeLoad[$$].PO_Date,
+	Vendor_ID: flowVars.POSchedulesBeforeLoad[$$].Vendor_ID,
+	Vendor_ShortName: flowVars.POSchedulesBeforeLoad[$$].Vendor_ShortName,
+	Vendor_Address: flowVars.POSchedulesBeforeLoad[$$].Vendor_Address,
+	PO_LineNumber: flowVars.POSchedulesBeforeLoad[$$].PO_LineNumber,
+	Item_ID: flowVars.POSchedulesBeforeLoad[$$].Item_ID,
+	Item_Description: flowVars.POSchedulesBeforeLoad[$$].Item_Description,
+	Quantity: flowVars.POSchedulesBeforeLoad[$$].Quantity,
+	Unit_of_Measure: flowVars.POSchedulesBeforeLoad[$$].Unit_of_Measure,
+	Category_Code: flowVars.POSchedulesBeforeLoad[$$].Category_Code,
+	Unit_Price: flowVars.POSchedulesBeforeLoad[$$].Unit_Price,
+	PO_Schedule_Number: flowVars.POSchedulesBeforeLoad[$$].PO_Schedule_Number,
+	Ship_to_Location: flowVars.POSchedulesBeforeLoad[$$].Ship_to_Location,
+	Merchandise_Amount: flowVars.POSchedulesBeforeLoad[$$].Merchandise_Amount,
+	Distribution_Line_Number: flowVars.POSchedulesBeforeLoad[$$].Distribution_Line_Number,
+	GL_Business_Unit: flowVars.POSchedulesBeforeLoad[$$].GL_Business_Unit,
+	Budget_Reference: flowVars.POSchedulesBeforeLoad[$$].Budget_Reference,
+	Fund_Code: flowVars.POSchedulesBeforeLoad[$$].Fund_Code,
+	Appropriation: flowVars.POSchedulesBeforeLoad[$$].Appropriation,
+	Program_Code: flowVars.POSchedulesBeforeLoad[$$].Program_Code,
+	Project: flowVars.POSchedulesBeforeLoad[$$].Project,
+	Resource_Category: flowVars.POSchedulesBeforeLoad[$$].Resource_Category,
+	Activity: flowVars.POSchedulesBeforeLoad[$$].Activity,
+	Account: flowVars.POSchedulesBeforeLoad[$$].Account,
+	Department: flowVars.POSchedulesBeforeLoad[$$].Department,
+	AM_Business_Unit: flowVars.POSchedulesBeforeLoad[$$].AM_Business_Unit,
+	Asset_Profile_ID: flowVars.POSchedulesBeforeLoad[$$].Asset_Profile_ID,
+	Operating_Unit: flowVars.POSchedulesBeforeLoad[$$].Operating_Unit,
+	School_Code: flowVars.POSchedulesBeforeLoad[$$].School_Code,
+	PC_Business_Unit: flowVars.POSchedulesBeforeLoad[$$].PC_Business_Unit,
+	Cleared_Amount: flowVars.POSchedulesBeforeLoad[$$].Cleared_Amount,
+	Outstanding_Amount: flowVars.POSchedulesBeforeLoad[$$].Outstanding_Amount,
+	'SFDC Error': "There was an error in the interface. The records failed for the following object: DEL_Purchase_Order_Schedule__c. " ++ $.errors[0].message default ""
+} filter $.'SFDC Error' != null and $.'SFDC Error' !='']]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Convert to CSV format"/>
+        <set-session-variable variableName="SalesforceErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot;) ? sessionVars.SalesforceErrors + payload : sessionVars.SalesforceErrors]" mimeType="application/csv" doc:name="Session Variable"/>
+        <dw:transform-message doc:name="TM: Purchase Orders Distributions Data">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var VendorNameMap = {( flowVars.VendorExternalIdNameMap map (record, index) -> {
+            (record.VendorExternalID as :string) : record.VendorName default ""
+})}
+---
+flowVars.InitialBatchPayload map {
+	Name: $.Distribution_Line_Number,
+	GL_Business_Unit__c: $.GL_Business_Unit,
+	Budget_Reference__c: $.Budget_Reference,
+	Fund_Code__c: $.Fund_Code,
+	Appropriation__c: $.Appropriation,
+	Program_Code__c: $.Program_Code,
+	Project__c: $.Project,
+	Resource_Category__c: $.Resource_Category,
+	Activity__c: $.Activity,
+	Account__c: $.Account,
+	Department__c: $.Department,
+	AM_Business_Unit__c: flowVars.LOVReturned[("AM_BUSINESS_UNIT-" ++ $.AM_Business_Unit)][0],
+	Asset_Profile_ID__c: flowVars.LOVReturned[("ASSET_PROFILE_ID-" ++ $.Asset_Profile_ID)][0],
+	Operating_Unit__c: $.Operating_Unit,
+	School_Code__c: $.School_Code,
+	PC_Business_Unit__c: $.PC_Business_Unit,
+	Cleared_Amount__c: $.Cleared_Amount,
+	Outstanding_Amount__c: $.Outstanding_Amount,
+	Merchandise_Amount__c: $.Merchandise_Amount,
+	Interface_External_Id__c: $.PODistribution_ExternalID,
+	Purchase_Order_Schedule__r:{
+		type: "DEL_Purchase_Order_Schedule__c",
+		Interface_External_Id__c : $.POSchedule_ExternalID as :string
+	},
+	// Below fields need to be populated for the application logic
+	Vendor_Name__c: VendorNameMap[$.Vendor_ID],
+	Vendor_ID__c: $.Vendor_ID,
+	Vendor__r:
+	{	type: "DEL_Vendor__c",	
+		External_Interface_Id__c: $.Vendor_ID as :string
+	},
+	PO_ID__c: $.PO_Number,
+	PO_Date__c: $.PO_Date as :date
+}]]></dw:set-payload>
+            <dw:set-variable variableName="PODistributionsBeforeLoad"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.InitialBatchPayload map {
+	Name: $.Distribution_Line_Number,
+	GL_Business_Unit__c: $.GL_Business_Unit,
+	Budget_Reference__c: $.Budget_Reference,
+	Fund_Code__c: $.Fund_Code,
+	Appropriation__c: $.Appropriation,
+	Program_Code__c: $.Program_Code,
+	Project__c: $.Project,
+	Resource_Category__c: $.Resource_Category,
+	Activity__c: $.Activity,
+	Account__c: $.Account,
+	Department__c: $.Department,
+	AM_Business_Unit__c: $.AM_Business_Unit,
+	Asset_Profile_ID__c: $.Asset_Profile_ID,
+	Operating_Unit__c: $.Operating_Unit,
+	School_Code__c: $.School_Code,
+	PC_Business_Unit__c: $.PC_Business_Unit,
+	Cleared_Amount__c: $.Cleared_Amount,
+	Outstanding_Amount__c: $.Outstanding_Amount,
+	Merchandise_Amount__c: $.Merchandise_Amount,
+	Interface_External_Id__c: $.PODistribution_ExternalID,
+	Purchase_Order_Schedule__r:{
+		Interface_External_Id : $.POSchedule_ExternalID as :string
+	} 
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="Interface_External_Id__c" type="DEL_Purchase_Order_Distribute_Line__c" doc:name="Salesforce : Upsert Purchase Order Distribution Lines">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:upsert>
+        <dw:transform-message doc:name="TM: PO Distribution Line Error Details">
+            <dw:set-payload><![CDATA[//%input payload application/xml 
+%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+%function change(string3) ("Chartfield") when string3 == 'FSF_Code__c'  otherwise (("Description") when string3 == 'FSF_Description__c' otherwise (("Record ID") when string3 =="FSF_Record_Id__c" otherwise (("Effective Date") when string3=='FSF_Effective_Date__c' otherwise ('Effective Status' when string3=='FSF_Active__c' otherwise ('Record Name' when string3=='Chart_Types__c' otherwise ('External ID' when string3=='External_Chart_Id__c' otherwise string3 )) )))) 
+---
+payload  map {
+	Record_ID: flowVars.InitialBatchPayload[$$].Record_ID,
+	PO_Number: flowVars.InitialBatchPayload[$$].PO_Number,
+	PO_Date: flowVars.InitialBatchPayload[$$].PO_Date,
+	Vendor_ID: flowVars.InitialBatchPayload[$$].Vendor_ID,
+	Vendor_ShortName: flowVars.InitialBatchPayload[$$].Vendor_ShortName,
+	Vendor_Address: flowVars.InitialBatchPayload[$$].Vendor_Address,
+	PO_LineNumber: flowVars.InitialBatchPayload[$$].PO_LineNumber,
+	Item_ID: flowVars.InitialBatchPayload[$$].Item_ID,
+	Item_Description: flowVars.InitialBatchPayload[$$].Item_Description,
+	Quantity: flowVars.InitialBatchPayload[$$].Quantity,
+	Unit_of_Measure: flowVars.InitialBatchPayload[$$].Unit_of_Measure,
+	Category_Code: flowVars.InitialBatchPayload[$$].Category_Code,
+	Unit_Price: flowVars.InitialBatchPayload[$$].Unit_Price,
+	PO_Schedule_Number: flowVars.InitialBatchPayload[$$].PO_Schedule_Number,
+	Ship_to_Location: flowVars.InitialBatchPayload[$$].Ship_to_Location,
+	Merchandise_Amount: flowVars.InitialBatchPayload[$$].Merchandise_Amount,
+	Distribution_Line_Number: flowVars.InitialBatchPayload[$$].Distribution_Line_Number,
+	GL_Business_Unit: flowVars.InitialBatchPayload[$$].GL_Business_Unit,
+	Budget_Reference: flowVars.InitialBatchPayload[$$].Budget_Reference,
+	Fund_Code: flowVars.InitialBatchPayload[$$].Fund_Code,
+	Appropriation: flowVars.InitialBatchPayload[$$].Appropriation,
+	Program_Code: flowVars.InitialBatchPayload[$$].Program_Code,
+	Project: flowVars.InitialBatchPayload[$$].Project,
+	Resource_Category: flowVars.InitialBatchPayload[$$].Resource_Category,
+	Activity: flowVars.InitialBatchPayload[$$].Activity,
+	Account: flowVars.InitialBatchPayload[$$].Account,
+	Department: flowVars.InitialBatchPayload[$$].Department,
+	AM_Business_Unit: flowVars.InitialBatchPayload[$$].AM_Business_Unit,
+	Asset_Profile_ID: flowVars.InitialBatchPayload[$$].Asset_Profile_ID,
+	Operating_Unit: flowVars.InitialBatchPayload[$$].Operating_Unit,
+	School_Code: flowVars.InitialBatchPayload[$$].School_Code,
+	PC_Business_Unit: flowVars.InitialBatchPayload[$$].PC_Business_Unit,
+	Cleared_Amount: flowVars.InitialBatchPayload[$$].Cleared_Amount,
+	Outstanding_Amount: flowVars.InitialBatchPayload[$$].Outstanding_Amount,
+	'SFDC Error': "There was an error in the interface. The records failed for the following object: DEL_Purchase_Order_Distribute_Line__c. " ++ $.errors[0].message default ""
+} filter $.'SFDC Error' != null and $.'SFDC Error' !='']]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Convert to CSV format"/>
+        <set-session-variable variableName="SalesforceErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot;) ? sessionVars.SalesforceErrors + payload : sessionVars.SalesforceErrors]" mimeType="application/csv" doc:name="Session Variable"/>
+    </sub-flow>
+
+    <sub-flow name="fsf-purchaseorder-InProgressTransaction_Sub_Flow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF032&quot;, &quot;InterfaceName&quot;: &quot;FSF Purchase Order Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DPO008_370000_370640&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload : In Progress Flow"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+    </sub-flow>
+    <sub-flow name="fsf-purchaseorder-CompletedTransaction_Sub_Flow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF032&quot;, &quot;InterfaceName&quot;: &quot;FSF Purchase Order Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_FSFPurchaseOrderLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordSuccessCount==0?'Error':sessionVars.RecordErrorCount==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[TotalRecords]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordErrorCount != 0 ?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload : Set Completed Transaction Payload"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+    </sub-flow>
+    <sub-flow name="FSFPurchaseLoad_LOVDetailsSub_Flow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'AM_BUSINESS_UNIT','ASSET_PROFILE_ID'&quot;} " mimeType="application/json" doc:name="Set Payload : LOV Query"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+</mule>

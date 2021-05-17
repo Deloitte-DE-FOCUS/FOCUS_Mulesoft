@@ -1,0 +1,10 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "sessionVariables": {
+            "ErrorPayload": {}
+        }
+    },
+    "id": "843ea5cb-c04f-4ce5-851d-1b867c6af834",
+    "version": "5.2.0.0"
+}

@@ -1,0 +1,37 @@
+form: FIXEDWIDTH
+name: 'fsf-purchaseorder-fixedwidth'
+values: 
+- { name: 'Record_ID', usage: M, type: String, length: 3 }
+- { name: 'PO_Number', usage: M, type: String, length: 10 }
+- { name: 'PO_Date', usage: M, type: String, length: 10 }
+- { name: 'Vendor_ID', usage: M, type: String, length: 10 }
+- { name: 'Vendor_ShortName', usage: M, type: String, length: 14 }
+- { name: 'Vendor_Address', usage: M, type: String, length: 30 }
+- { name: 'PO_LineNumber', usage: M, type: String, length: 5 }
+- { name: 'Item_ID', usage: M, type: String, length: 18 }
+- { name: 'Item_Description', usage: M, type: String, length: 254 }
+- { name: 'Quantity', usage: M, type: String, length: 16 }
+- { name: 'Unit_of_Measure', usage: M, type: String, length: 3 }
+- { name: 'Category_Code', usage: M, type: String, length: 8 }
+- { name: 'Unit_Price', usage: M, type: String, length: 16 }
+- { name: 'PO_Schedule_Number', usage: M, type: String, length: 3 }
+- { name: 'Ship_to_Location', usage: M, type: String, length: 10 }
+- { name: 'Merchandise_Amount', usage: M, type: String, length: 28 }
+- { name: 'Distribution_Line_Number', usage: M, type: String, length: 5 }
+- { name: 'GL_Business_Unit', usage: M, type: String, length: 5 }
+- { name: 'Budget_Reference', usage: M, type: String, length: 8 }
+- { name: 'Fund_Code', usage: M, type: String, length: 5 }
+- { name: 'Appropriation', usage: M, type: String, length: 5 }
+- { name: 'Program_Code', usage: M, type: String, length: 5 }
+- { name: 'Project', usage: M, type: String, length: 15 }
+- { name: 'Resource_Category', usage: M, type: String, length: 5 }
+- { name: 'Activity', usage: M, type: String, length: 15 }
+- { name: 'Account', usage: M, type: String, length: 10 }
+- { name: 'Department', usage: M, type: String, length: 10 }
+- { name: 'AM_Business_Unit', usage: M, type: String, length: 5 }
+- { name: 'Asset_Profile_ID', usage: M, type: String, length: 10 }
+- { name: 'Operating_Unit', usage: M, type: String, length: 8 }
+- { name: 'School_Code', usage: M, type: String, length: 10 }
+- { name: 'PC_Business_Unit', usage: M, type: String, length: 5 }
+- { name: 'Cleared_Amount', usage: M, type: String, length: 28 }
+- { name: 'Outstanding_Amount', usage: M, type: String, length: 28 }

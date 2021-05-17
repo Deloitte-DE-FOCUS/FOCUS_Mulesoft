@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+  
+    <!-- 
+   	 
+   <spring:beans>
+         <spring:import resource="classpath:/queryframework.xml" />      
+   	</spring:beans>  -->
+   
+    
+   
+    <flow name="inf033-fsf-voucher-extract-Flow" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <schedulers:cron-scheduler expression="0 7 17 ? * MON,TUE,WED,THU,FRI *" timeZone="US/Eastern"/>
+            <set-payload value="INF033" doc:name="Set Payload: to Interface ID"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID"/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id, Name, Distribution_Line_Amount__c, FSF_Account_Code__c, FSF_PC_Business_Unit_Code__c, FSF_Dept_Code__c, FSF_Operational_Unit_Code__c, FSF_Fund_Code__c, FSF_Appropriation_Code__c, FSF_Program_Code__c, Budget_Reference_Code__c, FSF_Project_Code__c, FSF_Activity_Code__c, Distribution_Line_Number__c, FSF_Voucher_ID__r.Voucher_Line_No__c, FSF_Voucher_ID__r.Id, FSF_Voucher_ID__r.Name, FSF_Voucher_ID__r.PO_Number_Text__c, FSF_Voucher_ID__r.PO_Line_Number_Text__c, FSF_Voucher_ID__r.PO_Schedule_Line_Number_Text__c, FSF_Voucher_ID__r.Ship_To__c, FSF_Voucher_ID__r.Item_ID__c, FSF_Voucher_ID__r.Voucher_Line_unit_Price__c, FSF_Voucher_ID__r.Voucher_Line_Total_Amount__c, FSF_Voucher_ID__r.FSF_Unspecified_Cat_No__c, FSF_Voucher_ID__r.Withholding_Switch__c, FSF_Voucher_ID__r.Withholding_Code__c,  FSF_Voucher_ID__r.Document_Voucher_Line_Description__c, FSF_Voucher_ID__r.CPA_Document_ID__r.Name, FSF_Voucher_ID__r.CPA_Document_ID__r.FSF_Vendor_ID__r.Vendor_ID__c, FSF_Voucher_ID__r.CPA_Document_ID__r.FSF_Vendor_Location_ID__r.Vendor_Location__c, FSF_Voucher_ID__r.CPA_Document_ID__r.FSF_Vendor_Address_ID__r.Address_Sequence_Number__c, FSF_Voucher_ID__r.CPA_Document_ID__r.Doc_Total_AMT__c, FSF_Voucher_ID__r.CPA_Document_ID__r.Payment_Handling__c, FSF_Voucher_ID__r.CPA_Document_ID__r.Provider_Id__r.DEL_FSF_TIN__c, FSF_Voucher_ID__r.CPA_Document_ID__r.Id,  FSF_Voucher_ID__r.CPA_Document_ID__r.Doc_Payment_Msg__c, FSF_Voucher_ID__r.CPA_Document_ID__r.Document_Status__c from DEL_Voucher_Distribution__c  where FSF_Voucher_ID__r.CPA_Document_ID__r.Document_Status__c='Submit Approved' and FSF_Voucher_ID__r.CPA_Document_ID__r.Document_Type__c in ('SP','PV')" doc:name="Salesforce"/>
+        </until-successful>
+         <enricher doc:name="Message Enricher" doc:description="Message Enricher is used so that the payload is not modified while the underlying flow is invoked">
+            <flow-ref name="In-Progress_FSF_Voucher_Extract" doc:name="In-Progress_FSF_Voucher_Extract"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used so that the payload is not modified while the underlying flow is invoked">
+            <flow-ref name="inf033-fsf-payment-voucher-extract-NoPayload_Flow" doc:name="inf033-fsf-payment-voucher-extract-NoPayload_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher> 
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression" doc:description="Stop Processing when no Data is present for processing"/>
+        <dw:transform-message doc:name="TM : Format Amount values" doc:description="Format amount values wherever required">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload  map {
+	Distribution_SFDC_ID:$.Id,
+	Distribution_Line_No:$.Distribution_Line_Number__c,
+	Distribution_Amount:(( ($.Distribution_Line_Amount__c) * (-1) ) as :number as :string {format:"00000000000000000000000.000"})  default '',
+	Distribution_Account:$.FSF_Account_Code__c,
+	Distribution_Department:$.FSF_Dept_Code__c,
+	Distribution_OP_Unit:$.FSF_Operational_Unit_Code__c,
+	Distribution_Fund:$.FSF_Fund_Code__c,
+	Distribution_Appropriation:$.FSF_Appropriation_Code__c,
+	Distribution_Program:$.FSF_Program_Code__c,
+	Distribution_Budget_Reference:$.Budget_Reference_Code__c,
+	Distribution_Project:$.FSF_Project_Code__c,
+	Distribution_Activity:$.FSF_Activity_Code__c,
+	Distribution_PC_Bussiness_Unit:$.FSF_PC_Business_Unit_Code__c,
+	Voucher_SFDC_ID:$.FSF_Voucher_ID__r.Id,
+	Voucher_PO_Numner:$.FSF_Voucher_ID__r.PO_Number_Text__c,
+	Voucher_PO_Line_Number:$.FSF_Voucher_ID__r.PO_Line_Number_Text__c,
+	Voucher_Line_Number:$.FSF_Voucher_ID__r.Voucher_Line_No__c,
+	Voucher_PO_Schedule_Line:$.FSF_Voucher_ID__r.PO_Schedule_Line_Number_Text__c ,
+	Voucher_Ship_to:$.FSF_Voucher_ID__r.Ship_To__c,
+	Voucher_Item:$.FSF_Voucher_ID__r.Item_ID__c,
+	Voucher_LineItem_Unit_Price:(( ($.FSF_Voucher_ID__r.Voucher_Line_unit_Price__c) * (-1) ) as :number as :string {format:"0000000000.00000"}) default '',
+	Voucher_Line_Amount:(( ($.FSF_Voucher_ID__r.Voucher_Line_Total_Amount__c) * (-1) ) as :number as :string {format:"00000000000000000000000.000"}) default '',
+	Voucher_Category_Number:$.FSF_Voucher_ID__r.FSF_Unspecified_Cat_No__c,
+	Voucher_Withholding_Switch:$.FSF_Voucher_ID__r.Withholding_Switch__c[0],
+	Voucher_Withholding_Code:$.FSF_Voucher_ID__r.Withholding_Code__c,
+	Vourcher_Description: $.FSF_Voucher_ID__r.Document_Voucher_Line_Description__c,
+	Document__SFDC_ID:$.FSF_Voucher_ID__r.CPA_Document_ID__r.Id,
+	Document_ID:$.FSF_Voucher_ID__r.CPA_Document_ID__r.Name,
+	Document_Vendor_ID:$.FSF_Voucher_ID__r.CPA_Document_ID__r.FSF_Vendor_ID__r.Vendor_ID__c,
+	Document_Vendor_LocationID:$.FSF_Voucher_ID__r.CPA_Document_ID__r.FSF_Vendor_Location_ID__r.Vendor_Location__c ,
+	Document_Vendor_AddressID:$.FSF_Voucher_ID__r.CPA_Document_ID__r.FSF_Vendor_Address_ID__r.Address_Sequence_Number__c,
+	Document_Document_Amount:(( ($.FSF_Voucher_ID__r.CPA_Document_ID__r.Doc_Total_AMT__c) * (-1) ) as :number as :string {format:"00000000000000000000000.000"}) default "" ,
+	Document_Payment_Handling:$.FSF_Voucher_ID__r.CPA_Document_ID__r.Payment_Handling__c,
+	Document_TIN:$.FSF_Voucher_ID__r.CPA_Document_ID__r.Provider_Id__r.DEL_FSF_TIN__c,
+	Document_Message:$.FSF_Voucher_ID__r.CPA_Document_ID__r.Doc_Payment_Msg__c
+	}]]></dw:set-payload>
+
+        </dw:transform-message>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set Initial Payload,Query">
+            <add-message-property key="InitialPayload" value="#[payload]"/>
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+            <add-message-property key="RecordSuccess" value="#[payload.size()]"/>
+            <add-message-property key="RecordError" value="#[0]"/>
+        </message-properties-transformer>
+        <logger message="FSF Voucher Extract : Initial Payload  #[payload]" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used so that the payload is not modified while the underlying flow is invoked
+LOV Values is retruned back from Enricher and copied to a flow variable">
+            <flow-ref name="Call-LOV-flow" doc:name="Call-LOV-flow" doc:description="Invoke Flow to get LOV values"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <dw:transform-message metadata:id="b6a67e54-048a-46da-956a-048d79f72ffb" doc:name="TM :  Fixed Width Transform" doc:description="Fixed Width Transform">
+            <dw:set-variable variableName="DetailRecord"><![CDATA[%dw 1.0
+%output text/plain schemaPath = "VoucherExtract.ffd"
+
+---
+payload map {
+	Business_Unit:"STATE",
+	Invoice_Number:$.Document_ID,
+	Invoice_Date: now as :date as :string {format:"MM/dd/yyyy"},
+	Voucher_ID:"NEXT",
+	Goods_Service_Date:now as :date as :string {format:"MM/dd/yyyy"},
+	Vendor_ID:$.Document_Vendor_ID,
+	TIN:$.Document_TIN,
+	Vendor_Location:$.Document_Vendor_LocationID,
+	Invoice_Address:$.Document_Vendor_AddressID,
+	Remitting_Address:$.Document_Vendor_AddressID,
+	Gross_Invoice_Amount:( ( ' ' ++ $.Document_Document_Amount ) when ($.Document_Document_Amount > 0) otherwise ($.Document_Document_Amount) ) default ' ',
+	Payment_Handling_Code:flowVars.LOVReturned[("FSF_PAYMENT_HANDLING_CODE-" ++ $.Document_Payment_Handling)][0],
+	PO_Business_Unit:"STATE" when ($.Voucher_PO_Numner != null) otherwise ' ',
+	PO_Number:$.Voucher_PO_Numner,
+	PO_Line_Number:$.Voucher_PO_Line_Number,
+	PO_Schedule_Number:$.Voucher_PO_Schedule_Line,
+	Voucher_Line_Number:$.Voucher_Line_Number,
+	Distribute_By:"A",
+	Ship_to_Location:$.Voucher_Ship_to,
+	Item_ID:$.Voucher_Item,
+	Quantity_Vouchered:"00000000000000001",
+	Unit_Price:(( ' ' ++ $.Voucher_LineItem_Unit_Price ) when ($.Voucher_LineItem_Unit_Price > 0) otherwise ($.Voucher_LineItem_Unit_Price) ) default ' ',
+	Merchandise_Amt:(( ' ' ++ $.Voucher_Line_Amount ) when ($.Voucher_Line_Amount > 0) otherwise ($.Voucher_Line_Amount) ) default ' ',
+	Description: $.Vourcher_Description default " ",
+	Category_Code:$.Voucher_Category_Number,
+	Withholding_Switch:$.Voucher_Withholding_Switch,
+	Withholding_Code:$.Voucher_Withholding_Code,
+	Distribution_Line_Number:$.Distribution_Line_No,
+	Distribution_Quantity_Vouchered:"00000000000000001",
+	Distribution_Line_Amount:((' ' ++ $.Distribution_Amount ) when ($.Distribution_Amount > 0) otherwise ($.Distribution_Amount) ) default ' ',
+	GL_Business_Unit:"STATE",
+	Account:$.Distribution_Account,
+	Department:$.Distribution_Department,
+	Operating_Unit:$.Distribution_OP_Unit,
+	Fund_Code:$.Distribution_Fund,
+	Appropriation:$.Distribution_Appropriation,
+	Program_Code:$.Distribution_Program,
+	Budget_Reference:$.Distribution_Budget_Reference,
+	School_Code:" ",
+	DE_Activity:" ",
+	DE_Resource_Category:"",
+	PC_Business_Unit:$.Distribution_PC_Bussiness_Unit,	
+	Project:$.Distribution_Project,
+	Activity:$.Distribution_Activity,
+	Category:"",
+	Subcategory:"",
+	AM_Business_Unit:"",
+	Asset_Profile_ID:"",
+	Asset_ID:"",
+	Payment_Message:$.Document_Message
+}]]></dw:set-variable>
+
+        </dw:transform-message>
+        <enricher source="#[payload]" target="#[flowVars.DetailRecord]" doc:name="Message Enricher">
+            <flow-ref name="inf033-fsf-voucher-extractSub_Flow" doc:name="inf033-fsf-voucher-extractSub_Flow"/>
+        </enricher>
+        <set-payload value="#[flowVars.DetailRecord + '\n']" doc:name="Set Payload"/>
+        <flow-ref name="Write_to_SFTP-FSF-Payment-Voucher" doc:name="Write_to_SFTP-FSF-Payment-Voucher"/>
+        <flow-ref name="inf033-fsf-voucher-extract-UpdateStatus-Sub_Flow" doc:name="inf033-fsf-voucher-extract-UpdateStatus-Sub_Flow"/>
+
+
+        <logger message="FSF Voucher Extract :  Header #[sessionVars.Header]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.ErrorUpdate.size() != 0]">
+                <logger message="FSF Voucher Extract : Warning for this Iterface run. Please Correct Warning" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <delete-message-property key="ErrorAttachment"/>
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF033&quot;, &quot;InterfaceName&quot;: &quot;FSF Payment Voucher Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_FSFVoucherExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;.csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DAP001_370000_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordSuccess==0?'Error':sessionVars.RecordError==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;RecordSkipped&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordError != 0 ?'Business':'']&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+      <message-properties-transformer scope="invocation" doc:name="Message Properties">
+			<delete-message-property key="UpdateSuccess"/>
+			<delete-message-property key="DetailRecord"/>
+			<delete-message-property key="ErrorUpdate"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			<delete-message-property key="LOVReturned"/>
+</message-properties-transformer>
+<message-properties-transformer scope="session" doc:name="Message Properties">
+			
+			<delete-message-property key="RecordError"/>
+			<delete-message-property key="RecordCount"/>
+			<delete-message-property key="RecordSuccess"/>
+			<delete-message-property key="TID"/>
+			<delete-message-property key="InitialPayload"/>
+			<delete-message-property key="TransAttachment"/>
+			
+</message-properties-transformer>
+        <logger message="FSF Voucher Extract : #[payload]" level="INFO" doc:name="Logger"/>
+         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+       
+        </flow>
+    <sub-flow name="inf033-fsf-voucher-extractSub_Flow">
+        <set-payload value="#[flowVars.DetailRecord]" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+    </sub-flow>
+ 
+    <sub-flow name="Write_to_SFTP-FSF-Payment-Voucher">
+        <logger message="Final File Prepared" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-1" outputPattern="${sftp.fsfvoucherextract.transaction.filename}" host="${sftp.fsfvoucherextract.transaction.host}" port="${sftp.fsfvoucherextract.transaction.port}" path="${sftp.fsfvoucherextract.transaction.path}" user="${sftp.fsfvoucherextract.transaction.username}" password="${sftp.fsfvoucherextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder"/>
+        </until-successful>
+        <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment" overwrite="true">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment]"/>
+        </message-properties-transformer>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP" outputPattern="${sftp.fsfvoucherextract.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.fsfvoucherextract.archive.host}" port="${sftp.fsfvoucherextract.archive.port}" path="${sftp.fsfvoucherextract.archive.path}" user="${sftp.fsfvoucherextract.archive.username}" password="${sftp.fsfvoucherextract.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive"/>
+        </until-successful>
+    </sub-flow>
+    <sub-flow name="inf033-fsf-voucher-extract-UpdateStatus-Sub_Flow">
+        <set-payload value="#[sessionVars.InitialPayload]" encoding="UTF-8" mimeType="application/csv" doc:name="Set Payload: to Initial Payload for updating flag to true" metadata:id="ff2f6868-efb1-4038-8d95-6f380f192776"/>
+        <dw:transform-message doc:name="TM:Create Update Array for SFDC" metadata:id="b330c174-e4a9-4ded-85a4-250218ce87d4">
+            <dw:input-payload doc:sample="sample_data\list_csv.csv" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/csv
+%output application/java
+---
+payload map  {
+	ID: $.Document__SFDC_ID,
+	Document_Status__c:"Submitted",
+	Document_Submit_Date__c: now as :date
+} distinctBy $.ID]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="View Success/Failure Message"/>
+        <sfdc:update-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_CPA_Document__c" doc:name="SFDC:Update Records with flag True">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update-bulk>
+        <message-properties-transformer doc:name="Message Properties" scope="invocation">
+            <add-message-property key="JobId" value="#[payload.jobId]"/>
+        </message-properties-transformer>
+        <until-successful maxRetries="100" millisBetweenRetries="5000" synchronous="true" doc:name="Until Successful">
+            <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce"/>
+        </until-successful>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <dw:transform-message doc:name="Transform Message" metadata:id="a5547b4d-8485-4cb3-a54b-5ff9bf44f6a9">
+            <dw:set-variable variableName="UpdateSuccess"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.results.*result map {
+	ID:$.id default '',
+	Success:$.success
+} groupBy $.ID]]></dw:set-variable>
+            <dw:set-variable variableName="ErrorUpdate"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.results.*result map {
+	ID:$.id default '',
+	Field:$.errors.fields,
+	Name:sessionVars.InitialPayload[$$].Document_ID,
+	Error:$.errors.statusCode,
+	Description:$.errors.message
+} filter $.ID == '' ]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.JobId]" doc:name="SFDC: Close Job"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-session-variable variableName="ErrorAttachment"><![CDATA[%dw 1.0
+%output application/csv 
+---
+flowVars.ErrorUpdate map {
+	 Error: 'Data Warning',
+	'Field Name in Error':$.Field default "",
+	'Field Value in Error':'',
+	'Error Description':($.Error default "" ) ++ "." ++ ( $.Description default "" ) ++ '. Please Change the Status for CPA Document :' ++ ( $.Name default "" ) ++  " to 'Submitted' "
+	
+}]]></dw:set-session-variable>
+        </dw:transform-message>
+        <logger message="Salesforce update: #[payload]" level="INFO" doc:name="Salesforce Update Outcome"/>
+    </sub-flow>
+    <sub-flow name="inf033-fsf-payment-voucher-extract-NoPayload_Flow">
+        <choice doc:name="Choice : Check whether Records are Present" doc:description="Check whether Records are any records are qualified for Processing
+Depending on this Check flow is routed to the respective branch">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="#[&quot;&quot;]" doc:name="Set Payload : Empty payload for empty file"/>
+                <flow-ref name="Write_to_SFTP-FSF-Payment-Voucher" doc:name="Write_to_SFTP-FSF-Payment-Voucher"/>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF033&quot;, &quot;InterfaceName&quot;: &quot;FSF Payment Voucher Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;Backup_DAP001_370000_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload to No Payload for Logging Framework" doc:description="Preparing payload to complete the Transaction"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoking Loggng Framework to complete the Transaction"/>
+            </when>
+            <otherwise>
+                <logger message="Records Extracted Succesfully " level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="In-Progress_FSF_Voucher_Extract">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF033&quot;, &quot;InterfaceName&quot;: &quot;FSF Payment Voucher Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Extract&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework-Initial Call" doc:description="This Set Payload is used to set the payload for the Logging Framework to a JSON to create the In-Progress Transaction."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
+    </sub-flow>
+
+ <sub-flow name="Call-LOV-flow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'FSF_PAYMENT_HANDLING_CODE','FSF_WITHHOLDING_CODE','FSF_WITHHOLDING_SWITCH'&quot;}" doc:name="Set Payload"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+
+    
+    </mule>

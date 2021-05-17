@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "Fixed-Wdith-Error"
+        }
+    },
+    "id": "97150630-b7c4-42dc-8364-7755c1243fc2",
+    "version": "5.2.0.0"
+}

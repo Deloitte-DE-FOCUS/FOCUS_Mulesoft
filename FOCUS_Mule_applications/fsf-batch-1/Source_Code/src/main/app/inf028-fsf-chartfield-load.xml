@@ -1,0 +1,537 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+    
+    <!-- <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" url="${sfdc.url}" doc:name="Salesforce: Basic Authentication" disableSessionInvalidation="true" >
+        <reconnect  count="5"/>
+    </sfdc:config> -->
+<!-- <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans>
+   	 <spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans> -->
+   	 <spring:beans> 
+         <spring:import resource="classpath:/test-framework.xml" />   
+   	</spring:beans>
+    <objectstore:config name="FSF_Chartfield_Main" partition="FSF_Chartfield_Main" doc:name="ObjectStore: Connector"/>
+   <sftp:connector name="SFTPOverride" validateConnections="true" 
+		doc:name="SFTP" >
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+    <objectstore:config name="FSF_ChartField_Error" partition="FSF_ChartField_Error" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="ObjectStore__Connector2" partition="FSF" doc:name="ObjectStore: Connector"/>
+    <flow name="inf028-fsf-chartfield-loadFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll-DHSS" doc:description="Poll will ytigger the flow at 7:05 AM evry day in EST timezone">
+            <schedulers:cron-scheduler expression="0 5 7 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF028" doc:name="Set Payload to Interface ID" doc:description="Payload is set to the Interface Id so that it can be save in a flow variable and used for logging/Error framework"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV:Set Interface ID" doc:description="Interface is stored in flow variable InterfaceID which is used by the Logging framework "/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" doc:name="Until Successful" synchronous="true">
+            <mulerequester:request resource="sftp://${sftp.fsfchartload.transaction.username}:${sftp.fsfchartload.transaction.password}@${sftp.fsfchartload.transaction.host}:${sftp.fsfchartload.transaction.port}${sftp.fsfchartload.transaction.path}?connector=SFTPOverride&amp;myfilename=${sftp.fsfchartload.transaction.filename}" timeout="120000" doc:name="Mule Requester" doc:description="Retrieve FSF Payment detail Load File if available. The Filename is passed to the Requester If the File is not found then Null is returned"/>
+        </until-successful>
+        <validation:is-not-null config-ref="Validation_Configuration1" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check for Null Payload" doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown "/>
+        <object-to-string-transformer mimeType="text/plain" doc:name="O to S: Change filestream to string" doc:description="This Connector will change the File Payload into a readable String."/>
+        <message-properties-transformer scope="session" doc:name="MP:Set Original Payload">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+            <flow-ref name="inf280-fsf-chartfield-load-InProgress-Log-Transaction-Sub_Flow" doc:name="inf280-fsf-chartfield-load-InProgress-Log-Transaction-Sub_Flow" doc:description="call subflow inf280-fsf-chartfield-load-InProgress-Log-Transaction-Sub_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher" doc:description="Retrieve LOV values in enricher so that the payload is not modified after retrieval">
+            <flow-ref name="Call-LOV-ChartField-flow" doc:name="Call-LOV-ChartField-flow" doc:description="Call subflow Call-LOV-ChartField-flow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-1" outputPattern="${sftp.fsfchartload.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.fsfchartload.archive.host}" port="${sftp.fsfchartload.archive.port}" path="${sftp.fsfchartload.archive.path}" user="${sftp.fsfchartload.archive.username}" password="${sftp.fsfchartload.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" doc:description="SFTP Archive do take backup of the File in the configured SFTP location Also Timeout is set sufficiently to allow writing of the file till that time"/>
+        </until-successful>
+        <remove-variable variableName="TransAttachment" doc:name="Variable: Remove TransAttachment" doc:description=" Remove TransAttachment variable to free heap memory"/>
+        <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload : Split Records" doc:description="Split the Payload by newline character and chage it into an array list."/>
+        <dw:transform-message doc:name="Transform Message : Get Detail Records">
+            <dw:set-payload><![CDATA[//Remove Trailer and Header to process Record Details.
+%dw 1.0
+%output application/java
+---
+payload[1..-2]]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set Record Count,Reccord Success,Record Error" doc:description="Set : =
+Record Count: Total Records in File.
+Reccord Success: Successfullr Records in File.
+Record Error:  Error Records in File.">
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+            <add-message-property key="RecordSuccess" value="#[0]"/>
+            <add-message-property key="RecordError" value="#[0]"/>
+            <delete-message-property key="TransAttachment"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="Transform Message : Filter Valid Records" metadata:id="843ea5cb-c04f-4ce5-851d-1b867c6af834">
+            <dw:input-payload doc:sample="sample_data\list_string.dwl"/>
+            <dw:set-payload><![CDATA[//Filter out Rows whose size is equal to 92
+%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) == "92")) joinBy "\n"]]></dw:set-payload>
+            <dw:set-session-variable variableName="ErrorPayload"><![CDATA[//Filter out Rows whose size is not equal to 92 to be logged as Business Error
+%dw 1.0
+%output application/java
+---
+payload filter (((sizeOf $) as :string ) != "92") map {
+	"Error":"Input Row Size Error",
+	"Field Name in Error":"Input Row",
+	"Field Value in Error":($) replace "\r" with "" replace "\r\n" with "" replace "\n" with "",
+	"Error Description":"Size of the Input row is not 92. Size is : " ++ (sizeOf $ default "" )
+	
+}]]></dw:set-session-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Convert Query Output to Map" metadata:id="0d32f9e7-cf30-48f6-a8f6-bca7d90d3382">
+            <dw:input-payload doc:sample="sample_data\list_flatfile.flatfile" mimeType="text/plain">
+                <dw:reader-property name="schemaPath" value="Fixed-Width-Initial.ffd"/>
+            </dw:input-payload>
+            <dw:set-payload><![CDATA[//Convert Fixed Width File into a Java ArrayList
+%dw 1.0
+%input payload text/plain 
+%output application/java
+---
+payload filter  ($.Record_ID != null and $.Record_ID !='') and  ($.Record_Name != null and $.Record_Name !='') and ($.Effective_Date != null and $.Effective_Date !='') and ($.Effective_Status != null and $.Effective_Status !='')  and ($.Chartfield != null and $.Chartfield !='')  and ($.Set_ID !=null and $.Set_ID !='')    map ((payload01 , indexOfPayload01) -> {
+	RecordID:payload01."Record_ID" ,
+	RecordName:payload01.Record_Name,
+	SetID:payload01."Set_ID",
+	Chartfield: payload01."Chartfield",
+	EffectiveDate: payload01."Effective_Date" ,
+	Active:payload01.Effective_Status,
+	Description: payload01."Description",
+	ShortDescription:payload01."Short_Description",
+	External_Chart_Id__c:(flowVars.LOVReturned[("FSF_RECORD_ID-" ++ payload01.Record_ID)][0] default "") ++ '-' ++ ( payload01."Chartfield" default "" )
+}) ]]></dw:set-payload>
+            <dw:set-session-variable variableName="Error"><![CDATA[// Add Records which are missing a Mandatory field in a file.
+%dw 1.0
+%input payload text/plain
+%output application/java
+%function changeRName(string1) ("Budget Reference") when string1 == 'BUD_REF_TBL' otherwise (("Funding") when string1 == 'FUND_TBL' otherwise (("Department") when string1 =="DEPT_TBL" otherwise (("Operating Unit") when string1 == "OPER_UNIT_TBL" otherwise (("Appropriation") when string1 == "CLASS_CF_TBL" otherwise (("GL Account") when string1 == "GL_ACCOUNT_TBL" otherwise (("Program") when string1 == "PROGRAM_TBL" otherwise (("School") when string1 == "CHARTFIELD1_TBL" otherwise (("Project") when string1 =="PROJECT" otherwise (("Activity") when string1 =="FS_ACTIVITY_TBL" otherwise ""    ) ) ))) ))) )
+%function changeRID(string1) ("Budget Reference") when string1 == '03' otherwise (("Funding") when string1 == '04' otherwise (("Department") when string1 =="05" otherwise (("Operating Unit") when string1 == "06" otherwise (("Appropriation") when string1 == "07" otherwise (("GL Account") when string1 == "08" otherwise (("Program") when string1 == "09" otherwise (("School") when string1 == "10" otherwise (("Project") when string1 =="11" otherwise (("Activity") when string1 =="12" otherwise ""    ) ) ))) ))) )	
+---
+payload map {
+	Record_ID: $.Record_ID,
+	Record_Name: $.Record_Name,
+	Set_ID: $.Set_ID,
+	Chartfield: $.Chartfield,
+	Effective_Date: $.Effective_Date,
+	Effective_Status: $.Effective_Status,
+	Description: $.Description,
+	Short_Description: $.Short_Description,
+	External_ID:changeRID($.Record_ID) ++ '-' ++ ( $."Chartfield" default "" ),
+	Error:( (( '| Record ID is Missing' )  when  ($.Record_ID=='' or $.Record_ID==null)  otherwise '' ) ++ 
+	(('| Record Name is Missing' ) when  ($.Record_Name=='' or $.Record_Name==null) otherwise '' ) ++ 
+	(('| Chartfield is Missing')  when ($.Chartfield=='' or $.Chartfield==null) otherwise ''  ) ++
+	(('| Effective Date is Missing') when  ($.Effective_Date=='' or $.Effective_Date==null) otherwise '') ++
+	(('| Effective Status Missing') when  ($.Effective_Status=='' or $.Effective_Status==null) otherwise '') ++
+	(('| Set ID is Missing') when ($.Set_ID==null or $.Set_ID=='') otherwise '' ) ) default 'No Error' 
+} filter ($.Record_ID=='' or $.Record_ID==null) or ($.Record_Name=='' or $.Record_Name==null) or ($.Chartfield=='' or $.Chartfield==null) or ($.Set_ID==null or $.Set_ID=='')
+ or ($.Effective_Date=='' or $.Effective_Date==null) or ($.Effective_Status=='' or $.Effective_Status==null) ]]></dw:set-session-variable>
+        </dw:transform-message>
+        <message-properties-transformer scope="session" doc:name="MP: Calculate ErrorPayloadCount and MissingCount" doc:description="Calculate 
+ErrorPayloadCount : Number of Records that have row size not equal to 92
+MissingCount: No of Records which are missing a madatory field">
+            <add-message-property key="MissingCount" value="#[sessionVars.Error != null ? sessionVars.Error.size():0]"/>
+            <add-message-property key="ErrorPayloadCount" value="#[sessionVars.ErrorPayload != null ? sessionVars.ErrorPayload.size():0]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="Transform Message" metadata:id="97150630-b7c4-42dc-8364-7755c1243fc2">
+            <dw:set-payload><![CDATA[//Sort the Payload by Effective Date to Use only the most Recent Record in case duplicate records are present.
+%dw 1.0
+%output application/java
+---
+((payload orderBy $.EffectiveDate )[-1..0] ) when ((sizeOf payload) > 0) otherwise {}]]></dw:set-payload>
+
+            <dw:set-session-variable variableName="Error"><![CDATA[//Create Error Attachment
+%dw 1.0
+%output application/csv
+---
+sessionVars.Error map { 
+	"Record ID": $.Record_ID as :number as :string {format:"00"} default "",
+	"Record Name": $.Record_Name,
+	"Set ID": $.Set_ID,
+	Chartfield: $.Chartfield,
+	"Effective Date": $.Effective_Date,
+	"Effective Status": $.Effective_Status,
+	Description: $.Description,
+	"Short Description": $.Short_Description,
+	"External ID":"",
+	"Error Description":$.Error when ( $.Error[0] != '|' ) otherwise $.Error[1..-1]
+	}]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="ErrorPayload"><![CDATA[//Convert Error Payload Java object into a CSV
+%dw 1.0
+%output application/csv header= false
+---
+sessionVars.ErrorPayload]]></dw:set-session-variable>
+        </dw:transform-message>
+        <choice doc:name="Choice" doc:description="Choice Router to check if Record size = 0">
+            <when expression="#[payload.size() == 0]">
+                <logger message="FSF ChartField Load : No Records" level="INFO" doc:name="Logger"/>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Set Record Skipped/Unique" doc:description="RecordSkipped : Number of duplicate Records which were skipped
+RecordUnique: Number of Unique Records present in the File
+ErrorAttachment: Error/Warning File variable
+RecordError : Number of Records in File">
+                    <add-message-property key="RecordSkipped" value="#[sessionVars.RecordCount - payload.size() - sessionVars.MissingCount - sessionVars.ErrorPayloadCount ]"/>
+                    <add-message-property key="RecordUnique" value="#[payload.size()]"/>
+                    <add-message-property key="ErrorAttachment" value="#['Error ,Field Name in Error,Field Value in Error,Error Description' + '\n' + sessionVars.ErrorPayload.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + '\n' + sessionVars.Error]"/>
+                    <add-message-property key="RecordError" value="#[sessionVars.MissingCount + sessionVars.ErrorPayloadCount]"/>
+                    <delete-message-property key="TransAttachment"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF028&quot;, &quot;InterfaceName&quot;: &quot;FSF Chartfield Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_FSFChartFieldLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;FileBackup&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#['Success']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[0]&quot;,&quot;RecordSkipped&quot;:&quot;#[sessionVars.RecordSkipped]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for error details:  ': ' ']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordError != 0 ?'Business':'']&quot;}" doc:name="Set Payload to: JSON which will be used by the logging framework." doc:description="JSON which will be used by the logging framework."/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the Logging Framework."/>
+               <message-properties-transformer scope="invocation" doc:name="Message Properties">
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="exceptionRecordCount"/>
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			<delete-message-property key="LOVReturned"/>
+</message-properties-transformer>
+<message-properties-transformer scope="session" doc:name="Message Properties">
+<delete-message-property key="Error"/>
+						<delete-message-property key="ErrorPayload"/>
+						
+						<delete-message-property key="ErrorAttachment"/>
+			<delete-message-property key="ErrorPayloadCount"/>
+			<delete-message-property key="MissingCoount"/>
+			<delete-message-property key="RecordCount"/>
+			<delete-message-property key="RecordError"/>
+			<delete-message-property key="RecordErrorCount"/>
+			<delete-message-property key="RecordSkipped"/>
+			<delete-message-property key="RecordSuccess"/>
+			<delete-message-property key="RecordUnique"/>
+			<delete-message-property key="TID"/>
+</message-properties-transformer>
+                <logger message="FSF ChartField Load :  #[payload]" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="TM: GroupBy External ID">
+                    <dw:set-payload><![CDATA[//Group the Payload by External ID to take the 0th element in the payload and groups with size greater than 1 to be used as Skipped Records.
+%dw 1.0
+%output application/java
+---
+payload groupBy $.External_Chart_Id__c]]></dw:set-payload>
+
+                </dw:transform-message>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Set Record Skipped/Unique" doc:description="RecordSkipped : Number of duplicate Records which were skipped
+RecordUnique: Number of Unique Records present in the File
+ErrorAttachment: Error/Warning File variable">
+                    <add-message-property key="RecordSkipped" value="#[sessionVars.RecordCount - payload.size() - sessionVars.MissingCount - sessionVars.ErrorPayloadCount ]"/>
+                    <add-message-property key="RecordUnique" value="#[payload.size()]"/>
+                    <add-message-property key="ErrorAttachment" value="#['Error ,Field Name in Error,Field Value in Error,Error Description'+ '\n' + sessionVars.ErrorPayload.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;)]"/>
+                </message-properties-transformer>
+                <dw:transform-message doc:name="TM:Flatten Payload">
+                    <dw:set-payload><![CDATA[//Flatten the Payload to a ArrayList
+%dw 1.0
+%output application/java
+---
+flatten (payload  map $[0] default [] )]]></dw:set-payload>
+                    <dw:set-variable variableName="NewSkippedRecords"><![CDATA[//Flatten the Duplicate Records by taking the records from groups with size greater than 1
+%dw 1.0
+%output application/java
+---
+ flatten (payload filter (sizeOf $) > 1 map $[1..-1] default [] )]]></dw:set-variable>
+                </dw:transform-message>
+                <dw:transform-message doc:name="TM: Convert Skipped Records to Fixed Width">
+                    <dw:set-variable variableName="SkippedRecordsText"><![CDATA[//Convert Arraylist of Skipped Records into a Fixed Width
+%dw 1.0
+%output text/plain schemaPath = "Fixed-Width-Initial.ffd"
+---
+flowVars.NewSkippedRecords map {
+	Record_ID:$."RecordID" ,
+	Record_Name:$.RecordName,
+	Set_ID:$."SetID",
+	Chartfield: $."Chartfield",
+	Effective_Date: $."EffectiveDate" ,
+	Effective_Status:$.Active,
+	Description: $."Description",
+	Short_Description:$."ShortDescription"
+	
+} ]]></dw:set-variable>
+
+                </dw:transform-message>
+                <enricher source="#[payload]" target="#[flowVars.SkippedRecordsText]" doc:name="Message Enricher">
+                    <flow-ref name="inf028-fsf-chartfield-loadSub_Flow" doc:name="inf028-fsf-chartfield-loadSub_Flow"/>
+                </enricher>
+                <message-properties-transformer scope="invocation" doc:name="MP: Split Skipped Records by NewLine" doc:description="Split SkippedRecordsText variable by NewLine character into a ArrayList.">
+                    <add-message-property key="SkippedRecordsText" value="#[flowVars.SkippedRecordsText.split(&quot;\n&quot;)]"/>
+                </message-properties-transformer>
+                <dw:transform-message doc:name="TM: Create Paylod for Upsert">
+                    <dw:set-payload><![CDATA[//Change the LOVs to be used in the Payload
+%dw 1.0
+%output application/java
+---
+payload  map {
+	FSF_Record_Id__c:$.RecordID ,
+	Chart_Types__c:flowVars.LOVReturned[("FSF_RECORD_ID-" ++ $.RecordID)][0] default "",
+	FSF_Code__c: $."Chartfield",
+	FSF_Effective_Date__c: $."EffectiveDate" as :date {format: "MM/dd/yyyy"}  as :string {format: "yyyy-MM-dd"} ,
+	FSF_Active__c: true when $.Active == 'A' otherwise false,
+	FSF_Description__c: $."Description",
+	External_Chart_Id__c: $.External_Chart_Id__c
+} ]]></dw:set-payload>
+                    <dw:set-variable variableName="SkippedRecordsError"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.SkippedRecordsText map {
+	"Error": "Duplicate Row Error",
+	"Field Name in Error":"Input Row",
+	"Field Value in Error":$ replace "\n" with "" replace "\r\n" with "" replace "\r" with "",
+	"Error Description":"Duplicate Record found based on Chartfield and Record Name"		
+}  filter ($."Field Value in Error" != "")]]></dw:set-variable>
+                </dw:transform-message>
+                <message-properties-transformer scope="invocation" doc:name="MP: Remove SkippedRecordsText and New Skipped Records" doc:description="Remove All variable which are not used later, to free up heap size.">
+                    <delete-message-property key="SkippedRecordsText"/>
+                    <delete-message-property key="NewSkippedRecords"/>
+                </message-properties-transformer>
+                <batch:execute name="BatchLoad" doc:name="BatchLoad" doc:description="Call the Batch Load Step."/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="inf028-fsf-chartfield-loadSub_Flow">
+        <set-payload value="#[flowVars.SkippedRecordsText]" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+    </sub-flow>
+    <batch:job name="BatchLoad" max-failed-records="-1" block-size="10000" doc:description="Batch Process which will run the load process in parallel on multiple threads">
+
+        <batch:process-records>
+            <batch:step name="Batch_Step" accept-policy="ALL" doc:description="Thi batch step will accept all records since no accept expression is defined.">
+                <batch:commit size="10000" doc:name="Batch Commit" doc:description="Batch Commit will process 10000 records per thread">
+
+                    <message-properties-transformer scope="invocation" doc:name="MP:Save Array" doc:description="Save the Incoming Array which will be used later to create the exception report.">
+                        <add-message-property key="BatchArray" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_FSF_Chart__c" externalIdFieldName="External_Chart_Id__c" doc:name="SFDC:Upsert Bulk " doc:description="Upsert payload with maximum limit of 10k records at a time.">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert-bulk>
+                    <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP: Save JobID" doc:description="Save the Job Id of the Bulk Upsert step">
+                        <add-message-property key="JobId" value="#[payload.jobId]"/>
+                        <add-message-property key="JobResponse" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <until-successful maxRetries="50" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful" doc:description="Untill Succesfull is used to retry the Poll Result step to get the Result stream with a interval of 5 secs.">
+                        <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Upsert Result" doc:description="Get the Result Dtream for the Bulk Upsert Job.">
+                            <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
+                        </sfdc:batch-result-stream>
+                    </until-successful>
+                   <!--  <object-to-string-transformer mimeType="application/xml" doc:name="O to S: Change Filestream to XML"/> -->
+                    <dw:transform-message doc:name="TM:Create Error Message" metadata:id="fd78efa0-33ac-4093-a779-6f39b4c55729">
+                        <dw:input-payload doc:sample="sample_data\string.dwl" mimeType="application/xml"/>
+                        <dw:set-payload><![CDATA[//Parse the Result Stream into a a CSV for Error Report
+%input payload application/xml 
+%output application/csv header = false 
+%function change(string3) ("Chartfield") when string3 == 'FSF_Code__c'  otherwise (("Description") when string3 == 'FSF_Description__c' otherwise (("Record ID") when string3 =="FSF_Record_Id__c" otherwise (("Effective Date") when string3=='FSF_Effective_Date__c' otherwise ('Effective Status' when string3=='FSF_Active__c' otherwise ('Record Name' when string3=='Chart_Types__c' otherwise ('External ID' when string3=='External_Chart_Id__c' otherwise string3 )) )))) 
+%function changeRName(string1) ("BUD_REF_TBL") when string1 == '03' otherwise (("FUND_TBL") when string1 == '04' otherwise (("DEPT_TBL") when string1 =="05" otherwise (("OPER_UNIT_TBL") when string1 == "06" otherwise (("CLASS_CF_TBL") when string1 == "07" otherwise (("GL_ACCOUNT_TBL") when string1 == "08" otherwise (("PROGRAM_TBL") when string1 == "09" otherwise (("CHARTFIELD1_TBL") when string1 == "10" otherwise (("PROJECT") when string1 =="11" otherwise (("FS_ACTIVITY_TBL") when string1 =="12" otherwise ""    ) ) ))) ))) )
+---
+payload.results.*result map {
+	Record_ID:flowVars.BatchArray[$$].FSF_Record_Id__c as :number as :string {format:"00"} ,
+	Record_Name:changeRName(flowVars.BatchArray[$$].FSF_Record_Id__c),
+	SetID:'',
+	ChartField:flowVars.BatchArray[$$].FSF_Code__c,
+	Effective_Date:flowVars.BatchArray[$$].FSF_Effective_Date__c,
+	Effective_Status:'A' when ( flowVars.BatchArray[$$].FSF_Active__c == true ) otherwise 'I',
+	Description:flowVars.BatchArray[$$].FSF_Description__c,	
+	ShortDescroption:'',
+	External_ID:flowVars.BatchArray[$$].External_Chart_Id__c,
+	'SFDC Error': (change($.errors.fields) ) ++ (    ( ' ' ++ 'is Missing' ) when $.errors.statusCode == 'REQUIRED_FIELD_MISSING' otherwise (' ' ++ $.errors.message)) when $.errors.fields != null otherwise null
+} filter $.'SFDC Error' != null and $.'SFDC Error' !='']]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer mimeType="application/csv" doc:name="OS: Change  datatream to CSV" doc:description="Change Weave output to string"/>
+                    <objectstore:store config-ref="FSF_Chartfield_Main" key="BatchInfo_#[server.nanoTime()]" value-ref="#[payload]" doc:name="ObjectStore:Store Error CSV" doc:description="Store the Error Report CSV generated in Last Transform Message"/>
+                    <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.JobId]" doc:name="SFDC: Close Job" doc:description="Close the Bulk Upsert Job "/>
+                    <logger message="#[payload.id]" level="INFO" doc:name="Logger"/>
+                    <set-payload value="#[[]]" doc:name="Set Payload: To empty List" doc:description="Set the Payload to an empty array so that an error is not thrown by the On-Complete step."/>
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload" doc:description="Set Payload to the exception generated."/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each" doc:description="Iterate over the Errors one by one">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>                    
+                    <objectstore:store config-ref="FSF_ChartField_Error" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="FSF_ChartField_Error" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+
+                </batch:commit>
+            </batch:step>
+           
+        </batch:process-records>
+        <batch:on-complete>
+            <json:object-to-json-transformer doc:name="Object to JSON : Convert Batch Summary" doc:description="Convert the output of the Proces step into a JSON"/>
+            <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Set RecordCount,RecordError,RecordSuccess" metadata:id="8617142e-cbbc-492e-af72-ffb26fa94f26" doc:description="Save the Record Count, Record Error and Record Success.">
+                <add-message-property key="RecordSuccess" value="#[json:/successfulRecords]"/>
+                <add-message-property key="RecordError" value="#[sessionVars.MissingCount + sessionVars.ErrorPayloadCount]"/>
+                <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + flowVars.SkippedRecordsError +'\n' + sessionVars.Error.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + '\n']"/>
+                <add-message-property key="RecordErrorCount" value="#[sessionVars.ErrorPayload.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;).split(&quot;\n&quot;).length + sessionVars.Error.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;).split(&quot;\n&quot;).length]"/>
+                <delete-message-property key="TransAttachment"/>
+            </message-properties-transformer>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+           <objectstore:retrieve-all-keys config-ref="FSF_ChartField_Error" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys"/>
+           <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>
+            <foreach doc:name="For Each : Iterate over Exception Keys" doc:description="For Each : Iterate over Exception Keys">
+                <choice doc:name="Choice" doc:description="Choice : Route Error Count and Error Report All the exception details enteries are routed to the default barnch and all the Connection Error count enteries are routed to the other branch.">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="FSF_ChartField_Error" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count" doc:description="Retrieve the value using key and Remove the entry from the Object Store at the same time"/>
+
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:description="Message Properties: Update Total SFDC Connection Error Count" doc:name="Message Properties: Update Total SFDC Connection Error Count">
+	                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+	                    </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="FSF_ChartField_Error" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details" doc:description="Retrieve the value using key and Remove the entry from the Object Store at the same time"/>
+
+		                <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+		                      <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+		                </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </foreach>
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if Exceptions occured" doc:description="Choice : Route when No Exception Occured If any error has occured, then the clean branch is executed otherwise the branch dealing with calculating Logging transaction metrics is executed.">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="FSF_ChartField_Error" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="For Each : Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="FSF_ChartField_Error" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Retrieve the value using key and Remove the entry from the Object Store at the same time so that that these enteries does not appear in the next Run"/>
+
+                    </foreach>
+                    <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow" doc:description="Invoke Interface-handle-batch-errors-Flow to raise Exception"/>
+              </when>
+              <otherwise>
+
+            <objectstore:retrieve-all-keys config-ref="FSF_Chartfield_Main" doc:name="ObjectStore: Retrieve Stored Objects" doc:description="Retrive the Object Store Error Report generated in the Process step"/>
+            <foreach doc:name="For Each" doc:description="Iterate Over Each Error Report">
+                        <objectstore:remove config-ref="FSF_Chartfield_Main" key="#[payload]" doc:name="ObjectStore: Read Stored Objects" doc:description="Retrieve object store error report to process it and delete it at the same time so that it is not present for the next interface run."/>
+
+                <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Create Error Attachment" doc:description="Parse the error report from the object store.">
+                    <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + payload]"/>
+                    <add-message-property key="RecordError" value="#[payload != '' ? sessionVars.RecordError + payload.split(&quot;\n&quot;).length:sessionVars.RecordError]"/>
+                </message-properties-transformer>
+            </foreach>
+            <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Update RecordCount,RecordError,RecordSuccess" metadata:id="9109bd5b-8548-49c1-9c54-aeba7188f064" doc:description="Update the Count for &quot;RecordCount&quot;, &quot;RecordSuccess&quot;, &quot;Record Error&quot;">
+                <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;)]"/>
+                <add-message-property key="RecordSuccess" value="#[sessionVars.RecordCount - sessionVars.RecordError - sessionVars.RecordSkipped]"/>
+                <delete-message-property key="TransAttachment"/>
+            </message-properties-transformer>
+            <set-payload value="{&quot;InterfaceID&quot;: &quot;INF028&quot;, &quot;InterfaceName&quot;: &quot;FSF Chartfield Load&quot;,&quot;ErrorFilename&quot;:&quot;Error_FSFChartFieldLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;FileBackup&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordSuccess==0?'Error':sessionVars.RecordError==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordSkipped&quot;:&quot;#[sessionVars.RecordSkipped]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for error details:  ': ' ']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordError != 0 ?'Business':'']&quot;}" mimeType="application/json" doc:name="Set Payload: to JSON for Logging Framework" doc:description="Set the payoad to JSON for the logging fraework with the metrics of the interface run."/>
+            <choice doc:name="Choice" doc:description="Check whether Error Records were present or not.">
+                <when expression="#[sessionVars.RecordError == 0 and sessionVars.RecordSkipped == 0]">
+                    <remove-session-variable variableName="ErrorAttachment" doc:name="Session Variable" doc:description="Remove the Session variable ErrorAtachment in case no Error records are present."/>
+                    <logger message="FSF ChartField Load : #[payload]" level="INFO" doc:name="Logger"/>
+                </when>
+                <otherwise>
+                    <logger message="FSF ChartField Load : JSON: #[payload]" level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the Logging framework to complete the transaction."/>
+					<message-properties-transformer scope="invocation" doc:name="Message Properties">
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="exceptionRecordCount"/>
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="TransactionID1"/>
+				<delete-message-property key="InterfaceSalesforceId"/>
+				<delete-message-property key="InterfaceLastProcessedDate"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SkippedRecordsError"/>
+			</message-properties-transformer>
+					<message-properties-transformer scope="session" doc:name="Message Properties">
+			<delete-message-property key="Error"/>
+						<delete-message-property key="ErrorPayload"/>
+			<delete-message-property key="ErrorPayloadCount"/>
+			<delete-message-property key="MissingCount"/>
+			<delete-message-property key="RecordCount"/>
+			<delete-message-property key="RecordError"/>
+			<delete-message-property key="RecordErrorCount"/>
+			<delete-message-property key="RecordSkipped"/>
+			<delete-message-property key="RecordSuccess"/>
+			<delete-message-property key="RecordUnique"/>
+			<delete-message-property key="TID"/>
+					</message-properties-transformer>
+
+            <logger message="FSF ChartField Load : #[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+            </choice>
+        </batch:on-complete>
+    </batch:job>
+    <!-- <sftp:connector name="SFTP" validateConnections="true" doc:name="SFTP" duplicateHandling="append">
+        <reconnect count="5"/>
+    </sftp:connector>
+    <sftp:connector name="SFTP-1" validateConnections="false"
+		doc:name="SFTP" duplicateHandling="addSeqNo">
+		<reconnect count="5" />
+	</sftp:connector> -->
+
+    <sub-flow name="inf280-fsf-chartfield-load-InProgress-Log-Transaction-Sub_Flow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF028&quot;, &quot;InterfaceName&quot;: &quot;FSF Chartfield Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DGL004&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP:Set JSON payload for logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="FSF ChartField Load : #[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+<sub-flow name="Call-LOV-ChartField-flow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'FSF_RECORD_ID','FSF_CHART_TYPE'&quot;}" doc:name="Set Payload"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+
+
+
+
+    
+    </mule>

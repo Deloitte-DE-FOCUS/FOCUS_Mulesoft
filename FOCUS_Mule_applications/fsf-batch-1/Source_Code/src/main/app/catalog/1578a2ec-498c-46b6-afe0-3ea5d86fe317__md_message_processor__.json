@@ -1,0 +1,16 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "XML-Batch"
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "csv-error"
+        }
+    },
+    "id": "1578a2ec-498c-46b6-afe0-3ea5d86fe317",
+    "version": "5.2.0.0"
+}
