@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub"	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:beans="http://www.springframework.org/schema/beans"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.springframework.org/schema/beans 
+http://www.springframework.org/schema/beans/spring-beans-4.1.xsd
+http://www.springframework.org/schema/context
+http://www.springframework.org/schema/context/spring-context-4.1.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+
+	
+	
+	<flow name="inf055-dmes-member-extractFlow">
+		<scheduler doc:name="Scheduler" doc:id="15d5a026-f7a4-4c4c-ae13-f68a8a942b9b" >
+			<scheduling-strategy >
+				<cron expression="0 30 21 ? * MON,TUE,WED,THU,FRI *" timeZone="GMT" />
+			</scheduling-strategy>
+		</scheduler>
+		<set-variable variableName="InterfaceID" value="INF055" />
+		<logger level="INFO" doc:name="Logger" doc:id="aa939246-f761-41a7-a118-35f4ff76afbf" message="Schedule Jog has started."/>
+		<try doc:name="Try" doc:id="36ba6718-9dfc-4848-ba39-f75484d366c0" >
+			<salesforce:query doc:id="6317c1bc-7694-429d-8f36-6b44817e2a58" doc:name="Check whether today is Holiday or not" config-ref="Salesforce_Config" targetValue="#[if (sizeOf(payload default []) &gt; 0) (true) else (false)]">
+			<salesforce:salesforce-query>Select id,Holiday_Date__c, Type__c from DEL_Holiday_List__c where Type__c INCLUDES ('DMES Member')</salesforce:salesforce-query>
+		</salesforce:query>
+			<choice doc:name="Choice" doc:id="79f35bcd-d143-4e7a-ab40-bb6b945eccb2" >
+				<when expression='#[(payload != null) and ((payload map $.Holiday_Date__c joinBy ",") contains ((now() as Date {format : "yyyy-MM-dd"}) ))]'>
+					<raise-error doc:name="Stop job if today is holiday" doc:id="194b7d79-fdf2-4b51-891c-5f548d3db58f" type="HOL:NOT_RUN" description="Today is Holiday, Hence job won't run." />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="Logger" doc:id="5784c7ba-c529-403a-9659-b4253872ede3" message="Today is not a holiday."/>
+				</otherwise>
+			</choice>
+			<error-handler >
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error propagate" doc:id="3320b840-99b0-4fd8-a549-e7b27e846a82" type="HOL:NOT_RUN" when='#[vars.isTodayHoliday == "false"]'>
+					<logger level="INFO" doc:name="Logger" doc:id="dcaf8300-e73c-4159-81db-31e0791f5f03" />
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<flow-ref doc:name="inf055-dmes-member-extract-in-progress-Flow" doc:id="7baf0808-b83d-4078-89af-80c9091fea0c" name="inf055-dmes-member-extract-in-progress-Flow"/>
+		<flow-ref doc:name="inf055-dmes-memer-lov-mapping-sub-flow" doc:id="9173aa78-312b-4f4c-91ff-f8d20cbcacfd" name="inf055-dmes-memer-lov-mapping-sub-flow" target="LOVMapping"/>
+		<ee:transform doc:name="Transform Message" doc:id="213fd795-8b7d-4290-aead-e4b906968b01" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="LOVMapping" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.LOVMapping map (
+	if (vars.Direction == "Inbound")
+	{($.Name ++ "-" ++ $.Partner_Code__c) : $.FOCUS_Code__c}
+	else 
+	{($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c}
+)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="inf057-dmes-member-response-error-load-hard-soft-error-Sub_Flow" doc:id="184c8118-129e-417f-b8fe-69505e1e8d71" name="inf057-dmes-member-response-error-load-hard-soft-error-Sub_Flow" />
+		<logger level="INFO" doc:name="Extarct Client with pending status" doc:id="8f95856f-3608-4c06-b964-bff2ad6318d6" message="Extarct Client with pending status"/>
+		<salesforce:query doc:name="Extarct Client with pending status" doc:id="abbfd3e0-aafc-4d2d-b88e-f7f9a47a30a7" config-ref="Salesforce_Config" target="MemberDetails" targetValue="#[payload map $]">
+			<salesforce:salesforce-query >Select Id,Person_Id__c, Status__c,Eligibility_end_date__c,Eligibility_start_date__c from DEL_DMES_Member__c where Status__c = 'Pending'</salesforce:salesforce-query>
+		</salesforce:query>
+		<set-payload value="#[vars.MemberDetails groupBy $.Person_Id__c]" doc:name="Prepare Payload" doc:id="a7ec4c29-121f-4450-bafa-203e240d0e8c" />
+
+		<choice doc:name="Choice" doc:id="bcffdf5d-72e7-47df-ab00-6ad7efffc09f" >
+			<when expression="#[sizeOf(payload) &lt;= 0]">
+				<logger level="INFO" doc:name="Logger" doc:id="182f2bff-da4c-4599-a685-44218dfe6826" message="No Client in Pending status." />
+				<ee:transform doc:name="Transform Message" doc:id="b46a70c1-f666-4974-b61c-15beb414cbf1" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="TransAttachment" ><![CDATA[%dw 2.0
+import * from dw::core::Strings
+output application/csv
+---
+{}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<flow-ref doc:name="inf055-Place-file-to-SFTP-Flow" doc:id="9e3a4fc6-05c6-436c-ac4c-69e24b16bda2" name="inf055-Place-file-to-SFTP-Flow" />
+			
+</when>
+			<otherwise>
+				<flow-ref doc:name="inf055-get-clientDetails-Flow" doc:id="365de3e3-6dc1-4d91-b26a-aed23eb8ebb3" name="inf055-get-clientDetails-Flow" />
+				<flow-ref doc:name="inf055-Filter-out-client-with-missing-address-details-Sub_Flow" doc:id="cb01a0f0-a003-45a9-960f-3a99448092f7" name="inf055-Filter-out-client-with-missing-address-details-Sub_Flow"/>
+				<ee:transform doc:name="Field mapping" doc:id="92e846b2-378f-4436-93d0-9961980e404a">
+					<ee:message>
+						<ee:set-payload resource="MemberMapping.dwl" />
+					
+				</ee:message>
+				</ee:transform>
+				 <ee:transform doc:name="Transform to FFD format" doc:id="6740bf94-697b-44ef-b9a8-099a064cac34">
+					<ee:message>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable resource="MemberFFD.dwl" variableName="TransAttachment" />
+					</ee:variables>
+				</ee:transform>
+				<flow-ref doc:name="inf055-Place-file-to-SFTP-Flow" doc:id="c5c268ae-52dd-4b95-86dd-560f7ecf587e" name="inf055-Place-file-to-SFTP-Flow" />
+				<flow-ref doc:name="inf055-update-processed-record-to-submitted-Flow" doc:id="3ebfb191-7e3c-49fb-bf75-0438aafe2c57" name="inf055-update-processed-record-to-submitted-Flow"/>
+				
+				
+			
+			</otherwise>
+		</choice>
+		<set-variable value="#[vars.TransAttachment]" doc:name="Set TransAttachment" doc:id="05de8cd0-127b-41ed-8da3-599a10fe148d" variableName="TransAttachment" mimeType="text/plain"/>
+		<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF055",
+ "InterfaceName": "DMES-Member",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":vars.fileName,
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Success",
+ "RecordCount": sizeOf(vars.MemberDetails),
+ "RecordSuccess":sizeOf(vars.MemberDetails),
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Response Payload for logging framework" doc:id="f64b2f35-9e27-4be1-9110-5fe10a185a40" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="2384cb11-98f6-4341-aec2-2f7317cddfee" name="LogTransactionSubFlow"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="e806e888-7ded-4fcf-89d3-67998ef05624" type="ANY">
+				<ee:transform doc:name="Alert Message Payload" doc:id="f10557be-0ff1-4154-aeea-883875d16765">
+					<ee:message />
+					<ee:variables>
+						<ee:set-variable variableName="errorMessage"><![CDATA[%dw 2.0
+output application/java
+---
+"There was an error in INF055-DMES-Member in ${secure::env} env. \n" ++ "Unable to Connect to Salesforce. Please retry after some time."]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<cloudhub:create-notification domain="${app.name}" doc:name="Create Notification" doc:id="9fcb97ba-b15b-4570-8a8f-08ac537aaee2" config-ref="CloudHub_Config" priority="ERROR" transactionId="uuid()">
+					<cloudhub:message><![CDATA[#[vars.errorMessage]]]></cloudhub:message>
+					<cloudhub:custom-properties><![CDATA[#[output application/java
+---
+{
+	"date" : now()
+}]]]></cloudhub:custom-properties>
+				</cloudhub:create-notification>
+				<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF055",
+ "InterfaceName": "DMES-Member",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename": vars.fileName default "" ,
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Error",
+ "RecordCount":sizeOf(vars.MemberDetails default ""),
+ "RecordSuccess":0,
+ "RecordError":sizeOf(vars.MemberDetails default ""),
+ "ErrorDescription":error.description,
+ "ExceptionType":"System",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload" doc:id="255c5755-af6a-49c5-8e9c-e163c1271741" />
+				<flow-ref doc:name="LogTransactionSubFlow" doc:id="795d4a04-c1c3-4dc5-a3d1-560c847bbd5c" name="LogTransactionSubFlow"/>
+			</on-error-propagate>
+		</error-handler>	
+		
+</flow>
+	<sub-flow name="inf055-dmes-member-extract-in-progress-Flow" doc:id="d52b9962-f3dc-4ac1-bb08-e628426b3191" >
+		<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF055",
+ "InterfaceName": "DMES-Member",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":"",
+ "CompletedExtension":"",  
+ "TransactionID": "", 
+ "MuleID":correlationId,
+ "Status":"In Progress",
+ "RecordCount":0,
+ "RecordSuccess":0,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload for Logging framework" doc:id="902d8399-3b11-4cb1-aa74-858d4e6ad193" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="bdb66a71-56cc-4837-bd11-ce00395a48a8" name="LogTransactionSubFlow"/>
+	</sub-flow>
+	<sub-flow name="inf055-get-clientDetails-Flow" doc:id="17460021-8a12-4595-a27f-e6454cd81977" >
+		<logger level="INFO" doc:name="Retrieving client details" doc:id="94f12a00-0c52-44fa-8024-3bdf6d121650" message="Retrieving client details"/>
+		<foreach doc:name="For Each" doc:id="ecb3300f-2c9b-41cd-a309-60ba7f7e15a3" collection="#[vars.MemberDetails map $.Person_Id__c]" batchSize="500">
+			<ee:transform doc:name="Transform Message" doc:id="3bff7d95-da1f-4e2b-ad1e-77a55a80aca2" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="personClause" ><![CDATA[%dw 2.0
+output application/java
+---
+(payload map ("'" ++ $ default "" ++ "'") joinBy ",")]]></ee:set-variable>
+				</ee:variables>
+			
+</ee:transform>
+			<salesforce:query doc:name="Query for Client detials " doc:id="489a3482-c60e-4806-b8e9-8caa47075d95" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Id,FirstName,LastName, DEL_MCI__c,DEL_SSN__c,DEL_Date_of_Death__c,Birthdate,DEL_Race_Primary__c,DEL_Ethnicity__c,DEL_Suffix__c,DEL_Gender__c, DEL_Language__c,DEL_Medicaid_Aid_Category__c,DEL_Home_County__c,DEL_Home_Street_1__c,DEL_Home_City__c, DEL_Home_State__c,DEL_Home_Zip_Code__c from Contact where Id in (:Id)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+Id : vars.personClause]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="6fbdd5f1-3a28-490e-a2eb-5d53fe93bb03" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="clientDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.clientDetails default []) ++ (payload map $)]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="INFO" doc:name="Logger" doc:id="51c84bbc-b053-4c3c-90e7-a74b13b86be2" message="Person Details retrieved."/>
+			<salesforce:query doc:name="Query for Person Address Details" doc:id="05653eae-a7a6-4621-ac86-aca702abf2c6" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Id,person__c,Address_Type__c,Street_1__c,Street_2__c,Apartment_Number__c,County__c,City__c,State__c,ZIP__c, Status__c from DEL_Person_Address__c where person__c in (:id)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	id : vars.personClause
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="cb18a750-2233-4ec6-bb38-00cd78f32561" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	Id : $.Id,
+	Person : $.Person__c,
+	AddressType : if ($.Address_Type__c == "Current" and $.status__c == "Active" ) (1) 
+		else if ($.Address_Type__c == "Home" and $.status__c == "Active") (2) 
+		else if ($.Address_Type__c == "Mailing" and $.status__c == "Active") (3)
+		else if ($.Address_Type__c == "Usual" and $.status__c == "Active") (4)
+		else if ($.Address_Type__c == "Work" and $.status__c == "Active") (5) 
+		else if ($.Address_Type__c == "Current" and $.status__c == "Inactive") (6) 
+		else if ($.Address_Type__c == "Home" and $.status__c == "Inactive") (7) 
+		else if ($.Address_Type__c == "Mailing" and $.status__c == "Inactive") (8)
+		else if ($.Address_Type__c == "Usual" and $.status__c == "Inactive") (9)
+		else if ($.Address_Type__c == "Work" and $.status__c == "Inactive") (10) else 11,
+	Street1 : $.Street_1__c,
+	Street2 : $.Street_2__c,
+	ApartmentNumber: $.Apartment_Number__c,
+	County :  if ($.County__c != null) $.County__c else "OUT OF STATE",
+	City : $.City__c,
+	State : $.State__c,
+	ZIP : $.ZIP__c,
+	Status : $.status__c
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<ee:transform doc:name="Transform Message" doc:id="4d24476a-fdeb-4a97-ab4b-b789b6552be2" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="personAddressDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.personAddressDetails default []) ++ (payload default [])]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			
+		
+</foreach>
+		<ee:transform doc:name="Transform Message" doc:id="8cd3a6b9-6844-4aba-a799-d1d9aa999652">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="personAddressDetails"><![CDATA[%dw 2.0
+output application/java
+---
+(vars.personAddressDetails orderBy ($.AddressType as Number)) groupBy $.Person]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+	</sub-flow>
+	<sub-flow name="inf055-Filter-out-client-with-missing-address-details-Sub_Flow" doc:id="bbe6e17b-224a-42af-83b5-163579e300e1" >
+		<salesforce:query doc:name="Query for Record Type Id" doc:id="71f8d4fb-390c-4cad-9e8a-652f6ee64dff" config-ref="Salesforce_Config" target="RecordId">
+			<salesforce:salesforce-query >select Id,Name from RecordType where Name = 'DMES Error'</salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="f51fed94-3cff-49a5-a8a9-7481c9efc498">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="addressDetailsMissing"><![CDATA[%dw 2.0
+output application/java
+---
+vars.clientDetails filter ((vars.personAddressDetails[$.Id] != null) 
+	and ((vars.personAddressDetails[$.Id].Street1 == null)
+	or (vars.personAddressDetails[$.Id].County == null)
+	or (vars.personAddressDetails[$.Id].City == null)
+	or (vars.personAddressDetails[$.Id].State == null)
+	or (vars.personAddressDetails[$.Id].ZIP == null))) map {
+ 	person : $.Id,
+ 	ErrorCode : ((if (vars.personAddressDetails[$.Id].Street1 == null) ["137"] else [null]) ++
+ 		(if (vars.personAddressDetails[$.Id].County == null) ["140"] else [null]) ++
+ 		(if (vars.personAddressDetails[$.Id].City == null) ["142"] else [null]) ++
+ 		(if (vars.personAddressDetails[$.Id].State == null) ["139"] else [null]) ++
+ 		(if (vars.personAddressDetails[$.Id].ZIP == null) ["141"] else [null]))
+ }]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:update-multiple type="DEL_DMES_Member__c" doc:name="Update multiple DMES Member Status to DMES Error" doc:id="d5910e32-2d2d-4d2f-8ac9-dab71b9161e5" config-ref="Salesforce_Config" target="ErrorResponse">
+			<salesforce:records><![CDATA[#[%dw 2.0
+output application/java
+---
+vars.addressDetailsMissing map {
+	Id : payload[$.person][0].Id,
+	Status__c : "DSCYF Error",
+	DMES_Error_Status_Initial_Date__c : ((now() as Date {format : "yyyy-MM-dd"})  ++ "America/New_York")
+}]]]></salesforce:records>
+
+		</salesforce:update-multiple>
+		
+		<logger level="DEBUG" doc:name="Logger" doc:id="4c7543b9-3cb8-46de-b180-bf71afeb83d9" message='#[vars.ErrorResponse.items default [] map ($.message) joinBy ","]'/>
+		<logger level="INFO" doc:name="DMES Member status updated to DMES Error" doc:id="29f18ade-430b-4e42-9469-7045ab5080e1" message="DMES Member status updated to DMES Error"/>
+		<ee:transform doc:name="Transform Message" doc:id="19ef8f1a-51be-400d-a50b-49bc8b3ee1d6" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="addressError" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.addressDetailsMissing.ErrorCode[0] filter ($ != null) map {
+	"RecordTypeId" : vars.RecordId[0].Id,
+	DMES_Member_Id__c : vars.addressDetailsMissing map payload[$.person][0].Id,
+	Person_Id__c : vars.addressDetailsMissing map $.person,
+	Error_Message__c : vars.errorMaster[$ ++ "ErrorMsg"][0],
+	Error_Code__c: $,
+	Error_Type__c: "Hard",
+	Type__c : "DMES Member Internal"
+} default []]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:create-multiple type="DEL_DMES_Error__c" doc:name="Create multiple DMES Error" doc:id="6754a8fb-d43f-42bd-a5a6-911699319cc1" config-ref="Salesforce_Config" target="CreatedDMESError">
+			<salesforce:records><![CDATA[#[%dw 2.0
+output application/java
+---
+vars.addressError map {
+	"RecordTypeId" : $."RecordTypeId",
+	DMES_Member_Id__c : $.DMES_Member_Id__c[0],
+	Person_Id__c : $.Person_Id__c[0],
+	Error_Message__c : $.Error_Message__c,
+	Error_Code__c : $.Error_Code__c,
+	Error_Type__c : $.Error_Type__c,
+	Type__c : $.Type__c
+}]]]></salesforce:records>
+		</salesforce:create-multiple>
+		<logger level="DEBUG" doc:name="Logger" doc:id="aad4ca0a-9eca-4039-9054-353758b09022" message='#[vars.CreatedDMESError.items default [] map ($.message) joinBy ","]'/>
+	</sub-flow>
+	<sub-flow name="inf055-update-processed-record-to-submitted-Flow" doc:id="018bda05-57ca-40d2-ad34-53bfb126443e" >
+		<ee:transform doc:name="Change the subject to Submitted" doc:id="219d362a-5c89-41d4-8e51-01c6aeba505a">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+input payload application/java
+output application/java
+---
+vars.MemberDetails filter (vars.addressDetailsMissing[$$].person != $.Person_Id__c) map {
+	Id : $.Id,
+	Status__c: "Submitted"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="d8f4b71b-a927-45ca-a4a2-0f1fc4f23937" batchSize="200" collection="#[payload]">
+			<salesforce:update-multiple config-ref="Salesforce_Config" type="DEL_DMES_Member__c" doc:name="Update DMES member to submitted" >
+				<salesforce:records ><![CDATA[#[payload map $]]]></salesforce:records>
+			</salesforce:update-multiple>
+			<logger level="DEBUG" doc:name="Logger" doc:id="3a4aadd9-29bc-41c0-9145-df90fa4d5aa7" message='#[payload.items default [] map ($.message default "") joinBy ","]'/>
+		</foreach>
+		<logger level="INFO" doc:name="Status updated to Submitted" doc:id="c8c34b31-c603-4487-ac42-8f0ac37c862b" message="Status updated to Submitted."/>
+		
+	
+</sub-flow>
+	<sub-flow name="inf055-Place-file-to-SFTP-Flow" doc:id="d048a438-bb6e-4790-8b9f-c78cf1cb1679" >
+		
+		<set-variable value='#["DSCYF_DMESELIG_" ++ (now() &gt;&gt; "EST") as String {format : "yyyyMMdd"} ++ "_001.txt"]' doc:name="Set File name" doc:id="21017247-45b0-4917-994d-4d4a447ab5a5" variableName="fileName"/>
+		<sftp:write doc:id="b332f9b0-ada1-4f6b-8a3c-0a17a68cde0c" config-ref="SFTP_Config" path='#[p("secure::sftp.member.path") ++ vars.fileName]' doc:name="Upload the generated extract ">
+			<sftp:content ><![CDATA[#[vars.TransAttachment]]]></sftp:content>
+		</sftp:write>
+		<sftp:write doc:id="4eee66b3-6ff3-4419-b900-61a0e9f30d87" config-ref="SFTP_Archive_Config" path='#[p("secure::sftp.member.archive.path") ++ vars.fileName]' doc:name="Upload the Archive extract ">
+			<sftp:content ><![CDATA[#[vars.TransAttachment]]]></sftp:content>
+		</sftp:write>
+		<logger level="INFO" doc:name="File has been placed in SFTP" doc:id="2ce37a57-f86c-4b15-be12-a1b719e4fe2b" message="File has been placed in SFTP."/>
+	</sub-flow>
+	<sub-flow name="inf055-dmes-memer-lov-mapping-sub-flow" doc:id="8cea7946-d053-411b-a6df-347e76d1a928" >
+		<set-payload value="{&quot;Direction&quot;:&quot;outBound&quot;,&quot;LOVNames&quot;:&quot;'DMES_ETHNICITY','DMES_LANGUAGE','DMES_SUFFIX','DMES_COUNTY','DMES_RACE'&quot;}" doc:name="Set Payload for LOV mapping" doc:id="5e1d801d-27d6-4556-b14e-ba4e460af5e3" mimeType="application/json"/>
+		<flow-ref doc:name="lOV_query_Sub_Flow" doc:id="2625ef43-00c6-436f-b2f6-ef36840fd5df" name="lOV_query_Sub_Flow"/>
+	</sub-flow>	
+			
+</mule>

@@ -1,0 +1,10 @@
+form: FIXEDWIDTH
+name: 'DMESAuth'
+values:
+- { name: 'AUIndicator', usage: M, type: String, length: 1 }
+- { name: 'FOCUSAuthNumber', usage: M, type: String, length: 15 }
+- { name: 'DMESAuthNumber', usage: M, type: String, length: 15 }
+- { name: 'DMESDetailNumber', usage: M, type: String, length: 15 }
+- { name: 'ListId', usage: M, type: String, length: 11 }
+- { name: 'PAEffectiveDate', usage: M, type: String, length: 8 }
+- { name: 'PAEndDate', usage: M, type: String, length: 8 }

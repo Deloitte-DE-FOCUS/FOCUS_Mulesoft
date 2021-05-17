@@ -1,0 +1,1825 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+	<flow name="inf058-dmes-claim-file-loadFlow" doc:id="200d2d88-8e06-43d4-ac16-598797dd4ef9" >
+		<scheduler doc:name="Scheduler" doc:id="340fa86e-05bd-4710-9d24-51dcd0820aa6" >
+			<scheduling-strategy >
+				<cron expression="0 30 11 ? * MON *" timeZone="IST" />
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Claim File job started" doc:id="c9ff65f2-ca4b-4a63-bfa3-fea2892afd6a" message="Claim File job started"/>
+		<set-variable value='"INF058"' doc:name="Set Interface Name" doc:id="1665b37d-3fae-4807-aa48-e404d0a64044" variableName="interfaceName"/>
+		<set-variable value='${secure::dmes.claim.load.rerun}' doc:name="Set Rerun flag" doc:id="9052a764-f0f9-4fac-9728-b317fdedc512" variableName="rerun"/>
+		<logger level="INFO" doc:name="Rerun flag" doc:id="e8d9b5cd-351c-4d6d-9caf-0e188c2edd3c" message="Rerun flag : ${secure::dmes.claim.load.rerun}"/>
+		<flow-ref doc:name="inf058-dmes-claim-file-load-In-Progress-Sub_Flow" doc:id="b4e1dffe-15f4-488b-b9b4-c22ea4cf0dcc" name="inf058-dmes-claim-file-load-In-Progress-Sub_Flow" />
+		<flow-ref doc:name="inf058-dmes-claim-file-load-read-and-rerun-Sub_Flow" doc:id="f0840d72-c18d-4889-981b-f487a698a8f2" name="inf058-dmes-claim-file-load-read-and-rerun-Sub_Flow"/>
+		<validation:is-not-empty-collection doc:name="Is not empty collection" doc:id="a336d390-f82a-467f-b076-3299f83150b5" message="No Records found." values="#[vars.claimFile]"/>
+		<flow-ref doc:name="inf058-dmes-claim-file-load-LOV-Sub_Flow" doc:id="69b2352a-96c6-49bc-b5f5-dffe42649d0b" name="inf058-dmes-claim-file-load-LOV-Sub_Flow"/>
+		<ee:transform doc:name="Transform Message" doc:id="a392b22f-e39c-41cb-854d-1407cc69c34a">
+			<ee:message>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="LOVNames" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.LOVNames map (
+	if (payload.Direction == "Inbound")
+	{($.Name ++ "-" ++ $.Partner_Code__c) : $.FOCUS_Code__c}
+	else 
+	{($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c}
+)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="inf058-dmes-claim-file-load-Sub_Flow" doc:id="06fcfb9d-ad03-4eb5-81f8-5527e659916d" name="inf058-dmes-claim-file-load-Sub_Flow"/>
+		<flow-ref doc:name="inf058-dmes-claim-file-load-Delete-older-claim-table-Sub_Flow" doc:id="c48db738-6321-43c0-bbb0-dfdb560518e2" name="inf058-dmes-claim-file-load-Delete-older-claim-table-Sub_Flow" />
+		<flow-ref doc:name="inf058-dmes-claim-file-load-On-complete-Sub_Flow" doc:id="81c41969-3862-4180-a9af-bb9efb5ec2a4" name="inf058-dmes-claim-file-load-On-complete-Sub_Flow"/> 
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="82ceab6f-d71c-44c9-9886-124ba374f478" type="ANY">
+				<ee:transform doc:name="Alert Message Payload" doc:id="1524b05c-db66-45f4-89f7-fcb7068cff04" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="errorMessage" ><![CDATA[%dw 2.0
+output application/java
+---
+"There was an error in INF058-DMES Claim File Load in ${secure::env} env. \n" ++ if (error.description == "No File Found." ) error.description else
+if (error.description == "No Records found.") error.description 
+else "Unable to Connect to Salesforce. Please retry after some time"]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<cloudhub:create-notification domain="${app.name}" doc:name="Send Alert Notification" doc:id="c1e4e0f4-11a3-45fc-92f0-493be50b3262" config-ref="CloudHub_Config" priority="ERROR" transactionId="uuid()">
+					<cloudhub:message><![CDATA[#[vars.errorMessage]]]></cloudhub:message>
+					<cloudhub:custom-properties><![CDATA[#[output application/java
+---
+{
+	"date" : now()
+}]]]></cloudhub:custom-properties>
+				</cloudhub:create-notification>
+				<set-variable value="#[vars.claimFile]" doc:name="Set Variable TransAttachment" doc:id="c44ac3d5-ad43-40b1-ac7a-a0b034c1f125" variableName="TransAttachment" mimeType="text/plain" />
+				<set-payload value='#[%dw 2.0	
+output application/json
+---
+{"InterfaceID": "INF058",
+	 "InterfaceName": "DMES Claim File Load",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename": if (vars.fileName[0] != null) ("Backup_" ++ vars.fileName[0]) else "",
+ "CompletedExtension":".txt",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status": if (error.errorType.namespace == "VALIDATION") "Success" else "Error" ,
+ "RecordCount": 0,
+ "RecordSuccess":0,
+ "RecordError":0,
+ "ErrorDescription": error.description,
+ "ExceptionType": if (error.errorType.namespace == "VALIDATION") "Business" else "System",
+ "Operation":"Weekly Extact"
+ }]' doc:name="Set Payload" doc:id="18185edd-b44f-45a8-9264-e2f0e01b9e7c" />
+				<flow-ref doc:name="LogTransactionSubFlow" doc:id="8699d28d-25c1-476c-ada5-c080e3dc7a88" name="LogTransactionSubFlow"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	
+	<sub-flow name="inf058-dmes-claim-file-load-read-and-rerun-Sub_Flow" doc:id="46069525-9716-42cb-8690-41fe1017733e" >
+		
+		<sftp:list doc:name="List" doc:id="ace5d321-3125-4d38-8046-756da2a7e4af" config-ref="SFTP_Config" directoryPath="${secure::sftp.dmes.claim.path}">
+			<sftp:matcher filenamePattern="${secure::sftp.dmes.claim.file.pattern}"/>
+		</sftp:list>
+		<try doc:name="Try" doc:id="4f851fd9-e293-47e8-b5af-5b776d1c8f7b" >
+			<set-variable value="#[payload]" doc:name="Set Variable for Incoming File" doc:id="9e8d2d53-d3dc-42f9-9bb9-b99efb658f7d" variableName="incomingFile" />
+			<validation:validate-size doc:name="Check for Older File" doc:id="120e75f3-a64d-483c-98db-48dec10bc4b2" value="#[payload]" message='#["Either no file or older files are found."//List of Older files: ++  (payload.*typedAttributes filter (($.fileName[15 to 22] ) as Date {format : "yyyyMMdd"} &lt; now() as Date {format : "yyyyMMdd"}) map $.fileName joinBy ",")]' min="1"/>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="76da9ff9-a049-4e69-a076-5cc97a49c885" type="VALIDATION:INVALID_SIZE">
+					<set-payload doc:name="Send error for older files" value='#[%dw 2.0	
+output application/json
+---
+{"InterfaceID": "INF058",
+ "InterfaceName": "DMES Claim File Load",
+ "ErrorFilename": "" ,
+ "ErrorExtension": "",
+ "CompletedFilename": "",
+ "CompletedExtension" : "",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Error",
+ "RecordCount": 0,
+ "RecordSuccess": 0,
+ "RecordError": 0,
+ "ErrorDescription": error.description,
+ "ExceptionType":"Business",
+ "Operation":"Weekly Extact"
+ }]' doc:id="fb948b2d-3c5d-4eac-bbd9-a7428f3bba8e" />
+					<flow-ref doc:name="LogTransactionSubFlow" doc:id="8c711688-f5bd-46e9-b31e-8e507ae020a9" name="LogTransactionSubFlow"/>
+				
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<set-variable value='#[if (vars.rerun == "N") (vars.incomingFile.*typedAttributes filter 
+	(($.fileName[15 to 22] ) as Date {format : "yyyyMMdd"} &gt;= (now() as Date {format : "yyyyMMdd"}) - |P7D|) map $.fileName
+) else (vars.incomingFile.*typedAttributes map $.fileName default "")]' doc:name="Set Claim File Name" doc:id="422586b1-3977-420a-a287-36cb3e199407" variableName="fileName" />
+		<logger level="INFO" doc:name="Logger" doc:id="956149ab-7074-47a6-9078-93f3c30f7241" message='#[vars.fileName]'/>
+		<validation:validate-size doc:name="Check for File present" doc:id="05305a3c-487e-48df-bb92-9a34edd56934" value="#[vars.fileName]" min="1" message="No File Found."/>
+		<sftp:read doc:name="Read Claim file from Server" doc:id="3560d095-daa6-44e5-a217-e3345a549ad8" config-ref="SFTP_Config" path='#[p("secure::sftp.dmes.claim.path") ++ vars.fileName[0]]' outputMimeType="application/flatfile; schemapath=ClaimLoadFile.ffd" />
+		<set-variable value="#[payload]" doc:name="Set claim file" doc:id="be65cf1a-8028-4b7e-9dfb-480e9638d2a3" variableName="claimFile" />
+		<set-variable value="#[vars.fileName[0][15 to 22]]" doc:name="Set File Date" doc:id="dacf4c2f-32e4-44ce-8284-08aa8b7c577e" variableName="fileDate"/>
+		<logger level="INFO" doc:name="Logger" doc:id="7386e72b-6495-47e9-b4d4-f3360929a0fc" message="Processing the file" />
+		<sftp:write doc:name="Move to Archive folder" doc:id="4050d8ef-cf6c-4a94-a796-fe43ec2ba72f" config-ref="SFTP_Archive_Config" path='#[p("secure::sftp.dmes.claim.archive.path") ++  vars.fileName[0]]'>
+			<sftp:content ><![CDATA[#[vars.claimFile]]]></sftp:content>
+		</sftp:write>
+		<sftp:delete doc:name="Delete the processed file" doc:id="53d9517e-5ef4-4794-a685-c2bdbd505886" config-ref="SFTP_Config" path='#[p("secure::sftp.dmes.claim.path") ++ vars.fileName[0]]' />
+		<logger level="INFO" doc:name="Claim File recevied" doc:id="66b45a86-a17e-45fd-b5f7-4d4ded1817e6" message="Claim File recevied" />
+	</sub-flow>
+	<sub-flow name="inf058-dmes-claim-file-load-Sub_Flow" doc:id="5497cbda-8ce1-4be1-acc8-1377dbfbe708" >
+		<logger level="INFO" doc:name="Start loading the claim records" doc:id="01b5695e-e1fc-4bcf-8af7-638721198f8c" message="Start loading the claim records"/>
+		<set-payload value="#[vars.claimFile]" doc:name="Set Payload" doc:id="126df455-a040-435a-bda3-db0b083e85bb" mimeType="text/flatfile; schemapath=ClaimLoadFile.ffd"/>
+		<ee:transform doc:name="Transform Message : Flat file to Object" doc:id="94f8a650-30b9-4b1b-bb02-de2e41db7c27" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[sizeOf (payload)]" doc:name="Set Record Count" doc:id="fad2133f-37ca-43cd-9162-cf59abf8ee37" variableName="RecordCount"/>
+		<flow-ref doc:name="inf058-dmes-claim-file-load-lookUp-Sub_Flow" doc:id="3fdbc227-4c96-4af6-8b7b-69114d2bc02f" name="inf058-dmes-claim-file-load-lookUp-Sub_Flow"/>
+		<ee:transform doc:name="Transform Message Lookups Variable" doc:id="89a95de8-ce95-48a6-b093-2ba0639d442f" >
+			
+			<ee:variables>
+				<ee:set-variable variableName="ClientMCILookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.ClientMCILookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="COSLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.COSLookup reduce ($$ ++ $) pluck $$) default []
+]]></ee:set-variable>
+				<ee:set-variable variableName="BillingProviderMCDIDLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderMCDIDLookup reduce ($$ ++ $) pluck $$) default []
+]]></ee:set-variable>
+				<ee:set-variable variableName="BillingProviderNPILookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderNameLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="BillingProviderNameLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderNameLookup reduce ($$ ++ $) pluck $) default []
+]]></ee:set-variable>
+				<ee:set-variable variableName="PlaceOfServiceLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.PlaceOfServiceLookup reduce ($$ ++ $) pluck $$) default []
+]]></ee:set-variable>
+				<ee:set-variable variableName="FundCodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.FundCodeLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="BillingProviderTaxonomyLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderTaxonomyLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="RevenueCodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.RevenueCodeLookup reduce ($$ ++ $) pluck $$) default []
+]]></ee:set-variable>
+				<ee:set-variable variableName="HealthcareProcedureCodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.HealthcareProcedureCodeLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="HeaderEOBCode1Lookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.HeaderEOBCode1Lookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+			<ee:set-variable variableName="HeaderEOBCode2Lookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.HeaderEOBCode2Lookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+			<ee:set-variable variableName="HeaderEOBCode3Lookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.HeaderEOBCode3Lookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+			<ee:set-variable variableName="DetailEOBCode1Lookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DetailEOBCode1Lookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+			<ee:set-variable variableName="DetailEOBCode2Lookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DetailEOBCode2Lookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+			<ee:set-variable variableName="DetailEOBCode3Lookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DetailEOBCode3Lookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+
+			<ee:set-variable variableName="Modifier1CodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.Modifier1CodeLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+			<ee:set-variable variableName="Modifier2CodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.Modifier2CodeLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+			<ee:set-variable variableName="Modifier3CodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.Modifier3CodeLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+			<ee:set-variable variableName="Modifier4CodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.Modifier4CodeLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="ListIDLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.ListIDLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="AidCategoryLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.LOVNames reduce ($ ++ $$) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="AuthIdCombineLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.AuthIdCombineLookup reduce ($ ++ $$) pluck ($$ ++ $)) default []]]></ee:set-variable>
+				<ee:set-variable variableName="RenderingProviderTaxonomyCodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.RenderingProviderTaxonomyCodeLookup reduce ($ ++ $$) pluck $$ default []]]></ee:set-variable>
+
+				<ee:set-variable variableName="RenderingProviderMCDIDLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.RenderingProviderMCDIDLookup reduce ($ ++ $$) pluck $$ default []
+]]></ee:set-variable>
+				<ee:set-variable variableName="RenderingProviderNameLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.RenderingProviderNameLookup reduce ($ ++ $$) pluck $$ default []
+]]></ee:set-variable>
+				<ee:set-variable variableName="RenderingProviderNPILookups" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.RenderingProviderNPILookup reduce ($ ++ $$) pluck $$ default []
+]]></ee:set-variable>
+				<ee:set-variable variableName="PrimaryDiagnosisCodeLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.PrimaryDiagnosisCodeLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="ClientSSNLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.ClientSSNLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="BillingProviderEINLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderEINLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="RenderingProviderEINLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.RenderingProviderEINLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable> 
+				<ee:set-variable variableName="DMESAuthIdLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DMESAuthIdLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+				<ee:set-variable variableName="DPBHSAuthIdLookups" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DPBHSAuthIdLookup reduce ($$ ++ $) pluck $$) default []]]></ee:set-variable>
+</ee:variables>				
+		</ee:transform>
+		<ee:transform doc:name="Transform Message Claim Error" doc:id="3a5f737e-d9ee-416b-85af-e485a587c8c3">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="DSCYFError"><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	Error_Message__c : ((if (vars.COSLookups default [] contains $.COS) [null] else [("COS not match in FOCUS")]) ++
+		//(if (vars.BillingProviderNameLookups default [] contains $.BillingProviderName) [null] else [("Billing Provider Name not match in FOCUS")])  ++
+		(if (vars.ClientMCILookups default [] contains trim($.ClientMCI as Number)) [null] else [("Client MCI not match in FOCUS")]) ++
+		//(if (vars.BillingProviderMCDIDLookups default [] contains $.BillingProviderMCDID) [null] else [("Billing Provider MCD ID not match in FOCUS")]) ++
+		(if (vars.BillingProviderNPILookups default [] contains $.BillingProviderNPI) [null] else [("Billing Provider NPI not match in FOCUS")]) ++
+		(if (vars.PlaceOfServiceLookups default [] contains $.PlaceOfService) [null] else [("Place Of Service not match in FOCUS")]) ++
+		(if (vars.FundCodeLookups default [] contains $.FundCode ) [null] else (if ($.ClaimRecordStatus == "Paid") [("Fund Code not match in FOCUS")] else [null])) ++
+		(if (vars.PrimaryDiagnosisCodeLookups default [] contains (if ((sizeOf (trim($.PrimaryDiagnosisCode default 0)) == 3)) (trim($.PrimaryDiagnosisCode) default "") else ((trim($.PrimaryDiagnosisCode default 0)[0 to 2] default "") ++ "." ++ trim($.PrimaryDiagnosisCode default 0)[3 to -1]) default "" )) [null] else (if ($.ClaimRecordStatus == "Paid") [("Primary Diagnosis Code not match in FOCUS")] else [null])) ++
+		//(if (vars.ClientSSNLookups default [] contains $.ClientSSN) [null] else [("Client SSN not match in FOCUS")] ) ++  
+		(if (vars.AidCategoryLookups default [] contains (("AID_CATEGORY-") ++ $.AidCategory default "")) [null] else (if ($.ClaimRecordStatus == "Paid") [("Aid Category not match in FOCUS")] else [null])) ++ 
+		(if (vars.BillingProviderTaxonomyLookups default [] contains $.BillingProviderTaxonomyCode ) [null] else [("Billing Provider Taxonomy Code not match in FOCUS")] ) ++ 
+		(if ($.DMESAuthId == null or $.DMESAuthId == "") [null] else (if (($.ListID != null or $.ListID != "") and (vars.ListIDLookups default [] contains trim($.ListID as Number) )) [null] else [("List ID not match in FOCUS")])) ++
+		(if ($.RevenueCode == null or $.RevenueCode == "") [null] else (if (($.RevenueCode != null or $.RevenueCode != "") and (vars.RevenueCodeLookups default [] contains $.RevenueCode )) [null] else [("Revenue Code not match in FOCUS")])) ++
+		//(if ((vars.DPBHSAuthIdLookups default [] contains $.DPBHSAuthId) or $.DMESAuthId == null or $.DMESAuthId == "" ) [null] else [("DPBHS Auth Id not match in FOCUS")] ) ++
+		(if ($.DMESAuthId == null or $.DMESAuthId == "") [null] else (if (vars.DMESAuthIdLookups default [] contains $.DMESAuthId ) [null] else [("DMES Auth Id not match in FOCUS")] )) ++
+		(if ($.HealthcareProcedureCode == null or $.HealthcareProcedureCode == "") [null] else (if (($.HealthcareProcedureCode != null or $.HealthcareProcedureCode != "") and (vars.HealthcareProcedureCodeLookups default [] contains $.HealthcareProcedureCode )) [null] else [("Healthcare Procedure Code not match in FOCUS")])) ++
+		(if ($.HeaderEOBCode1 == null or $.HeaderEOBCode1 == "") [null] else (if (($.HeaderEOBCode1 != null or $.HeaderEOBCode1 != "") and (vars.HeaderEOBCode1Lookups default [] contains $.HeaderEOBCode1 )) [null] else [("Header EOB Code 1 not match in FOCUS")])) ++
+		(if ($.HeaderEOBCode2 == null or $.HeaderEOBCode2 == "") [null] else (if (($.HeaderEOBCode2 != null or $.HeaderEOBCode2 != "") and (vars.HeaderEOBCode2Lookups default [] contains $.HeaderEOBCode2 )) [null] else [("Header EOB Code 2 not match in FOCUS")])) ++
+		(if ($.HeaderEOBCode3 == null or $.HeaderEOBCode3 == "") [null] else (if (($.HeaderEOBCode3 != null or $.HeaderEOBCode3 != "") and (vars.HeaderEOBCode3Lookups default [] contains $.HeaderEOBCode3 )) [null] else [("Header EOB Code 3 not match in FOCUS")])) ++
+		(if ($.DetailEOBCode1 == null or $.DetailEOBCode1 == "") [null] else (if (($.DetailEOBCode1 != null or $.DetailEOBCode1 != "") and (vars.DetailEOBCode1Lookups default [] contains $.DetailEOBCode1 )) [null] else [("Detail EOB Code 1 not match in FOCUS")])) ++
+		(if ($.DetailEOBCode2 == null or $.DetailEOBCode2 == "") [null] else (if (($.DetailEOBCode2 != null or $.DetailEOBCode2 != "") and (vars.DetailEOBCode2Lookups default [] contains $.DetailEOBCode2 )) [null] else [("Detail EOB Code 2 not match in FOCUS")])) ++
+		(if ($.DetailEOBCode3 == null or $.DetailEOBCode3 == "") [null] else (if (($.DetailEOBCode3 != null or $.DetailEOBCode3 != "") and (vars.DetailEOBCode3Lookups default [] contains $.DetailEOBCode3 )) [null] else [("Detail EOB Code 3 not match in FOCUS")])) ++
+		//(if (vars.Modifier1CodeLookups default [] contains $.HealthcareProcedureCodemodifier1 ) [null] else [("Modifier 1 Code not match in FOCUS")]) ++
+		//(if (vars.Modifier2CodeLookups default [] contains $.HealthcareProcedureCodemodifier2 ) [null] else [("Modifier 2 Code not match in FOCUS")]) ++
+		//(if (vars.Modifier3CodeLookups default [] contains $.HealthcareProcedureCodemodifier3 ) [null] else [("Modifier 3 Code not match in FOCUS")]) ++
+		//(if (vars.Modifier4CodeLookups default [] contains $.HealthcareProcedureCodemodifier4 ) [null] else [("Modifier 4 Code not match in FOCUS")]) ++
+		(if ($.DMESAuthId == null or $.DMESAuthId == "") [null] else (if (($.DMESAuthId != null) and ($.DPBHSAuthId != null) and (vars.AuthIdCombineLookups default [] contains (trim($.ClientMCI as Number) ++ $.DMESAuthId))) [null] else [("Client MCI – does not match with PBH Auth ID/DMES Auth ID")] ))
+		//(if (vars.BillingProviderEINLookups default [] contains trim($.BillingProviderName)) [null] else [("Billing Provider Name – does not match with NPI/EIN")] ) ++
+		//(if (vars.RenderingProviderTaxonomyCodeLookups default [] contains $.RenderingProviderTaxonomyCode) [null] else [("Rendering Provider Taxonomy not match in FOCUS")] ) 
+		//(if (vars.RenderingProviderMCDIDLookups default [] contains $.RenderingProviderMCDID) [null] else [("Rendering Provider MCD ID not match in FOCUS")] ) ++
+		//(if (vars.RenderingProviderEINLookups default [] contains $.RenderingProviderEIN) [null] else [("Rendering Provider EIN not match in FOCUS")] ) ++
+		//(if (vars.RenderingProviderNPILookups default [] contains $.RenderingProviderNPI) [null] else [("Rendering Provider NPI not match in FOCUS")] ) 
+	)
+	//DMES_Claim__c : vars.claimTableResponse.Id[$$]
+}]]></ee:set-variable>
+				<ee:set-variable variableName="DMESError"><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	Error_Message__c : ((if ($.COS == null or $.COS == "") [("COS received Null")] else [null]) ++
+		(if ($.BillingProviderName == null or $.BillingProviderName == "") [("Billing Provider Name received Null")] else [null]) ++
+		(if ($.BillingProviderEIN == null or $.BillingProviderEIN == "") [("Billing Provider EIN received Null")] else [null]) ++
+		(if ($.ServiceStartDate == null or $.ServiceStartDate == "") [("Service Start Date received Null")] else [null]) ++ 
+		(if ($.ServiceEndDate == null or $.ServiceEndDate == "") [("Service End Date received Null")] else [null]) ++
+		(if ($.RAAmount == null or $.RAAmount == "") [("RA Amount received Null")] else [null]) ++
+		(if ($.RADate == null or $.RADate == "") [("RA Date received Null")] else [null]) ++
+		(if ($.RANumber == null or $.RANumber == "") [("RA Number received Null")] else [null]) ++
+		(if (trim($.ClientMCI) == null or trim($.ClientMCI) == "") [("Clinet MCI received Null")] else [null]) ++
+		(if ($.ClientLastName == null or $.ClientLastName == "") [("Cliant Last Name received Null")] else [null]) ++
+		(if ($.ClientFirstName == null or $.ClientFirstName == "") [("Client First Name received Null")] else [null]) ++
+		(if ($.BillingProviderMCDID == null or $.BillingProviderMCDID == "") [("Billing Provider MCD ID received Null")] else [null]) ++
+		(if ($.BillingProviderNPI == null or $.BillingProviderNPI == "") [("Billing Provider NPI received Null")] else [null]) ++
+		(if ($.ServiceRate == null or $.ServiceRate == "") [("Service Date received Null")] else [null]) ++
+		(if ($.NumberOfUnits == null or $.NumberOfUnits == "") [("Number of Units received Null")] else [null]) ++
+		(if ($.PlaceOfService == null or $.PlaceOfService == "") [("Place Of Service received Null")] else [null]) ++
+		(if ($.ClaimRecordStatus == null or $.ClaimRecordStatus == "") [("Claim Record Status received Null")] else [null]) ++
+		(if ($.ICN == null or $.ICN == "") [("ICN received Null")] else [null]) ++
+		(if ($.MedicaidBillAmount == null or $.MedicaidBillAmount == "") [("Medicaid Billing Amount received Null")] else [null]) ++
+		(if ($.InitialSubmissionDate == null or $.InitialSubmissionDate == "") [("Initial Submission Date received Null")] else [null]) ++
+		(if ($.FinPayer == null or $.FinPayer == "") [("Fin Payer received Null")] else [null]) ++
+		(if ($.FundCode == null or $.FundCode == "" and ($.ClaimRecordStatus == "Paid")) [("Fund Code received Null")] else [null]) ++
+		//(if ($.DPBHSAuthId == null or $.DPBHSAuthId == "" or $.DMESAuthId == null or $.DMESAuthId == "") [("DPBHS Auth Id received Null")] else [null]) ++
+		//(if ($.DMESAuthId == null or $.DMESAuthId == "") [("DMES Auth Id received Null")] else [null]) ++
+		(if ($.PrimaryDiagnosisCode == null or $.PrimaryDiagnosisCode == "") [("Primary Diagnosis Code received Null")] else [null]) ++
+		(if ($.ServiceDays == null or $.ServiceDays == "") [("Service Days received Null")] else [null]) ++ 
+		//(if ($.ClientSSN == null or $.ClientSSN == "") [("Client SSN received Null")] else [null]) ++ 
+		//(if ($.ADJICN == null or $.ADJICN == "") [("ADJ ICN received Null")] else [null]) ++ 
+		(if ($.AidCategory == null or $.AidCategory == "" and ($.ClaimRecordStatus == "Paid")) [("Aid Category received Null")] else [null]) ++ 
+		(if ($.BenefitPlanInfo == null or $.BenefitPlanInfo == "" and ($.ClaimRecordStatus == "Paid")) [("Benefit Plan Info received Null")] else [null]) ++ 
+		(if ($.BillingProviderTaxonomyCode == null or $.BillingProviderTaxonomyCode == "") [("Billing Provider Taxonomy Code received Null")] else [null]) ++ 
+		(if (trim($.ListID as Number) == null or trim($.ListID as Number) == "") [("List ID received Null")] else [null]) ++
+		//(if ($.HeaderEOBCode1 == null or $.HeaderEOBCode1 == "") [("Header EOB Code 1 received Null")] else [null]) ++ 
+		//(if ($.RenderingProviderEIN == null or $.RenderingProviderEIN == "") [("Renedering Provider EIN received Null")] else [null]) ++ 
+		(if ($.DetailNumLineItem == null or $.DetailNumLineItem == "") [("Detail Num Line Item received Null")] else [null])
+	)
+	//DMES_Claim__c : vars.claimTableResponse.Id[$$] 
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="inf058-Create-Claim-Table-Sub_Flow" doc:id="335ca21b-e768-44d1-9271-8f5ae8486c01" name="inf058-Create-Claim-Table-Sub_Flow" />
+		<flow-ref doc:name="inf058-update-ADJ-ICN-Sub_Flow" doc:id="a0528e05-e7f8-493f-aad5-1a2afb4640c7" name="inf058-update-ADJ-ICN-Sub_Flow"/>
+		<set-payload value="#[(vars.originalPayload default [])]" doc:name="Set Payload" doc:id="054c8884-93ba-406b-80dd-7283928976bf" />
+		<ee:transform doc:name="Prepare Record level Error" doc:id="c5e570df-9ee7-44fd-98a4-c62bfdd185ba">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="DSCYF"><![CDATA[%dw 2.0
+output application/java
+---
+payload filter (vars.claimTableResponse[$$].id != null) map (value,index) -> {
+	Error : (vars.DSCYFError.Error_Message__c[index] filter ($ != null) map (v,i) -> {
+		Error_Message__c : v,
+		DMES_Claim__c : vars.claimTableResponse.Id[index],
+		Error_Status__c : "Pending",
+		Error_Field__c : v[0 to -19],
+		Error_Type__c : "DSCYF Error"
+	})
+}]]></ee:set-variable>
+				<ee:set-variable variableName="DMES"><![CDATA[%dw 2.0
+output application/java
+---
+payload filter (vars.claimTableResponse[$$].id != null) map (value,index) -> {
+	Error : (vars.DMESError.Error_Message__c[index] filter ($ != null) map (v,i) -> {
+		Error_Message__c : v,
+		DMES_Claim__c : vars.claimTableResponse.Id[index],
+		Error_Status__c : "Pending",
+		Error_Field__c : v[0 to -14],
+		Error_Type__c : "DMES Error"
+	})
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="30b6ff0b-9630-4642-93de-a20aaf1a93ce" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+flatten (vars.DSCYF map $.Error)]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<foreach doc:name="For Each" doc:id="d7a0f398-9202-4401-9b81-0f31c5c34549" batchSize="200">
+			 <salesforce:create-multiple type="DEL_DMES_Claim_Error__c" doc:name="Create multiple Claim DSCYF Error" doc:id="244d1405-a611-436d-83fc-3ecf5392a94c" config-ref="Salesforce_Config">
+				<salesforce:records><![CDATA[#[payload map $]]]></salesforce:records>
+			</salesforce:create-multiple>
+				<logger level="DEBUG" doc:name="Logger" doc:id="99991ee5-29e3-4159-8b56-b6af3edcc042" message='#[payload.items default [] map ($.message default "") joinBy ","]' />
+			</foreach>
+			<ee:transform doc:name="Transform Message" doc:id="c0b29b13-af52-4102-96a0-f609a281b46f" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+flatten (vars.DMES map $.Error)]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<foreach doc:name="For Each" doc:id="63f2b36f-4ea2-447a-b271-2a2a81237316" batchSize="200">
+				<salesforce:create-multiple type="DEL_DMES_Claim_Error__c" doc:name="Create multiple Claim DMES Error" doc:id="0c8ddb9d-68e0-47a6-8938-2ffbee48bac2" config-ref="Salesforce_Config">
+					<salesforce:records><![CDATA[#[payload map $]]]></salesforce:records>
+				</salesforce:create-multiple>
+				<logger level="DEBUG" doc:name="Logger" doc:id="e7b3ceb4-fec2-413e-ae7f-24d9d4a2fa84" message='#[payload.items default [] map ($.message default "") joinBy ","]' />
+			</foreach>
+		
+		<logger level="INFO" doc:name="Job Completed" doc:id="d03787c1-729a-403a-9b13-b0f3979fa002" message="Claim filed load complete" />
+	</sub-flow>
+	<sub-flow name="inf058-Create-Claim-Table-Sub_Flow" doc:id="50057640-3233-4216-8480-15db8d02e923" >
+		<set-variable value="#[payload]" doc:name="Set Variable originalPayload" doc:id="6b34b220-169b-4d1e-8660-88282d5a306e" variableName="originalPayload" />
+		<ee:transform doc:name="Transform Message to find records with ADJ ICN" doc:id="0c5512fd-d193-4cd8-9517-b65e0e7aa2e4">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="populatedADJICN"><![CDATA[%dw 2.0
+output application/java
+---
+payload filter ((!($.ICN startsWith("69")))) filter (($.ADJICN default "") != null and ($.ADJICN default "") != "" ) map $]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<set-payload value="#[(vars.originalPayload default [])]" doc:name="Set Payload" doc:id="3ce87518-d0b4-4d1d-b134-dac18e5083ac" />
+		<foreach batchSize="200">
+			<ee:transform doc:name="Transform Message Claim load" doc:id="c44a9f75-6c38-4785-87f7-2f5b8361c36e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	ADJ_ICN__c : ($.ADJICN default ""),
+	Aid_Category__c : ($.AidCategory default ""),
+	Aid_Category_Description__c : vars.LOVNames[("AID_CATEGORY-") ++ $.AidCategory][0] default "",
+	Benefit_Plan_Info__c : ($.BenefitPlanInfo default ""),
+	Billing_Provider_EIN__c : ($.BillingProviderEIN default ""),
+	Billing_Provider_MCD_ID__c : ($.BillingProviderMCDID default ""),
+	Billing_Provider_Name__c : ($.BillingProviderName default ""),
+	Billing_Provider_Name_FOCUS__c : vars.BillingProviderNameLookup[$.BillingProviderNPI][0] default "",
+	Billing_Provider_NPI__c : ($.BillingProviderNPI default ""),
+	//Billing_Provider_Taxonomy__c : $.BillingProviderTaxonomy default "",
+	Billing_Provider_Taxonomy_Code__c : $.BillingProviderTaxonomyCode default "",
+	Billing_Provider_Taxonomy_description__c : vars.BillingProviderTaxonomyLookup[$.BillingProviderTaxonomyCode][0] default "",
+	Claim_Record_Status__c : $.ClaimRecordStatus default "",
+	Client__c : vars.ClientMCILookup[trim(($.ClientMCI as Number) as String)][0] default "",
+	Client_First_Name__c : $.ClientFirstName default "",
+	Client_Last_Name__c : $.ClientLastName default "",
+	Client_MCI__c : trim($.ClientMCI default ""),
+	Client_SSN__c : $.ClientSSN default "",
+	Comment_Note__c : $.CommentNote default "",
+	COS__c : $.COS default "",
+	COS_Description__c : vars.COSLookup[$.COS][0] default "",
+	Detail_EOB_Code_1__c : $.DetailEOBCode1 default "",
+	Detail_EOB_Code_2__c : $.DetailEOBCode2 default "",
+	Detail_EOB_Code_3__c : $.DetailEOBCode3 default "",
+	Detail_EOB_Code_1_Description__c : vars.DetailEOBCode1Lookup[$.DetailEOBCode1][0] default "",
+	Detail_EOB_Code_2_Description__c : vars.DetailEOBCode2Lookup[$.DetailEOBCode2][0] default "",
+	Detail_EOB_Code_3_Description__c : vars.DetailEOBCode3Lookup[$.DetailEOBCode3][0] default "",
+	Detail_Num_Line_Item__c : $.DetailNumLineItem default "",
+	DMES_Authorization__c : vars.DMESAuthIdLookup[$.DMESAuthId][0] default "",
+	DMES_Authorization_Id__c : $.DMESAuthId default "",
+	//DMES_Prior_Auth__c : $.DMESPriorAuth default "",
+	DPBHS_Authorization_Id__c : $.DPBHSAuthId default "",
+	Fin_Payer__c : $.FinPayer default "",
+	//FOCUS_PA__c : $.DPBHSAuthId default "",
+	Fund_Code__c : $.FundCode default "",
+	Fund_Code_Description__c : vars.FundCodeLookup[$.FundCode][0] default "",
+	Header_EOB_Code_1__c : $.HeaderEOBCode1 default "",
+	//Header_EOB_Code_1_Submission_Denial_De__c : $.HeaderEOBCode1SubmissionDenialDe default "",
+	Header_EOB_Code_1_Description__c: vars.HeaderEOBCode1Lookup[$.HeaderEOBCode1][0] default "",
+	Header_EOB_Code_2__c : $.HeaderEOBCode2 default "",
+	Header_EOB_Code_2_Description__c : vars.HeaderEOBCode2Lookup[$.HeaderEOBCode2][0] default "",
+	Header_EOB_Code_3__c : $.HeaderEOBCode3 default "",
+	Header_EOB_Code_3_Description__c : vars.HeaderEOBCode3Lookup[$.HeaderEOBCode3][0] default "",
+	Healthcare_Procedure_Code__c : $.HealthcareProcedureCode default "",
+	Healthcare_Procedure_Code_Description__c : vars.HealthcareProcedureCodeLookup[$.HealthcareProcedureCode][0] default "",
+	Healthcare_Procedure_Code_modifier_1__c : $.HealthcareProcedureCodemodifier1 default "",
+	Healthcare_Procedure_Code_modifier_2__c : $.HealthcareProcedureCodemodifier2 default "",
+	Healthcare_Procedure_Code_modifier_3__c	 : $.HealthcareProcedureCodemodifier3 default "",
+	Healthcare_Procedure_Code_modifier_4__c : $.HealthcareProcedureCodemodifier4 default "",
+	Healthcare_Procedure_Code_mod_1_Desc__c : vars.Modifier1CodeLookup[$.HealthcareProcedureCodemodifier1][0] default "",
+	Healthcare_Procedure_Code_mod_2_Desc__c : vars.Modifier2CodeLookup[$.HealthcareProcedureCodemodifier2][0] default "",
+	Healthcare_Procedure_Code_mod_3_Desc__c : vars.Modifier3CodeLookup[$.HealthcareProcedureCodemodifier3][0] default "",
+	Healthcare_Procedure_Code_mod_4_Desc__c : vars.Modifier4CodeLookup[$.HealthcareProcedureCodemodifier4][0] default "",
+	ICN__c : $.ICN default "",
+	Initial_Submission_Date__c : if ($.InitialSubmissionDate != null) (($.InitialSubmissionDate as Date {format : "yyyy-MM-dd"})  ++ "America/New_York") else "",
+	List_ID__c : trim($.ListID as Number) default "",
+	LIST_ID_Description__c : vars.ListIDLookup[trim($.ListID as Number)][0] default "",
+	//Load_Date_From_DMES__c : $.LoadDatefromDMES default "",
+	//Load_Indicator__c : $.LoadIndicator default "",
+	Medicaid_Bill_Amount__c : (trim($.MedicaidBillAmount)[0 to -3] ++ "." ++ trim($.MedicaidBillAmount)[-2 to -1]) default "",
+	Number_of_Units__c : (trim($.NumberOfUnits[0 to -3]) ++ "." ++ trim($.NumberOfUnits[-2 to -1])),
+	Place_Of_Service__c : vars.PlaceOfServiceIdLookup[$.PlaceOfService][0] default "",
+	Place_of_Service_Code__c : $.PlaceOfService default "",
+	Place_of_Service_Description__c : vars.PlaceOfServiceLookup[$.PlaceOfService][0] default "",
+	Primary_Diagnosis_Code__c : (if ((sizeOf (trim($.PrimaryDiagnosisCode)) == 3)) (trim($.PrimaryDiagnosisCode) default "") else (trim($.PrimaryDiagnosisCode)[0 to 2] ++ "." ++ trim($.PrimaryDiagnosisCode)[3 to -1])  ) default "",
+	Primary_Diagnosis_Description__c : vars.PrimaryDiagnosisCodeLookup[(if ( (sizeOf (trim($.PrimaryDiagnosisCode)) == 3)) (trim($.PrimaryDiagnosisCode) default "") else (trim($.PrimaryDiagnosisCode)[0 to 2] ++ "." ++ trim($.PrimaryDiagnosisCode)[3 to -1])  )][0] default "",
+	Billing_Provider__c : vars.BillingProviderIdLookup[$.BillingProviderNPI][0] default "",
+	RA_Amount__c : (trim($.RAAmount)[0 to -3] ++ "." ++ trim($.RAAmount)[-2 to -1]),
+	RA_Date_Payment_Date__c : if ($.RADate != null) (($.RADate as Date {format : "yyyy-MM-dd"})  ++ "America/New_York") else "",
+	RA_Number__c : $.RANumber default "",
+	//Record_Status__c : "Accepted" ,
+	Rendering_Provider_EIN__c : $.RenderingProviderEIN default "",
+	Rendering_Provider_MCD_ID__c : trim($.RenderingProviderMCDID) default "",
+	Rendering_Provider_Name__c : $.RenderingProviderName default "",
+	Rendering_Provider_NPI__c : $.RenderingProviderNPI default "",
+	//Rendering_Provider_Taxonomy__c : $.RenderingProviderTaxonomy default "",
+	Rendering_Provider_Taxonomy_Code__c : $.RenderingProviderTaxonomyCode default "",
+	Rendering_Provider_Taxonomy_description__c : vars.RenderingProviderTaxonomyCodeLookup[$.RenderingProviderTaxonomyCode][0] default "",
+	Revenue_Code__c : $.RevenueCode default "",
+	Revenue_Code_Description__c : vars.RevenueCodeLookup[$.RevenueCode][0] default "",
+	Service_Authorization__c : vars.ServiceAuthLookup[$.DMESAuthId][0] default "",
+	Service_Days__c : $.ServiceDays default "",
+	Service_End_Date__c	: if ($.ServiceEndDate != null)((($.ServiceEndDate default "") as Date {format : "yyyy-MM-dd"}) ++ "America/New_York") else "" ,
+	Service_Rate__c : (trim($.ServiceRate)[0 to -3] ++ "." ++ trim($.ServiceRate)[-2 to -1]),
+	Service_Start_Date__c : if ($.ServiceStartDate != null) ((($.ServiceStartDate default "") as Date {format : "yyyy-MM-dd"})  ++ "America/New_York") else "",
+	Load_Date_From_DMES__c : (now() as LocalDateTime {format : "yyyy-MM-dd"} ) ++ "America/New_York",
+	Load_Indicator__c : ((vars.fileDate[0 to 3] ++ "-" ++  vars.fileDate[4 to 5] ++ "-" ++ vars.fileDate[6 to 7])  as String as Date {format : "yyyy-MM-dd"}) ++ "America/New_York",
+	Status__c : if ((sizeOf ((flatten (vars.DMESError.*Error_Message__c ) ) filter ($ != null)) > 0) or (sizeOf ((flatten (vars.DSCYFError.*Error_Message__c ) ) filter ($ != null)) > 0)) ("Error") else "Accepted"
+} ]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<salesforce:create type="DEL_DMES_Claim_Table__c" doc:name="Create Claim table" doc:id="5c2f0ee2-da7c-445a-994b-d63d02cfd562" config-ref="Salesforce_Config"/>
+			<logger level="DEBUG" doc:name="Logger" doc:id="8944affd-be34-4f11-adc2-597e4754304d" message='#[vars.claimTableResponse.items default [] map ($.message default "") joinBy ","]'/>
+			<set-variable doc:name="Set Error Response" doc:id="2be12821-ffb1-4141-9cb3-41ec7d1620a7" variableName="errorResponse" value='#[payload filter ($.success == false) map ($.errors[0].message) joinBy ","]'/>
+			<ee:transform doc:name="Transform Message" doc:id="8d1016f9-8d8f-457e-b836-757291ac4ac3">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="errorResponse"><![CDATA[%dw 2.0
+output application/java
+---
+(vars.errorResponse default []) ++ ((payload filter ($.success == false) map ($.errors[0].message) joinBy ",") default [])]]></ee:set-variable>
+					<ee:set-variable variableName="claimTableResponse"><![CDATA[%dw 2.0
+output application/java
+---
+(vars.claimTableResponse default []) ++ (payload default [])]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform> 
+		</foreach>
+		
+	</sub-flow>
+	<sub-flow name="inf058-update-ADJ-ICN-Sub_Flow" doc:id="47690ed1-802f-42f1-8a92-a00a0c4e651f" >
+		<choice doc:name="Choice" doc:id="90ca0b1e-42b9-4ee6-a307-5a0cf2898ad7" >
+			<when expression="#[sizeOf(vars.populatedADJICN) &gt; 0]">
+				<logger level="INFO" doc:name="Print populated ADJ ICN" doc:id="44dbf51e-17a6-47cd-b3af-02f6ec191b03" message="List of ADJ-ICN :  #[vars.populatedADJICN map $.ADJICN]" />
+				<salesforce:query doc:name="Query to find existing Claim records with ADJ ICN#" doc:id="d7dcfad8-8c1f-4345-8580-2e741567aad7" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query><![CDATA[select id, ICN__c,ADJ_ICN__c,Aid_Category__c,Aid_Category_Description__c,Benefit_Plan_Info__c,Billing_Provider_EIN__c,Billing_Provider_MCD_ID__c,Billing_Provider_Name__c,Billing_Provider_Name_FOCUS__c,Billing_Provider_NPI__c,Billing_Provider_Taxonomy_Code__c,Billing_Provider_Taxonomy_description__c,Claim_Record_Status__c,Client__c,Client_First_Name__c,Client_Last_Name__c,Client_MCI__c,Client_SSN__c,Comment_Note__c,COS__c,COS_Description__c,Detail_EOB_Code_1__c,Detail_EOB_Code_2__c,Detail_EOB_Code_3__c,Detail_EOB_Code_1_Description__c,Detail_EOB_Code_2_Description__c,Detail_EOB_Code_3_Description__c,Detail_Num_Line_Item__c,DMES_Authorization__c,DMES_Authorization_Id__c,Fin_Payer__c,Fund_Code__c,Fund_Code_Description__c,Header_EOB_Code_1__c,Header_EOB_Code_2__c,Header_EOB_Code_3__c,Header_EOB_Code_1_Description__c,Header_EOB_Code_2_Description__c,Header_EOB_Code_3_Description__c,Healthcare_Procedure_Code__c,Initial_Submission_Date__c,List_ID__c,LIST_ID_Description__c,Medicaid_Bill_Amount__c,Number_of_Units__c,Place_Of_Service__c,Place_of_Service_Code__c,Place_of_Service_Description__c,Billing_Provider__c,RA_Amount__c,RA_Date_Payment_Date__c,Rendering_Provider_EIN__c,Rendering_Provider_Name__c,Rendering_Provider_NPI__c,Rendering_Provider_Taxonomy_Code__c,Rendering_Provider_Taxonomy_description__c,Revenue_Code__c,Revenue_Code_Description__c,Service_Authorization__c,Service_Days__c,Service_End_Date__c,Service_Start_Date__c,Load_Indicator__c,Status__c,Healthcare_Procedure_Code_Description__c,Healthcare_Procedure_Code_modifier_1__c,	Healthcare_Procedure_Code_modifier_2__c,Healthcare_Procedure_Code_modifier_3__c,Healthcare_Procedure_Code_modifier_4__c,Healthcare_Procedure_Code_mod_1_Desc__c,Healthcare_Procedure_Code_mod_2_Desc__c,Healthcare_Procedure_Code_mod_3_Desc__c,Healthcare_Procedure_Code_mod_4_Desc__c,Primary_Diagnosis_Code__c,Primary_Diagnosis_Description__c,DPBHS_Authorization_Id__c,Service_Rate__c, 
+(select id, name,Error_Type__c,Error_Message__c,Error_Field__c,Error_Status__c,Error_Work_Group__c from DMES_Claim_Error__r) 
+from DEL_DMES_Claim_Table__c where ICN__c in (:populatedADJICN) and RA_Amount__c  >= 0 and Number_of_Units__c >= 0]]></salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	populatedADJICN : vars.populatedADJICN map ("'" ++ ($.ADJICN) ++ "'") joinBy ","
+}]]]></salesforce:parameters>
+		</salesforce:query>
+				<ee:transform doc:name="Exisitng Claim Records" doc:id="0d02abd5-799e-4c1c-bed1-121317475cb0">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="exisitngClaimRecords"><![CDATA[%dw 2.0
+output application/java
+---
+(vars.exisitngClaimRecords default [] ++ payload map $)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+				<foreach doc:name="For Each" doc:id="0c919658-a23f-413d-bcf4-b051f666bec4" batchSize="100" collection="#[vars.exisitngClaimRecords default []]">
+			<ee:transform doc:name="Transform Message" doc:id="09c1cdd4-af92-4bf1-b338-3a119c6b9139">
+			<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload flatMap {
+	ADJ_ICN__c : $.ADJ_ICN__c default "",
+	Aid_Category__c : ($.Aid_Category__c default ""),
+	Aid_Category_Description__c : $.Aid_Category_Description__c default "",
+	Benefit_Plan_Info__c : ($.Benefit_Plan_Info__c default ""),
+	Billing_Provider_EIN__c : ($.Billing_Provider_EIN__c default ""),
+	Billing_Provider_MCD_ID__c : ($.Billing_Provider_MCD_ID__c default ""),
+	Billing_Provider_Name__c : ($.Billing_Provider_Name__c default ""),
+	Billing_Provider_Name_FOCUS__c : $.Billing_Provider_Name_FOCUS__c default "",
+	Billing_Provider_NPI__c : ($.Billing_Provider_NPI__c default ""),
+	//Billing_Provider_Taxonomy__c : $.Billing_Provider_Taxonomy__c default "",
+	Billing_Provider_Taxonomy_Code__c : $.Billing_Provider_Taxonomy_Code__c default "",
+	Billing_Provider_Taxonomy_description__c : $.Billing_Provider_Taxonomy_description__c default "",
+	Claim_Record_Status__c : "Adjusted",
+	Client__c : $.Client__c,
+	Client_First_Name__c : $.Client_First_Name__c default "",
+	Client_Last_Name__c : $.Client_Last_Name__c default "",
+	Client_MCI__c : $.Client_MCI__c default "",
+	Client_SSN__c : $.Client_SSN__c default "",
+	Comment_Note__c : $.Comment_Note__c default "",
+	COS__c : $.COS__c default "",
+	COS_Description__c : $.COS_Description__c default "",
+	Detail_EOB_Code_1__c : $.Detail_EOB_Code_1__c default "",
+	Detail_EOB_Code_2__c : $.Detail_EOB_Code_2__c default "",
+	Detail_EOB_Code_3__c : $.Detail_EOB_Code_3__c default "",
+	Detail_EOB_Code_1_Description__c : $.Detail_EOB_Code_1_Description__c default "",
+	Detail_EOB_Code_2_Description__c : $.Detail_EOB_Code_2_Description__c default "",
+	Detail_EOB_Code_3_Description__c : $.Detail_EOB_Code_3_Description__c default "",
+	Detail_Num_Line_Item__c : $.Detail_Num_Line_Item__c default "",
+	DMES_Authorization__c : $.DMES_Authorization__c default "",
+	DMES_Authorization_Id__c : $.DMES_Authorization_Id__c default "",
+	//DMES_Prior_Auth__c : $.DMES_Prior_Auth__c default "",
+	DPBHS_Authorization_Id__c : $.DPBHS_Authorization_Id__c default "",
+	Fin_Payer__c : $.Fin_Payer__c default "",
+	//FOCUS_PA__c : $.FOCUS_PA__c default "",
+	Fund_Code__c : $.Fund_Code__c default "",
+	Fund_Code_Description__c : $.Fund_Code_Description__c default "",
+	Header_EOB_Code_1__c : $.Header_EOB_Code_1__c default "",
+	//Header_EOB_Code_1_Submission_Denial_De__c : $.Header_EOB_Code_1_Submission_Denial_De__c default "",
+	Header_EOB_Code_1_Description__c: $.Header_EOB_Code_1_Description__c default "",
+	Header_EOB_Code_2__c : $.Header_EOB_Code_2__c default "",
+	Header_EOB_Code_2_Description__c : $.Header_EOB_Code_2_Description__c default "",
+	Header_EOB_Code_3__c : $.Header_EOB_Code_3__c default "",
+	Header_EOB_Code_3_Description__c : $.Header_EOB_Code_3_Description__c default "",
+	Healthcare_Procedure_Code__c : $.Healthcare_Procedure_Code__c default "",
+	Healthcare_Procedure_Code_Description__c : $.Healthcare_Procedure_Code_Description__c default "",
+	Healthcare_Procedure_Code_modifier_1__c : $.Healthcare_Procedure_Code_modifier_1__c default "",
+	Healthcare_Procedure_Code_modifier_2__c : $.Healthcare_Procedure_Code_modifier_2__c default "",
+	Healthcare_Procedure_Code_modifier_3__c	: $.Healthcare_Procedure_Code_modifier_3__c default "",
+	Healthcare_Procedure_Code_modifier_4__c : $.Healthcare_Procedure_Code_modifier_4__c default "",
+	Healthcare_Procedure_Code_mod_1_Desc__c : $.Healthcare_Procedure_Code_mod_1_Desc__c default "",
+	Healthcare_Procedure_Code_mod_2_Desc__c : $.Healthcare_Procedure_Code_mod_2_Desc__c default "",
+	Healthcare_Procedure_Code_mod_3_Desc__c : $.Healthcare_Procedure_Code_mod_3_Desc__c default "",
+	Healthcare_Procedure_Code_mod_4_Desc__c : $.Healthcare_Procedure_Code_mod_4_Desc__c default "",
+	ICN__c : $.ICN__c default "",
+	Initial_Submission_Date__c : ((vars.populatedADJICN map (i,v) -> if (i.ADJICN == $.ICN__c) (i.InitialSubmissionDate as Date {format : "yyyy-MM-dd"} ++ "America/New_York") else "") filter ($ != ""))[0],
+	List_ID__c : trim($.List_ID__c as Number) default "",
+	LIST_ID_Description__c : ($.LIST_ID_Description__c) default "",
+	//Load_Date_From_DMES__c : $.Load_Date_From_DMES__c default "",
+	//Load_Indicator__c : $.Load_Indicator__c default "",
+	Medicaid_Bill_Amount__c : $.Medicaid_Bill_Amount__c default "",
+	Number_of_Units__c : -($.Number_of_Units__c),
+	Place_Of_Service__c : $.Place_Of_Service__c default "",
+	Place_of_Service_Code__c : $.Place_of_Service_Code__c default "",
+	Place_of_Service_Description__c : $.Place_of_Service_Description__c default "",
+	Primary_Diagnosis_Code__c : $.Primary_Diagnosis_Code__c default "",
+	Primary_Diagnosis_Description__c : $.Primary_Diagnosis_Description__c default "",
+	Billing_Provider__c : $.Billing_Provider__c default "",
+	RA_Amount__c : (-($.RA_Amount__c)),
+	RA_Date_Payment_Date__c : ((vars.populatedADJICN map (i,v) -> if (i.ADJICN == $.ICN__c) (i.RADate as Date {format : "yyyy-MM-dd"} ++ "America/New_York") else "") filter ($ != ""))[0],
+	RA_Number__c : ((vars.populatedADJICN map (i,v) -> if (i.ADJICN == $.ICN__c) (i.RANumber) else "") filter ($ != ""))[0],
+	//Record_Status__c : "Accepted" ,
+	Rendering_Provider_EIN__c : $.Rendering_Provider_EIN__c default "",
+	Rendering_Provider_MCD_ID__c : $.Rendering_Provider_MCD_ID__c default "",
+	Rendering_Provider_Name__c : $.Rendering_Provider_Name__c default "",
+	Rendering_Provider_NPI__c : $.Rendering_Provider_NPI__c default "",
+	//Rendering_Provider_Taxonomy__c : $.Rendering_Provider_Taxonomy__c default "",
+	Rendering_Provider_Taxonomy_Code__c : $.Rendering_Provider_Taxonomy_Code__c default "",
+	Rendering_Provider_Taxonomy_description__c : $.Rendering_Provider_Taxonomy_description__c default "",
+	Revenue_Code__c : $.Revenue_Code__c default "",
+	Revenue_Code_Description__c : $.Revenue_Code_Description__c default "",
+	Service_Authorization__c : $.Service_Authorization__c default "",
+	Service_Days__c : $.Service_Days__c default "",
+	Service_End_Date__c	: if ($.Service_End_Date__c != null) ((($.Service_End_Date__c default "") as Date {format : "yyyy-MM-dd"}) ++ "America/New_York") else "",
+	Service_Rate__c : $.Service_Rate__c,
+	Service_Start_Date__c : if ($.Service_Start_Date__c != null) ((($.Service_Start_Date__c default "") as Date {format : "yyyy-MM-dd"})  ++ "America/New_York") else "",
+	Load_Date_From_DMES__c : (now() as LocalDateTime {format : "yyyy-MM-dd"} ) ++ "America/New_York",
+	Load_Indicator__c : ((vars.fileDate[0 to 3] ++ "-" ++  vars.fileDate[4 to 5] ++ "-" ++ vars.fileDate[6 to 7])  as String as Date {format : "yyyy-MM-dd"}) ++ "America/New_York",
+	Status__c : if ((sizeOf ((flatten (vars.DMESError.*Error_Message__c ) ) filter ($ != null)) > 0) or (sizeOf ((flatten (vars.DSCYFError.*Error_Message__c ) ) filter ($ != null)) > 0)) ("Error") else "Accepted" 
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+			</ee:variables>
+		</ee:transform>
+					<salesforce:create type="DEL_DMES_Claim_Table__c" doc:name="Create Claim table" doc:id="c95b309a-dab7-4a20-bf3d-423bf8e9e1f6" config-ref="Salesforce_Config" >
+					</salesforce:create>
+			<logger level="DEBUG" doc:name="Logger" doc:id="9a10cd4c-d57a-4306-846c-b419788b67a1" message='#[vars.claimTableResponse.items default [] map ($.message default "") joinBy ","]' />
+			<ee:transform doc:name="Transform Message Claim Table Response" doc:id="f72a87cf-77d6-4981-b373-f765819ec19e">
+				<ee:message />
+				<ee:variables>
+					<ee:set-variable variableName="claimTableResponse"><![CDATA[%dw 2.0
+output application/java
+---
+(vars.claimTableResponse default []) ++ (payload default [])]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+					<ee:transform doc:name="Mapping for DMES Error" doc:id="5474597c-005c-472d-a559-9e5bf1ada756" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map (value,item) -> {
+	Error : vars.exisitngClaimRecords map ( $.DMES_Claim_Error__r map (v,i) -> {
+		DMES_Claim__c : value.Id,
+		Error_Message__c : v.Error_Message__c,
+		Error_Type__c : v.Error_Type__c,
+		Error_Field__c : v.Error_Field__c,
+		Error_Status__c : v.Error_Status__c
+	})
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<ee:transform doc:name="Flatten Payload" doc:id="7b1190e8-436f-40c5-8b5e-a0c2136f59f9" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+flatten (payload map $.Error[$$]) filter ($ != null)]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<foreach doc:name="For Each" doc:id="f284b631-12c5-4db3-a113-5184ff30c3b5" batchSize="200">
+						<salesforce:create-multiple type="DEL_DMES_Claim_Error__c" doc:name="Create multiple DMES error for ADJ ICN" doc:id="c024d6d0-2655-4c0f-95e4-6e8b102bc038" config-ref="Salesforce_Config" >
+							<salesforce:records ><![CDATA[#[payload map $]]]></salesforce:records>
+						</salesforce:create-multiple>
+						<logger level="DEBUG" doc:name="Logger" doc:id="422889ad-c798-4f65-aaad-873e928b2e5c" message='#[payload.items default [] map ($.message default "") joinBy ","]' />
+					</foreach>
+		</foreach>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="No Record found with ADJ ICN Populated" doc:id="9ea8a3a5-707b-4b20-8eea-1e8912e691f4" message="No Record found with ADJ ICN Populated"/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="inf058-dmes-claim-file-load-lookUp-Sub_Flow" doc:id="75633691-ea82-48ef-9054-f68603fbe0ef" >
+		<foreach doc:name="For Each DMES &amp; DPBHS Auth Id" doc:id="80276d72-2356-4951-898c-b9631476d887" collection="#[payload map $]" batchSize="150">
+			<salesforce:query doc:name="Query from DMES Auth Id" doc:id="8bdf49ad-ca79-4f5d-99a6-1d356ec82f22" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select Id,DPBHS_Authorization_Id__c, DMES_Authorization_ID__c,Service_Authorization__r.Client__r.DEL_MCI__c from DEL_DMES_Authorization__c where DMES_Authorization_ID__c in (:DMES)  and DPBHS_Authorization_Id__c in (:DPBHS)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	DPBHS : payload map (if ($.DPBHSAuthId != null) ("'" ++ $.DPBHSAuthId ++ "'") else "''") joinBy ",",
+	DMES : payload map (if ($.DMESAuthId != null) ("'" ++ $.DMESAuthId ++ "'") else "''") joinBy ","
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="e521c147-99dc-4c65-a8cb-60e75c235f4e" >
+				<ee:variables >
+					<ee:set-variable variableName="AuthIdCombineLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.AuthIdCombineLookup default []) ++ (payload map {
+	($.Service_Authorization__r.Client__r.DEL_MCI__c default "") : $.DMES_Authorization_ID__c default ""
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>	
+		<foreach doc:name="For Each Billing Provider EIN &amp; NPI" doc:id="f0a992fb-28a3-4a6f-803a-807771f589c6" collection='#[payload map $]' batchSize="150">
+			<salesforce:query doc:name="Query from Billing Provider EIN" doc:id="21dcfead-c5c0-4801-a3aa-df850502660f" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select Id, Provider__r.Name, Provider__r.DEL_Payee_FEIN__c,  NPI_Number__c from DEL_NPI__c where Provider__r.DEL_Payee_FEIN__c in (:EIN) and NPI_Number__c in (:NPI)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	EIN : payload map (if ($.BillingProviderEIN != null) ("'" ++ ($.BillingProviderEIN) ++ "'") else "''") joinBy ",",
+	NPI : payload map (if ($.BillingProviderNPI != null) ("'" ++ ($.BillingProviderNPI) ++ "'") else "''") joinBy ","
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="d2edace6-3358-46b5-a6a5-e4e47c46c54b" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="BillingProviderEINLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderEINLookup default []) ++ (payload map {
+	($.Provider__r.Name default "") : $.Id
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Rendering Provider EIN" doc:id="63564fc2-57a7-4d7f-9345-ad6d3263fd08" collection='#[payload map $]' batchSize="150">
+			<salesforce:query doc:name="Query from Rendering Provider EIN" doc:id="385517cf-d405-4823-964f-efff91b4c51e" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select Id, Provider__r.Name, Provider__r.DEL_Payee_FEIN__c from DEL_NPI__c where Provider__r.DEL_Payee_FEIN__c in (:EIN)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	EIN : payload map (if ($.RenderingProviderEIN != null) ("'" ++ ($.RenderingProviderEIN) ++ "'") else "''") joinBy ","
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="6b541d25-f536-49a1-b4cd-483fa620f3ba" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="RenderingProviderEINLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.RenderingProviderEINLookup default []) ++ (payload map {
+	($.Provider__r.DEL_Payee_FEIN__c default "") : $.Id
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each COS Code" doc:id="f9ff16f7-3f85-40d4-b0e9-23e1738669df" collection='#[payload map ($.COS default "")]' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="ddf8ac5b-0189-4eb6-961c-d5e253613be5" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for COS lookup" doc:id="8d680e23-f4e5-47a8-9608-5949d45cb483" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select COS_Code__c, COS_Description__c from DEL_Category_Of_Service__c where COS_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="59146b66-0ca8-4b76-982b-b8b10c2cd920" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="COSLookup" ><![CDATA[output application/java
+---
+(vars.COSLookup default []) ++ (payload map { 
+	($.COS_Code__c default "") : $.COS_Description__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Place of Service" doc:id="0b741626-4bb2-410d-83fb-8ffcb6554a2a" collection='payload map ($.PlaceOfService default "")' batchSize="150">
+			<ee:transform doc:name="Transform Message" doc:id="b4d6420b-7b81-43fc-bda9-a95278e59282" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'" ) joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Place Of Service Lookup" doc:id="c7154810-1cde-4d55-a313-fdb1f5e1c95e" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Place_of_Service_Description__c,Place_of_Service_Code__c from DEL_Place_Of_Service__c where Place_of_Service_Code__c in (:POS)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	POS : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="ded534c5-a9f8-45c0-92aa-67a1bd4346aa" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="PlaceOfServiceLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.PlaceOfServiceLookup default []) ++ (payload map {
+	($.Place_of_Service_Code__c default "") : $.Place_of_Service_Description__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		
+		<foreach doc:name="For Each Place of Service Id" doc:id="f2710108-0d69-47bc-a932-5a3ed07afdd7" collection='payload map ($.PlaceOfService default "")' batchSize="150">
+			<ee:transform doc:name="Transform Message" doc:id="2363e820-a056-474a-8db1-71963449bcf5" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'" ) joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Place Of Service Id Lookup" doc:id="a4f827a1-fdf4-40ce-b047-c5d915b52f69" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Id,Place_of_Service_Code__c from DEL_Place_Of_Service__c where Place_of_Service_Code__c in (:POS)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	POS : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="f21a3c8d-3d67-43ad-b693-8f25baa5c607" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="PlaceOfServiceIdLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.PlaceOfServiceIdLookup default []) ++ (payload map {
+	($.Place_of_Service_Code__c default "") : $.Id
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for Client MCI" doc:id="8d594b8b-d4fc-4fd9-aa4c-1220e4b808bd" collection='payload map trim($.ClientMCI default "null")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="3aea2e6b-a89b-472c-b396-b26af2f361da">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ ($ as Number) ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for MCI" doc:id="44f488db-eabb-49b8-af09-073cf7e9580e" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>Select Id, DEL_MCI__c from Contact where DEL_MCI__c in (:mci)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+mci : payload]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="f0c9bcd1-63f6-482c-9e04-bc873b2e3faa" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="ClientMCILookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.ClientMCILookup default []) ++ (payload map {
+	($.DEL_MCI__c default "") : $.Id
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for Client SSN" doc:id="9c1ab2a6-8c4b-4624-959e-cc785ed66a0b" collection="payload map trim($.ClientSSN)" batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="5ba3db80-3080-4c9a-a448-5de8081f7881">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for SSN" doc:id="e3da3fbc-c97e-436a-b2e5-a152de9b2e7c" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>Select Id, DEL_SSN_Text__c from Contact where DEL_SSN_Text__c in (:SSN)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+SSN : payload]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="52b8abad-27c9-4292-a7f1-a6fafd4df14e" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="ClientSSNLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.ClientSSNLookup default []) ++ (payload map {
+	($.DEL_SSN_Text__c default "") : $.Id
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for Billing Provider Id" doc:id="999170b2-ccd2-4df6-8676-693078f0234e" collection='payload map trim($.BillingProviderNPI default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="fc8f5a67-f085-4368-b820-a57ea53aa6f4">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Billing Provider Id" doc:id="ad9e5135-d9dd-4cfa-9bf8-1b7f93c85ece" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>select Provider__c, NPI_Number__c from DEL_NPI__c where NPI_Number__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="73357c79-d743-4fdd-ae44-2e87d9e3f513" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="BillingProviderIdLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderIdLookup default []) ++ (payload map {
+	($.NPI_Number__c default "") : $.Provider__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for Billing Provider Name" doc:id="00220d0c-521c-4772-9d3c-6975701058d8" collection='payload map trim($.BillingProviderNPI default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="591f5cf5-5a90-4818-a24b-72302cd049c5">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Billing Provider Name" doc:id="778d7176-cf50-46a7-8177-3f910cb83eb6" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>select Provider__r.Name,NPI_Number__c from DEL_NPI__c where NPI_Number__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="7ab7fe27-ba5e-4eb0-b8dc-c363da9eca77" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="BillingProviderNameLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderNameLookup default []) ++ (payload map {
+	($.NPI_Number__c default "") : $.Provider__r.Name
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for Billing Provider NPI" doc:id="8a98c972-5633-481e-be62-3bbd279fbca1" collection='payload map trim($.RenderingProviderNPI default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="c62e0d70-9d37-4eff-8af9-d200d70a5a30">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Rendering Provider NPI" doc:id="0ed787a0-f1e1-41cb-be45-d3364b72f321" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>select Provider__r.Name,NPI_Number__c from DEL_NPI__c where NPI_Number__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="a50743e9-e095-4e51-bb3f-52901aec6aed" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="RenderingProviderNPILookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.RenderingProviderNPILookup default []) ++ (payload map {
+	($.NPI_Number__c default "") : $.Provider__r.Name
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for Rendering Provider Name" doc:id="3eec3eba-0a12-46b8-aafa-81a6fc2fa13c" collection='payload map trim($.RenderingProviderNPI default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="8699d09a-a877-4717-a96b-3e155e7312cf">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Billing Provider Name" doc:id="9b3498f0-d3f9-4dde-acb5-4b88edf0288c" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>select Provider__r.Name,NPI_Number__c from DEL_NPI__c where NPI_Number__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="168f6609-b322-439d-bfa4-89b0982ffa9b" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="RenderingProviderNameLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.RenderingProviderNameLookup default []) ++ (payload map {
+	($.NPI_Number__c default "") : $.Provider__r.Name
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for DMES Auth " doc:id="36311526-3450-453e-975e-0a816c303bbb" collection='payload map trim($.DMESAuthId default "null")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="86d2d633-6b66-423d-ab87-3a58cb8f9b1c">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for DMES Auth" doc:id="fc105def-47f4-4770-8f27-bb45150f4130" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>select Id, DMES_Authorization_ID__c from DEL_DMES_Authorization__c where DMES_Authorization_ID__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{code : payload}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="2557f42b-f467-45db-9cdc-7400fa3c3f0b" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="DMESAuthIdLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DMESAuthIdLookup default []) ++ (payload map {
+	($.DMES_Authorization_ID__c default "") : $.Id
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for DPBHS Auth " doc:id="d8b5c6c2-03f3-4307-862c-cb5559f734fc" collection='payload map trim($.DPBHSAuthId default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="a93c4e8f-02dd-4a2e-b489-de07c5fa8aeb">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for DPBHS Auth Id" doc:id="84505faf-c6f0-4649-ae37-d7e09afaa0b2" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>select Id, DPBHS_Authorization_Id__c from DEL_DMES_Authorization__c where DPBHS_Authorization_Id__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{code : payload}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="d27b4222-ed03-467d-8786-8fa19eedbd59" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="DPBHSAuthIdLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DPBHSAuthIdLookup default []) ++ (payload map {
+	($.DPBHS_Authorization_Id__c default "") : $.Id
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for DMES Auth for Service Authorization" doc:id="0159d4da-f876-479d-8eec-a39d9ffe4415" collection='payload map trim($.DMESAuthId default "null")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="04090fba-b2d3-4761-b20a-10a9f7fedf8f">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Service Auth" doc:id="94764a77-2139-4512-892f-f9aaa8098624" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>select DMES_Authorization_ID__c, Service_Authorization__c from DEL_DMES_Authorization__c where DMES_Authorization_ID__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{code : payload}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="3322cb4e-962a-425b-885f-c0951d989345" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="ServiceAuthLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.ServiceAuthLookup default []) ++ (payload map {
+	($.DMES_Authorization_ID__c default "") : $.Service_Authorization__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each for Billing Provider MCD ID" doc:id="dfa4d817-fcce-4d00-bf6f-106f6374bd5c" collection='payload map trim($.BillingProviderMCDID default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="d20e173f-0aee-4c66-b747-5c5482a1e768">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ trim ($ default "null") ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for BillingProviderMCDID" doc:id="7cc4be31-9a0b-4671-930f-dc1dc0dfb035" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>select MCD_ID__c from DEL_MCD__c	where MCD_ID__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{code : payload}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="41f5a52c-30a9-4bbf-9e81-6a043d6e4e44" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="BillingProviderMCDIDLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderMCDIDLookup default []) ++ (payload map {
+	($.MCD_ID__c default "") : $$
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Fund Code Code" doc:id="87d22c71-8a27-468b-a50a-eb626bc58b78" collection='payload map ($.FundCode default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="63a3d92f-2646-4049-b952-4c5b3e787d0a" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Fund Code lookup" doc:id="949a7a59-f0d5-40e7-a3eb-47da3ad46f79" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Fund_Code_Description__c,Fund_Code__c from DEL_Cost_Recovery_Fund_Code__c where Fund_Code__c in (:fundCode)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	fundCode : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="36813948-c08c-4fa5-83dc-efb094143dd1" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="FundCodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.FundCodeLookup default []) ++ (payload map {
+	($.Fund_Code__c default "") : $.Fund_Code_Description__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Billing provider taxonomy " doc:id="ac5cd87f-1edc-44e8-9f48-b9618621093a" collection='payload map ($.BillingProviderTaxonomyCode default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="56a3ff23-b502-40d7-af8f-11502583b8a8" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Billing Provider Taxonomy Code lookup" doc:id="c5ae8942-f6c6-48d1-af6f-157ba2a568ee" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select Classification__c,Taxonomy_Code__c from DEL_Provider_Taxonomy__c where Taxonomy_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="8bddd396-6921-4146-836c-b7531b8fd40e" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="BillingProviderTaxonomyLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.BillingProviderTaxonomyLookup default []) ++ (payload map {
+	($.Taxonomy_Code__c default "") : $.Classification__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each List ID Code" doc:id="fc995cb0-561c-43e9-a6a0-39c55262b963" collection='payload map (trim ($.ListID default ""))' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="c0c78bee-96d3-43e5-a5a2-5edf49c0d2f7" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ ($ as Number) default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for List ID lookup" doc:id="a1d6f1e6-3024-449a-8834-a376e3e2e350" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select List_ID_Code__c, List_ID_Description__c from DEL_DMES_List_ID__c where List_ID_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="5ec2efda-0ba5-42d3-b56c-c814d4dfef4c" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="ListIDLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.ListIDLookup default []) ++ (payload map {
+	($.List_ID_Code__c default "") : $.List_ID_Description__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Revenue Code" doc:id="6c13817c-62c9-4e69-b9a4-829927dfd1f5" collection='payload map ($.RevenueCode default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="bed81dc7-9d9a-4691-9516-6d3690d6d379" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Revenue Code lookup" doc:id="5aa00419-dd28-4bbc-b8ef-249491237a8f" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select National_Health_Care_Procedure_Code_Desc__c, National_Health_Care_Procedure_Code__c from DEL_National_Health_Care_Procedure_Code__c where National_Health_Care_Procedure_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="08e7bcdb-fb20-4ce1-8980-818ad995acbd" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="RevenueCodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.RevenueCodeLookup default []) ++ (payload map {
+	 ($.National_Health_Care_Procedure_Code__c default "") : $.National_Health_Care_Procedure_Code_Desc__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Healthcare Procedure Code" doc:id="fc8b856a-4fe5-4426-9e95-766407dd3b24" collection='payload map ($.HealthcareProcedureCode default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="4e4d2c9c-fde7-46f3-8b64-186dc9e31781" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for HealthcareProcedureCode lookup" doc:id="0e589626-02dc-4ca7-b394-4d271a3585ab" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select HC_Procedure_Code_Desc__c, National_Health_Care_Procedure_Code_Calc__c from DEL_Healthcare_Procedure_Code__c where National_Health_Care_Procedure_Code_Calc__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code: payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="da4e17b6-6c46-4516-9636-c5b758ba5cc3" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="HealthCareProcedureCodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.HealthCareProcedureCodeLookup default []) ++ (payload map {
+	($.National_Health_Care_Procedure_Code_Calc__c default "") : $.HC_Procedure_Code_Desc__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Modifier 1 Code" doc:id="b1fde4d8-53d6-4437-abe6-8f12e7ceac80" collection='payload map ($.HealthcareProcedureCodemodifier1 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="801a2015-def6-45db-b818-994161548f42" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Modifier 1 Code lookup" doc:id="b39da03b-ee1a-4f1e-bb19-9815456fd33d" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Modifier_Description__c, National_Modifier_Code__c from DEL_Modifier_Code__c where National_Modifier_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="c5e5001d-c508-4161-be09-d1b36fb52ad9" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="Modifier1CodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.Modifier1CodeLookup default []) ++ (payload map {
+	($.National_Modifier_Code__c default "") : $.Modifier_Description__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Modifier 2 Code" doc:id="9723f1f9-f753-4070-9ef3-451c0e940186" collection='payload map ($.HealthcareProcedureCodemodifier2 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="f3d9d5c9-fe5f-4b4b-9bd1-d406edb6cd64" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Modifier 2 Code lookup" doc:id="c3eb7197-5020-4dba-a094-a98b2aed0a68" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Modifier_Description__c, National_Modifier_Code__c from DEL_Modifier_Code__c where National_Modifier_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="971b0045-58a3-45d3-b658-917121d5882c" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="Modifier2CodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.Modifier2CodeLookup default []) ++ (payload map {
+	($.National_Modifier_Code__c default "") : $.Modifier_Description__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Modifier 3 Code" doc:id="70560154-c1bd-438a-a5e4-016633dce209" collection='payload map ($.HealthcareProcedureCodemodifier3 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="ee3e182c-37ef-4004-8102-1d0ba88034ca" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Modifier 3 Code lookup" doc:id="05ab86ac-3436-4d00-939f-ad5551a01e92" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Modifier_Description__c, National_Modifier_Code__c from DEL_Modifier_Code__c where National_Modifier_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="e754de0c-f127-4d7d-b60b-458b6efe3273" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="Modifier3CodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.Modifier3CodeLookup default []) ++ (payload map {
+	($.National_Modifier_Code__c default "") : $.Modifier_Description__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Modifier 4 Code" doc:id="0878ed70-93db-4143-9cca-a16d0e6d8e81" collection='payload map ($.HealthcareProcedureCodemodifier4 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="f092a40d-e59e-4b94-bca3-acc7cdb4c94f" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Modifier 4 Code lookup" doc:id="6e055d2c-3afd-4ecd-83a6-7d15e7780943" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Modifier_Description__c, National_Modifier_Code__c from DEL_Modifier_Code__c where National_Modifier_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="cd6b3d75-4c9c-4900-8296-7a9e801aa39c" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="Modifier4CodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.Modifier4CodeLookup default []) ++ (payload map {
+	($.National_Modifier_Code__c default "") : $.Modifier_Description__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each HeaderEOBCode1" doc:id="bad63788-72f4-4fa1-8c20-3e2038766214" collection='payload map ($.HeaderEOBCode1 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="039feedb-2b42-4649-a50e-9ccadb925a7c" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for HeaderEOBCode1 lookup" doc:id="263b862c-d593-4e11-a076-18b03038a36d" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select EOB_Description_1__c,EOB_Code__c from DEL_Explanation_of_Benefit__c where EOB_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="72b2aede-5898-496b-a6c7-4e82ff94e0f7" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="HeaderEOBCode1Lookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.HeaderEOBCode1Lookup default []) ++ (payload map {
+	($.EOB_Code__c default "") : $.EOB_Description_1__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each HeaderEOBCode2" doc:id="533e618a-acc7-4551-b6e5-ab0b503c0a4a" collection='payload map ($.HeaderEOBCode2 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="08639e80-4cdc-4329-885f-6b8b8c2f3a4f" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for HeaderEOBCode2 lookup" doc:id="d52b22a5-367e-4372-954a-beb65624b173" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select EOB_Description_1__c,EOB_Code__c from DEL_Explanation_of_Benefit__c where EOB_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="59974f0d-7692-42e6-a0f4-36ce3233c7cc" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="HeaderEOBCode2Lookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.HeaderEOBCode2Lookup default []) ++ (payload map {
+	($.EOB_Code__c default "") : $.EOB_Description_1__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Header EOB Code 3" doc:id="dadb2541-3e87-4813-9444-9597a017a48e" collection='payload map ($.HeaderEOBCode3 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="350e5df7-3d77-4d94-93e0-c642b708061f" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for HeaderEOBCode3 lookup" doc:id="7cd78da7-fd99-4b8b-ba7e-ede95a4d4a8e" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select EOB_Description_1__c,EOB_Code__c from DEL_Explanation_of_Benefit__c where EOB_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="7daae82b-3df5-446d-89b2-08dcfb0b914f" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="HeaderEOBCode3Lookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.HeaderEOBCode3Lookup default []) ++ (payload map {
+	($.EOB_Code__c default "") : $.EOB_Description_1__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Detail EOB Code 1" doc:id="23486220-cb1f-4554-84ac-a2a40b54a2ea" collection='payload map ($.DetailEOBCode1 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="9abe3b7c-4a9e-4a0f-b669-8517b56bedf2" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for DetailEOBCode1 lookup" doc:id="eaf797ee-2b75-4606-b49f-06f91104a443" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select EOB_Description_1__c,EOB_Code__c from DEL_Explanation_of_Benefit__c where EOB_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="67f6ffaa-b5d9-4225-a738-7f98f129d2b0" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="DetailEOBCode1Lookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DetailEOBCode1Lookup default []) ++ (payload map {
+	($.EOB_Code__c default "") : $.EOB_Description_1__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Detail EOB Code 2" doc:id="7354d9c2-766e-4a9e-925b-baa223d732fa" collection='payload map ($.DetailEOBCode2 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="e99ac6e0-c914-4034-a6c6-50c6eb6138b5" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for DetailEOBCode2 lookup" doc:id="497b9672-6e1d-445e-b622-d6ec6f9c7508" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select EOB_Description_1__c,EOB_Code__c from DEL_Explanation_of_Benefit__c where EOB_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="8b370c64-9d40-4a6c-baec-7f891fbf5487" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="DetailEOBCode2Lookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DetailEOBCode2Lookup default []) ++ (payload map {
+	($.EOB_Code__c default "") : $.EOB_Description_1__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Detail EOB Code 3" doc:id="060b712b-349a-463a-854f-56431cd2e762" collection='payload map ($.DetailEOBCode3 default "")' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="b671ce93-3b92-4577-ae72-aac85b7414ed" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for DetailEOBCode3 lookup" doc:id="0ef10beb-9596-4ba2-a144-e9fa673a7717" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select EOB_Description_1__c,EOB_Code__c from DEL_Explanation_of_Benefit__c where EOB_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="3c5ce186-44f3-4901-a2f9-e258dbc14574" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="DetailEOBCode3Lookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.DetailEOBCode3Lookup default []) ++ (payload map {
+	($.EOB_Code__c default "") : $.EOB_Description_1__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Rendering Provider Taxonomy Code" doc:id="545b631e-06f8-4846-8ff1-8610d8097583" collection='#[payload map ($.RenderingProviderTaxonomyCode default "")]' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="a59bc16d-9104-4164-b14b-b9bc6c8d0b7b" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Rendering Taxonomy Code lookup" doc:id="dd546b47-8463-4c13-a1e5-dd5e529db3b9" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select Classification__c,Taxonomy_Code__c from DEL_Provider_Taxonomy__c	where Taxonomy_Code__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="a296a78b-069e-4e09-99b4-ad7ceee065cc" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="RenderingProviderTaxonomyCodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.RenderingProviderTaxonomyCodeLookup default []) ++ (payload map {
+	($.Taxonomy_Code__c default "") : $.Classification__c
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Rendering Provider MCD ID" doc:id="e3ab2a2a-9238-4f28-83e2-d1337a613abd" collection='#[payload map ($.RenderingProviderMCDID default "")]' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="64277314-b36e-43ff-b0ea-188d5b40402d" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ $ default "null" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Rendering Provider MCD ID lookup" doc:id="204ba8d8-8ae2-42d8-a8d5-99ecb355ba60" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select MCD_ID__c from DEL_MCD__c	where MCD_ID__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="92495538-8b85-4867-9255-b8d5c6a73b80" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="RenderingProviderMCDIDLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.RenderingProviderMCDIDLookup default []) ++ (payload map {
+	($.MCD_ID__c default "") : $$
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Primary Diagnosis Code" doc:id="6db2e340-e57a-43b5-9704-007331a338af" collection='#[payload map ($.PrimaryDiagnosisCode default "")]' batchSize="150">
+			<ee:transform doc:name="Prepare where clause" doc:id="db6b2d53-2a9f-4514-a187-227a1918c5e1" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ("'" ++ (if ((sizeOf (trim($)) == 3)) (trim($) default "null") else (trim($)[0 to 2] ++ "." ++ trim($)[3 to -1])  ) default "" ++ "'") joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Primary Diagnosis Code" doc:id="f843ff53-acd1-49ba-8036-cb88fe6625ab" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select ICD10__c,Diagnosis__c from Diagnosis_ICD_Mapping__c where ICD10__c in (:code)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	code : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="1080cad0-1b08-45df-9451-0457a2e734f5" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="PrimaryDiagnosisCodeLookup" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.PrimaryDiagnosisCodeLookup default []) ++ (payload map {
+	($.ICD10__c default "") : ($.Diagnosis__c)
+})]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="inf058-dmes-claim-file-load-Delete-older-claim-table-Sub_Flow" doc:id="6aa00323-3375-4ad8-ae7e-61886e7dab94" >
+		<choice doc:name="Choice" doc:id="aff0906b-009f-44e3-a123-86883295f1c6" >
+			<when expression='#[vars.rerun == "Y"]'>
+				<salesforce:query doc:name="Query for searching older claim table" doc:id="a08efba5-37c5-4bef-ba6b-b0642ab7c806" config-ref="Salesforce_Config">
+					<salesforce:salesforce-query >Select Id, Load_Indicator__c,Load_Date_From_DMES__c from DEL_DMES_Claim_Table__c where Load_Indicator__c != null</salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	date : vars.fileDate 
+}]]]></salesforce:parameters>
+				</salesforce:query>
+				<ee:transform doc:name="Transform Message" doc:id="16ed6823-24ec-4116-a827-cb227d6ffcf0">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload filter ((($.Load_Indicator__c as Date as String {format : "yyyyMMdd"}) == vars.fileDate ) and 
+	(($.Load_Date_From_DMES__c as Date as String {format : "yyyyMMdd"}) != (now() as Date as String {format : "yyyyMMdd"})) 
+) map $.Id]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="List of Older claim records" doc:id="0bc5cd6a-d378-4182-a360-21e3e730eb32" message="List of Older claim records : #[payload]"/>
+				<foreach doc:name="For Each" doc:id="f3010195-9dda-434e-8088-01c0f864dd3b" batchSize="200">
+					<salesforce:delete doc:name="Delete Claim Records" doc:id="a6ec42c5-4e71-4aae-b9f9-3f5df7ba195b" config-ref="Salesforce_Config" >
+						<salesforce:delete-ids ><![CDATA[#[payload map $]]]></salesforce:delete-ids>
+					</salesforce:delete>
+					<logger level="DEBUG" doc:name="Logger" doc:id="3e9117fb-4c0e-4e03-b25e-3610b02f6f2b" message='#[payload.items default [] map ($.message default "") joinBy ","]' />
+				</foreach>
+				<logger level="INFO" doc:name="Logger" doc:id="6ebb7aab-62e1-4def-a5c3-19caa77c01c1" message="Older Claim Records Deleted."/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="129da719-dceb-438b-b53e-ebcfcf267444" message="No rerun."/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="inf058-dmes-claim-file-load-In-Progress-Sub_Flow" doc:id="ed4864e6-6dda-4a5f-a8c8-80b883e130cf" >
+		<set-payload value='#[%dw 2.0	
+output application/json
+---
+{"InterfaceID": "INF058",
+ "InterfaceName": "DMES Claim File Load",
+ "ErrorFilename":"",
+ "ErrorExtension":"",
+ "CompletedFilename": "",
+ "CompletedExtension":"",  
+ "TransactionID": "", 
+ "MuleID":correlationId,
+ "Status":"In Progress",
+ "RecordCount": 0,
+ "RecordSuccess":0,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Weekly Extact"
+ }]' doc:name="Set Payload" doc:id="6e970f17-353f-46a1-8e28-55d889f23d86" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="9c25e865-e9c6-4b61-865e-6742a05d24ee" name="LogTransactionSubFlow"/>
+	</sub-flow>
+	<sub-flow name="inf058-dmes-claim-file-load-On-complete-Sub_Flow" doc:id="339cfbb8-3433-4f1e-a311-db84394c7325" >
+		<set-variable value="#[vars.claimFile]" doc:name="Set Variable TransAttachment" doc:id="e1dda195-1def-4b74-ad70-ca54afa9fb7c" variableName="TransAttachment" mimeType="text/plain" />
+		<set-payload value='#[%dw 2.0	
+output application/json
+---
+{"InterfaceID": "INF058",
+ "InterfaceName": "DMES Claim File Load",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename": "Backup_" ++ vars.fileName[0],
+ "CompletedExtension":".txt", 
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":if (vars.errorResponse != "") ("Error") else "Success",
+ "RecordCount": vars.RecordCount,
+ "RecordSuccess": if (vars.errorResponse != "") (0) else vars.RecordCount,
+ "RecordError":if (vars.errorResponse == "") (0) else vars.RecordCount,
+ "ErrorDescription":if (vars.errorResponse != "") (vars.errorResponse) else "",
+ "ExceptionType":if (vars.errorResponse != "") ("Business") else "",
+ "Operation":"Weekly Extact"
+ }]' doc:name="Set Payload" doc:id="bfe1f732-f409-4224-aa6d-f7d3ac53028b" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="da8f83bc-bdaf-462b-aec5-f59a7893f352" name="LogTransactionSubFlow"/>
+	</sub-flow>
+	<sub-flow name="inf058-dmes-claim-file-load-LOV-Sub_Flow" doc:id="7ded9075-f3e6-4209-b090-b6e2ccd80f8b" >
+		<set-payload value="#[{&quot;Direction&quot;:&quot;Inbound&quot;,&quot;LOVNames&quot;:&quot;'AID_CATEGORY'&quot;}]" doc:name="Set Payload" doc:id="764e7b02-c7c4-49b1-9aba-26442c26c49a" />
+		<flow-ref doc:name="lOV_query_Sub_Flow" doc:id="c9d1136d-4921-431d-9956-95c27059d829" name="lOV_query_Sub_Flow" target="LOVNames"/>
+	</sub-flow>
+</mule>

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+	<cloudhub:config name="CloudHub_Config" doc:name="CloudHub Config" doc:id="e365723f-6dd1-4a90-a157-ae8aa2a43650" >
+		<cloudhub:connection username="${secure::cloudhub.username}" password="${secure::cloudhub.password}" environment="${secure::env.id}"/>
+	</cloudhub:config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="6a62520c-539c-49c0-b224-e0bd3a2a30fa" >
+	
+		<salesforce:cached-basic-connection username="${secure::sfdc.username}" password="${secure::sfdc.password}" url="${secure::sfdc.url}" securityToken="${secure::sfdc.token}" readTimeout="20000" connectionTimeout="20000">
+			<reconnection >
+				<reconnect frequency="20000"/>
+			</reconnection>
+		</salesforce:cached-basic-connection>
+	</salesforce:sfdc-config>
+	
+	<sftp:config name="SFTP_Config" doc:name="SFTP Config" doc:id="070c924a-6107-4cbe-be4f-d256eebe1a9f" >
+		<sftp:connection host="${secure::sftp.host}" port="${secure::sftp.port}" username="${secure::sftp.username}" password="${secure::sftp.password}" >
+			<reconnection >
+				<reconnect />
+			</reconnection>
+		</sftp:connection>
+	</sftp:config>
+	<sftp:config name="SFTP_Archive_Config" doc:name="SFTP Archive Config" doc:id="47047567-c7c1-4764-bf0d-5ed0028c7998" >
+		<sftp:connection host="${secure::sftp.archive.host}" port="${secure::sftp.archive.port}" username="${secure::sftp.archive.username}" password="${secure::sftp.archive.password}" connectionTimeout="30" responseTimeout="30">
+			<reconnection >
+				<reconnect frequency="10000"/>
+			</reconnection>
+		</sftp:connection>
+	</sftp:config>
+	<import doc:name="Import" doc:id="67dfa078-6ef8-4446-89a6-90314b640cb4" file="queryframework.xml" />
+	<import doc:name="Import" doc:id="415fedaf-d7c9-48c7-b9b4-9dec70ddeead" file="loggingframework.xml" />
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="b7e42777-cc0e-4d4a-9b25-66d1411f7604" file="${env}.properties" key="${key}" >
+		<secure-properties:encrypt algorithm="Blowfish" />
+	</secure-properties:config>
+	<global-property doc:name="Global Property : env" doc:id="5ff58901-9ca3-4a77-bb45-c8a3bd62aa92" name="env" value="${env}" />
+	<global-property doc:name="Global Property : key" doc:id="7bdeea22-85eb-4974-9eb9-594ba21e34ef" name="key" value="${key}" />
+	<global-property doc:name="Global Property : Claim Rerun" doc:id="5837bd40-a6b8-4596-9b02-cdd3a895269c" name="dmes.claim.load.rerun" value="${secure::dmes.claim.load.rerun}" />
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="c083f113-9d6c-4161-bc2f-211b44ef7e2d" >
+	<http:listener-connection host="0.0.0.0" port="${https.port}" protocol="HTTPS">
+			<tls:context>
+				<tls:key-store type="jks" path="focus_interface.jks" alias="focus_interfaces" keyPassword="password" password="password" />
+			</tls:context>
+		</http:listener-connection>
+	</http:listener-config>
+	
+	<flow name="dmes-on-demand-flow" doc:id="fae323a9-5188-4074-bedf-fd6b2cdf0b07" >
+		<http:listener doc:name="Listener" doc:id="bd308c28-a896-45e4-8cb6-ab0f4e1b4a0d" config-ref="HTTP_Listener_config" path="/dmesrequest"/>
+		<logger level="INFO" doc:name="Logger" doc:id="b84769d6-0f3a-4a55-8319-8e9c025c1458" message="#[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="22680447-990e-4e56-9c21-aec55cda669c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload.OnDemandRequest.attrList reduce ((val, acc = {interfaceName : payload.OnDemandRequest.interfaceName}) -> acc ++ (( { (val.attributeName) : ( val.attributeValue ) } )))]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="5a02be4c-8e9b-4d65-a683-86ce9cc82add" message="#[&quot;JSON received for &quot; ++ payload['interfaceName']]"/>
+		<choice doc:name="Choice" doc:id="1716358e-90f7-4190-96f4-28459a07d948" >
+			<when expression="#[payload['interfaceName'] == 'INF015']">
+				<logger level="INFO" doc:name="Logger" doc:id="7e775a32-8d61-42ab-a450-8d645d680930" message="INF015 is started"/>
+				<flow-ref doc:name="inf015_hippa_medicaid_claims_837_institutional_Flow" doc:id="aaf8a6bf-30ce-423f-a7cc-c09f45783725" name="inf015_hippa_medicaid_claims_837_institutional_Flow" />
+			</when>
+			<when expression="#[payload['interfaceName'] == 'INF016']">
+				<logger level="INFO" doc:name="Logger" doc:id="77d47bb9-3981-4558-9ca3-42032b0c61c4" message="INF016 is started"/>
+				<flow-ref doc:name="inf016_hippa_medicaid_claims_837_professional_Flow" doc:id="b2ec1d96-aa5b-4adb-9d84-c34d22631668" name="inf016_hippa_medicaid_claims_837_professional_Flow"/>
+			</when>
+			<when expression="payload['interfaceName'] == 'INF017'">
+				<logger level="INFO" doc:name="Logger" doc:id="e680e64d-b3f8-4fc5-859e-8e0ae34acf97" message="INF017 is started"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="e6449a8d-52e1-41af-a9f0-5533c83dec73" message="No Interface found with the provided Interface Code!"/>
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="On Demand Response" doc:id="7de74cc3-987d-4df1-b42c-da3b4529bea2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"OnDemandResponse": {
+		"interfaceName":  vars.interfaceName,
+		"interfaceTransactionId" : vars.TID
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<sub-flow name="lOV_query_Sub_Flow" doc:id="b66c428c-dea3-45e4-9015-7c653d0ffdc0" >
+		
+		<ee:transform doc:name="Transform Message" doc:id="0368fcb8-75be-49d7-98f2-cdf687a9f5d8" >
+			
+			<ee:variables >
+				<ee:set-variable variableName="Direction" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.Direction]]></ee:set-variable>
+				<ee:set-variable variableName="LOVNames" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.LOVNames]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="51105ee3-525a-4f63-aeaf-5e926f2ed634" message="SELECT Name, Partner_Code__c, FOCUS_Code__c From DEL_Interface_Picklist_Mapping__c where Name in (#[vars.LOVNames]) and Active__c = true"/>
+		<salesforce:query-all doc:name="Query all" doc:id="3acfb205-d6a4-4298-a9c6-e8d885cdf297" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query >SELECT Name, Partner_Code__c, FOCUS_Code__c From DEL_Interface_Picklist_Mapping__c where Name in (:LOV) and Active__c = true</salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	LOV : vars.LOVNames
+}]]]></salesforce:parameters>
+		</salesforce:query-all>
+		<!-- <ee:transform doc:name="Transform Message" doc:id="e9e9f379-ee86-4b36-bde0-1c2776dc7066" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="LOVMapping" ><![CDATA[%dw 2.0
+output application/java
+-&#45;&#45;
+payload map (
+	if (vars.Direction == "Inbound")
+	{($.Name ++ "-" ++ $.Partner_Code__c) : $.FOCUS_Code__c}
+	else 
+	{($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c}
+)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform> -->
+	</sub-flow>
+			
+</mule>

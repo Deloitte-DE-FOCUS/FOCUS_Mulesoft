@@ -1,0 +1,11 @@
+form: FIXEDWIDTH
+id: 'AcceptedResponse'
+name: 'AcceptedResponse'
+values: 
+- { name: 'MID', usage: M, type: String, length: 10 }
+- { name: 'FILLER', usage: M, type: String, length: 1 }
+- { name: 'DATE', usage: M, type: String, length: 8 }
+- { name: 'FILLER', usage: M, type: String, length: 1 }
+- { name: 'FirstName', usage: M, type: String, length: 20 }
+- { name: 'FILLER', usage: M, type: String, length: 1 }
+- { name: 'LastName', usage: M, type: String, length: 30 }

@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+	<flow name="inf061-dmes-member-auth-response-error-load-Main-Flow" doc:id="6bb6181e-f415-4640-8e60-ead7db218634">
+		 <!-- <sftp:listener doc:name="On New or Updated File" doc:id="0271f125-1e5a-48c6-8f65-5c24c39e8238" config-ref="SFTP_Config" directory="${secure::sftp.auth.error.path}" autoDelete="true" recursive="false">
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+			<sftp:matcher filenamePattern="${secure::sftp.auth.error.pattern}"/>
+		</sftp:listener> --> 
+		<!-- <scheduler doc:name="Scheduler" doc:id="059aacff-17fb-41ef-85f9-bc98eb0c1bae" >
+			<scheduling-strategy >
+				<fixed-frequency timeUnit="HOURS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<sftp:read doc:name="Read" doc:id="de4feba5-de11-4beb-9144-1a97fa369919" config-ref="SFTP_Config" path="DMES/member/outbound/dscyf/DSCYF_PA_REJ_RESP1.txt"/> -->
+		 
+		<scheduler doc:name="Scheduler" doc:id="5dbadf18-21cc-4065-bb06-74741590b481" >
+			<scheduling-strategy >
+				<cron expression="0 30 10 ? * MON,TUE,WED,THU,FRI *" timeZone="EST"/>
+			</scheduling-strategy>
+		</scheduler>
+		
+		<flow-ref doc:name="inf061-dmes-member-auth-response-error-load-In-Progress-Flow" doc:id="71e9b2b3-c493-4b88-84df-f2b1ca8dbd12" name="inf061-dmes-member-auth-response-error-load-In-Progress-Flow"/>
+		<flow-ref doc:name="inf061-dmes-member-auth-response-error-load_read_Flow" doc:id="5937e492-5f11-4e88-b58a-54f86d77ba46" name="inf061-dmes-member-auth-response-error-load_read_Flow"/>
+		<validation:is-true doc:name="Is true" doc:id="2433cc73-8437-4249-80f5-b1c1ba52d3f2" expression='#[vars.errorFile[0] != ""]' message="No Records found"/>
+		<flow-ref doc:name="inf061-dmes-member-auth-response-error-load-hard-soft-error-Sub_Flow" doc:id="113c56c4-32bd-4e8d-8e63-38a295732038" name="inf061-dmes-member-auth-response-error-load-hard-soft-error-Sub_Flow"/>
+		<flow-ref doc:name="inf061-dmes-member-auth-response-error-load-Flow" doc:id="982e4403-44b8-49dc-8561-0f29f5f1b1af" name="inf061-dmes-member-auth-response-error-load-Flow"/>
+		<flow-ref doc:name="inf061-dmes-member-auth-response-error-load-complete-Flow" doc:id="208ce3c2-91d3-4836-bc3d-9862c18ad7bd" name="inf061-dmes-member-auth-response-error-load-complete-Flow"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="16a3b0dc-3fd7-4f60-b332-a677ae77c846" type="ANY">
+				<ee:transform doc:name="Alert Message Payload" doc:id="52c2bac2-3be1-4a14-92f7-0242a8c58bf2">
+					<ee:message />
+					<ee:variables>
+						<ee:set-variable variableName="errorMessage"><![CDATA[%dw 2.0
+output application/java
+---
+"There was an error in INF061-DMES-Member-Auth-Error-Response in ${secure::env} env. \n" ++ if (error.description == "No file found." ) error.description else
+if (error.description == "No Records found") error.description 
+else "Unable to Connect to Salesforce. Please retry after some time"]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<cloudhub:create-notification domain="${app.name}" doc:name="Send Alert Notification" doc:id="212c69bb-fa9a-4c13-9427-baf3c3e77e0f" config-ref="CloudHub_Config" priority="ERROR" transactionId="uuid()">
+					<cloudhub:message><![CDATA[#[vars.errorMessage]]]></cloudhub:message>
+					<cloudhub:custom-properties><![CDATA[#[output application/java
+---
+{
+	"date" : now()
+}]]]></cloudhub:custom-properties>
+				</cloudhub:create-notification>
+				<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": vars.interfaceName,
+ "InterfaceName": "DMES-Member-Auhtorization-Error-Response",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename": vars.fileName ,
+ "CompletedExtension":"txt",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":if (error.errorType.namespace == "VALIDATION") "Success" else "Error",
+ "RecordCount":if (error.errorType.namespace == "VALIDATION") (0) else (sizeOf(vars.errorFile) default 0),
+ "RecordSuccess":0,
+ "RecordError":if (error.errorType.namespace == "VALIDATION") (0) else (sizeOf(vars.errorFile) default 0),
+ "ErrorDescription":error.description,
+ "ExceptionType":if (error.errorType.namespace == "VALIDATION") "Business" else "System",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload" doc:id="8d5f0393-b6a3-4bbc-af66-011477199d9b" />
+				<flow-ref doc:name="LogTransactionSubFlow" doc:id="9c095f35-6c5e-4621-b088-48867cfb44da" name="LogTransactionSubFlow"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<sub-flow name="inf061-dmes-member-auth-response-error-load_read_Flow" doc:id="89550179-e055-44d2-9abd-419ac83b1ad1" >
+		<sftp:list doc:name="List" doc:id="9addf56f-9294-461b-96e2-83c9e24cc3c0" directoryPath="${secure::sftp.auth.error.path}" config-ref="SFTP_Config">
+			<sftp:matcher filenamePattern="${secure::sftp.auth.error.pattern}" />
+		</sftp:list>
+		<set-variable value='#[payload.*typedAttributes map $.fileName default ""]' doc:name="Set Variable" doc:id="13b3ce0d-efb2-400e-8116-15bdb2763a47" variableName="fileName"/>
+		<validation:validate-size doc:name="Validate size" doc:id="0e74b411-8c4c-4e20-98d8-5b0570619e03" value="#[vars.fileName]" min="1" message="No file found."/>
+		<sftp:read doc:name="Read the Auth error file" doc:id="a4c90c7a-8a21-485b-8cf9-e48ca76a7fdb" config-ref="SFTP_Config" path="#[p('secure::sftp.auth.error.path') ++ vars.fileName[0]]"/>
+		<logger level="INFO" doc:name="Error File recevied" doc:id="5c04112f-5455-41ab-a49b-779857173d5d" message="Error File recevied for DMES Authorization"/>
+		<sftp:write doc:name="Move to archive folder" doc:id="c198b3f4-cf55-41b4-b6b2-50e7c0c71c0e" config-ref="SFTP_Archive_Config" path='#[p("secure::sftp.auth.error.archive.path") ++ ("DSCYF_PA_REJ_RESP_") ++ now() as String {format: "yyyyMMddHHmmss"} ++ ".dat"]'/>
+		<ee:transform doc:name="Reading error file" doc:id="0efdf273-73f3-4308-8dda-c2675cf71d40" >
+			
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="fileName" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.fileName[0]]]></ee:set-variable>
+				<ee:set-variable variableName="interfaceName" ><![CDATA[%dw 2.0
+output application/java
+---
+"INF061"]]></ee:set-variable>
+				<ee:set-variable variableName="errorFile" ><![CDATA[%dw 2.0
+output application/java
+---
+if (payload contains "\r") (splitBy(payload,"\r\n")) 
+else (splitBy(payload,"\n"))]]></ee:set-variable>
+				<ee:set-variable variableName="TransAttachment" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<sftp:delete doc:name="Delete from server" doc:id="57e87f6b-a202-4978-a8c8-5f0d6b36b386" config-ref="SFTP_Config" path="#[p('secure::sftp.auth.error.path') ++ vars.fileName]" />
+	</sub-flow>
+	<sub-flow name="inf061-dmes-member-auth-response-error-load-hard-soft-error-Sub_Flow" doc:id="e0f42232-7fd4-4d13-8aad-219c7048437e" >
+		<salesforce:query doc:name="Query for retrieve Error Master table" doc:id="c7e2df24-8f53-4f23-a073-b9ca3b273b95" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query >select Id,DMES_Error_Code__c, Error_Type_Add__c, Error_Type_Update__c,DMES_Error_Message_Text__c from DEL_DMES_Master_Error__c </salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="0e6816ea-8c47-4803-8cad-e2e0135a4fc9" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="errorMaster" ><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	($.DMES_Error_Code__c) : $.Error_Type_Add__c,
+	($.DMES_Error_Code__c) : $.Error_Type_Update__c,
+	($.DMES_Error_Code__c) : $.DMES_Error_Message_Text__c 
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</sub-flow>
+
+		<!-- <salesforce:update-multiple type="DEL_DMES_Error__c" doc:name="Update multiple DMES Error Object" doc:id="f5392c98-9ca1-40b9-8a78-53d95c97966b" config-ref="Salesforce_Config">
+			<salesforce:records ><![CDATA[#[%dw 2.0
+output application/java
+-&#45;&#45;
+payload map {
+	Id : vars.DMESMemberDetails[$$].Id,
+	Error_Message__c : $.ErrorMsg,
+	Error_Code__c: $.ErrorCode,
+	Type__c : "DMES Member Response"
+}]]]></salesforce:records>
+		</salesforce:update-multiple> -->
+		
+	<sub-flow name="inf061-dmes-member-auth-response-error-load-Flow" doc:id="45376237-8692-44f9-9d8c-eddd7a960b43" >
+	<ee:transform doc:name="Transform Message mapping for Error file" doc:id="df7e7e8d-5b66-45b1-b65a-c02260ac28d1">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+vars.errorFile map {
+	AUIndicator : $[0],
+	FOCUSAuthNumber : trim($[1 to 15]),
+	DMESAuthNumber : trim($[16 to 30]),
+	DMESDetailNumber : trim($[31 to 33]),
+	ErrorCode : trim($[34 to 37]),
+	ErrorDesc : trim($[38 to 87]),
+	ErrorType : trim($[88])
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<foreach doc:name="Validation for each record" doc:id="69417d4f-20a1-4b6e-b9d1-24ac22eb1c21" batchSize="500" collection="#[payload map $]">
+			<salesforce:query doc:name="Query for DPBHS &amp; DMES details from Auth table" doc:id="49f83ee4-a44a-49cc-a0ff-1746e9a39f28" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query>Select Id, DMES_Authorization_ID__c, DPBHS_Authorization_Id__c from DEL_DMES_Authorization__c where DPBHS_Authorization_Id__c in (:DPBHS)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	DPBHS : payload map (if ($.FOCUSAuthNumber != null) ("'" ++ $.FOCUSAuthNumber ++ "'") else ("''")) joinBy ",",
+	DMES : payload map (if ($.DMESAuthNumber != null) ("'" ++ $.DMESAuthNumber ++ "'") else ("''")) joinBy ",",
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="d7767ec0-51c9-4654-a871-b7201a05e94f" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="AuthIdDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+((vars.AuthIdDetails default []) ++ (payload map $))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="INFO" doc:name="Retrieved DPBHS &amp; DMES Auth Id Details from Authorization table" doc:id="d2a832ea-c43a-4aaa-91a5-952efc0fcdc5" message="Retrieved DPBHS &amp; DMES Auth Id Details from Authorization table"/>
+		
+		</foreach>
+		<ee:transform doc:name="Transform Message" doc:id="04e79363-d51b-4c07-88da-5acba2f713a2" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="AuthIdDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.AuthIdDetails groupBy $.DPBHS_Authorization_Id__c]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message Rejected Records" doc:id="6618be8f-6ba4-41e4-94e5-cd196cea4027" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="rejectedRecords" ><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	 Id : vars.AuthIdDetails[$.FOCUSAuthNumber].Id,
+	 FOCUSAuthNumber : $.FOCUSAuthNumber,
+	 RejectMsg : ((if (vars.AuthIdDetails[$.FOCUSAuthNumber].DPBHS_Authorization_Id__c[0] == $.FOCUSAuthNumber) [null] else [$.FOCUSAuthNumber ++ ", FOCUSAuthNumber " ++ $.FOCUSAuthNumber ++ " not match in FOCUS"]) ++
+	 	if ($.AUIndicator == "U") ( (if (vars.AuthIdDetails[$.FOCUSAuthNumber].DMES_Authorization_ID__c[0] == $.DMESAuthNumber) [null] else [$.FOCUSAuthNumber ++ ", " ++ "DMESAuthNumber " ++ ($.DMESAuthNumber) ++ " not match in FOCUS"]) ++
+	 	(if (((vars.AuthIdDetails[$.FOCUSAuthNumber].DMES_Authorization_ID__c[0] default "") ++ "-" ++ (vars.AuthIdDetails[$.FOCUSAuthNumber].DPBHS_Authorization_Id__c[0] default "")) == (($.DMESAuthNumber default "") ++ "-" ++ $.FOCUSAuthNumber)) [null] else [$.FOCUSAuthNumber ++ " DMES/DPBHS combimation not match in FOCUS"]) ) else [null]
+	 )
+} groupBy $.FOCUSAuthNumber]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Prepare Reject File" doc:id="42b0b9fa-91a8-4c4c-a5de-b7cca77f4bee" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="rejectedRecordFile" ><![CDATA[%dw 2.0
+output application/java
+---
+flatten (payload map vars.rejectedRecords[$.FOCUSAuthNumber].RejectMsg[0] map ( $ filter $ != null) map $ ) joinBy "\n"]]></ee:set-variable>
+				<ee:set-variable variableName="ErrorRecord" ><![CDATA[%dw 2.0
+output application/java
+---
+(payload map vars.rejectedRecords[$.FOCUSAuthNumber].RejectMsg[0] map ( $ filter $ != null)  ) filter (sizeOf ($) > 0)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="f1237e24-28df-4a86-ac23-9b20058d41fd" batchSize="200">
+			<ee:transform doc:name="Transform Message" doc:id="3a8f3da7-5695-4125-81dc-5a22f1aeec32" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload filter (((vars.rejectedRecords[$.FOCUSAuthNumber].Id) != $.Id) and ((sizeOf (flatten (vars.rejectedRecords[$.FOCUSAuthNumber].RejectMsg[0] filter ($ != null)))) < 1) and ($.ErrorType == "H")) map {
+	Id : vars.AuthIdDetails[$.FOCUSAuthNumber].Id[0],
+	DMES_Status__c : "DMES Error",
+	DMES_Error_Status_Initial_Date__c : if (vars.AuthIdDetails[$.FOCUSAuthNumber].DMES_Error_Status_Initial_Date__c[0] == null) (((now()) as Date {format : "yyyy-MM-dd"}) ++ "America/New_York") else ((vars.AuthIdDetails[$.FOCUSAuthNumber].DMES_Error_Status_Initial_Date__c[0] ++ "America/New_York")),
+	//DMES_Process_Date_Used__c : if ($.ErrorType == "S") (true) else ""
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:update-multiple type="DEL_DMES_Authorization__c" doc:name="Update multiple DMES Auth Status to DMES Hard Error" doc:id="490e6bb6-4f5b-4aa4-b1e5-20fb0cbd9e8d" config-ref="Salesforce_Config" target="ErrorResponseHard">
+			<salesforce:records><![CDATA[#[payload map $]]]></salesforce:records>
+
+		</salesforce:update-multiple>
+			<logger level="DEBUG" doc:name="Logger" doc:id="65ccb479-0d2e-490a-b75e-fa9eb1ac668d" message='#[vars.ErrorResponseHard default [] map ($.message default "") joinBy ","]'/>
+		</foreach>
+		<foreach doc:name="For Each" doc:id="8995d7ad-ea67-4d61-9a19-8d72c9e06790" batchSize="200">
+			<ee:transform doc:name="Transform Message" doc:id="9f59c7c7-dd95-4a20-8db6-118bd4bd318c" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload filter (((vars.rejectedRecords[$.FOCUSAuthNumber].Id) != $.Id) and ((sizeOf (flatten (vars.rejectedRecords[$.FOCUSAuthNumber].RejectMsg[0] filter ($ != null)))) < 1) and ($.ErrorType == "S")) map {
+	Id : vars.AuthIdDetails[$.FOCUSAuthNumber].Id[0],
+	DMES_Status__c : "DMES Error",
+	DMES_Error_Status_Initial_Date__c : if (vars.AuthIdDetails[$.FOCUSAuthNumber].DMES_Error_Status_Initial_Date__c[0] == null) (((now()) as Date {format : "yyyy-MM-dd"}) ++ "America/New_York" ) else ((vars.AuthIdDetails[$.FOCUSAuthNumber].DMES_Error_Status_Initial_Date__c[0] as Date) ++ "America/New_York"),
+	DMES_Process_Date_Used__c : true
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:update-multiple type="DEL_DMES_Authorization__c" doc:name="Update multiple DMES Auth Status to DMES Soft Error" doc:id="b557a7fd-e868-47f4-9ae9-500d5e07f4f8" config-ref="Salesforce_Config" target="ErrorResponseSoft">
+			<salesforce:records><![CDATA[#[payload map $]]]></salesforce:records>
+
+		</salesforce:update-multiple>
+			<logger level="DEBUG" doc:name="Logger" doc:id="785a2d3e-4e01-4154-8407-48372c60dbce" message='#[vars.ErrorResponseSoft default [] map ($.message default "") joinBy ","]'/>
+		</foreach>
+		<logger level="INFO" doc:name="DMES Authorization status updated to DMES Error" doc:id="1f75b153-8c9a-46ca-b956-b7c8705c6ada" message="DMES Authorization status updated to DMES Error"/>
+		<salesforce:query doc:name="Query for Record Type Id" doc:id="ba739cd0-f34f-4198-a530-93f943d5b50d" config-ref="Salesforce_Config" target="RecordId">
+			<salesforce:salesforce-query >select Id,Name from RecordType where Name = 'DMES Authorization Error'</salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message for DMES Auth Error" doc:id="d1440d07-54e6-41b4-ba92-1d68a38b3101" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload filter (((vars.rejectedRecords[$.FOCUSAuthNumber].Id) != $.Id) and ((sizeOf (flatten (vars.rejectedRecords[$.FOCUSAuthNumber].RejectMsg[0] filter ($ != null)))) < 1)) map {
+	"RecordTypeId" : vars.RecordId[0].Id,
+	DMES_Authorization__c : vars.AuthIdDetails[$.FOCUSAuthNumber].Id,
+	Error_Message__c : $.ErrorDesc,
+	Error_Code__c: $.ErrorCode,
+	Error_Type__c: if ($.ErrorType == "H") ("Hard") else (if ($.ErrorType == "S") ("Soft") else ""),
+	Type__c : "DMES Authorization Response"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="d55a8bf9-382b-4975-9c24-0185bc237a13" batchSize="200">
+			<ee:transform doc:name="Transform Message" doc:id="16e6b8b0-cad0-4edb-b40b-ad9992111d2d" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	"RecordTypeId" : vars.RecordId[0].Id,
+	DMES_Authorization__c : $.DMES_Authorization__c[0],
+	Error_Message__c : $.Error_Message__c,
+	Error_Code__c: $.Error_Code__c,
+	Error_Type__c: $.Error_Type__c,
+	Type__c : $.Type__c
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:create-multiple type="DEL_DMES_Error__c" doc:name="Create multiple DMES Auth Error" doc:id="5b68de5e-d645-44ad-8355-1777ec8dc1e0" config-ref="Salesforce_Config">
+			<salesforce:records><![CDATA[#[payload map $]]]></salesforce:records>
+		</salesforce:create-multiple>
+			<logger level="DEBUG" doc:name="Logger" doc:id="061fe0fb-6dae-44d7-95bf-487c1a7ae5b5" message='#[payload.items default [] map ($.message default "") joinBy ","]' />
+		</foreach>
+		<logger level="INFO" doc:name="Complete" doc:id="facd90a8-512a-4593-9cc0-e47ee9ae3b12" message="DMES Error created for DMES Authorization." />
+	</sub-flow>
+	<sub-flow name="inf061-dmes-member-auth-response-error-load-complete-Flow" doc:id="7e4949e1-4f52-49c7-a4b9-ce0d1406c2fb" >
+		<set-variable value='#[if (vars.rejectedRecordFile == "" or vars.rejectedRecordFile == null) (null) else ("DPBHSNumber,Error Desciption\n" ++ vars.rejectedRecordFile)]' doc:name="Set Variable ErrorAttachment" doc:id="a7a1bf52-6ae9-426d-a49d-2e5a5ff00a3f" variableName="ErrorAttachment" mimeType="application/octet-stream"/>
+		<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": vars.interfaceName,
+ "InterfaceName": "DMES-Member-Auth-Error-Response",
+ "ErrorFilename": "RejectedRecordFile.csv",
+ "ErrorExtension":".txt",
+ "CompletedFilename":("DSCYF_PA_REJ_RESP_") ++ now() as String {format: "yyyyMMddHHmmss"} ++ ".txt",
+ "CompletedExtension":"txt",
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":if (sizeOf(vars.ErrorRecord default "0") &lt; 1) ("Success") else ("Completed with Error(s)"),
+ "RecordCount": sizeOf(vars.errorFile default ""),
+ "RecordSuccess": (sizeOf(vars.errorFile default "0") - sizeOf(vars.ErrorRecord default "0")),
+ "RecordError": sizeOf(vars.ErrorRecord default "0"), 
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set complete Payload for logging framework" doc:id="a002a42b-a25d-4725-8061-7cc89be02b4c" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="62074d38-2152-4865-918b-0c37f39c714f" name="LogTransactionSubFlow"/>
+	</sub-flow>
+	<sub-flow name="inf061-dmes-member-auth-response-error-load-In-Progress-Flow" doc:id="b278b7ac-4889-454e-9d4e-79e5c7cd45f3" >
+		<set-payload value='#[%dw 2.0	
+output application/json
+---
+{"InterfaceID": "INF061",
+ "InterfaceName": "DMES-Member-Auth-Error-Response",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":"",
+ "CompletedExtension":"",  
+ "TransactionID": "", 
+ "MuleID":correlationId,
+ "Status":"In Progress",
+ "RecordCount": 0,
+ "RecordSuccess":0,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set in progress Payload for loggign framework" doc:id="f94409d1-0a0c-426b-bf94-8a97fb8f8be1" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="f20eda72-529d-412a-93b5-de70e5185ba7" name="LogTransactionSubFlow"/>
+	</sub-flow>
+	
+	
+	
+</mule>

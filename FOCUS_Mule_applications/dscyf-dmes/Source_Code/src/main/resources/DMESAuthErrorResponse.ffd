@@ -1,0 +1,9 @@
+form: FIXEDWIDTH
+name: 'DMESAuth'
+values:
+- { name: 'AUIndicator', usage: M, type: String, length: 1 }
+- { name: 'FOCUSAuthNumber', usage: M, type: String, length: 15 }
+- { name: 'DMESAuthNumber', usage: O, type: String, length: 15 }
+- { name: 'ErrorCode', usage: M, type: String, length: 4 }
+- { name: 'ErrorDesc', usage: M, type: String, length: 50 }
+- { name: 'ErrorType', usage: M, type: String, length: 1 }

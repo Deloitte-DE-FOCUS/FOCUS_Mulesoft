@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+	<flow name="inf056-dmes-member-response-accepted-load-Main-Flow" doc:id="646a1dc0-6fd3-478f-b6c7-964ce98fd2f4" initialState="stopped">
+		<sftp:listener doc:name="On New or Updated File" doc:id="987ee55a-e566-4795-b64a-e4b45c2cf3b5" config-ref="SFTP_Config" directory="DMES/member/outbound/dscyf/" moveToDirectory="DMES/member/inbound/dscyf/archive" renameTo="#[attributes.fileName]" autoDelete="true" recursive="false">
+			<scheduling-strategy >
+				<fixed-frequency/>
+			</scheduling-strategy>
+			<sftp:matcher filenamePattern="dscyf_accepted_*" />
+		</sftp:listener>
+		<logger level="INFO" doc:name="Accepted file recevied " doc:id="28010ef7-3897-483b-981c-e12b9d768bbb" message="Accepted file recevied."/>
+		<ee:transform doc:name="Reading the Accepted file" doc:id="ac1e664c-9d9a-47c9-8257-5695cde4f08a" >
+			
+			<ee:variables >
+				<ee:set-variable variableName="fileName" ><![CDATA[%dw 2.0
+output application/java
+---
+attributes.fileName]]></ee:set-variable>
+				<ee:set-variable variableName="interfaceName" ><![CDATA[%dw 2.0
+output application/java
+---
+"INF056"]]></ee:set-variable>
+				<ee:set-variable variableName="acceptedFile" ><![CDATA[%dw 2.0
+output application/java
+---
+if (payload contains "\r") (splitBy(payload,"\r\n")) 
+else (splitBy(payload,"\n"))]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="inf056-dmes-member-response-accepted-load-In-Progress-Flow" doc:id="f01df7b4-4812-4930-9a97-479205a88de1" targetValue='#[paylaod]' name="inf056-dmes-member-response-accepted-load-In-Progress-Flow"/>
+		<flow-ref doc:name="inf056-dmes-member-response-accepted-load-Flow" doc:id="5f8e6153-7634-47cc-ac77-0290a9521e68" name="inf056-dmes-member-response-accepted-load-Flow"/>
+		<flow-ref doc:name="inf056-dmes-member-response-accepted-load-complete-Flow" doc:id="21d1b768-c717-45df-9531-89e1599ca6a9" name="inf056-dmes-member-response-accepted-load-complete-Flow"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="df9ec6e5-19d6-4618-a6ad-cc1a74229dfb" type="ANY">
+				<ee:transform doc:name="Alert Message Payload" doc:id="f814897d-5c15-4b0a-a0de-0ea1c54382e7">
+					<ee:message />
+					<ee:variables>
+						<ee:set-variable variableName="errorMessage"><![CDATA[%dw 2.0
+output application/java
+---
+"There was an error in INF056-DMES-Member-Accepted-Response in ${secure::env} env. \n" ++ "Unable to Connect to Salesforce. Please retry after some time."]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<cloudhub:create-notification domain="${app.name}" doc:name="Send Alert Notification" doc:id="1123bfd7-9a1c-4cf3-b201-e47c379278d6" config-ref="CloudHub_Config" priority="ERROR" transactionId="uuid()">
+					<cloudhub:message><![CDATA[#[vars.errorMessage]]]></cloudhub:message>
+					<cloudhub:custom-properties><![CDATA[#[output application/java
+---
+{
+	"date" : now()
+}]]]></cloudhub:custom-properties>
+				</cloudhub:create-notification>
+				<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": vars.interfaceName,
+ "InterfaceName": "DMES-Member-Accepted-Response",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename": "" ,
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Error",
+ "RecordCount":sizeOf(vars.acceptedFile default ""),
+ "RecordSuccess":0,
+ "RecordError":sizeOf(vars.acceptedFile default ""),
+ "ErrorDescription":error.description,
+ "ExceptionType":"System",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload for Error response" doc:id="2012e7f7-93be-4856-bdb1-59fe6af48ba7" />
+				<flow-ref doc:name="LogTransactionSubFlow" doc:id="eae242f0-3ab3-43a6-98d7-82e909c408f9" name="LogTransactionSubFlow"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<sub-flow name="inf056-dmes-member-response-accepted-load-Flow" doc:id="e1ed0fa1-09b9-4402-bb0c-32cb5e53f3eb">
+		<ee:transform doc:name="Transform Message mapping for Accepted file" doc:id="1f5bf6a4-afba-4c18-aa86-9eab869b6d5b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.acceptedFile map {
+	MCI : $[0 to 9] replace/^0+|\\s+/ with "",
+	Date : $[11 to 14] ++ "-" ++ $[15 to 16] ++ "-" ++ $[17 to 18],
+	FirstName : $[20 to 40],
+	LastName : $[42 to -1]
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="Retrieve client details from each MCI" doc:id="49dc5cc0-2a60-4e8a-aa90-e6b9202fcab2" batchSize="150" collection="#[payload map $.MCI]">
+			<ee:transform doc:name="Prepare where cluase" doc:id="120b5c4e-aa0c-4b7e-b065-fec095164703">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+(payload map ("'" ++ $ default "" ++ "'") joinBy ",")]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for MCI search" doc:id="ec0b1f60-0b8e-47ed-a2ce-1151e43d5276" config-ref="Salesforce_Config" target="MCIDetails">
+				<salesforce:salesforce-query>Select Id, DEL_MCI__c from Contact where DEL_MCI__c in (:mci)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	mci : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<logger level="INFO" doc:name="Retrieved client details from each MCI" doc:id="a01b1625-095a-4808-bb76-c58f24e92bd0" message="Retrieved client details from each MCI"/>
+		</foreach>
+		<foreach doc:name="Retrieving DMES Member details from each MCI" doc:id="5d722d31-ae8b-4d57-8cbb-3d743930488b" collection="vars.MCIDetails" batchSize="150">
+			<ee:transform doc:name="Prepare where cluase" doc:id="9020e07e-c190-4908-bd45-ea7761e67c6d">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+(payload map ("'" ++ $.Id default "" ++ "'") joinBy ",")]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Query for Person Id sercah" doc:id="854a90a8-9af3-40ce-9140-5d47dc1a583b" config-ref="Salesforce_Config" target="DMESDetails">
+				<salesforce:salesforce-query>Select Id, Person_Id__c from DEL_DMES_Member__c where  Person_Id__c in (:id)</salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	id : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<logger level="INFO" doc:name="Retrieved DMES Member details from each MCI" doc:id="9d19469b-9916-4fe6-8660-ee0d94bd5706" message="Retrieved DMES Member details from each MCI"/>
+		</foreach>
+		<ee:transform doc:name="TM : for Accepted records" doc:id="c075764e-74e4-41a3-9642-b6703d89d19c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map(value, index) -> {
+	Id : vars.DMESDetails[index].Id,
+	DMES_ACCEPTED_Date__c : value.Date,
+	//DMES_ACCEPTED_Date__c : value.'Date' as String {format : "yyyy-MM-dd"},
+	DMES_MCI_First_Name__c : trim(value.FirstName),
+	DMES_MCI_Last_Name__c : trim(value.LastName),
+	Status__c : "Approved"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:update-multiple type="DEL_DMES_Member__c" doc:name="Update DMES Member status to approved" doc:id="932240c5-da3b-412d-b406-4d494fc111d0" config-ref="Salesforce_Config" target="AcceptResponse">
+			<salesforce:records><![CDATA[#[payload map {
+	Id : $.Id,
+	DMES_ACCEPTED_Date__c : $."DMES_ACCEPTED_Date__c" as Date,
+	DMES_MCI_First_Name__c : $."DMES_MCI_First_Name__c",
+	DMES_MCI_Last_Name__c : $."DMES_MCI_Last_Name__c",
+	Status__c : $."Status__c"
+}]]]></salesforce:records>
+		</salesforce:update-multiple>
+		<logger level="INFO" doc:name="Complete" doc:id="922b1218-7c3e-40b7-9b44-f0b216868c26" message="Updated DMES Member status to approved" />
+	</sub-flow>
+	
+	<sub-flow name="inf056-dmes-member-response-accepted-load-complete-Flow" doc:id="0e7f226a-166a-4ffe-ab72-09827ec01314" >
+		<remove-variable doc:name="Remove Variable TransAttachment" doc:id="d9d2f0a1-e416-4764-be5e-5bf26e360975" variableName="TransAttachment"/>
+		<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": vars.interfaceName,
+ "InterfaceName": "DMES-Member-Accepted-Response",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":vars.fileName default "",
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":if (vars.AcceptResponse.successful == true) ("Success") else ("Error"),
+ "RecordCount": sizeOf(vars.acceptedFile default ""),
+ "RecordSuccess":sizeOf(vars.acceptedFile default ""),
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Complete Payload for logging framework" doc:id="5206d2f0-8507-44ec-8ce3-b1b4d7774ac1" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="eeda2073-1f44-4c9b-9606-e91b264359a3" name="LogTransactionSubFlow"/>
+	</sub-flow>
+	<sub-flow name="inf056-dmes-member-response-accepted-load-In-Progress-Flow" doc:id="7aba092c-11c7-4655-8402-adebaa119e72" >
+		<set-variable value="#[payload]" doc:name="Set Variable TransAttachment" doc:id="55215f95-3d76-4110-8179-4dcc869afbba" variableName="TransAttachment"/>
+		<set-payload value='#[%dw 2.0	
+output application/json
+---
+{"InterfaceID": vars.interfaceName,
+ "InterfaceName": "DMES-Member-Accepted-Response",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":vars.fileName,
+ "CompletedExtension":".txt",  
+ "TransactionID": "", 
+ "MuleID":correlationId,
+ "Status":"In Progress",
+ "RecordCount": sizeOf(vars.acceptedFile),
+ "RecordSuccess":0,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set in progress Payload for loggong framework" doc:id="45cf4a78-7782-4ad2-b683-327433304e77" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="3b5f39e7-7cd9-484e-ab17-e4c5d8ea6940" name="LogTransactionSubFlow"/>
+	</sub-flow>
+</mule>

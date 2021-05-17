@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+	<flow name="inf059-dmes-member-auth-extractFlow" doc:id="61327b5c-6436-47a2-8634-7ab8ba7ad3d2" >
+		<scheduler doc:name="Scheduler" doc:id="167c8568-c4f4-43ee-9f78-64186dc6849e" >
+			<scheduling-strategy >
+				<cron expression="0 30 21 ? * MON,TUE,WED,THU,FRI *" timeZone="GMT" />
+			</scheduling-strategy>
+		</scheduler>
+		<set-variable variableName="InterfaceID" value="INF059" />
+		<try doc:name="Try" doc:id="3d4c9be1-a499-494b-b732-f2a117c28a66" >
+			<salesforce:query doc:id="a4c11489-6c8e-4ff1-b97b-1dfb35bc2146" doc:name="Check whether today is Holiday or not" config-ref="Salesforce_Config" targetValue="#[if (sizeOf(payload default []) &gt; 0) (true) else (false)]">
+			<salesforce:salesforce-query>Select id,Holiday_Date__c, Type__c from DEL_Holiday_List__c where Type__c INCLUDES ('DMES Authorization')</salesforce:salesforce-query>
+		</salesforce:query>
+			<choice doc:name="Choice" doc:id="d8996390-1fab-4338-ae05-1b2d031ea364" >
+				<when expression='#[(payload != null) and ((payload map $.Holiday_Date__c joinBy ",") contains ((now() as Date {format : "yyyy-MM-dd"}) ))]'>
+					<raise-error doc:name="Stop job if today is holiday" doc:id="28e56b4d-1338-4a18-8177-1fedbf0d2839" type="HOL:NOT_RUN" description="Today is Holiday, Hence job won't run." />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="Logger" doc:id="f11da3c8-ea20-48c5-b33a-f2328b43700b" message="Today is not a holiday."/>
+				</otherwise>
+			</choice>
+			<error-handler >
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error propagate" doc:id="34dac77a-879a-473e-9e53-20e29457843d" type="HOL:NOT_RUN" when='#[vars.isTodayHoliday == "false"]'>
+					<logger level="INFO" doc:name="Logger" doc:id="e0341cc2-0221-41c8-b157-41b1c8b4248e" />
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<logger level="INFO" doc:name="Schedule Job has started." doc:id="15a4ff10-1e82-4d9c-8a91-05d97f6f8ab8" message="Schedule Job has started."/>
+		<flow-ref doc:name="inf059-dmes-member-auth-extract-in-progress-Flow" doc:id="f4180d8c-c394-4b73-9ec1-21ab73ce01f7" name="inf059-dmes-member-auth-extract-in-progress-Flow"/>
+		<flow-ref doc:name="inf059-dmes-auth-lov-sub-flow" doc:id="c938500b-4642-471d-b96e-077152df69b0" name="inf059-dmes-auth-lov-sub-flow" target="LOVMapping"/>
+		<ee:transform doc:name="Transform Message" doc:id="211bb61d-d286-4b19-81cf-f0ec96c895b9" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="LOVMapping" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.LOVMapping map (
+	if (vars.Direction == "Inbound")
+	{($.Name ++ "-" ++ $.Partner_Code__c) : $.FOCUS_Code__c}
+	else 
+	{($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c}
+)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="inf061-dmes-member-auth-response-error-load-hard-soft-error-Sub_Flow" doc:id="fa2ac79b-5a9b-4baa-8cbe-2293d994a6b2" name="inf061-dmes-member-auth-response-error-load-hard-soft-error-Sub_Flow" />
+		<logger level="INFO" doc:name="Extarct Client with pending status" doc:id="8f11c565-935e-4121-b0f9-dba49c7659b7" message="Extarct Client with pending status"/>
+		<salesforce:query doc:name="Extarct Client with pending or cancelled status" doc:id="b3449f9e-d1e4-4531-a7a0-21e1bb566786" config-ref="Salesforce_Config" target="MemberAuthDetails" targetValue="#[payload map $]">
+			<salesforce:salesforce-query >Select Id,Client_Name__c, Client_PID__c,DMES_ACCEPTED_Date__c,DMES_AR_Review_Needed__c,DMES_Authorization_Effective_End_Date__c,DMES_Authorization_Effective_Start_Date__c,DMES_Authorization_ID__c,DMES_Detail_Number__c,DMES_Error_Status_Initial_Date__c,DMES_Process_Date_Used__c,DMES_Process_Effective_End_Date__c,DMES_Process_Type__c,DMES_Provider_Check__c,DMES_Received_Date__c,DMES_Status__c,DMES_Super_PA__c,DPBHS_Authorization_Id__c,DPBHS_Authorization_Id_Sequence__c,Level_of_Service__c,Service_Authorization__c,Service_Authorization__r.Service__r.List_Id_Code__c,Service_Authorization__r.Provider__r.DEL_National_Prov_Id__c,Service_Authorization__r.Provider__r.Id from DEL_DMES_Authorization__c where (DMES_Status__c = 'Pending' or DMES_Status__c = 'Cancelled') and Service_Authorization__r.Admission_Date__c != null Order By Service_Authorization__c </salesforce:salesforce-query>
+		</salesforce:query>
+		<set-payload value="#[vars.MemberAuthDetails groupBy $.Client_PID__c]" doc:name="Prepare Payload" doc:id="31a9478c-5350-4e6f-8811-94f7677754a7" />
+
+		<choice doc:name="Choice" doc:id="cd2594c5-289c-4bf1-a764-52f3d9a0462d" >
+			<when expression="#[sizeOf(payload) &lt;= 0]">
+				<logger level="INFO" doc:name="Logger" doc:id="c7eb4024-6ad9-4218-889c-8aa233bcc510" message="No Client in Pending status." />
+				<ee:transform doc:name="Transform Message" doc:id="fef37308-3569-4bcc-b501-aebf24c66a16" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="TransAttachment" ><![CDATA[%dw 2.0
+import * from dw::core::Strings
+output application/csv
+---
+{}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<flow-ref doc:name="inf059-Place-file-to-SFTP-Flow" doc:id="bdb093bc-31ef-4397-b021-32f376e5deba" name="inf059-Place-file-to-SFTP-Flow" />
+			
+</when>
+			<otherwise>
+				<flow-ref doc:name="inf059-get-clientDetails-Flow" doc:id="8578ca89-5366-490f-8d3b-497e911ecf77" name="inf059-get-clientDetails-Flow" />
+				<flow-ref doc:name="inf059-internal-validation-Sub_Flow" doc:id="df7331d9-aea5-45b4-8f04-05f06f38349f" name="inf059-internal-validation-Sub_Flow"/>
+				<ee:transform doc:name="Field mapping" doc:id="648a7594-7b7d-43b8-a850-0a218d238fe7">
+					<ee:message>
+						<ee:set-payload resource="AuthMemberMapping.dwl" />
+					
+</ee:message>
+				</ee:transform>
+				 <ee:transform doc:name="Transform to FFD format" doc:id="bb2215ad-99ba-4f74-92f9-d079fa459e27">
+					<ee:message>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable resource="AuthMember.dwl" variableName="TransAttachment" ></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<flow-ref doc:name="inf059-Place-file-to-SFTP-Flow" doc:id="07b6fc9f-47d0-4ae6-a9b6-6f4bcfa52ce8" name="inf059-Place-file-to-SFTP-Flow" /> 
+				<flow-ref doc:name="inf059-update-processed-record-to-submitted-Flow" doc:id="aae51759-95bb-42a6-aaff-7045de2e4b85" name="inf059-update-processed-record-to-submitted-Flow"/>
+				
+				
+			
+</otherwise>
+		</choice>
+		<set-variable value="#[vars.TransAttachment]" doc:name="Set TransAttachment" doc:id="47cf6ae2-34d9-4095-9e50-b7e27e034560" variableName="TransAttachment" mimeType="text/plain"/>
+		<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF059",
+ "InterfaceName": "DMES-Member-Authorization-Extract",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":vars.fileName,
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Success",
+ "RecordCount": sizeOf(vars.MemberAuthDetails),
+ "RecordSuccess":sizeOf(vars.MemberAuthDetails),
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Response Payload for logging framework" doc:id="c84157d5-9810-4306-bf3b-987b45582a62" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="be09afb7-6ba2-48ca-ab19-5ca4a8a3c3da" name="LogTransactionSubFlow"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="95fc01e3-2408-43d9-abbf-5f5e8e4de0ec" type="ANY">
+				<ee:transform doc:name="Alert Message Payload" doc:id="1874f30b-eb64-4968-94b3-d7b92e825a32">
+					<ee:message />
+					<ee:variables>
+						<ee:set-variable variableName="errorMessage"><![CDATA[%dw 2.0
+output application/java
+---
+"There was an error in INF059-DMES-Member-Authorization-Extract in ${secure::env} env. \n" ++ "Unable to Connect to Salesforce. Please retry after some time."]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<cloudhub:create-notification domain="${app.name}" doc:name="Send Alert Notification" doc:id="3d69c734-2c40-43bf-935b-e16b73f0227f" config-ref="CloudHub_Config" priority="ERROR" transactionId="uuid()">
+					<cloudhub:message><![CDATA[#[vars.errorMessage]]]></cloudhub:message>
+					<cloudhub:custom-properties><![CDATA[#[output application/java
+---
+{
+	"date" : now()
+}]]]></cloudhub:custom-properties>
+				</cloudhub:create-notification>
+				<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF059",
+ "InterfaceName": "DMES-Member-Authorization-Extract",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename": vars.fileName default "" ,
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Error",
+ "RecordCount":sizeOf(vars.MemberAuthDetails default ""),
+ "RecordSuccess":0,
+ "RecordError":sizeOf(vars.MemberAuthDetails default ""),
+ "ErrorDescription":error.description,
+ "ExceptionType":"System",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload" doc:id="fb293dac-a864-42c6-b3c3-44f2013a97e6" />
+				<flow-ref doc:name="LogTransactionSubFlow" doc:id="5aa203bd-cd4d-4cb8-a570-9f96624019d2" name="LogTransactionSubFlow"/>
+			</on-error-propagate>
+		</error-handler>	
+		
+	</flow>
+	<sub-flow name="inf059-dmes-member-auth-extract-in-progress-Flow" doc:id="d5cda41d-6c9b-476f-908a-40daf5a265fb" >
+		<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF059",
+ "InterfaceName": "DMES-Member-Authorization-Extract",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":"",
+ "CompletedExtension":"",  
+ "TransactionID": "", 
+ "MuleID":correlationId,
+ "Status":"In Progress",
+ "RecordCount":0,
+ "RecordSuccess":0,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload for Logging framework" doc:id="be2a9154-6b34-4376-b83e-61b6e9ac77ce" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="79a675be-8cef-47c9-a6d1-8a2956c1a778" name="LogTransactionSubFlow"/>
+	</sub-flow>	
+	<sub-flow name="inf059-get-clientDetails-Flow" doc:id="f633d11d-7fd5-41c4-88ad-bf39c9396051" >
+		<logger level="INFO" doc:name="Retrieving Client details" doc:id="3c0cf2c9-5723-4809-b97e-67fc7154d93b" message="Retrieving Client details"/>
+		<foreach doc:name="For Each" doc:id="b4d61fab-feba-4b44-af9a-6bad5e7ff7e4" collection="#[vars.MemberAuthDetails]" batchSize="500">
+			<salesforce:query doc:name="Query from Contact" doc:id="843abb04-655f-42d7-882e-7b333f087797" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select DEL_PID__c,DEL_MCI__c,DEL_SSN__c,Birthdate,DEL_Date_of_Death__c,LastName,FirstName from Contact where DEL_PID__c in (:PID)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	PID : payload map ("'" ++ ($.Client_PID__c default "") ++ "'") joinBy ","
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="78b5ab56-173f-46ac-acf5-0801fdf3c47c" >
+				
+				<ee:variables >
+					<ee:set-variable variableName="MemberAuthContactDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+((vars.MemberAuthContactDetails default []) ++ (payload map $))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each" doc:id="1074e77c-23d2-41da-9453-88a0a1045f6f" collection="#[vars.MemberAuthDetails]" batchSize="500">
+			<salesforce:query doc:name="Query from Service" doc:id="a3803e31-2dc3-4364-b2a0-ae37d7b97fcb" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Id,Client_PID__c,Admission_Date__c,Authorization_Date__c,Provider__r.Id, Provider_ID__c, Provider__r.DEL_Provider_Taxonomy_ID__c,Provider__r.DEL_Provider_Taxonomy_Code__c, Provider__r.DEL_Payee_FEIN__c,Authorization_from__c, Authorization_To__c, Service__r.List_Id_Code__c,Service__r.FACTS_I_Service_Code__c,Service__r.Healthcare_Procedure_Code__r.Code_Type__c from DEL_Support__c where Id in (:Service)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	Service : payload map (if ($.Service_Authorization__c != null)("'" ++ ($.Service_Authorization__c) ++ "'") else ['']) joinBy ","
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="b7a71612-85e1-4233-80b9-eb6ac6ece4ce" >
+				<ee:variables >
+					<ee:set-variable variableName="MemberAuthServiceDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+((vars.MemberAuthServiceDetails default []) ++ (payload map $))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Provider EIN" doc:id="2fc49e9c-7544-4f05-9bfa-11c64f590fba" batchSize="500" collection="#[vars.MemberAuthServiceDetails]">
+			<salesforce:query doc:name="Query for NPI Number" doc:id="e8a5adde-152e-4788-b0f3-9682779adfca" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select Id, Provider__r.Id,Provider__r.Name, Provider__r.DEL_Payee_FEIN__c,  NPI_Number__c from DEL_NPI__c where Provider__r.DEL_Payee_FEIN__c in (:EIN) and Status__c = 'Active'</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	EIN : payload map ("'" ++ ($.Provider__r.DEL_Payee_FEIN__c default "") ++ "'") joinBy ","
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="897c3439-9d9c-4c8e-8cbf-fad8e7bf02df" >
+				<ee:variables >
+					<ee:set-variable variableName="ProviderNPI" ><![CDATA[%dw 2.0
+output application/java
+---
+((vars.ProviderNPI default []) ++ (payload map $))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each MCI number" doc:id="92849a43-2589-4a00-8b89-dbaed8d4d912" collection="#[vars.MemberAuthContactDetails]" batchSize="500">
+			<salesforce:query doc:name="Query for DMES Member" doc:id="b035a740-6f19-4231-91bf-25fe91bb8b46" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Id, Person_Id__r.DEL_PID__c, DMES_MCI__c,Initial_Approval_Date__c,Eligibility_start_date__c,Eligibility_end_date__c,Status__c from DEL_DMES_Member__c where DMES_MCI__c in (:MCI) or Person_Id__r.DEL_PID__c in (:PID)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	MCI : payload map (if ($.DEL_MCI__c != null) ("'" ++ $.DEL_MCI__c ++ "'") else "''") joinBy ",",
+	PID : payload map (if ($.DEL_PID__c != null) ("'" ++ $.DEL_PID__c ++ "'") else "''") joinBy ","
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="9a042596-3a57-4954-ad9a-96c61180501c" >
+				<ee:variables >
+					<ee:set-variable variableName="DMESMemberDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+((vars.DMESMemberDetails default []) ++ (payload map $))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<foreach doc:name="For Each Provider Taxonomy code" doc:id="4cf14b3a-a7d9-4d31-a968-5250da76f623" collection="#[vars.MemberAuthDetails]" batchSize="500">
+			<salesforce:query doc:name="Query for Provider Taxonomy" doc:id="a9232b83-30f1-4643-af26-21bd905a3a78" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >Select Taxonomy_Code_Calc__c, Provider_Record_Id__c from DEL_Provider_Medicaid_Enrollment__c where Provider_Record_Id__c in (:Provider) and  Status__c = 'Active'</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	Provider : payload map (if ($.Service_Authorization__r.Provider__r.Id != null) ("'" ++ $.Service_Authorization__r.Provider__r.Id[0 to -4] ++ "'") else "''") joinBy ","
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Transform Message" doc:id="f4f009aa-faae-4c67-8ece-f21e86c88928" >
+				<ee:variables >
+					<ee:set-variable variableName="ProviderTaxonomyDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+((vars.ProviderTaxonomyDetails default []) ++ (payload map $))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<ee:transform doc:name="Transform Message GroupBy" doc:id="1306e1d7-b00d-4bf2-8a38-1a14d6a53df6" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="MemberAuthContactDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.MemberAuthContactDetails groupBy $.DEL_PID__c]]></ee:set-variable>
+				<ee:set-variable variableName="MemberAuthServiceDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.MemberAuthServiceDetails groupBy $.Client_PID__c]]></ee:set-variable>
+				<ee:set-variable variableName="ProviderNPI" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.ProviderNPI groupBy $.Provider__r.Id]]></ee:set-variable>
+				<ee:set-variable variableName="DMESMemberDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.DMESMemberDetails filter ($.Person_Id__r.DEL_PID__c != null) groupBy ($.Person_Id__r.DEL_PID__c )]]></ee:set-variable>
+				<ee:set-variable variableName="ProviderTaxonomyDetails" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.ProviderTaxonomyDetails groupBy $.Provider_Record_Id__c]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="inf059-internal-validation-Sub_Flow" doc:id="4bb21de2-d299-4c40-bfc0-0fc88f15cc4f" >
+		<logger level="INFO" doc:name="Validation flow start" doc:id="75f665ae-cf43-4213-8ed3-67401ae81979" message="Validation flow start"/>
+		<salesforce:query doc:name="Query for Record Type Id" doc:id="4ec2a07d-f635-4f41-82a9-cf6f8d4d8528" config-ref="Salesforce_Config" target="RecordId">
+			<salesforce:salesforce-query >select Id,Name from RecordType where Name = 'DMES Authorization Error'</salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="TM Validation" doc:id="5149d62b-7916-46a7-a8a9-4e0e2f236740" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="ValidationError" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.MemberAuthDetails //filter (
+	//(vars.MemberAuthContactDetails[$.Client_PID__c].DEL_MCI__c[0] == null or vars.MemberAuthContactDetails[$.Client_PID__c].DEL_MCI__c[0] == "") or 
+	//(vars.MemberAuthServiceDetails[$.Client_PID__c].Admission_Date__c[0] != null and $.DMES_Process_Type__c == null ) or 
+	//(vars.MemberAuthServiceDetails[$.Client_PID__c].Admission_Date__c[0] == null and $.DMES_Status__c == "Pending" ) or
+	//(vars.ProviderNPI[(vars.MemberAuthServiceDetails[$.Client_PID__c].Provider__r.Id)[0]].NPI_Number__c[0] == null or vars.ProviderNPI[(vars.MemberAuthServiceDetails[$.Client_PID__c].Provider__r.Id)[0]].NPI_Number__c[0] == "") or
+	//(vars.ProviderTaxonomyDetails[(vars.MemberAuthServiceDetails[$.Client_PID__c].Provider__r.Id)[0][0 to -4]].Taxonomy_Code_Calc__c[0] == null or vars.ProviderTaxonomyDetails[(vars.MemberAuthServiceDetails[$.Client_PID__c].Provider__r.Id)[0][0 to -4]].Taxonomy_Code_Calc__c[0] == "")  or 
+	//(vars.MemberAuthServiceDetails[$.Client_PID__c].Service__r.List_Id_Code__c[0] == null or vars.MemberAuthServiceDetails[$.Client_PID__c].Service__r.List_Id_Code__c[0] == "") or 
+	//(($.DMES_Authorization_Effective_Start_Date__c default "1900-01-01") < vars.MemberAuthContactDetails[$.Client_PID__c].Birthdate[0]) or
+	//(($.DMES_Authorization_Effective_Start_Date__c default "1900-01-01") > (vars.MemberAuthContactDetails[$.Client_PID__c].DEL_Date_of_Death__c[0] default "2999-12-12")) or
+	//(($.DMES_Authorization_Effective_End_Date__c default "2900-01-01") > vars.MemberAuthContactDetails[$.Client_PID__c].Birthdate[0] + |P18Y|) or 
+	//(($.DMES_Authorization_Effective_Start_Date__c default "1900-01-01") < (vars.DMESMemberDetails[vars.MemberAuthContactDetails[$.Client_PID__c].DEL_MCI__c[0]].Eligibility_start_date__c[0] default "2900-01-01")) or 
+	//(($.DMES_Authorization_ID__c != "") and ($.DMES_Authorization_ID__c != null) and (not ($.DMES_Authorization_ID__c startsWith("D")))) or 
+	//(vars.MemberAuthServiceDetails[$.Client_PID__c].Service__r.Healthcare_Procedure_Code__r.Code_Type__c[0] == null)
+	//(vars.DMESMemberDetails[$.Client_PID__c][0].Id != null and (vars.DMESMemberDetails[$.Client_PID__c][0].Status__c[0] == "DSCYF Error") or (vars.DMESMemberDetails[$.Client_PID__c][0].Status__c[0] == "DMES Error")) or
+	//(vars.DMESMemberDetails[vars.MemberAuthContactDetails[$.Client_PID__c].DEL_MCI__c[0]].Id == null and (vars.DMESMemberDetails[vars.MemberAuthContactDetails[$.Client_PID__c].DEL_MCI__c[0]].Initial_Approval_Date__c[0] != null))  
+//)
+ map {
+	Id : $.Id,
+	ErrorCode : (
+		(if (vars.MemberAuthContactDetails[$.Client_PID__c].DEL_MCI__c[0] == null or vars.MemberAuthContactDetails[$.Client_PID__c].DEL_MCI__c[0] == "") ["3002"] else [null]) ++
+		//(if (vars.MemberAuthServiceDetails[$.Client_PID__c].Service__r.Healthcare_Procedure_Code__r.Code_Type__c[0] == null) ["P975"] else [null]) ++
+		(if (vars.ProviderTaxonomyDetails[(vars.MemberAuthServiceDetails[$.Client_PID__c].Provider__r.Id)[0][0 to -4]].Taxonomy_Code_Calc__c[0] == null or vars.ProviderTaxonomyDetails[(vars.MemberAuthServiceDetails[$.Client_PID__c].Provider__r.Id)[0][0 to -4]].Taxonomy_Code_Calc__c[0] == "") ["P972"] else [null]) ++
+		(if (vars.MemberAuthServiceDetails[$.Client_PID__c].Admission_Date__c[0] != null and $.DMES_Process_Type__c == null ) ["IN_02"] else [null]) ++ 
+		(if (vars.MemberAuthServiceDetails[$.Client_PID__c].Admission_Date__c[0] == null and $.DMES_Status__c == "Pending" ) ["IN_01"] else [null]) ++ 
+		(if (vars.ProviderNPI[(vars.MemberAuthServiceDetails[$.Client_PID__c].Provider__r.Id)[0]].NPI_Number__c[0] == null or vars.ProviderNPI[(vars.MemberAuthServiceDetails[$.Client_PID__c].Provider__r.Id)[0]].NPI_Number__c[0] == "") ["IN_11"] else [null]) ++ 
+		(if ($.Service_Authorization__r.Service__r.List_Id_Code__c == null or $.Service_Authorization__r.Service__r.List_Id_Code__c == "") ["IN_12"] else [null]) ++
+		(if (($.DMES_Authorization_Effective_Start_Date__c default "1900-01-10") < vars.MemberAuthContactDetails[$.Client_PID__c].Birthdate[0]) ["IN_06"] else [null]) ++ 
+		(if (($.DMES_Authorization_Effective_Start_Date__c default "1900-01-10") > (vars.MemberAuthContactDetails[$.Client_PID__c].DEL_Date_of_Death__c[0] default "2999-12-12")) ["IN_07"] else [null]) ++ 
+		(if (($.DMES_Authorization_Effective_End_Date__c default "2900-01-01") > vars.MemberAuthContactDetails[$.Client_PID__c].Birthdate[0] + |P18Y|) ["IN_09"] else [null]) ++
+		(if (($.DMES_Authorization_Effective_Start_Date__c default "1900-01-10") < vars.MemberAuthContactDetails[$.Client_PID__c].Birthdate[0]) ["IN_10"] else [null]) ++ 
+		(if (($.DMES_Authorization_ID__c != "") and ($.DMES_Authorization_ID__c != null) and (not ($.DMES_Authorization_ID__c startsWith("D")))) ["IN_03"] else [null]) ++
+		(if (vars.DMESMemberDetails[$.Client_PID__c][0].Id != null and (vars.DMESMemberDetails[$.Client_PID__c][0].Status__c == "DSCYF Error") or (vars.DMESMemberDetails[$.Client_PID__c][0].Status__c == "DMES Error")) ["IN_04"] else [null]) ++
+		(if ((vars.DMESMemberDetails[$.Client_PID__c][0].Id default "") == null and ((vars.DMESMemberDetails[$.Client_PID__c][0].Initial_Approval_Date__c[0] default "") != null)) ["IN_05"] else [null])
+	)
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:update-multiple type="DEL_DMES_Authorization__c" doc:name="Update Status to DSCYF Error" doc:id="fdc75e80-423d-4e5b-b0c3-5838e6c9d4f0" config-ref="Salesforce_Config">
+			<salesforce:records><![CDATA[#[%dw 2.0
+output application/java
+---
+vars.ValidationError filter ((((sizeOf (vars.ValidationError[$$].ErrorCode filter ($ != null)) )) >= 1 )) map {
+	Id : $.Id,
+	DMES_Status__c : "DSCYF Error",
+	DMES_Error_Status_Initial_Date__c : ((now() as Date {format : "yyyy-MM-dd"}) ++ "America/New_York")
+}]]]></salesforce:records>
+		</salesforce:update-multiple>
+		<logger level="DEBUG" doc:name="Logger" doc:id="35c9eb89-4618-432c-b531-927b97944030" message='#[payload.items default [] map ($.message default "") joinBy ","]'/>
+		<ee:transform doc:name="Transform Message" doc:id="ea11eb44-5a2c-40fd-b9a2-5dde9b849ceb">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+vars.ValidationError.ErrorCode map ($ filter ($ != null)) map (value,index) -> {
+	error : value map (v,i) -> {
+	"RecordTypeId" : vars.RecordId[0].Id,
+	DMES_Authorization__c : vars.ValidationError[index].Id,
+	Error_Message__c : vars.errorMaster[v][0],
+	Error_Code__c: v,
+	Error_Type__c: "Hard",
+	Type__c : "DMES Authorization Internal"
+	
+} }  default []]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create-multiple doc:name="Create multiple DSCYF Error" doc:id="17eec2fa-dbb6-47a4-a2f2-7ab304a5cd2c" config-ref="Salesforce_Config" type="DEL_DMES_Error__c">
+			<salesforce:records><![CDATA[#[%dw 2.0
+output application/java
+---
+flatten (payload.error map $)]]]></salesforce:records>
+		</salesforce:create-multiple>
+		<logger level="DEBUG" doc:name="Logger" doc:id="60b51ed2-a445-487c-8999-2499a70c00a8" message='#[payload.items default [] map ($.message default "") joinBy ","]'/>
+	</sub-flow>
+	<sub-flow name="inf059-update-processed-record-to-submitted-Flow" doc:id="35a3c231-caf0-4b8f-8cd0-493739a9967f" >
+		<ee:transform doc:name="Change the subject to Submitted" doc:id="0c6d41cf-87cd-4e6a-9616-12bc40407132">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+input payload application/java
+output application/java
+---
+vars.MemberAuthDetails filter ((((sizeOf (vars.ValidationError[$$].ErrorCode filter ($ != null)) )) == 0 )) map {
+	Id : $.Id,
+	DMES_Status__c : "Submitted",
+	DMES_Received_Date__c : (now() as Date {format : "yyyy-MM-dd"})
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="9426837d-ed86-487f-8373-55e1328548fe" batchSize="200">
+			<salesforce:update-multiple config-ref="Salesforce_Config" type="DEL_DMES_Authorization__c" doc:name="Update DMES member to submitted" >
+				<salesforce:records ><![CDATA[#[payload map $]]]></salesforce:records>
+			</salesforce:update-multiple>
+			<logger level="DEBUG" doc:name="Logger" doc:id="4e99282d-9863-4288-93ec-71884e854d07" message='#[payload.items default [] map ($.message default "") joinBy ","]'/>
+		</foreach>
+		<logger level="INFO" doc:name="Status updated to Submitted" doc:id="865ddb4b-a8b2-4043-b6ef-1223a10434a0" message="Status updated to Submitted."/>
+		
+	
+</sub-flow>
+	<sub-flow name="inf059-Place-file-to-SFTP-Flow" doc:id="8064c9df-9947-4510-936a-72aec29028c5" >
+		
+		<set-variable value='#["DSCYF_PA_AUTH_" ++ (now() >> "America/New_York") as String {format : "yyyyMMddHHmm"} ++ ".dat"]' doc:name="Set File name" doc:id="dc1c5911-f2ff-4106-9109-807cae6e04b5" variableName="fileName"/>
+		<sftp:write doc:id="4341e12b-0aff-4ba3-a111-f3fa96ddd931" config-ref="SFTP_Config" path='#[p("secure::sftp.auth.path") ++ vars.fileName]' doc:name="Upload the generated extract ">
+			<sftp:content ><![CDATA[#[vars.TransAttachment]]]></sftp:content>
+		</sftp:write>
+		<sftp:write doc:id="aee6e3a3-adc3-48f1-a3f8-834c744b9bf4" config-ref="SFTP_Archive_Config" path='#[p("secure::sftp.auth.archive.path") ++ vars.fileName]' doc:name="Upload the Archive extract ">
+			<sftp:content ><![CDATA[#[vars.TransAttachment]]]></sftp:content>
+		</sftp:write>
+		<logger level="INFO" doc:name="File has been placed in SFTP" doc:id="4d4eb448-c2eb-4d3f-91b2-8d8a9c64a6aa" message="File has been placed in SFTP."/>
+	</sub-flow>
+	<sub-flow name="inf059-dmes-auth-lov-sub-flow" doc:id="1ac78a24-3e46-4b0d-95e5-f5f1645e3380" >
+	
+		<set-payload value="{&quot;Direction&quot;:&quot;outBound&quot;,&quot;LOVNames&quot;:&quot;'DMES_LIST_ID'&quot;}" doc:name="Set Payload" doc:id="0cfb92cd-768a-416d-8eb6-f941ec0f6c90" mimeType="application/json"/>
+		<flow-ref name="lOV_query_Sub_Flow" doc:name="lOV_query_Sub_Flow"/>
+	</sub-flow>
+</mule>
+
+	

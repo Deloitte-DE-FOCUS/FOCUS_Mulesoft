@@ -1,0 +1,872 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+	<flow name="inf016_hippa_medicaid_claims_837_professional_Flow" doc:id="6a91b970-0485-4d65-bb37-6ed8908a7000" >
+		<ee:transform doc:name="Set Interface Name,Unique ID,Batch ID,Claim Configurations" doc:id="7f06dbb5-8c9e-499c-a538-7a429d7e9082">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="claimConfigurations"><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="interfaceName"><![CDATA[%dw 2.0
+output application/java
+---
+'HIPPA Medicaid Claims 837 Professional Extract']]></ee:set-variable>
+				<ee:set-variable variableName="environment"><![CDATA[%dw 2.0
+output application/java
+---
+p('secure::x12.hippamedicaidclaims837P.environment')]]></ee:set-variable>
+				<ee:set-variable variableName="uniqueId" ><![CDATA[%dw 2.0
+output application/java
+import * from dw::core::Strings
+---
+leftPad (randomInt(1000000000),9,1)]]></ee:set-variable>
+				<ee:set-variable variableName="uniqueIdSt02" ><![CDATA[%dw 2.0
+output application/java
+import * from dw::core::Strings
+---
+leftPad (randomInt(1000000000),9,1)]]></ee:set-variable>
+				<ee:set-variable variableName="uniqueIdGs06" ><![CDATA[%dw 2.0
+output application/java
+import * from dw::core::Strings
+---
+leftPad (randomInt(1000000000),9,1)]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="inf016_Log_In_Progress_Transaction_Sub_Flow" doc:id="9781c32c-2a35-4d7b-be74-922f4b75f6f5" name="inf016_Log_In_Progress_Transaction_Sub_Flow"/>
+		<set-variable doc:name="Variable : Create Batch Key" doc:id="c376294d-dfec-45d4-9646-ab5c749d024d" variableName="batchKey" doc:description="Creating Batch Key which will be used in the BHT segment of the file.
+Batch key is a unique ID created in this format Date(yyyyMMdd) + time(HHmm) + random number(length 8)" value='#[now() as String {format : "yyyyMMddHHmm"} ++ randomInt(100000000) as String]'/>
+		<ee:transform doc:name="Message Properties : Set Segment,Record and Component Separators" doc:id="e7d51e3b-961e-4304-990d-d43c09304c90">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="elementSeparator"><![CDATA[%dw 2.0
+output application/java
+---
+if(vars.claimConfigurations["Element Separator"] != null) (vars.claimConfigurations["Element Separator"]) else ("*")]]></ee:set-variable>
+				<ee:set-variable variableName="segmentSeparator"><![CDATA[%dw 2.0
+output application/java
+---
+("\n")]]></ee:set-variable>
+				<ee:set-variable variableName="componentSeparator" ><![CDATA[%dw 2.0
+output application/java
+---
+if(vars.claimConfigurations["Component Separator"] != null) (vars.claimConfigurations["Component Separator"]) else (":")]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:query doc:name="Salesforce : Query Claim Information" doc:id="f9ced3f6-152e-410d-8bf4-c00dfaa6648a" config-ref="Salesforce_Config" doc:description="Query to retrieve Claim information from Salesforce Also this takes care of the Business Rule  &amp;quot;Only claims with the Claim Type as Professional will be selected for this file&amp;quot; by adding the where clause for getting Professional Claims only Also this takes care of the Business Rule &amp;quot;When executed by the user the 837 file generation execution will take all claims records in Pending Claims status and must have the Claims Frequency Type Code based on the criteria below a. 1 When Admission and Discharge Dates match exactly dates of service b. 2 When Admission Date equals From Date of Service and To Date of Service is Lesser Than Discharge Date (or no Discharge Date)  c. 3 When From Date of Service Greater Than Admission Date and To Date of Service is Lesser Than Discharge Date (or no Discharge Date)  d. 4 When From Date of Service is Greater Than Admission Date and To Date of Service equals Discharge Date e. System will date stamp the Initial Submission Date field on the cl">
+			<salesforce:salesforce-query >select Id, Provider_ID_Formula__c, Claim_Number__c, Remittance_Advice_Date__c, Void_Submission_Date__c, Initial_Submission_Date__c, Client_Last_Name__c,ICN_Number__c, Client_First_Name__c, Client_Middle_Name__c,Client_ID__c, Client_Suffix__c,Client_MCI__c, Client_DOB__c, Client_Sex__c, Place_of_Service_Code_Calc__c, Claim_Record_Status__c, Claim_Note__c, Service_Admission_Date__c, Void_Claim_ICN__c, Primary_Diagnosis_Code__c, Medicaid_Service_Code__c, Service_Modifier_1_Calc__c, Service_Modifier_2_Calc__c, Service_Modifier_3_Calc__c, Service_Modifier_4_Calc__c, Medicaid_Bill_Amount__c, Number_of_Units__c, Service_Start_Date__c, Service_End_Date__c,National_Healthcare_Procedure_Code_Calc__c,DPBHS_Authorization_Id__c,DMES_Authorization_Id__c from DEL_Medicaid_Billing__c where Claim_Type__c = 'Professional' and ((Claim_Record_Status__c = 'Claim - Pending' and Initial_Submission_Date__c = null) or (Claim_Record_Status__c = 'Claim - Void' and Void_Submission_Date__c = null)) and Provider_ID_Formula__c !=null ORDER BY Provider_ID_Formula__c</salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message : Enrich with Interface Logic" doc:id="e86a5b5d-0801-487a-8711-1a54fd097c28">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	($),
+	"claimsFrequencyTypeCode" : 
+	if (($.Void_Claim_ICN__c != null) and ($.Initial_Submission_Date__c == null) and (($.Claim_Record_Status__c == 'Claim - Pending')) ) "7"
+		else if ($.Claim_Record_Status__c == "Claim - Void" and ($.Void_Submission_Date__c == null) and ($.Remittance_Advice_Date__c != null)) "8"
+			else if (($.Claim_Record_Status__c == "Claim - Void") and  ($.Remittance_Advice_Date__c == null)) ("Invalid") 
+				else "1"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+		<ee:transform doc:name="Transform Message : Filter Invalid Claim frequency" doc:id="39586764-3d88-4d83-9d2e-03056aac206e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload filter ($.claimsFrequencyTypeCode != 'Invalid') map {
+	($)
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Set Variable UpdatePayload" doc:id="3364305b-6c13-4c8f-933f-c20bf4a7df67" variableName="updatePayload"/>
+		<set-variable value="#[sizeOf(payload)]" doc:name="Variable : Total number of Records" doc:id="fc72705f-d445-46c9-b6f7-d19092ff6159" doc:description="Store Total number of Records" variableName="RecordCount"/>
+		<choice doc:name="Choice" doc:id="7acbdf54-7858-4bee-935a-483182f6a05e" >
+			<when expression="#[sizeOf(payload) &lt; 1]">
+				<logger level="INFO" doc:name="Logger" doc:id="2c974171-a118-42ac-9f4b-281171eef654" message="No Records found"/>
+				<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF016",
+ "InterfaceName": "HIPPA Medicaid Claims 837 Professional Extract",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":"",
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Success",
+ "RecordCount":0,
+ "RecordSuccess":0,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload" doc:id="1a4e6a17-1738-4828-91eb-1ca0d9cd5277" />
+				<flow-ref doc:name="LogTransactionSubFlow" doc:id="386b6378-b4e1-424d-8599-ad39f1acc482" name="LogTransactionSubFlow"/>
+			</when>
+			<otherwise >
+				
+				<ee:transform doc:name="Transform Message" doc:id="23b9dc5d-e7e9-4beb-982f-07dfc8c3a16c">
+					<ee:message>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="CaimsLessThan99" ><![CDATA[%dw 2.0
+output application/java
+---
+flatten ((payload groupBy $.Client_ID__c pluck $) filter (sizeOf ($) <= 99))]]></ee:set-variable>
+						<ee:set-variable variableName="CaimsMoreThan99" ><![CDATA[%dw 2.0
+output application/java
+---
+flatten ((payload groupBy $.Client_ID__c pluck $) filter (sizeOf ($) > 99))]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<set-payload value="#[vars.CaimsMoreThan99]" doc:name="Set Payload for claims more than 99" doc:id="6ebe0fec-18b2-4419-9d74-34f806693fec" />
+				<foreach doc:name="For Each client with more than 99 claims" doc:id="a24af6bb-9507-4f61-b1b6-ac73d7d4d0b8" collection="#[payload groupBy $.Client_ID__c pluck $]">
+					<foreach doc:name="For Each 99 claims" doc:id="7bc7cb9d-f33e-452b-8289-34a4a97f6dca" batchSize="99">
+					<choice doc:name="Choice" doc:id="b8ca7a29-20fb-4a0d-8cb7-2144c5eb6e08" >
+							<when expression="#[((sizeOf (payload) mod 99) == 0)]">
+								<flow-ref doc:name="inf016_hippa_madicaid_claims_pro_process_claims_subFlow" doc:id="8bf26879-10e0-489d-8816-60dcde01fa5a" name="inf016_hippa_madicaid_claims_pro_process_claims_subFlow" />
+							</when>
+							<otherwise >
+								<logger level="INFO" doc:name="Logger" doc:id="db0871ee-592b-471b-8743-61f33dd98928" message="Processing done for single PID with more than 99 claims"/>
+								<ee:transform doc:name="Transform Message" doc:id="c9ab5875-b08b-4dc6-a7fa-44a4a6f06770" >
+									<ee:message >
+									</ee:message>
+									<ee:variables >
+										<ee:set-variable variableName="CaimsLessThan99" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.CaimsLessThan99 default [] ) ++ payload ]]></ee:set-variable>
+									</ee:variables>
+								</ee:transform>
+							</otherwise>
+						</choice>
+				</foreach>
+				</foreach>
+				<set-payload value="#[vars.CaimsLessThan99]" doc:name="Set Payload for Claims less than 99" doc:id="afd2b4aa-d8d7-4f76-b376-8d3f43219d28" />
+				<flow-ref doc:name="inf016_hippa_madicaid_claims_pro_process_claims_subFlow" doc:id="7326ae5f-bd27-48f0-8972-08f479b4196d" name="inf016_hippa_madicaid_claims_pro_process_claims_subFlow" />
+				<flow-ref doc:name="inf016_hippa_medicaid_claims_837_pro_get_ICN_Flow" doc:id="713b4716-5c59-4d74-9b81-daf1afd143c7" name="inf016_hippa_medicaid_claims_837_pro_get_ICN_Flow" />
+				<ee:transform doc:name="TM: Generate Array for SFDC Update" doc:id="0bf9894a-804c-4b33-87c1-262d09de6af2">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+(vars.updatePayload map {
+	Id:$.Id,
+	( Initial_Submission_Date__c: if ($.claimsFrequencyTypeCode != '8') ( now() as Date  ) else ""),
+	(Claim_Record_Status__c: if ($.claimsFrequencyTypeCode != '8') ("Claim - Submitted") else "") ,
+	(Void_Submission_Date__c: if ($.claimsFrequencyTypeCode == '8') (now() as Date ) else "")
+}) ++ (vars.updateList default [])]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<foreach doc:name="For Each" doc:id="a57fde61-3c7a-4d62-b137-e72079be4635" batchSize="200">
+			<salesforce:update type="DEL_Medicaid_Billing__c" doc:name="SFDC: Update Records" doc:id="d5dcda44-d7ee-446c-b34c-feb299431a23" config-ref="Salesforce_Config" >
+						<salesforce:records ><![CDATA[#[payload map $]]]></salesforce:records>
+					</salesforce:update>
+		</foreach>
+			
+</otherwise>
+		</choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="045bb483-0e66-4b8b-bb02-200b2835e581" type="ANY">
+				<ee:transform doc:name="Alert Message Payload" doc:id="584d76b7-534f-4762-8887-48eb659013c9">
+					<ee:message />
+					<ee:variables>
+						<ee:set-variable variableName="errorMessage"><![CDATA[%dw 2.0
+output application/java
+---
+"There was an error in INF016-HIPPA Medicaid Claims 837 Professional Extract in ${secure::env} env. \n" ++ "Unable to Connect to Salesforce. Please retry after some time."]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<cloudhub:create-notification domain="${app.name}" doc:name="Send Alert Notification" doc:id="3b4f116d-c832-492a-8828-23c9be89cd4f" config-ref="CloudHub_Config" priority="ERROR" transactionId="uuid()">
+					<cloudhub:message><![CDATA[#[vars.errorMessage]]]></cloudhub:message>
+					<cloudhub:custom-properties><![CDATA[#[output application/java
+---
+{
+	"date" : now()
+}]]]></cloudhub:custom-properties>
+				</cloudhub:create-notification>
+				<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "IN016",
+ "InterfaceName": "HIPPA Medicaid Claims 837 Pro",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename": "" ,
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Error",
+ "RecordCount":"",
+ "RecordSuccess":"",
+ "RecordError":"",
+ "ErrorDescription":error.description,
+ "ExceptionType":"System",
+ "Operation":"On Demand Job"
+ }]' doc:name="Set Payload" doc:id="548c7608-a44d-4ad4-bf49-79a3695c67d0" />
+				<flow-ref doc:name="LogTransactionSubFlow" doc:id="d6c231d4-b66a-45f2-8a68-faeb99c3e555" name="LogTransactionSubFlow"/>
+			</on-error-propagate>
+		</error-handler>
+	
+</flow>	
+	<sub-flow name="inf016_hippa_madicaid_claims_pro_process_claims_subFlow" >
+	<!-- <foreach doc:name="For Each" doc:id="a327dfe6-4786-430a-8b3b-cc3ddde6c697" batchSize="99" doc:description="Iterate the records with the configured Batch size	
+This also takes care of the Business Rule &amp;quot;File is limited to not more than 5000 CLM statements&amp;quot; by passing only 5000 to the processing block which in turn creates the File"> -->
+					<ee:transform doc:name="Transform Message : Create X12 HIPPA 837 Message" doc:id="357e6175-883f-47e1-af79-74c0f4dff430" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Strings
+output application/java
+---
+{
+	functionalGroups: [{
+		functionalGroupHeader: {
+			applicationReceiversCode: vars.claimConfigurations['Receiver ETIN'] default "", // Claims Conf 2
+			applicationSendersCode: vars.claimConfigurations['Submitter ETIN'] default "", // Claim Configuration Parameter 6
+			date: (now() >> "America/New_York") as String {format : "yyyyMMdd"}, //GS04 yyyyMMDD
+			functionalIDCode: "HC",
+			groupControlNumber: vars.uniqueIdGs06, // GS06 Unique Number
+			responsibleAgencyCode: "X",
+			time: (now() >> "America/New_York") as String {format : "HHmm"},
+			versionReleaseIndustryIDCode: vars.claimConfigurations['Pro Release ID']
+		},
+		functionalGroupTrailer: {
+			groupControlNumber: vars.uniqueIdGs06, // GS06 Unique Number
+			numberOfTransactionsSetsIncluded: "1" // Number of Transaction 1 is fixed for 837 Inst and Prof
+		},
+		transactions: [{
+			detailMessage837: {
+				BHT: {
+					date: (now() >> "America/New_York") as String {format : "yyyyMMdd"},
+					hierarchicalStructureCode: "0019",
+					referenceIdentification: vars.batchKey, // FOCUS Batch Key : Need to generate 
+					time: (now() >> "America/New_York") as String {format : "HHmm"},
+					transactionSetPurposeCode: "00",
+					transactionTypeCode: "CH" // Claim Conf - CH or RP
+				},
+				HLLoopList: [{
+					parentHL: {
+						PRV: {
+							providerCode: "BI",//PRV01
+							referenceIdentification: vars.claimConfigurations["Billing/Pay-To Provider Taxonomy"] default "", //PRV03  Provider taxonomy code
+							referenceIdentificationQualifier: "PXC"//PRV02
+						},
+						NM1List: [
+							{
+								// Billing Provider Name Mappings
+								REF: {
+									referenceIdentification: vars.claimConfigurations['Billing Provider EIN'], // REF01  Depends on Provider first name
+									referenceIdentificationQualifier: "EI" // REF01 - Depends on Provider first name 
+							},
+							entityIdentifierCode: "85", // NM101
+							entityTypeQualifier:  "2", // NM102 - Depends on Provider first name 
+							identificationCode: vars.claimConfigurations['Billing Provider NPI'], // NM109 - Provider_NPI__c
+							identificationCodeQualifier: "XX", // NM108
+							n3: {
+								addressInformation1: vars.claimConfigurations['Billing Provider Street 1'] default "", // Claim Configuration Parameters -12
+								//addressInformation2: if ((vars.claimConfigurations['Billing Provider Street 2'] != null) and (vars.claimConfigurations['Billing Provider Street 2'] != "") ) ( vars.claimConfigurations['Billing Provider Street 2'] ) else ""  // Claim Configuration Parameters -8
+							},
+							n4: {
+								cityName: vars.claimConfigurations['Billing Provider City'] default "", // Claims Config 14
+								stateOrProvinceCode: vars.claimConfigurations['Billing Provider State'] default "", // Claims Config 15
+								postalCode: vars.claimConfigurations['Billing Provider Zip Code'] default "" // Claims Config 16								
+							},
+							nameFirst: "" default "", // NM104
+							//nameFirst: if (($[0].Provider_First_Name__c  !=null) and ($[0].Provider_First_Name__c != '') ) (leftPad($[0].Provider_First_Name__c,60," " )) else "", // NM104
+							//nameLastOrOrganizationName: $[0].Provider_Name_Formula__c default "", // NM103
+							nameLastOrOrganizationName: vars.claimConfigurations['Billing Provider Name'] , // NM103
+							nameMiddle: "", // NM105 Blank
+							namePrefix: "", // NM106 Blank
+							nameSuffix: "" // NM107 Blank
+							}
+						],
+						hierarchicalChildCode: 1,
+						//hierarchicalIDNumber: 1, // need to add logic
+						hierarchicalLevelCode: 20
+						//hierarchicalParentIDNumber: "" // Blank Field
+					},
+					childHLList : payload groupBy (($.Client_MCI__c default "")) pluck $ map {
+						CLMList : $ map {
+							REF: if (($.claimsFrequencyTypeCode == '7' and $.Void_Claim_ICN__c != null) or (($.claimsFrequencyTypeCode == '8') and $.ICN_Number__c != null) ) 
+							({ //Payer Claim Control Number
+								referenceIdentification: if ($.claimsFrequencyTypeCode == '7') ($.Void_Claim_ICN__c default "") else (if ($.claimsFrequencyTypeCode == '8') ( $.ICN_Number__c  default "")  else "" ), // REF01  Depends on Provider first name 
+								referenceIdentificationQualifier: "F8"// REF01 
+							}) else "",
+							HIList: [
+								{ // Principal Diagnosis
+									content: "ABK" ++ vars.claimConfigurations["Component Separator"] ++ (($.Primary_Diagnosis_Code__c default "") replace "." with "" ) // Component BK:Primary_Diagnosis_Code__c
+								}														
+							],
+							LXList : [
+								{
+									DTPList : [
+										{ //  Service Date
+											dateTimePeriod: ($.Service_Start_Date__c as Date as String {format : "yyyyMMdd"}) ++ "-" ++ ($.Service_End_Date__c as Date as String {format : "yyyyMMdd"}), // DTP03 Service_End_Date__c - Service_Start_Date__c i
+											dateTimePeriodFormatQualifier: "RD8", // DTP02
+											dateTimeQualifier: "472" // DTP01
+										}
+									],
+									SV1 : {
+										"productOrServiceID" : "HC" ++  ((vars.claimConfigurations['Component Separator'] ++  ($.National_Healthcare_Procedure_Code_Calc__c default "") )  default "") ++  ((vars.claimConfigurations['Component Separator'] ++ $.Service_Modifier_1_Calc__c) default "") ++ ( (vars.claimConfigurations['Component Separator'] ++  $.Service_Modifier_2_Calc__c) default "") ++  ( (vars.claimConfigurations['Component Separator'] ++ $.Service_Modifier_3_Calc__c ) default "") ++  ( ( vars.claimConfigurations['Component Separator'] ++ $.Service_Modifier_4_Calc__c) default "") ,//SV201 - Revenue_Code__c 
+										"compositeMedicalProcedureIdentifier" : "",//SV202 Blank Field
+										"lineItemChargeAmount" : (($.Medicaid_Bill_Amount__c default "0") as Number) as String {format : "0.00"} , //SV203 - Medicaid_Bill_Amount__c,
+										"unitorBasisforMeasurementCode" : "UN" ,//SV204
+										"serviceUnitsOrDays" : ($.Number_of_Units__c default "0") as Number as String {format : "0" },	//SV205 - Number_of_Units__c,									
+										"serviceTypeCode":	""	,	
+										"compositeDiagnosisCodePointer":"1"	
+									},
+									assignedNumber : "1" //LX01
+								}
+							],
+							G1 : [ 
+							({
+								//REF01 : if (($.Service_Start_Date__c as Date >= "2020-10-01" as Date) and ($.Patient_Type_Calc__c == "Inpatient" )) ($.DMES_Authorization_Id__c ) else "",and ($.Patient_Type_Calc__c == "Outpatient")
+								REF02 : if (($.Service_Start_Date__c as Date >= "2020-10-01" as Date) ) ($.DMES_Authorization_Id__c ) else ""
+							}) if ((($.Service_Start_Date__c as Date) >= ("2020-10-01" as Date)) and ($.DMES_Authorization_Id__c != null)) ],	
+							NTE : if (($.Claim_Note__c != null) and ($.Claim_Note__c != "")) ({
+								"noteReferenceCode" : "ADD",//NTE01
+								"claimNoteText" : $.Claim_Note__c  //NTE02 Claim_Note__c
+							}) else "",
+							//PRV: { //Attending Provider Specialty Information
+							//	providerCode: "AT", //PRV01
+							//	referenceIdentificationQualifier: "PXC",//PRV02
+							//	referenceIdentification: $.Attending_Physician_Healthcare_Taxonomy__c default "" //PRV03 Attending Physician Healthcare Taxonomy
+							//},
+							patientAccountNumber : ($.Claim_Number__c default "") , // CLM01 Claim_Type__c + Claim_Number__c
+							totalClaimChargeAmount : (($.Medicaid_Bill_Amount__c default "0") as Number) as String {format : "0.00"} , // CLM02 Claim_Billing_amt__c
+							claimFilingIndicatorCode: "", // CLM03 Blank Field
+							nonProfessionalClaimTypeCode: "", // CLM04 Blank Field
+							healthCareServiceLocationInformation: ($.Place_of_Service_Code_Calc__c default "") ++ vars.claimConfigurations['Component Separator'] ++ "B" ++ vars.claimConfigurations['Component Separator'] ++ $.claimsFrequencyTypeCode, // CLM05 - Component - 	Place of Service Code:B:Claim Frequency Code
+							yesNoConditionOrResponseCode1: "Y", // CLM06 Empty for Professional
+							medicareAssignmentCode: "C", // CLM07
+							benefitsAssignmentCertificationIndicator: "Y", // CLM08
+							releaseofInformationCode: "Y" // CLM09	
+						}, //End of Claim Line
+						NM1List : [
+							{ // Subscriber Name
+								DMG : {
+									dateTimePeriod: if ($.Client_DOB__c[0] == null) ("") else ($.Client_DOB__c[0] as Date as String { format : "yyyyMMdd"} ), // DMG02 - Client_DOB__c
+									dateTimePeriodFormatQualifier: "D8", // DMG01,
+									genderCode: if (($.Client_Sex__c[0] default "" )== "Male") "M" else (if (($.Client_Sex__c[0] default "") == "Female") "F" else "") // DMG03 - Client_Sex__c : Also LOV Mapping
+								},
+								entityIdentifierCode: "IL", // NM101
+								entityTypeQualifier: "1", // NM102 - Interface Logic to be added
+								identificationCode: if (($.Client_MCI__c[0]  !=null) and ($.Client_MCI__c[0] != '') ) ( leftPad($.Client_MCI__c[0],10,0) ) else "" , // NM109 - Client_MCI__c padded to 10 chars
+								identificationCodeQualifier: "MI", // NM108
+								n3: {
+									addressInformation1: vars.claimConfigurations["Subscriber Street 1"] default "" // Claim Configuration Parameters -17
+								// addressInformation2: "" // not used in Subscriber Name mappings
+								},
+								n4: {
+									cityName: vars.claimConfigurations["Subscriber City"] default "", // N401 Claim Configuration Parameters - 19
+									stateOrProvinceCode: vars.claimConfigurations["Subscriber State"] default "", // N402 Claim Configuration Parameters - 20
+									postalCode: vars.claimConfigurations["Subscriber Zip Code"] default "" // N403 Claim Configuration Parameters - 21
+								},
+								nameFirst: $.Client_First_Name__c[0] default "", // NM104 Client_First_Name__c
+								nameLastOrOrganizationName: $.Client_Last_Name__c[0] default "", // NM103 Client_Last_Name__c
+								nameMiddle: $.Client_Middle_Name__c[0] default "", // NM105 Client_Middle_Name__c
+								namePrefix: "", // Blank Field NM106
+								nameSuffix: $.Client_Suffix__c[0] default "" // NM107 Client_Suffix__c
+							},
+							{ // Payer Name
+								
+								 REF: {
+									referenceIdentification: "516000279", // REF02 : Not used by interface
+									referenceIdentificationQualifier: "" // REF01
+								},
+								entityIdentifierCode: "PR", // NM101
+								entityTypeQualifier: "2", // NM102 
+								identificationCode: if ($.Service_Start_Date__c[0] as Date >= "2020-10-01" as Date) ("DSCYF") else (vars.claimConfigurations["Payer TIN"]), // NM109 Claim config ID  23
+								identificationCodeQualifier: "PI", // NM108
+					
+								n4: {
+									cityName: vars.claimConfigurations["Payer City"] default "Wiliminton", // N401 Claim Configuration Parameters - 26
+									stateOrProvinceCode: vars.claimConfigurations["Payer State"] default "DE", // N402 Claim Configuration Parameters - 27
+									postalCode: vars.claimConfigurations["Payer Zip Code"] default "198051121" // N403 Claim Configuration Parameters - 28								
+								},
+								nameFirst: "", // NM104 Blank field
+								nameLastOrOrganizationName: vars.claimConfigurations['Payer Name'] default "State of Delware",  // NM103 Claim Configuration Parameter -22
+								nameMiddle: "", // NM105 Blank field
+								namePrefix: "", // Blank Field NM106
+								nameSuffix: "" // NM107 Blank Field
+								}
+						],
+						SBRList : [{
+							claimFilingIndicatorCode: "MC", // Blank Field SBR09
+							conditionorResponseCode: "", // Blank Field SBR07
+							coordinationofBenefitsCode: "", // Blank Field SBR06
+							employmentStatusCode: "", // Blank Field SBR08
+							individualRelationshipCode: "18", // SBR02
+							insuranceTypeCode: "", // Blank Field SBR05
+							insuredGrouporPolicyNumber: "", // Blank Field SBR03
+							otherInsuredGroupName: "", // Blank Field SBR04
+							payerResponsibilitySequenceNumberCode: "P" // SBR01
+						}],
+						hierarchicalChildCode: 0,
+						//hierarchicalIDNumber: 2, // need to add logic
+						hierarchicalLevelCode: 22
+						//hierarchicalParentIDNumber: 1	 // need to add logic
+					} 
+				}],	
+				NM1List: [
+					{ // Submitted Name Mappings
+					PER: {
+						communiationNumber1: vars.claimConfigurations["Submitter Contact Phone"] default "", //PER04 Claims Config 4
+						communicationNumberQualifier1: "TE",//PER03 TE to represent Telephone
+						contactFunctionCode: "IC",//PER01
+						name: vars.claimConfigurations["Submitter Contact Name"] default "" //PER02 Claims Config -3
+					},
+					entityIdentifierCode: "41",//NM101
+					entityTypeQualifier: "2",//NM102
+					identificationCode: vars.claimConfigurations["Submitter ETIN"] default "", //NM109 Claims Config 2
+					identificationCodeQualifier: "46",//NM108
+					nameFirst: "", //NM104 Blank field
+					nameLastOrOrganizationName: vars.claimConfigurations["Submitter Name"] default "", //NM103 Claims Config 1
+					nameMiddle: "", //NM105 Blank field
+					namePrefix: "", //NM106 Blank field
+					nameSuffix: "" //NM107 Blank field
+				},
+				{ // Receiver Name Mapping section
+					entityIdentifierCode: "40",//NM101
+					entityTypeQualifier: "2",//NM102
+					identificationCode: vars.claimConfigurations["Receiver ETIN"] default "", //NM109 Claims Config -6
+					identificationCodeQualifier: "46",//NM108
+					nameFirst: "", //NM104 Blank field
+					nameLastOrOrganizationName: vars.claimConfigurations["Receiver Name"] default "", //NM103 Claims Config 5
+					nameMiddle: "", //NM105 Blank field
+					namePrefix: "", //NM106 Blank field
+					nameSuffix: "" //NM107 Blank field
+				}
+				]
+			},
+			transactionSetHeader: {
+				implementationConventionReference: vars.claimConfigurations['Pro Release ID'],
+				transactionSetControlNumber: vars.uniqueIdSt02,
+				transactionSetIDCode: "837"
+			},
+			transactionSetTrailer: {
+				transactionSegmentCount: "0", // Need to implement, should be auto-calculated
+				transactionSetControlNumber: vars.uniqueIdSt02
+			}
+		}]
+		}],
+		interchangeControlHeader: {
+		acknowledgmentRequested: "1", // No Acknowledgment Requested
+		authInfoQualifier: "00",
+		authInformation: "          ",
+		componentElementSeparator:  vars.claimConfigurations['Component Separator'] ++ vars.claimConfigurations['Segment Separator'],
+		interchangeControlNumber: vars.uniqueId,
+		interchangeControlVersionNumber: "00501",
+		interchangeDate: (now() >> "America/New_York") as String {format : "yyMMdd"},
+		interchangeIDQualifierReceiver: "ZZ",
+		interchangeIDQualifierSender: "ZZ",
+		interchangeReceiverID: if (vars.claimConfigurations["Receiver ETIN"]  != null ) ( rightPad(vars.claimConfigurations["Receiver ETIN"],15," ")  ) else "               ",  // Claim Configuration Parameter 6
+		interchangeSenderID: if (vars.claimConfigurations["Submitter ETIN"]  != null ) ( rightPad(vars.claimConfigurations["Submitter ETIN"],15," ") ) else "               ", // Claim Configuration Parameter 2
+		interchangeTime: (now() >> "America/New_York") as String {format : "HHmm"},
+		repetitionSeparator: "!",
+		securityInfoQualifier: "00",
+		securityInformation: "          ",
+		usageIndicator: p('secure::x12.hippamedicaidclaims837P.environment')
+	},
+	"interchangeControlTrailer" : {
+		interchangeControlNumber: vars.uniqueId,
+		numberOfIncludedFunctionalGroups: "1" // Number of Functional Groups 1 is fixed for 837 Inst and Prof
+	}
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<set-variable value="#[payload]" doc:name="Set Variable" doc:id="87365c15-ddeb-40f9-8c21-cc29ac75b70a" variableName="x12Format_pro"/>
+					<ee:transform doc:name="Transformer Reference : Call X12 Transformer" doc:id="51fe3d5c-483f-45f2-9438-d9813cbda907" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	interchangeControlHeader : ( 
+		"ISA" ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.authInfoQualifier ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.authInformation ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.securityInfoQualifier ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.securityInformation ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.interchangeIDQualifierSender ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.interchangeSenderID ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.interchangeIDQualifierReceiver ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.interchangeReceiverID ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.interchangeDate ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.interchangeTime ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.repetitionSeparator ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.interchangeControlVersionNumber ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.interchangeControlNumber ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.acknowledgmentRequested ++ vars.elementSeparator ++
+		payload.interchangeControlHeader.usageIndicator ++ vars.elementSeparator ++ (":~") ++ vars.segmentSeparator
+	),
+	interchangeControlTrailer : ("IEA" ++ vars.elementSeparator ++ 
+		payload.interchangeControlTrailer.numberOfIncludedFunctionalGroups ++ vars.elementSeparator ++ 
+		payload.interchangeControlTrailer.interchangeControlNumber ++ ("~") ++ vars.segmentSeparator
+	),
+	functionalGroupHeader : ("GS" ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupHeader.functionalIDCode[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupHeader.applicationSendersCode[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupHeader.applicationReceiversCode[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupHeader.date[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupHeader.time[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupHeader.groupControlNumber[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupHeader.responsibleAgencyCode[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupHeader.versionReleaseIndustryIDCode[0] ++ ("~") ++ vars.segmentSeparator
+	),
+	functionalGroupTrailer : ("GE" ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupTrailer.numberOfTransactionsSetsIncluded[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.functionalGroupTrailer.groupControlNumber[0] ++ ("~") ++ vars.segmentSeparator
+	),
+	transactionSetHeader : ("ST" ++ vars.elementSeparator ++ 
+		payload.functionalGroups.transactions[0].transactionSetHeader.transactionSetIDCode[0] ++ vars.elementSeparator ++ 
+		payload.functionalGroups.transactions[0].transactionSetHeader.transactionSetControlNumber[0] ++ vars.elementSeparator ++ 
+		payload.functionalGroups.transactions[0].transactionSetHeader.implementationConventionReference[0] ++ ("~") ++ vars.segmentSeparator
+	),
+	transactionSetTrailer : ("SE" ++ vars.elementSeparator ++ 
+		(payload.functionalGroups.transactions[0].transactionSetTrailer.transactionSegmentCount[0]) ++ vars.elementSeparator ++ 
+		(payload.functionalGroups.transactions[0].transactionSetTrailer.transactionSetControlNumber[0] default "") ++ ("~") ++ vars.segmentSeparator
+	),
+	BHT : ("BHT" ++ vars.elementSeparator ++
+		payload.functionalGroups.transactions[0].detailMessage837.BHT.hierarchicalStructureCode[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.transactions[0].detailMessage837.BHT.transactionSetPurposeCode[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.transactions[0].detailMessage837.BHT.referenceIdentification[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.transactions[0].detailMessage837.BHT.date[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.transactions[0].detailMessage837.BHT.time[0] ++ vars.elementSeparator ++
+		payload.functionalGroups.transactions[0].detailMessage837.BHT.transactionTypeCode[0] ++ ("~") ++ vars.segmentSeparator
+	),
+	REF : payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map ("REF" ++ vars.elementSeparator ++ 
+		($.parentHL.NM1List.REF.referenceIdentificationQualifier[0] ++ vars.elementSeparator) ++ 
+		($.parentHL.NM1List.REF.referenceIdentification[0] ++ ("~") ++ vars.segmentSeparator)
+	),
+	N3 : payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map ("N3" ++ vars.elementSeparator ++ 
+		($.parentHL.NM1List.n3.addressInformation1[0] ++ ("~") ++ vars.segmentSeparator ) //++ 
+		//($.parentHL.NM1List.n3.addressInformation2[0] ++ ("~") ++ vars.segmentSeparator)
+	),	
+	N4 : payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map ("N4" ++ vars.elementSeparator ++
+		($.parentHL.NM1List.n4.cityName[0] ++ vars.elementSeparator) ++ 
+		($.parentHL.NM1List.n4.stateOrProvinceCode[0] ++ vars.elementSeparator) ++
+		($.parentHL.NM1List.n4.postalCode[0] ++ ("~") ++ vars.segmentSeparator)
+	),
+	DMG : flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList.childHLList map ($.NM1List map ("DMG" ++ vars.elementSeparator ++ 
+		($.DMG.dateTimePeriodFormatQualifier[0] default "" ++ vars.elementSeparator) ++
+		($.DMG.dateTimePeriod[0] default "" ++ vars.elementSeparator) ++
+		($.DMG.genderCode[0] default "" ++ ("~") ++ vars.segmentseparator)
+	))),
+	PER : ("PER" ++ vars.elementSeparator ++ 
+		payload.functionalGroups.transactions[0].detailMessage837.NM1List[0].PER.contactFunctionCode[0] ++ vars.elementSeparator ++ 
+		payload.functionalGroups.transactions[0].detailMessage837.NM1List[0].PER.name[0] ++ vars.elementSeparator ++ 
+		payload.functionalGroups.transactions[0].detailMessage837.NM1List[0].PER.communicationNumberQualifier1[0] ++ vars.elementSeparator ++ 
+		payload.functionalGroups.transactions[0].detailMessage837.NM1List[0].PER.communiationNumber1[0] ++ ("~") ++ vars.segmentseparator
+	),
+	PRV : payload.functionalGroups.transactions[0].detailMessage837.HLLoopList map ("PRV" ++ vars.elementSeparator ++ 
+		($.parentHL.PRV.providerCode[0] ++ vars.elementSeparator) ++ 
+		($.parentHL.PRV.referenceIdentificationQualifier[0] ++ vars.elementSeparator) ++ 
+		($.parentHL.PRV.referenceIdentification[0] ++ ("~") ++ vars.segmentseparator)
+	),
+	DTP : flatten (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map ("DTP" ++ vars.elementSeparator ++
+		($.LXList[0].DTPList[0].dateTimeQualifier[0] ++ vars.elementSeparator) ++
+		($.LXList[0].DTPList[0].dateTimePeriodFormatQualifier[0] ++ vars.elementSeparator) ++
+		($.LXList[0].DTPList[0].dateTimePeriod[0] ++ ("~") ++ vars.segmentseparator)
+	),
+	//CL1 : flatten (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map ("CL1" ++ vars.elementSeparator ++
+	//	 ($.CL1.admissionTypeCode ++ vars.elementSeparator) ++
+	//	 ($.CL1.admissionSourceCode ++ vars.elementSeparator) ++
+	//	 ($.CL1.patientStatusCode ++ vars.segmentSeparator)
+	//),
+	NTE : flatten (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map ( if ($.NTE == "") ("") else
+		("NTE" ++ vars.elementSeparator ++
+		 ($.NTE.noteReferenceCode[0] default "" ++ vars.elementSeparator) ++
+		 ($.NTE.claimNoteText[0] default "" ++ ("~") ++ vars.segmentSeparator))
+	),
+	LXList : (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map ($.LXList map ("LX" ++ vars.elementSeparator ++
+		($[0].assignedNumber ++ ("~") ++ vars.segmentSeparator) 
+	)),
+	SV1 :  (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map ($.LXList map $.SV1 map ("SV1" ++ vars.elementSeparator ++
+		($.productOrServiceID[0] default "" ++ vars.elementSeparator) ++
+		($.lineItemChargeAmount[0] default "" ++ vars.elementSeparator) ++
+		($.unitorBasisforMeasurementCode[0] default "" ++ vars.elementSeparator) ++
+		($.serviceUnitsOrDays[0] default "" ++ vars.elementSeparator) ++
+		($.compositeMedicalProcedureIdentifier[0] default "" ++ vars.elementSeparator) ++
+		($.serviceTypeCode[0] default "" ++ vars.elementSeparator) ++
+		($.compositeDiagnosisCodePointer[0] default "" ++ ("~") ++ vars.segmentSeparator)
+	)),
+	SV2 : flatten (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map ("SV1" ++ vars.elementSeparator ++
+		($.LXList[0].SV1.productOrServiceID default "" ++ vars.elementSeparator) ++
+		($.LXList[0].SV1.compositeMedicalProcedureIdentifier default "" ++ vars.elementSeparator) ++
+		($.LXList[0].SV1.lineItemChargeAmount default "" ++ vars.elementSeparator) ++
+		($.LXList[0].SV1.unitorBasisforMeasurementCode default "" ++ vars.elementSeparator) ++
+		($.LXList[0].SV1.serviceUnitsOrDays default "" ++ vars.elementSeparator) ++
+		($.LXList[0].SV1.serviceTypeCode[0] default "" ++ vars.elementSeparator) ++
+		($.LXList[0].SV1.compositeDiagnosisCodePointer[0] default "" ++ ("~") ++ vars.segmentSeparator)
+	),
+	DTPList : (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map ($.LXList map $.DTPList[0] map ("DTP" ++ vars.elementSeparator ++
+		($.dateTimeQualifier[0] ++ vars.elementSeparator) ++
+		($.dateTimePeriodFormatQualifier[0] ++ vars.elementSeparator) ++
+		($.dateTimePeriod[0] ++ ("~") ++ vars.segmentSeparator)
+	)),
+	HIList : (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map ($.HIList map  ("HI" ++ vars.elementSeparator ++
+		 $.content[0] ++ ("~") ++ vars.segmentSeparator 
+			)),
+			
+	G1 : (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList)) map ($.CLMList.G1 map(v,i) -> (if ((sizeOf (v) > 0) and (v.REF02 != null)) 
+		("REF*G1" ++ vars.elementSeparator ++ (v.REF02[0] default "") ++ ("~") ++ vars.segmentSeparator ) else ""
+		)),
+	F8 : flatten (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.CLMList)) map (if ($.REF == "") ("") else ("REF" ++ vars.elementSeparator ++ 
+		($.REF.referenceIdentificationQualifier default "") ++ vars.elementSeparator ++
+		($.REF.referenceIdentification default "") ++ ("~") ++ vars.segmentSeparator 
+		)),	
+	CLM : (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList)) map ($.CLMList map  ("CLM" ++ vars.elementSeparator ++
+		($.patientAccountNumber default "" ++ vars.elementSeparator) ++
+		($.totalClaimChargeAmount default "" ++ vars.elementSeparator) ++
+		($.claimFilingIndicatorCode default "" ++ vars.elementSeparator) ++
+		($.nonInstitutionalClaimTypeCode default "" ++ vars.elementSeparator) ++
+		($.healthCareServiceLocationInformation default "" ++ vars.elementSeparator) ++
+		($.yesNoConditionOrResponseCode1 default "" ++ vars.elementSeparator) ++
+		($.medicareAssignmentCode default "" ++ vars.elementSeparator) ++
+		($.benefitsAssignmentCertificationIndicator default "" ++ vars.elementSeparator) ++
+		($.releaseofInformationCode default "" ++ ("~") ++ vars.segmentseparator) ++ ( if ($.REF != "")	(("REF" ++ vars.elementSeparator) ++ 
+		($.REF.referenceIdentificationQualifier ++ vars.elementSeparator) ++ 
+		($.REF.referenceIdentification ++ ("~") ++ vars.segmentseparator)) else "")	
+
+		//(DTP ++ vars.segmentseparator) ++
+		//(CL1 ++ vars.segmentseparator) ++
+		//(CN1 ++ vars.segmentseparator) ++
+
+		//(NTE ++ vars.segmentseparator) ++
+		//(HIList ++ vars.segmentseparator) ++
+		//(NM1 ++ vars.segmentseparator) ++
+		//(SBR ++ vars.segmentseparator) ++
+		//(PRV ++ vars.segmentseparator) ++
+		//(LX ++ vars.segmentseparator) ++
+	)),	
+	HL : ("HL*1**20*1" ++ ("~") ++ vars.segmentseparator),
+	HLLoopList : flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList) map ("HL" ++ vars.elementSeparator ++ 
+		(($$ + 2) default "" ++ vars.elementSeparator) ++ ("1*22*0") ++ ("~") ++ vars.segmentseparator
+		//($.hierarchicalParentIDNumber default "" ++ vars.elementSeparator) ++ 
+		//($.hierarchicalLevelCode default "" ++ vars.elementSeparator) ++ 
+		//($.hierarchicalChildCode default "" ++ vars.segmentseparator)	//++
+		//PRV ++ vars.segmentseparator ++
+		//SBR ++ vars.segmentseparator ++ 
+		//DTP ++ vars.segmentseparator ++
+		//NM1 ++ vars.segmentseparator ++
+		//CLM ++ vars.segmentseparator
+	),	
+	SBR : payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map ("SBR" ++ vars.elementSeparator ++ 
+		($.childHLList.SBRList[0].payerResponsibilitySequenceNumberCode[0] ++ vars.elementSeparator) ++
+		($.childHLList.SBRList[0].individualRelationshipCode[0] ++ vars.elementSeparator) ++
+		($.childHLList.SBRList[0].insuredGrouporPolicyNumber[0] ++ vars.elementSeparator) ++
+		($.childHLList.SBRList[0].otherInsuredGroupName[0] ++ vars.elementSeparator) ++
+		($.childHLList.SBRList[0].insuranceTypeCode[0] ++ vars.elementSeparator) ++
+		($.childHLList.SBRList[0].coordinationofBenefitsCode[0] ++ vars.elementSeparator) ++
+		($.childHLList.SBRList[0].conditionorResponseCode[0] ++ vars.elementSeparator) ++
+		($.childHLList.SBRList[0].employmentStatusCode[0] ++ vars.elementSeparator) ++
+		($.childHLList.SBRList[0].claimFilingIndicatorCode[0] ++ ("~") ++ vars.segmentseparator) //++
+		//NM1List ++ vars.segmentseparator ++
+		//DMG ++ vars.segmentseparator
+	),
+	NM1ParentList : (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.parentHL.NM1List[$$]) map ("NM1" ++ vars.elementSeparator ++
+		($.entityIdentifierCode ++ vars.elementSeparator) ++
+		($.entityTypeQualifier ++ vars.elementSeparator) ++
+		($.nameLastOrOrganizationName ++ vars.elementSeparator) ++
+		($.nameFirst ++ vars.elementSeparator) ++
+		($.nameMiddle ++ vars.elementSeparator) ++
+		($.namePrefix ++ vars.elementSeparator) ++
+		($.nameSuffix ++ vars.elementSeparator) ++
+		($.identificationCodeQualifier ++ vars.elementSeparator) ++
+		($.identificationCode ++ ("~") ++ vars.segmentSeparator) //++
+		//N3 ++ vars.segmentSeparator ++
+		//N4 ++ vars.segmentSeparator ++
+		//DMG ++ vars.segmentSeparator ++
+		//REF ++ vars.segmentSeparator ++
+		//PER ++ vars.segmentSeparator
+	),
+	NM1ChildList : (flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.NM1List)) map ("NM1" ++ vars.elementSeparator ++
+		($.entityIdentifierCode[0] ++ vars.elementSeparator) ++
+		($.entityTypeQualifier[0] ++ vars.elementSeparator) ++
+		($.nameLastOrOrganizationName[0] ++ vars.elementSeparator) ++
+		($.nameFirst[0] ++ vars.elementSeparator) ++
+		($.nameMiddle[0] ++ vars.elementSeparator) ++
+		($.namePrefix[0] ++ vars.elementSeparator) ++
+		($.nameSuffix[0] ++ vars.elementSeparator) ++
+		($.identificationCodeQualifier[0] ++ vars.elementSeparator) ++
+		($.identificationCode[0] ++ ("~") ++ vars.segmentSeparator)),
+	
+	NM1ListSubmitted : ("NM1" ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].entityIdentifierCode ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].entityTypeQualifier ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].nameLastOrOrganizationName ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].nameFirst default "" ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].nameMiddle default "" ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].namePrefix default "" ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].nameSuffix default "" ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].identificationCodeQualifier default "" ++ vars.elementSeparator ++ 
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[0].identificationCode default "" ++ ("~") ++ vars.segmentSeparator
+	),
+	NM1ListReceiver : ("NM1" ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].entityIdentifierCode ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].entityTypeQualifier ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].nameLastOrOrganizationName ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].nameFirst ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].nameMiddle ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].namePrefix default "" ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].nameSuffix default "" ++ vars.elementSeparator ++
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].identificationCodeQualifier default "" ++ vars.elementSeparator ++ 
+	payload.functionalGroups[0].transactions[0].detailMessage837.NM1List[1].identificationCode default "" ++ ("~") ++ vars.segmentSeparator
+	 
+	),
+	NM1Payer : flatten (payload.functionalGroups.transactions[0].detailMessage837[0].HLLoopList map $.childHLList.NM1List) map ("NM1" ++ vars.elementSeparator ++ "PR*2*" ++ vars.claimConfigurations['Payer Name'] ++ "*****PI*" ++ 
+	//$.childHLList.NM1List[0][1].entityIdentifierCode[0] ++ vars.elementSeparator ++
+	//$.childHLList.NM1List[0][1].entityTypeQualifier[0] ++ vars.elementSeparator ++ 
+	//$.childHLList.NM1List[0][1].nameLastOrOrganizationName[0] ++ vars.elementSeparator ++
+	//$.childHLList.NM1List[0][1].nameFirst[0] ++ vars.elementSeparator ++
+	//$.childHLList.NM1List[0][1].nameMiddle[0] ++ vars.elementSeparator ++
+	//$.childHLList.NM1List[0][1].namePrefix[0] default "" ++ vars.elementSeparator ++
+	//$.childHLList.NM1List[0][1].nameSuffix[0] default "" ++ vars.elementSeparator ++
+	//$.childHLList.NM1List[0][1].identificationCodeQualifier[0] default "" ++ vars.elementSeparator ++ 
+	$.identificationCode[1] ++ ("~") ++ vars.segmentSeparator ++ 
+	"N4" ++ vars.elementSeparator ++
+ 	$.n4.cityName[1] default "" ++ vars.elementSeparator ++ 
+ 	$.n4.stateOrProvinceCode[1] default "" ++ vars.elementSeparator ++ 
+ 	$.n4.postalCode[1] default "" ++ ("~") ++ vars.segmentSeparator)
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<ee:transform doc:name="Transform Message : Combine segments" doc:id="00e700e1-26a2-45e8-947d-c952ebef005c" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+( payload.interchangeControlHeader ++ payload.functionalGroupHeader ++ payload.transactionSetHeader ++ 
+  payload.BHT ++ payload.NM1ListSubmitted ++ payload.PER ++  payload.NM1ListReceiver ++ 
+  payload.HL ++ payload.PRV[0] ++ payload.NM1ParentList[0] ++ payload.N3[0] ++ payload.N4[0] ++ payload.REF[0] ++	
+	((vars.x12Format_pro.functionalGroups.*transactions[0].detailMessage837.HLLoopList[0].*childHLList[0] map 
+		(payload.HLLoopList[$$] ++ payload.SBR[0] ++ payload.NM1ChildList[$$] ++ payload.N3[0] ++ payload.N4[0] ++ payload.DMG[$$] ++ payload.NM1Payer[$$] ++ 
+			(((payload.CLM[$$] map (v,i) -> payload.CLM[$$][i] ++ payload.HIList[$$][i] ++ payload.LXList[$$][i] ++ payload.SV1[$$][i] ++ payload.DTPList[$$][i] ++ payload.G1[$$][i] )  joinBy "" )  )
+		)
+	) joinBy "" ) ++
+ payload.transactionSetTrailer ++ payload.functionalGroupTrailer ++ payload.interchangeControlTrailer 
+) as String]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<ee:transform doc:name="Transform Message : Convert to plain text" doc:id="a4f74b0c-af27-4820-8e65-67e7760a60f7" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output text/plain
+---
+payload replace ("SE*0") with ("SE*" ++ (sizeOf (payload scan ("\n")) - 4))]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+					<set-variable value='#["FFS-545572159_837P" ++  now()  as String {format: "yyyyMMddHHmmss"} ++ p("secure::x12.hippamedicaidclaims837P.filename.extension")]' doc:name="Set File Name" doc:id="e472284f-54d1-464e-8a1a-3f77776af835" variableName="fileName"/>
+					<!--<sftp:write doc:name="Write" doc:id="7d6790e6-1560-4696-a97b-6fdbe10a02a3" config-ref="SFTP_Config" path='#[p("secure::sftp.dmes.hippa.837P.transaction.path") ++ vars.fileName]'/>-->
+					<flow-ref doc:name="inf016_On_Complete_Transaction_Sub_Flow" doc:id="0cfdb419-9305-4f29-89d8-a307c83d0897" name="inf016_On_Complete_Transaction_Sub_Flow"/>
+				<!-- </foreach> -->	
+
+</sub-flow>
+	<sub-flow name="inf016_hippa_medicaid_claims_837_pro_get_ICN_Flow" doc:id="f453a5bb-a704-4612-aefb-9d6f5d5d48b5" >
+		<ee:transform doc:name="Create Void ICN List for Query" doc:id="9e59b1d3-5478-4a99-a9db-bdd8c9e1888d" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="VoidICNList" ><![CDATA[%dw 2.0
+output application/java
+---
+//Create where clause for SOQL query.
+
+vars.updatePayload filter ($.Void_Claim_ICN__c != null) map ("'" ++ $.Void_Claim_ICN__c ++ "'" ) ]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each : Iterate over VoidICN List" doc:id="a5a2c727-e250-4194-90d1-d4cf503109cb" doc:description="Iterate 150 records from Void ICN List at a time. This is done because of the where clause charcter limit of 4000 charcters for an SOQL Query" collection="#[vars.VoidICNList]" batchSize="150">
+			<ee:transform doc:name="Transform Message : prepare Payload for Salesforce Query" doc:id="30ac3121-d6ce-4233-8560-3ae12ab04795" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ($) joinBy ","]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<salesforce:query doc:name="Salesforce : Get ID with Void ICN match" doc:id="d040ee92-f55d-4669-b5b8-fd33836dbfd0" doc:description="Get ID with Void ICN matches with ICN Number, these records will be updated with VOID Submit date" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query >select Id from DEL_Medicaid_Billing__c where ICN_Number__c IN (:ICN)</salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+ICN : payload]]]></salesforce:parameters>
+			</salesforce:query>
+			<set-variable value="#[((vars.updateList default []) ++ payload )]" doc:name="Set Variable updateList" doc:id="fdd35ead-4d30-4079-9ef2-da0cf7cad5dc" variableName="updateList"/>
+		</foreach>
+		<ee:transform doc:name="Transform Message : Prepare Update List Using the Query Result" doc:id="b1ff8a43-7109-441d-9e52-ea08f5688bc8">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+				<ee:set-variable variableName="updateList" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.updateList default [] map {
+	Id : $.Id,
+	Void_Submission_Date__c : now()
+}]]></ee:set-variable>
+				
+</ee:variables>
+			</ee:transform>
+	</sub-flow>
+	<sub-flow name="inf016_Log_In_Progress_Transaction_Sub_Flow" doc:id="cda99be3-08a6-4565-acfa-fd7b640a34dc" >
+		<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF016",
+ "InterfaceName": "HIPPA Medicaid Claims 837 Professional Extract",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":"",
+ "CompletedExtension":"",  
+ "TransactionID": "", 
+ "MuleID":correlationId,
+ "Status":"In Progress",
+ "RecordCount":0,
+ "RecordSuccess":0,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload" doc:id="8c106998-ce12-437e-8a4b-19caeca2700b" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="ae0d40fc-b9ff-4559-b822-186ba6e8aa0c" name="LogTransactionSubFlow"/>
+	</sub-flow>
+	<sub-flow name="inf016_On_Complete_Transaction_Sub_Flow" doc:id="4e3eab20-1d53-4102-b695-2710e5df6a28" >
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="e184d577-63bb-4721-b08a-7de91be72ffb" variableName="TransAttachment"/>
+		<set-payload value='#[%dw 2.0
+output application/json
+---
+{"InterfaceID": "INF016",
+ "InterfaceName": "Hippa Medicaid Claim - Pro",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":vars.fileName,
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Success",
+ "RecordCount": vars.RecordCount,
+ "RecordSuccess":vars.RecordCount,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"On Demand Job"
+ }]' doc:name="Set Payload" doc:id="f9c5dda3-6afc-40e6-9c4b-2191aea5b583" />
+		<flow-ref doc:name="Flow Reference" doc:id="ac539c6f-6f26-4b76-9b44-678e320710b0" name="LogTransactionSubFlow"/>
+	</sub-flow>
+
+</mule>

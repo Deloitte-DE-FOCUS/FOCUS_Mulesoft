@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<types:mule xmlns:types="http://www.mulesoft.org/schema/mule/types">
+  <types:catalog>
+    <types:type name="ffd" format="fixedWidth">
+      <types:shape format="fixedWidth" element="ffd" location="ffd.ffd" example="examples/dscyf_error_20200305.txt"/>
+    </types:type>
+  </types:catalog>
+  <types:enrichment select="#fa277dad-067f-4418-bb69-26f4c2edde78"/>
+  <types:enrichment select="#ac1e664c-9d9a-47c9-8257-5695cde4f08a"/>
+  <types:enrichment select="#3bff7d95-da1f-4e2b-ad1e-77a55a80aca2"/>
+  <types:enrichment select="#50abfad3-94d2-40a6-ac6d-f6c9d2bac539"/>
+  <types:enrichment select="#c7d4fb23-755d-420b-a086-71bd438f5294"/>
+  <types:enrichment select="#adafe4ca-b681-4e6b-bb21-65128210f5ae"/>
+  <types:enrichment select="#325f9563-ce68-489f-a228-a8b7f051a0b6"/>
+  <types:enrichment select="#3ddc0d68-bbce-4e42-b6b6-c821f94ef4e8"/>
+  <types:enrichment select="#19830074-caa3-4f59-b7b5-922aad4a7116"/>
+</types:mule>

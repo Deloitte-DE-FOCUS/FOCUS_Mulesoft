@@ -1,0 +1,12 @@
+form: FIXEDWIDTH
+id: 'ErrorResponse'
+name: 'ErrorResponse'
+values: 
+- { name: 'MID', type: String, length: 10 }
+- { name: 'Filler', type: String, length: 1 }
+- { name: 'DATE', type: Integer, length: 8 }
+- { name: 'Filler', type: String, length: 1 }
+- { name: 'ERROR-CODE', type: String, length: 4 }
+- { name: 'Filler', type: String, length: 1 }
+- { name: 'ERROR-MESSAGE', type: String, length: 50 }
+- { name: 'Filler', type: String, length: 1 }
