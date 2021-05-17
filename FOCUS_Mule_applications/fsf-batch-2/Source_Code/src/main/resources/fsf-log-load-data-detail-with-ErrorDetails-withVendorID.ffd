@@ -1,0 +1,8 @@
+form: FIXEDWIDTH
+name: 'fsf-log-load-data-detail'
+values: 
+- { name: 'RecordType', usage: M, type: String, length: 2 }
+- { name: 'ETIN', usage: M, type: String, length: 10 }
+- { name: 'InterfaceErrorMessage', usage: M, type: String, length: 73 }
+- { name: 'VendorID', usage: M, type: String, length: 50 }
+- { name: 'UpdateError', usage: M, type: String, length: 200 }

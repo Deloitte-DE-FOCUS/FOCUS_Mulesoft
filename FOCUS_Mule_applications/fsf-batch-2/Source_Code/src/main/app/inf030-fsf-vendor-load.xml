@@ -1,0 +1,891 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:smtp="http://www.mulesoft.org/schema/mule/smtp"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/smtp http://www.mulesoft.org/schema/mule/smtp/current/mule-smtp.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+
+
+	<objectstore:config name="FSF_Vendor_Load_ObjectStore__Connector" doc:name="ObjectStore: Connector" objectStore-ref="FSF_Vendor_Load_Object_Store"/>	
+	<objectstore:config name="FSF_Vendor_Load_Error_ObjectStore" doc:name="ObjectStore: Connector" objectStore-ref="FSF_Vendor_Load_Error_Object_Store"/>
+    <spring:beans>
+         <spring:bean id="FSF_Vendor_Load_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean> 
+         <spring:bean id="FSF_Vendor_Load_Error_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean>
+   	</spring:beans>
+
+    <flow name="inf030-fsf-vendor-loadFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="Polls in US-Eastern Timezone at 10 07 AM everyday">
+            <schedulers:cron-scheduler expression="0 7 10 1/1 * ? *" timeZone="US/Eastern"/>
+			<!-- <schedulers:cron-scheduler expression="0 1/1 * 1/1 * ? *" /> -->
+            <set-payload value="INF030" doc:name="Set Payload to Interface ID" doc:description="Payload is set it interface ID so that the Flow will trigger and later this ID will be used in the Logging and Exception handling framework"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Flowvars is set it interface ID recieved from payload so that the Flow will trigger and later this ID will be used in the Logging and Exception Handling Framework"/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" doc:name="Until Successful" synchronous="true">
+            <mulerequester:request resource="sftp://${sftp.FSFVendorLoad.transaction.username}:${sftp.FSFVendorLoad.transaction.password}@${sftp.FSFVendorLoad.transaction.host}:${sftp.FSFVendorLoad.transaction.port}${sftp.FSFVendorLoad.transaction.path}?connector=SFTPOverride&amp;myfilename=${sftp.FSFVendorLoad.transaction.filename}" timeout="120000" doc:name="Mule Requester" doc:description="Mule Requester retrieves the File from the SFTP Directory if file was not found Null is returned"/>
+        </until-successful>
+		<validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validation : if File is not found then Null is returned, this component validates for Not null, if Null is returned then Exception will be thrown." config-ref="Validation_Configuration1"/>        
+        <object-to-string-transformer doc:name="Object to String" mimeType="text/plain" doc:description="Consume Payload"/>
+        <until-successful maxRetries="3" doc:name="Until Successful" millisBetweenRetries="20000" synchronous="true">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP" outputPattern="${sftp.FSFVendorLoad.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.FSFVendorLoad.archive.host}" port="${sftp.FSFVendorLoad.archive.port}" path="${sftp.FSFVendorLoad.archive.path}" user="${sftp.FSFVendorLoad.archive.username}" password="${sftp.FSFVendorLoad.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP : Archive File" doc:description="Archiving the file in a configured SFTP location"/>
+        </until-successful>
+        <set-session-variable variableName="totalRecCount" value="#[payload.split(&quot;\n&quot;).length]" doc:name="Session Variable : Set Total Record Count" doc:description="Set Total records count by splitting the Payload with Line Feed character"/>
+        <set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="Set TransAttachment" doc:description="Set Transaction Attachment for the Logging Framework
+This serves as a backup of the file in Interface dashboard"/>
+        
+        <set-payload value="#[payload.split(&quot;\nH&quot;)]" doc:name="Set Payload : Split Payload" doc:description="Splitting the Payload with Line feed and 'H' charcter to get a  Vendor records as a set of (Header , Withholding, Address , Location )"/>
+
+ 		<enricher doc:name="Message Enricher : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+			<flow-ref name="VendorLoadLogInProgressTransaction_Sub_Flow" doc:name="VendorLoadLogInProgressTransaction_Sub_Flow" doc:description="Invoke In Progress Transaction"/>
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+		</enricher> 
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Delete Trans Attachment" doc:description="Delete Trasaction Attachment so that it wont be logged again in the Interface dashboard">
+			<delete-message-property key="TransAttachment" /> 
+		</message-properties-transformer>
+ 
+                <enricher source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]" doc:name="Message Enricher : Retrieve LOV values" doc:description="Retrieve LOV values in Message enricher, so that the orignal payload is not disturbed.">
+                    <flow-ref name="inf030-fsf-vendor-load-retrieve-LOV-Sub_Flow" doc:name="inf030-fsf-vendor-load-retrieve-LOV-Sub_Flow"/>
+                </enricher>
+               
+        <batch:execute name="inf030-fsf-vendor-loadBatch" doc:name="inf030-fsf-vendor-loadBatch"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="inf030-fsf-vendor-load-retrieve-LOV-Sub_Flow">
+        <dw:transform-message doc:name="Transform Message : Prepare Payload for Query Framework" doc:description="Prepare Payload for Query Framework Only the specified LOV will be retrieved ">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Direction" : "Inbound",
+	"LOVNames" : "'WITHHOLDING_CLASS'"
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow> 
+    <batch:job name="inf030-fsf-vendor-loadBatch" max-failed-records="-1">
+        <batch:process-records>
+            <batch:step name="Batch_Step_Enrich_Records">
+            	<set-payload value="#[payload.startsWith(&quot;H&quot;) ? payload : (&quot;H&quot; + payload) ]" doc:name="Set Payload : Enrich Payload" doc:description="Add H Charcter which was lost during Splitting"/>
+                <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload : Split Payload : Get records" doc:description="Get Indivisual Records"/>
+                <set-variable variableName="HeaderLength" value="#[payload[0].length()]" doc:name="Variable: Header Length" doc:description="Getting the Header Record Length"/>
+        		<set-variable variableName="Header" value="#[payload[0]]" doc:name="Variable: Store Header" doc:description="Storing the Header Record "/>
+                <enricher source="#[payload]" target="#[flowVars.headerrec]" doc:name="Message Enricher">
+                    <!-- <processor-chain doc:name="Processor Chain"> -->
+                        <dw:transform-message doc:name="Transform Message : Mark Valid records" doc:description="Flagging the Valid Records having correct Header Length">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{ 
+"data" : flowVars.Header ,
+"valid" : ((sizeOf (flowVars.Header)) == 214),
+(desc : "Length of the Header Record is incorrect, expected 214 but found " ++ flowVars.HeaderLength ++ " , Child Records will be ignored \n****************************\n" ++ ((payload joinBy "\n") ++ "\n ****************************\n\n" ) ) when ((sizeOf (flowVars.Header)) !=214) 
+}]]></dw:set-payload>
+                        </dw:transform-message>
+                     <!-- </processor-chain> -->
+                </enricher>
+                <batch:set-record-variable variableName="valid" value="#[flowVars.headerrec]" doc:name="Record Variable : Valid Records " doc:description="Creating a Batch Record valraible flag for marking Valid records so that it can be avaialable in all Batch Steps"/>
+                <batch:set-record-variable variableName="subrecCount" value="#[payload.length]" doc:name="Record Variable : Sub Record Count " doc:description="Creating a Batch Record valraible flag for storing Sub Payload Record Count so that it can be avaialable in all Batch Steps"/>
+                <!-- <logger message="qwe" level="INFO" doc:name="Logger"/> -->
+            </batch:step>
+            <batch:step name="InValid_length_Header_Batch_Step" accept-expression="#[recordVars.valid.valid == false]">
+                <batch:commit  doc:name="Batch Commit" size="250">
+                    <!-- <logger message="qwerttyyy" level="INFO" doc:name="Logger"/> -->
+                    <!-- <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="invalidLengthHeaderCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[&quot;&quot; + payload.size()]" overwrite="true" doc:name="ObjectStore : Store invalid Length Header Count"/> -->
+                	<foreach collection="#[flowVars.records]" doc:name="For Each : Loop over all records" doc:description="Loop Over all Records using special flow variable avaialable in Batch">
+                		<expression-component doc:name="Expression : Create Report"><![CDATA[flowVars.invalidHeader = (flowVars.invalidHeader == null) ? "" + (payload.recordVars['valid']['data'] + "," + payload.recordVars['valid']['desc'] ) : flowVars.invalidHeader + (payload.recordVars['valid']['data'] + "," + payload.recordVars['valid']['desc'] )
+]]></expression-component>
+                		<expression-component doc:name="Expression : Get Count "><![CDATA[flowVars.invalidRecordsCount = (flowVars.invalidRecordsCount == null) ? (payload.recordVars['subrecCount']) : flowVars.invalidRecordsCount + (payload.recordVars['subrecCount'])
+]]></expression-component> 
+					</foreach>
+					
+                    <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="invalidLengthHeader#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.invalidHeader]" doc:name="ObjectStore : Store Report" doc:description="Storing Invalid Header Records Report"/>
+                    <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="invalidLengthRecordsCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[&quot;&quot; + flowVars.invalidRecordsCount]" doc:name="ObjectStore : Store Invalid Records Count" doc:description="Storing Invalid Header Records Count"/>
+                    <!-- <logger message="qwe" level="INFO" doc:name="Logger"/> -->
+                </batch:commit>
+
+            </batch:step>
+            <batch:step name="Valid_length_Header_Batch_Step" accept-expression="#[recordVars.valid.valid == true]">
+                <set-variable variableName="HeaderLength" value="#[payload[0].length()]" doc:name="Variable : Store Header Length" doc:description="Storing Valid Header Length"/>
+        		<set-variable variableName="Header" value="#[payload[0]]" doc:name="Variable : Store Header" doc:description="Storing Valid Header"/>
+                <dw:transform-message doc:name="Transform Message : Header Fixed Length Transform" doc:description="Fixed Length transform on Header Record to convert it to Java Payload of List of Maps">
+                    <dw:input-variable variableName="Header"  mimeType="text/plain">
+                        <dw:reader-property name="schemaPath" value="fsf-data-header.ffd"/>
+                    </dw:input-variable>
+                    <dw:set-variable variableName="headerData"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	data : payload[0],
+	valid : ( flowVars.Header.Header != null and flowVars.Header.VendorID != null and flowVars.Header.ETIN != null and flowVars.Header.VendorName != null and flowVars.Header.Withholding != null),  
+	parsedData : flowVars.Header,
+	(desc : (("Missing Header" ) when (flowVars.Header.Header == null)  otherwise "" ) ++ ((" Missing Vendor ID" ) when (flowVars.Header.VendorID == null)  otherwise "" ) ++ ((" Missing ETIN" ) when (flowVars.Header.ETIN == null) otherwise "" ) ++ ((" Missing Vendor Name" ) when (flowVars.Header.VendorName == null) otherwise "" ) ++ ((" Missing Withholding Flag" ) when (flowVars.Header.Withholding == null) otherwise "" ) ++ " , Child Records will be ignored \n****************************\n" ++ ((payload joinBy "\n") ++ "\n ****************************\n\n" ) ) when ( flowVars.Header.Header == null or flowVars.Header.VendorID == null or flowVars.Header.ETIN == null or flowVars.Header.VendorName == null or flowVars.Header.Withholding == null)
+}]]></dw:set-variable>
+                </dw:transform-message>
+
+                <batch:set-record-variable variableName="validFields" value="#[flowVars.headerData]" doc:name="Record Variable : Store Header Data" doc:description="Storing Parsed Header data"/>
+                <!-- <logger message="qwe" level="INFO" doc:name="Logger"/> -->
+  
+            </batch:step>
+            <batch:step name="InValid_Fields_Header_Batch_Step" accept-expression="#[(recordVars.valid.valid == true) &amp;&amp; (recordVars.validFields.valid == false)]">
+                <batch:commit  doc:name="Batch Commit" size="250">
+                    <!-- <logger message="qwerttyyy" level="INFO" doc:name="Logger"/> -->
+                    <!-- <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="invalidFieldsHeaderCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[&quot;&quot; + payload.size()]" overwrite="true" doc:name="ObjectStore : Store Count"/> -->
+                	<foreach collection="#[flowVars.records]" doc:name="For Each : Loop over all records" doc:description="Looping Over all records">
+                		<expression-component doc:name="Expression : Create Report"><![CDATA[flowVars.missingHeader = (flowVars.missingHeader == null) ? "" + (payload.recordVars['validFields']['data'] + "," + payload.recordVars['validFields']['desc'] ) : flowVars.missingHeader + (payload.recordVars['validFields']['data'] + "," + payload.recordVars['validFields']['desc'] )
+]]></expression-component>
+                		<expression-component doc:name="Expression : Get Count "><![CDATA[flowVars.invalidRecordsCount = (flowVars.invalidRecordsCount == null) ? (payload.recordVars['subrecCount']) : flowVars.invalidRecordsCount + (payload.recordVars['subrecCount'])
+]]></expression-component> 
+					</foreach>
+                    <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="invalidFieldsHeader#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.missingHeader]" doc:name="ObjectStore : Store report" doc:description="Storing Invalid Records report having Missing Fields in Header"/>
+                    <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="invalidMissingRecordsCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[&quot;&quot; + flowVars.invalidRecordsCount]" doc:name="ObjectStore : Store Invalid Records Count" doc:description="Storing Invalid Records Count having Missing Fields in Header"/>
+
+                    <!-- <logger message="qwe" level="INFO" doc:name="Logger"/> -->
+                </batch:commit>                
+            </batch:step>
+<!--              <batch:step name="Get_Provider_ID_Batch_Step" accept-expression="#[(recordVars.valid.valid == true) &amp;&amp; (recordVars.validFields.valid == true)]">
+                <enricher source="#[payload != null ? payload.Id : null]" target="#[recordVars.AccountId]" doc:name="Message Enricher : Get Account ID from ETIN">
+                    <processor-chain doc:name="Processor Chain">
+                        <sfdc:query-single config-ref="Salesforce__Basic_Authentication" query="select Id from Account where DEL_FSF_TIN__c = '#[recordVars.validFields.parsedData[0].ETIN]'" doc:name="Salesforce"/>
+                        <logger level="INFO" doc:name="Logger"/>
+                    </processor-chain>
+                </enricher>
+            </batch:step>  -->
+
+            <batch:step name="Valid_Fields_Header_Batch_Step" accept-expression="#[(recordVars.valid.valid == true) &amp;&amp; (recordVars.validFields.valid == true)]">
+            	<!-- <logger message="qwe" level="INFO" doc:name="Logger"/> -->
+                <enricher doc:name="Message Enricher" doc:description="Invoking the Salesforce operation in Enricher so that Payload is not disturbed">
+                    <processor-chain doc:name="Processor Chain" doc:description="Processor Chain is used so that multiple Mule Contructs in the Message Enrichere where only one could have been otherwise used">
+                        <dw:transform-message doc:name="Transform Message" doc:description="This Transformation prepares data for Upsert and maps data as per field of the Corresponding Object in Salesforce
+Also this takes care of Business Rule &quot;All the Vendor records inserted in FOCUS are marked as Active&quot;">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	Name : recordVars.validFields.parsedData[0].VendorName,
+	Vendor_ID__c : recordVars.validFields.parsedData[0].VendorID,
+	ETIN__c : recordVars.validFields.parsedData[0].ETIN,
+	//Account__c : recordVars.AccountId,
+	Status__c : "Active",
+	External_Interface_Id__c : recordVars.validFields.parsedData[0].VendorID,
+	Withholding__c : (recordVars.validFields.parsedData[0].Withholding == "Y")
+}]]]></dw:set-payload>
+                        </dw:transform-message>
+                        <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="External_Interface_Id__c" type="DEL_Vendor__c" doc:name="Salesforce" doc:description="Salesforce Upsert to Load Vendor Data
+This takes care of the Business Rule &quot;The Vendor Load interface loads Vendor Data, Address, Location and Withholding data.
+The FSF Vendor Load interface only inserts If  record is not in FOCUS, 
+if record is in Focus the record is compared and updated as needed&quot; with respect to vendor Data">
+                            <sfdc:objects ref="#[payload]"/>
+                        </sfdc:upsert>
+                        <dw:transform-message doc:name="Transform Message : Process SFDC result" doc:description="Retrieve Salesforce ID which will be used later
+Also Error Message is set for failed record">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	(id : $.id) when ($.id != null),
+	("errors" : $.errors[0].message 
+		
+	) when ($.success == false)
+}]]></dw:set-payload>
+                        </dw:transform-message>
+                        <!-- <logger message="qqwe" level="INFO" doc:name="Logger"/> -->
+                    </processor-chain>
+                    <enrich source="#[payload[0].id]" target="#[recordVars.VendorData]"/>
+                    <enrich source="#[payload[0]]" target="#[recordVars.VendorResult]"/>
+                </enricher>
+                <expression-filter expression="#[recordVars.VendorResult.errors != null ]" doc:name="Expression" doc:description="Stop processing if Vendor Result is Null"/>
+                	<foreach collection="#[payload]" doc:name="For Each : Loop over all records" doc:description="Iterate over all records in Payload">
+                		<expression-component doc:name="Expression : Create Report"><![CDATA[flowVars.records = (flowVars.records == null) ? (payload + &quot;\n&quot;) : (payload + flowVars.records + &quot;\n&quot;)
+]]></expression-component>
+					</foreach>
+                <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="invalidRecordsCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[&quot;&quot; + payload.length]" doc:name="ObjectStore : Store Invalid Records Count" doc:description="Store Invalid Records Count In Object Store so that it can be retrieved after Batch Process"/>
+                <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="invalidRecordsReport#[java.util.UUID.randomUUID().toString()]" value-ref="#[&quot;&quot; + payload[0] + &quot; , &quot; + recordVars.VendorResult.errors + &quot;\n&quot; + &quot;Child Records will be considered invalid,&quot; + flowVars.records ]" doc:name="ObjectStore : Store Invalid Records Count" doc:description="Store Invalid Records Report In Object Store so that it can be retrieved after Batch Process"/>
+                <!-- <logger message="After Enrich" level="INFO" doc:name="Logger"/> -->
+            </batch:step>
+            <batch:step name="ProcessAddressBatch_Step" accept-expression="#[(recordVars.valid.valid == true) &amp;&amp; (recordVars.validFields.valid == true)]">
+                <dw:transform-message doc:name="Transform Message : Filter General Invalid Records" doc:description="Prepare Invalid Records Report in a List">
+                    <dw:set-variable variableName="generalFileErrors"><![CDATA[%dw 1.0
+%output application/java
+%var invalidRecs = payload filter ( not (($ startsWith "A") or ($ startsWith "L") or ($ startsWith "W") or ($ startsWith "H") )) default []
+---
+((invalidRecs map ($ ++ ";Record level Header is Missing") joinBy "\n") ++ "\n") when ((sizeOf invalidRecs) > 0)  otherwise ""]]></dw:set-variable>
+                </dw:transform-message>
+<batch:set-record-variable variableName="GeneralErrors" value="#[flowVars.generalFileErrors]" doc:name="Record Variable : General Errors" doc:description="Store General File Errors in Record Variable so that it can be retrived in all later Batch Steps"/>
+
+                <!-- <logger message="abcd" level="INFO" doc:name="Logger"/> -->
+                <!-- <set-variable variableName="orignalPayload" value="#[payload]" doc:name="Variable"/> -->
+                <dw:transform-message doc:name="Transform Message : Get Address Record Rows" doc:description="Get Address Records from the Payload">
+                	<dw:set-variable variableName="addressRecords1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "A")]]></dw:set-variable>
+                </dw:transform-message>
+				    
+                <set-variable variableName="addressRecordsCount" value="#[flowVars.addressRecords1.size()]" doc:name="Variable : Total Address Records Count" doc:description="Get Total Address Records Count"/>
+                <expression-filter expression="#[flowVars.addressRecordsCount > 0 ]" doc:name="Expression : Stop Processing if no Address Records" doc:description="Stop Processing this Batch Step if No Addess Records is found"/>
+                <dw:transform-message doc:name="Transform Message : Get Invalid Address Record Rows" doc:description="Generate Invalid Length Address Records Report">
+                	<dw:set-variable variableName="invalidAddressRecords11"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.addressRecords1 filter ((sizeOf $) != 214) map {
+data : $,
+reason : "Length of the record is " ++ ((sizeOf $)) ++ " record should be of length 214 "
+}]]></dw:set-variable>
+                </dw:transform-message>
+
+<batch:set-record-variable variableName="AddressInvalidLengthFieldErrorsCount" value="#[(flowVars.invalidAddressRecords11:java.lang.String).toString() == &quot;&quot; ? new Integer(&quot;0&quot;) : (flowVars.invalidAddressRecords11:java.lang.String).toString().split(&quot;\n&quot;).length ]" doc:name="Record Variable : Invalid Length Address Records Count" doc:description="Store Invalid Length Address Records Count in Record variable so that they can be retrived in any later Batch Step"/>
+<batch:set-record-variable variableName="AddressInvalidLengthFieldErrors" value="#[flowVars.invalidAddressRecords11:java.lang.String]" doc:name="Record Variable : Invalid Length Address records" doc:description="Store Invalid Length Address Records Report in Record variable so that they can be retrived in any later Batch Step"/>
+<expression-filter expression="#[ flowVars.addressRecordsCount &gt; recordVars.AddressInvalidLengthFieldErrorsCount ]" doc:name="Expression : Check and stop processing for this Batch Step if All Records are invalid " doc:description="Stop Processing this Batch Step if all Address Records were Invalid"/>
+
+             
+                                <dw:transform-message doc:name="Transform Message : Get Address Record Rows" doc:description="Filter valid Address Records">
+                	<dw:set-variable variableName="addressRecords1"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.addressRecords1 filter ((sizeOf $) == 214)]]></dw:set-variable>
+                </dw:transform-message>                
+                <expression-filter expression="#[flowVars.addressRecordsCount > 0 ]" doc:name="Expression" doc:description="Expression : Check and stop processing for this Batch Stepif No Records are Valid "/>
+                <dw:transform-message doc:name="Transform Message : Get Address Records" doc:description="Create Fixed Width Payload of Address Records">
+                	<dw:set-variable variableName="addressRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.addressRecords1 joinBy "\n") ++ "\n"]]></dw:set-variable>
+                </dw:transform-message>
+                <!-- <expression-filter expression="#[flowVars.addressRecords.trim().equals(&quot;&quot;) == false]" doc:name="Expression"/> -->
+                <dw:transform-message doc:name="Transform Message : Fixed Width Transform" doc:description="Fixed Width Transformation to get Java Payload of List of Maps
+Also setting orignal Index of records for proper identification of records">
+                	<dw:input-variable variableName="addressRecords" mimeType="text/plain">
+                		<dw:reader-property name="schemaPath" value="fsf-data-address.ffd"/>
+                	</dw:input-variable>
+                    <dw:set-variable variableName="addressRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.addressRecords map {
+	orignalRecordIndex : $$,
+	//VendorId : $.VendorID,
+	Address_1__c : $.Address1,
+	Address_2__c : $.Address2,
+	(Address_Date__c : ($.AddressDate as :date {format: "MM/dd/yyyy"} )) when ($.AddressDate != null),
+	Address_Sequence_Number__c : $.AddressSequenceNumber,
+	External_Interface_Id__c : recordVars.validFields.parsedData[0].VendorID ++ "-" ++ ($.AddressSequenceNumber default ""),
+	City__c : $.City,
+	State__c : $.State,
+	Zip_Code__c : $.ZipCode,
+	Description__c : $.Description,
+	
+	Vendor__c : recordVars.VendorData
+	
+}]]></dw:set-variable>
+                </dw:transform-message>
+                <dw:transform-message doc:name="inValidAddressRecords Transform" doc:description="This Transformation creates a Error Report for all Invalid records which have Missing Field or Incorrect Format of data
+This will be added to Error Report after some processing">
+                    <dw:set-variable variableName="inValidAddressRecords"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.addressRecords filter (($.Address_Sequence_Number__c == null) or ($.Address_Date__c == null) ) map {
+	orignalRecord : flowVars.addressRecords1[$.orignalRecordIndex],
+	error : " " ++ ("Missing Address Sequence Number" when ($.Address_Sequence_Number__c == null) otherwise "")
+	 
+	 ++ (" Missing Address Date " when ($.Address_Date__c == null) otherwise "")
+} ]]>
+</dw:set-variable>
+</dw:transform-message>
+<!-- ($.VendorId == null) or  -->
+<!-- ++ (" Missing Vendor ID " when ($.VendorId == null) otherwise "") -->
+
+<batch:set-record-variable variableName="AddressMissingFieldErrorsCount" value="#[(flowVars.inValidAddressRecords:java.lang.String).toString() == &quot;&quot; ? new Integer(&quot;0&quot;) : (flowVars.inValidAddressRecords:java.lang.String).toString().split(&quot;\n&quot;).length ]" doc:name="Record Variable : Address Missing Field Errors Count" doc:description="Store Address Missing Field Errors Count In Object Store so that it can be retrieved after Batch Process"/>
+<set-variable variableName="AddressValidRecordsCount" value="#[flowVars.addressRecordsCount - recordVars.AddressMissingFieldErrorsCount - recordVars.AddressInvalidLengthFieldErrorsCount ]" doc:name="Variable : Address Valid Records Count" doc:description="Store valid address records count"/>
+<batch:set-record-variable variableName="AddressMissingFieldErrors" value="#[flowVars.inValidAddressRecords:java.lang.String]" doc:name="Record Variable : Store Address Missing Field Report" doc:description="Store Address Missing Field Errors Report In Object Store so that it can be retrieved after Batch Process"/>
+<expression-filter expression="#[ flowVars.addressRecordsCount &gt; recordVars.AddressMissingFieldErrorsCount ]" doc:name="Expression : Check and stop processing if All Records are invalid "/>
+
+
+                    <dw:transform-message doc:name="ValidAddressRecords Transform" doc:description="Filter valid Address Records">
+                    <dw:set-variable variableName="ValidAddressRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.addressRecords filter ( ($.Address_Sequence_Number__c != null) and ($.Address_Date__c != null) ) ]]>
+</dw:set-variable>
+</dw:transform-message>
+<!-- ($.VendorID != null) and -->
+					<dw:transform-message doc:name="ValidAddressRecordsSFDC Transform" doc:description="Remove Orignal Index field from every record so that it can be used SFDC Upsert">
+                    <dw:set-variable variableName="ValidAddressRecordsSFDC"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.ValidAddressRecords map ($ - "orignalRecordIndex") ]]>
+</dw:set-variable>
+
+                </dw:transform-message>
+<!-- flowVars.ValidAddressRecords map (($ - "orignalRecordIndex") - "VendorId")  -->                
+<batch:set-record-variable variableName="AddressRecordsSkippedCount" value="#[ flowVars.AddressValidRecordsCount - flowVars.ValidAddressRecordsSFDC.size() ]" doc:name="Record Variable : Address Records Skipped Count" doc:description="Store Address Records Skipped Count in Record variable so that they can be retrived in any later Batch Step"/>
+                <enricher source="#[payload]" target="#[flowVars.addressRecords]" doc:name="Message Enricher" doc:description="Invoking SFDC operation in enricher so that payload is not modified">
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="External_Interface_Id__c" type="DEL_Vendor_Address__c" doc:name="Salesforce" doc:description="SFDC Upsert to load Vendor Address Records
+This takes care of the Business Rule &quot;The Vendor Load interface loads Vendor Data, Address, Location and Withholding data.
+The FSF Vendor Load interface only inserts If  record is not in FOCUS, 
+if record is in Focus the record is compared and updated as needed&quot; with respect to Address Data">
+                        <sfdc:objects ref="#[flowVars.ValidAddressRecordsSFDC]"/>
+                    </sfdc:upsert>
+                </enricher>
+                <dw:transform-message doc:name="Transform Message : SFDC Errors Transform">
+                <dw:set-variable variableName="AddressSFDCErrors" doc:description="This Transformation creates a Error Report for all the records which failed in Salesforce
+This will be added to Error Report">
+                	<![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.addressRecords map {
+	(record : $.id) when ($.id != null),
+	orignalPayload : flowVars.addressRecords1[(flowVars.ValidAddressRecords[$$].orignalRecordIndex)],
+	("errors" : $.errors[0].message 
+		
+	) when ($.success == false)
+} filter $.errors != null]]></dw:set-variable>
+                </dw:transform-message>
+
+
+<batch:set-record-variable  variableName="AddressRecordsSuccessCount" value="#[flowVars.addressRecordsCount - recordVars.AddressMissingFieldErrorsCount - recordVars.AddressRecordsSkippedCount ]" doc:name="Record Variable : Address Records Success Count" doc:description="Store Address Records Success Count in Record variable so that they can be retrived in any later Batch Step"/>                        
+                <expression-filter expression="#[(flowVars.AddressSFDCErrors:java.lang.String) != &quot;&quot;]" doc:name="Expression : Stop Processing for Zero SFDC Errors" doc:description="Stop processing if there are no Business Exceptions"/>
+<batch:set-record-variable variableName="AddressSFDCErrors" value="#[flowVars.AddressSFDCErrors:java.lang.String]" doc:name="Record Variable : Address SFDC Errors" doc:description="Store Address SFDC Error Report in Record variable so that they can be retrived in any later Batch Step"/>
+<batch:set-record-variable variableName="AddressSFDCErrorsCount" value="#[(flowVars.AddressSFDCErrors:java.lang.String).toString().split(&quot;\n&quot;).length]" doc:name="Record Variable : Address SFDC Errors Count" doc:description="Store Address SFDC Error Count in Record variable so that they can be retrived in any later Batch Step"/>
+<batch:set-record-variable  variableName="AddressRecordsSuccessCount" value="#[ recordVars.AddressRecordsSuccessCount - recordVars.AddressSFDCErrorsCount ]" doc:name="Record Variable : Update Address Records Success Count" doc:description="Store Address Records Success Count in Record variable so that they can be retrived in any later Batch Step"/>
+
+            </batch:step>
+
+
+            <batch:step name="ProcessLocation_Batch_Step" accept-expression="#[(recordVars.valid.valid == true) &amp;&amp; (recordVars.validFields.valid == true)]">
+                <set-variable variableName="orignalPayload" value="#[payload]" doc:name="Variable" doc:description="Storing Orignal payload in variable"/>
+                <dw:transform-message doc:name="Transform Message: Get Location Record Rows" doc:description="Filter Location records">
+                	<dw:set-variable variableName="locationRecords1">
+                	<![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith 'L')]]>
+                	</dw:set-variable>
+                </dw:transform-message>
+<set-variable variableName="LocationRecordsTotalCount" value="#[flowVars.locationRecords1.size()]" doc:name="Variable : LocationRecordsTotalCount" doc:description="Store Total Location records Size"/>
+<expression-filter expression="#[flowVars.LocationRecordsTotalCount > 0 ]" doc:name="Expression"/>                                
+                                <dw:transform-message doc:name="Transform Message: Get Invalid Location Record Rows" doc:description="Get Invalid Length Location Record Rows Error Report">
+                	<dw:set-variable variableName="InValidLengthlocationRecords1">
+                	<![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.locationRecords1 filter ((sizeOf $) != 56) map {
+data : $,
+reason : "Size of the record " ++ (sizeOf $) ++ " it should be 56"
+}]]>
+                	</dw:set-variable>
+                </dw:transform-message>
+
+<batch:set-record-variable variableName="LocationInvalidLengthFieldErrorsCount" value="#[(flowVars.InValidLengthlocationRecords1:java.lang.String).toString() == &quot;&quot; ? new Integer(&quot;0&quot;) : (flowVars.InValidLengthlocationRecords1:java.lang.String).toString().split(&quot;\n&quot;).length ]" doc:name="Record Variable : Invalid Length Address Records Count" doc:description="Store Invalid Length Address Records Count in Record variable so that it can be retrieved in any later Batch Step"/>
+<batch:set-record-variable variableName="LocationInvalidLengthFieldErrors" value="#[flowVars.InValidLengthlocationRecords1:java.lang.String]" doc:name="Record Variable : Invalid Length Location records" doc:description="Store Invalid Length Address Records Report in Record variable so that it can be retrieved in any later Batch Step"/>
+
+<expression-filter expression="#[ flowVars.LocationRecordsTotalCount &gt; recordVars.LocationInvalidLengthFieldErrorsCount ]" doc:name="Expression : Check and stop processing if All Records are invalid " doc:description="Check and stop processing if All Records are invalid"/>
+
+                
+                                <dw:transform-message doc:name="Transform Message: Get Valid Location Record Rows" doc:description="Get Valid Length Location Record Rows">
+                	<dw:set-variable variableName="locationRecords1">
+                	<![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.locationRecords1 filter ((sizeOf $) == 56)]]>
+                	</dw:set-variable>
+                </dw:transform-message>
+                
+                <dw:transform-message doc:name="Transform Message: Get Location Records" doc:description="Get Fixed width payload of Location Records">
+                	<dw:set-variable variableName="locationRecords">
+                	<![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.locationRecords1 joinBy '\n') ++ '\n']]>
+                	</dw:set-variable>
+                </dw:transform-message>
+                <!-- <expression-filter expression="#[flowVars.locationRecords.trim().equals(&quot;&quot;) == false]" doc:name="Expression"/> -->
+                <dw:transform-message doc:name="Transform Message : Fixed Width Transform" doc:description="Fixed Width Transformation to convert to JAVA Payload of List of Maps
+Also it stores the Origanal Index of the record for proper identification">
+                	<dw:input-variable variableName="locationRecords" mimeType="text/plain">
+                		<dw:reader-property name="schemaPath" value="fsf-data-location.ffd"/>
+                	</dw:input-variable>                    
+
+                    <dw:set-variable variableName="locationRecords">
+<![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.locationRecords map {
+	"orignalRecordIndex" : $$,
+	"Vendor_Location__c" : $.VendorLocation,
+	"Location_Description__c" : $.LocationDescription,
+	"Primary_Address_Sequence__c" : $.PrimaryAddressSequence,
+	"External_Interface_Id__c" : recordVars.validFields.parsedData[0].VendorID ++ "-" ++ ($.VendorLocation default ""),
+	(Effective_Date__c : (($.EffectiveDate ++ ' 00:00:00+00:00') as :datetime { format: "MM/dd/yyyy HH:mm:ssXXX" } as :number)) when ($.EffectiveDate != null),
+	Vendor__c : recordVars.VendorData
+}]]>
+                    </dw:set-variable>
+                </dw:transform-message>
+
+                <dw:transform-message doc:name="inValidLocationRecords Transform" doc:description="This Transformation creates a Error Report for all Invalid records which have Missing Field or Incorrect Format of data
+This will be added to Error Report">
+                    <dw:set-variable variableName="inValidLocationRecords"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.locationRecords filter (($.Vendor_Location__c == null) or ($.Effective_Date__c == null) ) map {
+	orignalRecord : flowVars.locationRecords1[$.orignalRecordIndex],
+	error : " " ++ ("Missing Vendor Location " when ($.Vendor_Location__c == null) otherwise "") ++ (" Missing Effective Date " when ($.Effective_Date__c == null) otherwise "")
+} ]]>
+</dw:set-variable>
+</dw:transform-message>
+
+<batch:set-record-variable variableName="LocationMissingFieldErrorsCount" value="#[(flowVars.inValidLocationRecords:java.lang.String).toString() == &quot;&quot; ? new Integer(&quot;0&quot;) : (flowVars.inValidLocationRecords:java.lang.String).toString().split(&quot;\n&quot;).length ]" doc:name="Record Variable : Location Missing Field Errors Count" doc:description="Store Location Missing Field Errors Count in Record variable so that it can be retrieved in any later Batch Step"/>
+<set-variable variableName="LocationValidRecordsCount" value="#[flowVars.LocationRecordsTotalCount - recordVars.LocationInvalidLengthFieldErrorsCount - recordVars.LocationMissingFieldErrorsCount]" doc:name="Variable : Location Valid Records Count" doc:description="Store Location Valid Records Count"/>
+<batch:set-record-variable variableName="LocationMissingFieldErrors" value="#[flowVars.inValidLocationRecords:java.lang.String]" doc:name="Record Variable : Location Missing Field Errors " doc:description="Store Location Missing Field Error Report in Record variable so that it can be retrieved in any later Batch Step"/>
+<expression-filter expression="#[ flowVars.LocationRecordsTotalCount &gt; recordVars.LocationMissingFieldErrorsCount ]" doc:name="Expression : Check and stop processing if All Records are invalid " doc:description="Check and stop processing for this Batch Step if All Records are invalid"/>
+                    
+                    <dw:transform-message doc:name="ValidLocationRecords Transform" doc:description="Filter valid Location Records">
+                    <dw:set-variable variableName="ValidLocationRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.locationRecords filter (($.Vendor_Location__c != null) and ($.Effective_Date__c != null) )  groupBy $.External_Interface_Id__c ]]>
+</dw:set-variable>
+</dw:transform-message>
+	                
+
+                <dw:transform-message doc:name="Transform Message : Select record with greatest Date" doc:description="Find record with Greatest Effective Date
+This take care of Business Rule &quot;The Vendor Load interface loads inserts Location record, the records having the highest Effective Date is inserted for the records having same vendor ID and Vendor Location, other Location records are skipped&quot;">
+                     <dw:set-variable variableName="ValidLocationRecords">
+                     <![CDATA[%dw 1.0
+%output application/java
+%var gTime = flowVars.ValidLocationRecords map {
+	"rec" : max $.Effective_Date__c 
+}
+---
+flowVars.ValidLocationRecords map (val,index) -> {
+	"rec" : (val filter ($.Effective_Date__c == gTime[index].rec))[0]
+}]]>
+                     </dw:set-variable>
+                </dw:transform-message>
+                    <dw:transform-message doc:name="Transform Message : SFDC Transform" doc:description="Essential Transformation to remove Orignal Index field from all records so that it is ready for SFDC Upsert
+Also Effectice Datetime is converted to Date datatype to correspond to the Salesforce field">
+                    <dw:set-variable variableName="ValidLocationRecordsSFDC"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.ValidLocationRecords.rec map {
+($ mapObject {
+	(($$) : $) when ( ($$ as :string != "Effective_Date__c") and ($$ as :string != "orignalRecordIndex")),
+	("Effective_Date__c" : $ as :datetime as :date) when $$ as :string == "Effective_Date__c"
+}
+)}]]></dw:set-variable>
+                </dw:transform-message>
+     
+<batch:set-record-variable variableName="LocationRecordsSkippedCount" value="#[ flowVars.LocationValidRecordsCount - flowVars.ValidLocationRecordsSFDC.size() ]" doc:name="Record Variable : Location Records Skipped Count" doc:description="Store Location skipped Count in Record variable so that it can be retrieved in any later Batch Step"/>           
+                <enricher source="#[payload]" target="#[flowVars.ValidLocationRecordsSFDC]" doc:name="Message Enricher" doc:description="SFDC operation is invoked in Enricher so that Payload is not modified">
+                <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="External_Interface_Id__c" type="DEL_Location__c" doc:name="Salesforce" doc:description="SFDC Upsert to Location Records
+This takes of Business Rule &quot;The Vendor Load interface loads Vendor Data, Address, Location and Withholding data.
+The FSF Vendor Load interface only inserts If  record is not in FOCUS, 
+if record is in Focus the record is compared and updated as needed&quot; with respect to Location Data">
+                    <sfdc:objects ref="#[flowVars.ValidLocationRecordsSFDC]"/>
+                </sfdc:upsert>
+				</enricher>
+                <dw:transform-message doc:name="Transform Message : SFDC Errors" doc:description="Create SFDC Error Report for Failed records">
+                <dw:set-variable variableName="locationRecordsErrors">
+                <![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.ValidLocationRecordsSFDC map {
+	(record : $.id) when ($.id != null),
+	orignalPayload : flowVars.locationRecords1[(flowVars.ValidLocationRecords.rec[$$].orignalRecordIndex)],
+	(errors : $.errors[0].fields[0] ++ ":" ++ $.errors[0].message  ++ ":" ++ $.errors[0].statusCode 
+		
+	) when ($.success == false)
+} filter ($.errors != null)]]>
+                </dw:set-variable>
+                        </dw:transform-message>
+<batch:set-record-variable  variableName="LocationRecordsSuccessCount" value="#[flowVars.LocationRecordsTotalCount - recordVars.LocationMissingFieldErrorsCount - recordVars.LocationRecordsSkippedCount ]" doc:name="Record Variable : Location Records Success Count" doc:description="Store Location Records Success Count in Record variable so that it can be retrieved in any later Batch Step"/>                        
+                <expression-filter expression="#[(flowVars.locationRecordsErrors:java.lang.String).toString() != &quot;&quot;]" doc:name="Expression : Stop Processing for Zero SFDC Errors" doc:description="Stop Processing of this batch step for Zero SFDC Errors"/>
+<batch:set-record-variable variableName="LocationSFDCErrors" value="#[flowVars.locationRecordsErrors:java.lang.String]" doc:name="Record Variable : Location SFDC Errors" doc:description="Store Location SFDC Error Report in Record variable so that it can be retrieved in any later Batch Step"/>
+<batch:set-record-variable variableName="LocationSFDCErrorsCount" value="#[(flowVars.locationRecordsErrors:java.lang.String).toString().split(&quot;\n&quot;).length]" doc:name="Record Variable : Location SFDC Errors Count" doc:description="Store Location SFDC Errors Count in Record variable so that it can be retrieved in any later Batch Step"/>
+<batch:set-record-variable  variableName="LocationRecordsSuccessCount" value="#[ recordVars.LocationRecordsSuccessCount - recordVars.LocationSFDCErrorsCount ]" doc:name="Record Variable : Update Location Records Success Count" doc:description="Update Location Records Success Count in Record variable so that it can be retrieved in any later Batch Step"/>
+                
+            	
+            </batch:step>
+            <batch:step name="ProcessWithholding_Batch_Step" accept-expression="#[(recordVars.valid.valid == true) &amp;&amp; (recordVars.validFields.valid == true)]">
+                <set-variable variableName="orignalPayload" value="#[payload]" doc:name="Variable : Orignal payload" doc:description="Store Orignal Payload so that it can be used later"/>
+                <dw:transform-message doc:name="Transform Message : Get Withholding Record Rows" doc:description="Get Withholding Record Rows by filtering">
+                     <dw:set-variable variableName="withholdingRecords1"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter ($ startsWith "W"))]]></dw:set-variable>
+
+                </dw:transform-message>
+
+                <set-variable variableName="TotalWithholdingRecordsCount" value="#[flowVars.withholdingRecords1.size()]" doc:name="Variable : Total Withholding Records Count" doc:description="Store Total Withholding Records Count"/>
+                <expression-filter expression="#[flowVars.TotalWithholdingRecordsCount > 0 ]" doc:name="Expression : Stop Processing When No Withholding records" doc:description="Stop Processing this Batch Step further if No Withholding records are found"/>        
+
+                <dw:transform-message doc:name="Transform Message : Get Invalid Length Withholding Record Rows" doc:description="Get Invalid Length Withholding Record Error Report">
+                     <dw:set-variable variableName="InValidwithholdingRecords1"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+(flowVars.withholdingRecords1 filter ((sizeOf $) != 11)) map {
+data : $,
+reason : "Size of the record is " ++ (sizeOf $) ++ " it should be 11"
+}]]></dw:set-variable>
+
+                </dw:transform-message>
+                
+<batch:set-record-variable variableName="WithholdingInvalidLengthFieldErrorsCount" value="#[(flowVars.InValidwithholdingRecords1:java.lang.String).toString() == &quot;&quot; ? new Integer(&quot;0&quot;) : (flowVars.InValidwithholdingRecords1:java.lang.String).toString().split(&quot;\n&quot;).length ]" doc:name="Record Variable : Invalid Length Withholding Records Count" doc:description="Store Invalid Length Withholding Records Count in Record variable so that it can be retrieved in any later Batch Step"/>
+<batch:set-record-variable variableName="WithholdingInvalidLengthFieldErrors" value="#[flowVars.InValidwithholdingRecords1:java.lang.String]" doc:name="Record Variable : Invalid Length Withholding records" doc:description="Store Invalid Length Withholding Record Error Report in Record variable so that it can be retrieved in any later Batch Step"/>
+<expression-filter expression="#[ flowVars.TotalWithholdingRecordsCount &gt; recordVars.WithholdingInvalidLengthFieldErrorsCount ]" doc:name="Expression : Check and stop processing this Batch Step further if All Records are invalid "/>
+                      
+                
+                
+                <dw:transform-message doc:name="Transform Message : Get Valid Length Withholding Records" doc:description="Get Valid Length Withholding Records">
+                     <dw:set-variable variableName="withholdingRecords1"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.withholdingRecords1 filter ((sizeOf $) == 11))]]></dw:set-variable>
+
+                </dw:transform-message>
+
+
+                <dw:transform-message doc:name="Transform Message : Get Withholding records" doc:description="Create Fixed width payload of withholding Records">
+                    <dw:set-variable variableName="withholdingRecords">
+                	<![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.withholdingRecords1 joinBy '\n') ++ '\n']]>
+                	</dw:set-variable>
+                </dw:transform-message>
+                
+                <!-- <expression-filter expression="#[flowVars.withholdingRecords.trim().equals(&quot;&quot;) == false]" doc:name="Expression : Filter Payload with withholding Records"/> -->
+                <dw:transform-message doc:name="Transform Message : Fixed Width Transform for Withholding Records" doc:description="Fixed Width Transformation to convert to JAVA Payload of List of Maps
+Also it stores the Origanal Index of the record for proper identification">
+                	<dw:input-variable variableName="withholdingRecords" mimeType="text/plain">
+                		<dw:reader-property name="schemaPath" value="fsf-data-withholding.ffd"/>
+                	</dw:input-variable>
+<!--                     <dw:input-payload mimeType="text/plain">
+                    	<dw:reader-property name="schemaPath" value="fsf-data-withholding.ffd"/>
+                    </dw:input-payload> -->
+                    <dw:set-variable variableName="withholdingRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.withholdingRecords map {
+	"orignalRecordIndex" : $$,
+	"Withholding_Type__c" : $.WithholdingType,
+	("Withholding_Class__c" : flowVars.LOVReturned[("WITHHOLDING_CLASS-" ++ ($.WithholdingClass default "-1"))][0] default $.WithholdingClass ) when ($.WithholdingClass != null),
+	("External_Interface_Id__c" : recordVars.validFields.parsedData[0].VendorID ++ "-" ++ $.WithholdingType ++ "-" ++ $.WithholdingClass) when (($.WithholdingClass != null) and ($.WithholdingType != null)),
+	Vendor__c : recordVars.VendorData
+	
+} ]]></dw:set-variable>
+                    <!-- <dw:set-payload></dw:set-payload> -->
+                </dw:transform-message>
+                
+                <dw:transform-message doc:name="inValidWithholdingRecords Transform" doc:description="This Transformation creates a Error Report for all Invalid records which have Missing Field or Incorrect Format of data
+This will be added to Error Report">
+                    <dw:set-variable variableName="inValidWithholdingRecords"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.withholdingRecords filter (($.Withholding_Type__c == null) or ($.Withholding_Class__c == null) ) map {
+	orignalRecord : flowVars.withholdingRecords1[$.orignalRecordIndex],
+	error : " " ++ ("Missing Withholding Type " when ($.Withholding_Type__c == null) otherwise "") ++ (" Missing Withholding Class " when ($.Withholding_Class__c == null) otherwise "")
+} ]]>
+</dw:set-variable>
+</dw:transform-message>
+
+<batch:set-record-variable variableName="WithholdingMissingFieldErrorsCount" value="#[(flowVars.inValidWithholdingRecords:java.lang.String).toString() == &quot;&quot; ? new Integer(&quot;0&quot;) : (flowVars.inValidWithholdingRecords:java.lang.String).toString().split(&quot;\n&quot;).length ]" doc:name="Record Variable : Withholding Missing Field Errors Count" doc:description="Store Withholding Missing Field Errors Count in Record variable so that it can be retrieved in any later Batch Step"/>
+<set-variable variableName="WithholdingValidRecordsCount" value="#[flowVars.TotalWithholdingRecordsCount - recordVars.WithholdingMissingFieldErrorsCount - recordVars.WithholdingInvalidLengthFieldErrorsCount ]" doc:name="Variable : Withholding Valid Records Count" doc:description="Store Withholding Valid Records Count"/>
+<batch:set-record-variable variableName="WithholdingMissingFieldErrors" value="#[flowVars.inValidWithholdingRecords:java.lang.String]" doc:name="Record Variable : Withholding Missing Field Errors " doc:description="Store Withholding Missing Field Error Report in Record variable so that it can be retrieved in any later Batch Step"/>
+<expression-filter expression="#[ flowVars.TotalWithholdingRecordsCount &gt; recordVars.WithholdingMissingFieldErrorsCount ]" doc:name="Expression : Check if All Records are Valid " doc:description="Check and stop processing the Batch Step if All Records are invalid" />
+
+
+                    <dw:transform-message doc:name="ValidWithholdingRecords Transform" doc:description="Transformation to filter out valid Withholding Records">
+                    <dw:set-variable variableName="ValidWithholdingRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.withholdingRecords filter (($.Withholding_Type__c != null) and ($.Withholding_Class__c != null) ) ]]>
+</dw:set-variable>
+</dw:transform-message>
+                    <dw:transform-message doc:name="ValidWithholdingRecords Transform : Get Unique Records" doc:description="Get Unique Records using Exteranal ID
+This take care of the Business Rule &quot;The Vendor Load interface loads inserts only unique Withholding records for a particular Vendor identified by its Vendor ID and Withholding Type and Withholding Class, other Withholding record are skipped&quot;">
+                    <dw:set-variable variableName="ValidWithholdingRecords2"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.ValidWithholdingRecords distinctBy ($.External_Interface_Id__c) ]]>
+</dw:set-variable>
+</dw:transform-message>
+                    <dw:transform-message doc:name="ValidWithholdingRecords Transform : Get Unique Records Index" doc:description="Get Unique Records Index">
+                    <dw:set-variable variableName="validrecsindexlist"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.ValidWithholdingRecords2 map ($.orignalRecordIndex) ]]>
+</dw:set-variable>
+</dw:transform-message>
+
+                    <dw:transform-message doc:name="ValidWithholdingRecords Transform : Get Duplicate Records" doc:description="Generate Duplicate Records Warning">
+                    <dw:set-variable variableName="duplicateRecs"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.ValidWithholdingRecords filter (not (flowVars.validrecsindexlist contains $.orignalRecordIndex)) map {
+	orignalRecord : flowVars.withholdingRecords1[$.orignalRecordIndex],
+	"errors" : "Duplicate record found for Vendor : " ++ (recordVars.validFields.parsedData[0].VendorID default "")
+
+} ]]>
+</dw:set-variable>
+</dw:transform-message>
+
+                
+                <dw:transform-message doc:name="Transform Message : SFDC Transform" doc:description="Removing Orignal Index for invoking of SFDC operation">
+                    <dw:set-variable variableName="withholdingRecordsSFDC"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.ValidWithholdingRecords2 map $ - "orignalRecordIndex" ]]></dw:set-variable>
+                    <!-- <dw:set-payload></dw:set-payload> -->
+                </dw:transform-message>
+                <batch:set-record-variable variableName="WithholdingRecordsSkippedCount" value="#[ flowVars.WithholdingValidRecordsCount - flowVars.withholdingRecordsSFDC.size() ]" doc:name="Record Variable : Withholding Records Skipped Count" doc:description="Store Withholding Records Skipped Count in Record variable so that it can be retrieved in any later Batch Step"/>
+                <enricher source="#[payload]" target="#[flowVars.withholdingRecordsSFDC]" doc:name="Message Enricher" doc:description="Invoking SFDC operation in Enricher so that payload is not modified">
+                <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="External_Interface_Id__c" type="DEL_Withholding__c" doc:name="Salesforce" doc:description="Salesforce Upsert to Load Withholding Records
+This takes care of the Business Rule &quot;The Vendor Load interface loads Vendor Data, Address, Location and Withholding data.
+The FSF Vendor Load interface only inserts If  record is not in FOCUS, 
+if record is in Focus the record is compared and updated as needed&quot; with respect to Withholding Data">
+                    <sfdc:objects ref="#[flowVars.withholdingRecordsSFDC]"/>
+                </sfdc:upsert>
+                </enricher>
+                <dw:transform-message doc:name="Transform Message : Get Error Report" doc:description="Generate Withholding records SFDC Error report for failed records">
+                            <dw:set-variable variableName="inValidWithholdingRecordErrors"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+flowVars.withholdingRecordsSFDC map {
+	orignalRecord : flowVars.withholdingRecords1[flowVars.ValidWithholdingRecords2[$$].orignalRecordIndex],
+	("errors" : $.errors[0].message
+		
+	) when ($.success == false)
+} filter ($.errors != null)]]></dw:set-variable>
+                        </dw:transform-message>
+<batch:set-record-variable variableName="WithholdingDuplicateRecordsReport" value="#[flowVars.duplicateRecs]" doc:name="Record Variable : Duplicate Withholding Records Errors" doc:description="Storing Duplicate Withholding Records Error Report in Record variable so that it can be retrieved in any later Batch Step"/>
+<batch:set-record-variable  variableName="WithholdingRecordsSuccessCount" value="#[flowVars.TotalWithholdingRecordsCount - recordVars.WithholdingMissingFieldErrorsCount - recordVars.WithholdingRecordsSkippedCount ]" doc:name="Record Variable : Withholding Records Success Count" doc:description="Storing Withholding Records success count in Record variable so that it can be retrieved in any later Batch Step"/>                        
+                <expression-filter expression="#[(flowVars.inValidWithholdingRecordErrors:java.lang.String) != &quot;&quot;]" doc:name="Expression : Check if there was any Errors" doc:description="Stop Processing the Batch Step for Zero SFDC Errors"/>
+<batch:set-record-variable variableName="WithholdingSFDCErrors" value="#[flowVars.inValidWithholdingRecordErrors:java.lang.String]" doc:name="Record Variable : Withholding SFDC Errors" doc:description="Storing Withholding SFDC Errors in Record variable so that it can be retrieved in any later Batch Step"/>
+<batch:set-record-variable variableName="WithholdingSFDCErrorsCount" value="#[(flowVars.inValidWithholdingRecordErrors:java.lang.String).toString().split(&quot;\n&quot;).length]" doc:name="Record Variable : Withholding SFDC Errors Count" doc:description="Storing SFDC Errors Count in Record variable so that it can be retrieved in any later Batch Step"/>
+
+<batch:set-record-variable  variableName="WithholdingRecordsSuccessCount" value="#[ recordVars.WithholdingRecordsSuccessCount - recordVars.WithholdingSFDCErrorsCount ]" doc:name="Record Variable : Update Withholding Records Success Count" doc:description="Storing Withholding records Success Count in Record variable so that it can be retrieved in any later Batch Step"/>
+                        
+            	
+            </batch:step>
+			<batch:step name="Process_Errors_Batch_Step" accept-expression="#[ ( (recordVars.AddressMissingFieldErrorsCount != null ) || (recordVars.LocationMissingFieldErrorsCount != null ) || (recordVars.WithholdingMissingFieldErrorsCount != null ) ) ]">
+                <batch:commit  doc:name="Batch Commit" size="250">
+                    <!-- <logger level="INFO" doc:name="Logger"/> -->
+                    <foreach collection="#[flowVars.records]" doc:name="For Each">
+ <expression-component doc:name="Expression : Update Address Invalid Length Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['AddressInvalidLengthFieldErrors'] == null ? "" : payload.recordVars['AddressInvalidLengthFieldErrors'] ) : flowVars.temp + (payload.recordVars['AddressInvalidLengthFieldErrors'] == null ? "" : payload.recordVars['AddressInvalidLengthFieldErrors'] )
+]]></expression-component>
+<expression-component doc:name="Expression : Update Location Invalid Length Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['LocationInvalidLengthFieldErrors'] == null ? "" : payload.recordVars['LocationInvalidLengthFieldErrors'] ) : flowVars.temp + (payload.recordVars['LocationInvalidLengthFieldErrors'] == null ? "" : payload.recordVars['LocationInvalidLengthFieldErrors'] )
+]]></expression-component>
+<expression-component doc:name="Expression : Update Withholding Invalid Length Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['WithholdingInvalidLengthFieldErrors'] == null ? "" : payload.recordVars['WithholdingInvalidLengthFieldErrors'] ) : flowVars.temp + (payload.recordVars['WithholdingInvalidLengthFieldErrors'] == null ? "" : payload.recordVars['WithholdingInvalidLengthFieldErrors'] )
+]]></expression-component>                    
+                        <expression-component doc:name="Expression : Update Address SFDC Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['AddressSFDCErrors'] == null ? "" : payload.recordVars['AddressSFDCErrors'] ) : flowVars.temp + (payload.recordVars['AddressSFDCErrors'] == null ? "" : payload.recordVars['AddressSFDCErrors'] )
+]]></expression-component>
+                        <expression-component doc:name="Expression: Update Location SFDC Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['LocationSFDCErrors'] == null ? "" : payload.recordVars['LocationSFDCErrors'] ) : flowVars.temp + (payload.recordVars['LocationSFDCErrors'] == null ? "" : payload.recordVars['LocationSFDCErrors'] )
+]]></expression-component>
+                        <expression-component doc:name="Expression: Update Withholding SFDC Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['WithholdingSFDCErrors'] == null ? "" : payload.recordVars['WithholdingSFDCErrors'] ) : flowVars.temp + (payload.recordVars['WithholdingSFDCErrors'] == null ? "" : payload.recordVars['WithholdingSFDCErrors'] )
+]]></expression-component>
+<expression-component doc:name="Expression: Update Withholding Duplicate Records Report Error"><![CDATA[flowVars.temp1 = (flowVars.temp1 == null) ? ("" + (payload.recordVars['WithholdingDuplicateRecordsReport'] == null ? "" : payload.recordVars['WithholdingDuplicateRecordsReport'] )) : (flowVars.temp1 + ( (payload.recordVars['WithholdingDuplicateRecordsReport'] == null) ? "" : payload.recordVars['WithholdingDuplicateRecordsReport'] ))]]></expression-component>
+
+<expression-component doc:name="Expression : Update Address Missing Field Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['AddressMissingFieldErrors'] == null ? "" : payload.recordVars['AddressMissingFieldErrors'] ) : flowVars.temp + (payload.recordVars['AddressMissingFieldErrors'] == null ? "" : payload.recordVars['AddressMissingFieldErrors'] )
+]]></expression-component>
+<expression-component doc:name="Expression : Update Location Missing Field Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['LocationMissingFieldErrors'] == null ? "" : payload.recordVars['LocationMissingFieldErrors'] ) : flowVars.temp + (payload.recordVars['LocationMissingFieldErrors'] == null ? "" : payload.recordVars['LocationMissingFieldErrors'] )
+]]></expression-component>
+<expression-component doc:name="Expression : Update Withholding Missing Field Error"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['WithholdingMissingFieldErrors'] == null ? "" : payload.recordVars['WithholdingMissingFieldErrors'] ) : flowVars.temp + (payload.recordVars['WithholdingMissingFieldErrors'] == null ? "" : payload.recordVars['WithholdingMissingFieldErrors'] )
+]]></expression-component>
+
+<expression-component doc:name="Expression : Update Skipped Records Count"><![CDATA[flowVars.skip = (flowVars.skip == null) ? 0 + (payload.recordVars['WithholdingRecordsSkippedCount'] == null ? 0 : payload.recordVars['WithholdingRecordsSkippedCount'] ) : flowVars.skip + (payload.recordVars['WithholdingRecordsSkippedCount'] == null ? 0 : payload.recordVars['WithholdingRecordsSkippedCount'] )
+]]></expression-component>
+<expression-component doc:name="Expression : Update Skipped Records Count"><![CDATA[flowVars.skip = (flowVars.skip == null) ? 0 + (payload.recordVars['LocationRecordsSkippedCount'] == null ? 0 : payload.recordVars['LocationRecordsSkippedCount'] ) : flowVars.skip + (payload.recordVars['LocationRecordsSkippedCount'] == null ? 0 : payload.recordVars['LocationRecordsSkippedCount'] )
+]]></expression-component>
+<expression-component doc:name="Expression : Update Skipped Records Count"><![CDATA[flowVars.skip = (flowVars.skip == null) ? 0 + (payload.recordVars['AddressRecordsSkippedCount'] == null ? 0 : payload.recordVars['AddressRecordsSkippedCount'] ) : flowVars.skip + (payload.recordVars['AddressRecordsSkippedCount'] == null ? 0 : payload.recordVars['AddressRecordsSkippedCount'] )
+]]></expression-component>
+<expression-component doc:name="Expression : Update General Invalid record Errors"><![CDATA[flowVars.temp = (flowVars.temp == null) ? "" + (payload.recordVars['GeneralErrors'] == null ? "" : payload.recordVars['GeneralErrors'] ) : flowVars.temp + (payload.recordVars['GeneralErrors'] == null ? "" : payload.recordVars['GeneralErrors'] )
+]]></expression-component>                        
+                    </foreach>
+                    <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="SkipCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[&quot;&quot; + flowVars.skip]" overwrite="true" doc:name="Store Skipped Records Count"/>
+                    <choice doc:name="Choice" doc:description="Condtional logic to check whether there are Duplicate records in the Vendor">
+                        <when expression="#[(flowVars.temp1 != null) &amp;&amp; (!flowVars.temp1.equals(&quot;&quot;))]">
+                            <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="DuplicateRecords#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.temp1]" overwrite="true" doc:name="ObjectStore  Store Duplicate records Report" doc:description="Store Duplicate records Report with Unique ID in Key to distinguish it with other Batch Step Runs
+Stored in Object Store so that it is available after the Batch Job"/>
+                        </when>
+                        <otherwise>
+                            <logger message="No duplicate records for this Vendor record" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+
+                   <expression-filter expression="#[flowVars.temp.trim() != &quot;&quot; ]" doc:name="Expression : Check for Errors" doc:description="Stop Processing The Batch Step for no Errors"/> 
+                    <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="MissingFieldsAddress#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.temp]" overwrite="true" doc:name="Store error report" doc:description="Store Error Report with Unique ID in Key to distinguish it with other Batch Step Runs
+Stored in Object Store so that it is available after the Batch Job"/>
+                    
+                    <objectstore:store config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="MissingFieldsAddressCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.temp.split(&quot;\n&quot;).length]" overwrite="true" doc:name="Store Error Count" doc:description="Store Error Count with Unique ID in Key to distinguish it with other Batch Step Runs
+Stored in Object Store so that it is available after the Batch Job"/>
+                    <!-- <logger message="qwe" level="INFO" doc:name="Logger"/> -->
+                </batch:commit>
+            </batch:step>
+
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>                    
+                    <objectstore:store config-ref="FSF_Vendor_Load_Error_ObjectStore" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="FSF_Vendor_Load_Error_ObjectStore" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+                </batch:commit>
+            </batch:step>
+
+        </batch:process-records>
+        <batch:on-complete>
+
+        <objectstore:retrieve-all-keys config-ref="FSF_Vendor_Load_Error_ObjectStore" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys"/>
+           <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>            
+            <foreach doc:name="For Each">
+                <choice doc:name="Choice : Route Error Count and Error Report" doc:description="Choice : Route Error Count and Error Report">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="FSF_Vendor_Load_Error_ObjectStore" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count"/>
+
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:description="Message Properties: Update Total SFDC Connection Error Count" doc:name="Message Properties: Update Total SFDC Connection Error Count">
+	                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+	                    </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="FSF_Vendor_Load_Error_ObjectStore" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details" doc:description="Exception ObjectStore : Retrive and Remove a record having Exception Details"/>
+
+		                <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+		                      <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+		                </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </foreach>
+            <flow-ref name="inf030-vendor-load-handle-batch-errors-Flow" doc:name="inf030-vendor-load-handle-batch-errors-Flow"/>        
+            <choice doc:name="Choice : Route when No Exception Occured" doc:description="Choice : Route when No Exception Occured">
+                <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="FSF_Vendor_Load_ObjectStore__Connector" doc:name="ObjectStore : Retrieve all Keys" doc:description="Retrieve all Keys for this Load"/>
+                    <foreach doc:name="For Each : Iterate over each Entry" doc:description="For Each : Iterate over each Entry">
+                        <objectstore:remove config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove Each Entry" doc:description="Remove Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+
+                    </foreach>
+                </when>
+                <otherwise>
+
+        <set-session-variable variableName="totalErrorCount" value="#[0]" doc:name="Session Variable : Initialize Total Record Error Count" doc:description="Initialize Total Record Error Count"/>
+        <set-session-variable variableName="totalSkipCount" value="#[0]" doc:name="Session Variable : Initialize Total Record Skip Count" doc:description="Initialize Total Record Skip Count"/>
+        
+            <objectstore:retrieve-all-keys config-ref="FSF_Vendor_Load_ObjectStore__Connector" doc:name="ObjectStore" doc:description="Retrieve all Keys for this Load"/>
+            <foreach doc:name="For Each" doc:description="Iterate over each Entry">
+                 <choice doc:name="Choice : Route Count enteries" doc:description="Route Count enteries">
+                    <when expression="#[ payload.contains('Count') ]">
+                        <choice doc:name="Choice" doc:description="Route Skip enteries">
+                    		<when expression="#[ payload.contains('Skip') ]">
+                    			<objectstore:remove config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove and get" doc:description="Remove Entry from Object Store and store the value of entry in Payload"/>
+	                       		<message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update SkipCount" doc:description="Update SkipCount">
+	                            	<add-message-property key="totalSkipCount" value="#[sessionVars.totalSkipCount == 0? (new java.lang.Integer(payload)) : sessionVars.totalSkipCount + (new java.lang.Integer(payload))]"/>	                            
+	                       		</message-properties-transformer>
+                    		</when>
+                    		<otherwise>
+                                        <objectstore:remove config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove and get" doc:description="Remove Entry from Object Store and store the value of entry in Payload"/>
+
+	                       		<message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update totalErrorCount" doc:description="Update totalErrorCount">
+	                            <add-message-property key="totalErrorCount" value="#[sessionVars.totalErrorCount == 0? (new java.lang.Integer(payload)) : sessionVars.totalErrorCount + (new java.lang.Integer(payload))]"/>
+	                            <!-- <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment == null ? &quot;&quot; + payload + '\n' : sessionVars.ErrorAttachment +  payload + '\n' ]"/> -->
+	                       </message-properties-transformer>
+	                       </otherwise>
+	                       </choice>
+                    </when>
+                    <otherwise>
+		                <objectstore:remove config-ref="FSF_Vendor_Load_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove and get" doc:description="Remove Entry from Object Store and store the value of entry in Payload"/>
+		                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update ErrorAttachment" doc:description="Generate ErrorAttachment
+This takes care of the Business Rule &quot;All records are searched for mandatory fields, if the fields are missing or invalid , the record is added to Exception report&quot;">
+		                      <!-- <add-message-property key="totalErrorCount" value="#[sessionVars.totalErrorCount == 0? (payload.split(&quot;\n&quot;).length) : sessionVars.totalErrorCount + (payload.split(&quot;\n&quot;).length)]"/> -->
+		                      <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment == null ? &quot;&quot; + (payload.endsWith(System.lineSeparator()) ? payload : payload + System.lineSeparator()) : sessionVars.ErrorAttachment +  (payload.endsWith(System.lineSeparator()) ? payload : payload + System.lineSeparator()) ]"/>
+		                </message-properties-transformer>
+                    </otherwise>
+                    </choice>
+            </foreach>
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Set Success Count, Record Status" overwrite="true" doc:description="Set Success Count, Record Status
+These merics will be used in the Logging Framework">
+			<add-message-property key="totalSuccCount"
+				value="#[sessionVars.totalRecCount -  sessionVars.totalErrorCount -  sessionVars.totalSkipCount ]" />
+			<add-message-property key="recStatus"
+				value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+		</message-properties-transformer>
+
+			<set-payload
+				value="{&quot;InterfaceID&quot;: &quot;INF030&quot;, &quot;InterfaceName&quot;: &quot;FSF Vendor Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_VendorLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;Number of Unique Record(s) - #[sessionVars.totalRecCount - sessionVars.totalSkipCount] #[sessionVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;#[sessionVars.totalSkipCount]&quot;}"
+				mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework
+Using this data Logging framework will take the required action"/>
+			<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging Framework for Completing the Transaction" />				
+        
+               </otherwise>
+             </choice>        
+        </batch:on-complete>
+    </batch:job>
+    
+     <flow name="inf030-vendor-load-handle-batch-errors-Flow">
+        
+   		<validation:custom-validator doc:name="Validation : Validate for Batch Techincal Errors" exceptionClass="org.mule.api.ConnectionException" class="gov.delaware.validation.DelawareValidator" config-ref="Validation_Configuration" doc:description="Validate for Batch Exceptions, if Batch Technical Errors are present a Exception is thrown depending on the nature of the Batch Exceptions"/>
+        
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/> 
+    </flow>    
+    
+    <sub-flow name="VendorLoadLogInProgressTransaction_Sub_Flow">
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF030&quot;, &quot;InterfaceName&quot;: &quot;FSF Vendor Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_vendorload&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework
+Using this data Logging framework will take the required action"/>
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging Framework for Starting a Transaction"/>
+		
+	</sub-flow>
+
+
+</mule>

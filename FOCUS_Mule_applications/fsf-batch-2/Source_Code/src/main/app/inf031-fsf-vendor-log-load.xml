@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+	<objectstore:config name="FSF_Vendor_Log_Load_ObjectStore__Connector" doc:name="ObjectStore: Connector" objectStore-ref="FSF_Vendor_Log_Load_Object_Store"/>	
+	<objectstore:config name="FSF_Vendor_Log_Load_Error_ObjectStore__Connector" doc:name="ObjectStore: Connector" objectStore-ref="FSF_Vendor_Log_Load_Error_Object_Store"/>
+    <spring:beans>
+         <spring:bean id="FSF_Vendor_Log_Load_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean> 
+         <spring:bean id="FSF_Vendor_Log_Load_Error_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean>
+   	</spring:beans>
+
+    <flow name="inf031-fsf-vendor-log-loadFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="The Poller runs in US/Eastern timezone">
+            <schedulers:cron-scheduler expression="0 15 7 1/1 * ? *" timeZone="US/Eastern"/> 
+			<!-- <schedulers:cron-scheduler expression="0 1/1 * 1/1 * ? *" />  -->
+			<set-payload value="INF031" doc:name="Set Payload to Interface ID" doc:description="Payload is set it interface ID so that the Flow will trigger and later this ID will be used in the Logging and Exception handling framework"/>			
+        </poll>
+
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Flowvars is set it interface ID recieved from payload so that the Flow will trigger and later this ID will be used in the Logging and Exception Handling Framework"/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <mulerequester:request resource="sftp://${sftp.FSFVendorLogLoad.transaction.username}:${sftp.FSFVendorLogLoad.transaction.password}@${sftp.FSFVendorLogLoad.transaction.host}:${sftp.FSFVendorLogLoad.transaction.port}${sftp.FSFVendorLogLoad.transaction.path}?connector=SFTPOverride&amp;myfilename=${sftp.FSFVendorLogLoad.transaction.filename}" timeout="120000" doc:name="Mule Requester" doc:description="Retrieve the Vendor load load File."/>
+        </until-successful>      
+		<validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validation : if File is not found then Null is returned, this component validates for Not null, if Null is returned then Exception will be thrown." config-ref="Validation_Configuration1"/>        
+        <object-to-string-transformer doc:name="Object to String" mimeType="text/plain" doc:description="Consume Payload"/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP" outputPattern="${sftp.FSFVendorLogLoad.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.FSFVendorLogLoad.archive.host}" port="${sftp.FSFVendorLogLoad.archive.port}" path="${sftp.FSFVendorLogLoad.archive.path}" user="${sftp.FSFVendorLogLoad.archive.username}" password="${sftp.FSFVendorLogLoad.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP : Archive File" doc:description="Archive File in the specified directory, the archived file serves as a backup "/>
+        </until-successful>
+        <set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="Set TransAttachment" doc:description="Store Transaction Attachment, this is to used as a backup of file in Interface Dashboard"/>
+        <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Split Records" doc:description="Split records based on Line Feed character"/>
+		<enricher doc:name="Message Enricher" doc:description="Logging Framework is invoked in Message Enricher so that the Payload is not modified">
+			<flow-ref name="VendorLogLoadLogInProgressTransaction_Sub_Flow" doc:name="VendorLogLoadLogInProgressTransaction_Sub_Flow" />
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+		</enricher>
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Delete Trans Attachment" doc:description="Deleting TransAttachment so that it wont be logged again in the Interface Dashboard">
+			<delete-message-property key="TransAttachment" /> 
+		</message-properties-transformer>
+        <choice doc:name="Choice : Check Detail Level Records" doc:description="Check Detail Level Records if there are no records found then Complete the transaction otherwise continue with the load
+">
+            <when expression="#[payload.length &gt; 2]">
+                <dw:transform-message doc:name="Transform Message - Get Detail Level Records" doc:description="Get Detail Level Records by Removing header and Trailer">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[1..-2]]]></dw:set-payload>
+                </dw:transform-message>
+                <set-session-variable variableName="totalRecCount" value="#[payload.size()]" doc:name="Session Variable : Set Total Record Count" doc:description="Set Total Record Count for the Load"/>
+                <batch:execute name="inf031-fsf-vendor-log-loadBatch" doc:name="inf031-fsf-vendor-log-loadBatch" doc:description="Invoke batch to continue with the Load"/>
+            </when>
+            <otherwise>
+
+            				<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Count" doc:description="Update Count and Record Status to be used in Logging Framework">
+				
+				<add-message-property key="totalRecCount"
+					value="#[0]" />
+				<add-message-property key="totalSuccCount"
+					value="#[0]" />
+				<add-message-property key="totalErrorCount"
+					value="#[0]" />
+                    <add-message-property key="recStatus" value="#['Success']"/>
+
+			</message-properties-transformer>
+
+			<set-payload
+				value="{&quot;InterfaceID&quot;: &quot;INF031&quot;, &quot;InterfaceName&quot;: &quot;FSF Vendor Log Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_VendorLogLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;No Detail Records Found in the file&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}"
+				mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework to complete Transaction with Business Exception" />
+			<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging Framework to complete Transaction" />
+                
+            </otherwise>
+        </choice>
+        <!-- <set-variable variableName="outboundFileName" value="#[payload[0].substring(53)]" doc:name="Variable - Set Outbound File Name"/> -->
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+
+    </flow>
+    <batch:job name="inf031-fsf-vendor-log-loadBatch">
+        <batch:process-records>
+            <batch:step name="Process_InvalidLengthRecords_Batch_Step" accept-expression="#[payload.length() != 85]">
+                <batch:commit  doc:name="Batch Commit" streaming="true">
+                    <!-- <set-session-variable variableName="fsfInvalidLengthRecordsSize" value="#[sessionVars.fsfInvalidLengthRecordsSize == null ? sessionVars.fsfInvalidLengthRecordsSize : sessionVars.fsfInvalidLengthRecordsSize + payload.size()]" doc:name="Session Variable"/> -->
+                    <dw:transform-message doc:name="TM : Create Invalid Records Error Report" doc:description="Generate Invalid Length Records Error Report">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv separator=",", header=false
+---
+payload map {
+	record : $,
+	message : "Length of the record is incorrect (" ++ sizeOf $ ++ ") expected length is 85 "
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer doc:name="Object to String" doc:description="Consume payload"/>
+                    <expression-filter expression="#[!payload.equals(&quot;&quot;)]" doc:name="Expression : Check for Invalid records" doc:description="Checking for Invalid records this is done so that Error Report is inserted in Object Store only if Invalid Records is present"/>
+					<!-- <set-session-variable variableName="fsflogloadInvalidLengthRecordsCount" value="#[payload.split(&quot;\n&quot;).length]" doc:name="Session Variable : Invalid Length Records Count"/> -->
+                    <objectstore:store config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="InvalidLengthReport" value-ref="#[payload]" doc:name="ObjectStore - Store Report" doc:description="Store Invalid Length Records Report in Object Store so that it can be retrieved after the Batch Process"/>
+                    <!-- <logger message="Hello!" level="INFO" doc:name="Logger"/> -->
+                </batch:commit>
+            </batch:step>
+            <batch:step name="FixedLengthTransform_Batch_Step" accept-expression="#[payload.length() == 85]">
+                <batch:commit size="200" doc:name="Batch Commit">
+                    <dw:transform-message doc:name="TM : Convert List to Fixed Width Payload" doc:description="Generate Fixed Width payload">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload joinBy "\n") ++ "\n"]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM :  Convert Fixed Width to List" doc:description="Fixed Width Transformation to convert to JAVA Payload of List of Maps">
+                        <dw:input-payload mimeType="text/plain">
+                            <dw:reader-property name="schemaPath" value="fsf-log-load-data-detail.ffd"/>
+                        </dw:input-payload>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                    </dw:transform-message>
+                    <foreach doc:name="For Each" doc:description="Iterate over each Record
+The steps in this For each will enable the Payload from the Batch Commit to be available in the next Batch Steps">
+                        <expression-component doc:name="Expression"><![CDATA[flowVars.records[flowVars.counter-1].payload=payload]]></expression-component>
+                    </foreach>
+                    <!-- <logger message="h" level="INFO" doc:name="Logger"/> -->
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Process_MissingFields_Batch_Step" accept-expression="#[ (payload instanceof java.util.Map) &amp;&amp; (payload.ETIN == null || (payload.RecordType == null || !payload.RecordType.equals(&quot;01&quot;) )) ]">
+                <batch:commit  doc:name="Batch Commit" size="100">
+                    <!-- <set-session-variable variableName="fsfMissingFieldsRecordsSize" value="#[payload.size()]" doc:name="Session Variable"/> -->
+                    <dw:transform-message doc:name="Transform Message" doc:description="Generate Error Report of Missing and Invalid Records">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath="fsf-log-load-data-detail-with-ErrorDetails.ffd"
+---
+payload map {
+	RecordType : $.RecordType default "",
+	ETIN : $.ETIN default "",
+	InterfaceErrorMessage : $.ErrorMessage default "",
+	UpdateError : ((",Record Type is invalid : Detail level records should start with 01 ") when ($.RecordType != null and $.RecordType != "01" ) otherwise "") ++ ((",Record Type is missing ") when ($.RecordType == null) otherwise "") ++ ((",ETIN is missing") when ($.ETIN == null) otherwise "")  
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer doc:name="Object to String" doc:description="Convert Error report from Input Stream to String to make it serializable"/>
+                    <expression-filter expression="#[!payload.equals(&quot;&quot;)]" doc:name="Expression " doc:description="Insert Data in Object Store only if Invalid data is present"/>
+                    <objectstore:store config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="MissingFieldReport" value-ref="#[payload]" doc:name="ObjectStore - Store Missing Fields Report" doc:description="Store Missing Fields Report In Object Store so that it can be retrieved after Batch Process"/>
+					<!-- <set-session-variable variableName="fsflogloadMissingFieldsRecordsCount" value="#[payload.split(&quot;\n&quot;).length]" doc:name="Session Variable : Missing Fields Records Count"/> -->
+
+                    <!-- <logger message="QWE" level="INFO" doc:name="Logger"/> -->
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Retrieve_VendorID_ValidLengthRcords_Batch_Step" accept-expression="#[ (payload instanceof java.util.Map) &amp;&amp; (payload.ETIN != null &amp;&amp; (payload.RecordType != null &amp;&amp;  payload.RecordType.equals(&quot;01&quot;)) ) ]">
+                <batch:commit size="300" doc:name="Batch Commit">
+                    <dw:transform-message doc:name="TM : Get Comma Separated List Of Vendor ID" doc:description="This Transformation creates a Command Separated List of Vendor ID to be used in Salesforce Query">
+<!--                         <dw:input-payload mimeType="text/plain">
+                            <dw:reader-property name="schemaPath" value="fsf-log-load-data-detail.ffd"/>
+                        </dw:input-payload> -->
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+((payload.ETIN ) map ("'" ++ $ ++ "'" )) joinBy ","]]></dw:set-payload>
+                    </dw:transform-message>
+                    <!-- <set-variable variableName="query" value="select Id from DEL_Vendor__c where ETIN__c IN (#[payload])" doc:name="Variable"/> -->
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id,ETIN__c from DEL_Vendor__c where ETIN__c IN (#[payload]) and Status__c = 'Active'" doc:name="Salesforce Query Vendor Id" doc:description="Retrieve the Vendor records which are active and have the specified ETIN's"/>
+                    <dw:transform-message doc:name="TM : GroupBy ETIN" doc:description="Grouping the Payload by ETIN number">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload groupBy $.ETIN__c)
+]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Add Error Message" doc:description="Add Error Message to Payload">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.records.payload map (record,index) -> {
+	ETIN__c : record.ETIN,
+	//ErrorDescription : record.ErrorMessage,
+	(rec : payload[record.ETIN] map {
+		Id : $.Id,
+		ETIN__c : $.ETIN__c, 
+		ErrorDescription : record.ErrorMessage
+	}) when (payload[record.ETIN] != null)
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <foreach doc:name="For Each" doc:description="Iterate over each Record
+The steps in this For each will enable the Payload from the Batch Commit to be available in the next Batch Steps">
+                        <expression-component doc:name="Expression"><![CDATA[flowVars.records[flowVars.counter-1].payload=payload]]></expression-component>
+
+                        <!-- <expression-component doc:name="Expression"><![CDATA[flowVars.records[flowVars.counter-1].payload= { "ETIN" : (payload.hasNext() ? payload.next() : null)}]]></expression-component> -->
+                    </foreach>
+                    <!-- <logger message="qwerqwe" level="INFO" doc:name="Logger"/> -->
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Process_ValidLengthRcords_Batch_Step" accept-expression="#[ (payload instanceof java.util.Map) &amp;&amp; (payload.rec != null) ]">
+                <batch:commit doc:name="Batch Commit" size="10000">
+
+                    <!-- <flow-ref name="inf031-fsf-vendor-log-loadFlow1111" doc:name="inf031-fsf-vendor-log-loadFlow1111"/> -->
+
+                <!-- <logger message="Payload : #[payload]" level="INFO" doc:name="Logger"/> -->
+                    <dw:transform-message doc:name="TM : Retrieve Unique Payload">
+                        <dw:set-variable variableName="preUpdateData"><![CDATA[%dw 1.0
+%output application/java
+---
+(flatten payload.rec) distinctBy $.Id]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Update Status" doc:description="Update Status to Inactive for all records
+This take care of setting status for the Business Rule &quot;The Vendor Log Load interface identifies the Vendor records using the ETIN number and updates Status of the Vendor record to Inactive&quot;
+This also takes care of the Business Rule &quot;Error description field is to be ignored&quot;">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.preUpdateData.Id map ( {
+	Id: $,
+	Status__c : "Inactive"
+})]]></dw:set-payload>
+                    </dw:transform-message>
+
+
+                    <!-- <set-payload value="#[org.apache.commons.collections.IteratorUtils.toList(payload)]" doc:name="Set Payload"/> -->
+ 
+                    <!-- <logger message="wqewq" level="INFO" doc:name="Logger"/> -->
+                    <foreach doc:name="For Each" batchSize="10000" doc:description="Iterate 10000 records at a time
+For each used so that the maximum limit of SFDC Upsert Bul operation is not exceeded">
+                        <sfdc:update-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Vendor__c" doc:name="Salesforce - Update Bulk" doc:description="Update 10000 records at a time
+This take care of updating records for the Business Rule &quot;The Vendor Log Load interface identifies the Vendor records using the ETIN number and updates Status of the Vendor record to Inactive&quot;">
+                            <sfdc:objects ref="#[payload]"/>
+                        </sfdc:update-bulk>
+                        <set-variable variableName="jobId" value="#[payload.jobId]" doc:name="Variable : Job ID" doc:description="Store the job id"/>
+        <until-successful maxRetries="50" millisBetweenRetries="30000" synchronous="true" doc:name="Until Successful : Retrieve job Result when ready" doc:description="Trying to get Bulk Job Result when it is ready.
+At retry is made after every 30 seconds and a maxinum of 50 retry is set, to retrieve the Bulk job result">
+            <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce - Get Batch Result Stream"/>
+        </until-successful>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" doc:description="Consume XML Input Stream recieved from salesforce"/>
+
+
+        
+		<dw:transform-message doc:name="TM : Filter SFDC Errors" doc:description="Generate SFDC Error report">
+						<dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml 
+%output application/java
+---
+(payload.results.*result map {
+		//Id : $.Id,	
+		RecordType : "01",
+		ETIN : flowVars.preUpdateData[$$ + ((flowVars.counter - 1) * 10000)].ETIN__c,
+		InterfaceErrorMessage : flowVars.preUpdateData[$$ + ((flowVars.counter - 1) * 10000)].ErrorDescription,
+		VendorID : ",Vendor ID : " ++ flowVars.preUpdateData[$$ + ((flowVars.counter - 1) * 10000)].Id,
+		//record : flowVars.records[$$].payload,
+		UpdateError : (",Fields : " ++ $.errors.fields ++ " Message : " ++ $.errors.message ++ " Status Code : " ++ $.errors.statusCode ) when $.errors.fields != null otherwise null
+} filter $.'UpdateError' != null and $.'UpdateError' !='')]]></dw:set-payload>
+					</dw:transform-message>
+                        <dw:transform-message doc:name="TM : Get Count Of Errors" doc:description="Get Count Of SFDC Errors">
+                            <dw:set-variable variableName="sizeOfInvalidSFDCRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+sizeOf (payload groupBy $.ETIN)]]></dw:set-variable>
+                        </dw:transform-message>
+                        <dw:transform-message doc:name="TM : Fixed width transform" doc:description="Fixed Width Transform to generate error report">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath="fsf-log-load-data-detail-with-ErrorDetails-withVendorID.ffd"
+---
+payload]]></dw:set-payload>
+                        </dw:transform-message>
+ <!--                    Use groupBy $.ETIN above    <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                            <add-message-property key="sfdcErrorCount" value="#[sessionVars.sfdcErrorCount == null ? payload.size() : sessionVars.sfdcErrorCount + payload.size() ]"/>
+                        <foreach counterVariableName="counter2" doc:name="For Each">
+                            <enricher source="#[payload]" target="#[flowVars.invalidRec]" doc:name="Message Enricher">
+                                <processor-chain doc:name="Processor Chain">
+                                    <dw:transform-message doc:name="Transform Message">
+                                        <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath="fsf-log-load-data-detail-with-ErrorDetails.ffd"  
+-
+{
+	RecordType : payload[0].RecordType,	
+	ETIN : payload[0].ETIN,
+	InterfaceErrorMessage : payload[0].InterfaceErrorMessage
+	//UpdateError : payload[0].UpdateError
+}]]></dw:set-payload>
+                                    </dw:transform-message>
+                                    <object-to-string-transformer doc:name="Object to String"/>
+                                </processor-chain>
+                            </enricher>
+                            <dw:transform-message doc:name="Transform Message">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv separator="|" , header=false  
+-
+payload map {
+	Id : "Error while updating Vendor with unique Id :" ++ $.Id,
+	ErrorDescription : $.UpdateError
+}]]></dw:set-payload>
+                            </dw:transform-message>
+                            <object-to-string-transformer doc:name="Object to String"/>
+                            <set-payload value="#[payload + flowVars.invalidRec ]" doc:name="Set Payload"/>
+                            <objectstore:store config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="#[&quot;&quot; + flowVars.jobId + flowVars.counter2]" value-ref="#[payload]" doc:name="ObjectStore"/>
+                        </foreach> --> 
+                    <object-to-string-transformer doc:name="Object to String" doc:description="Convert InputStream to String to make it serializable"/>
+                    <enricher source="#[payload]" target="#[flowVars.jobDetails]" doc:name="Message Enricher" doc:description="Invoking Salesforce Operation in Message Enricher so that the payload is not modified">
+                        <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.jobId]" doc:name="Salesforce : Close Job"/>
+                    </enricher>
+
+                    <expression-filter expression="#[!payload.equals(&quot;&quot;)]" doc:name="Check for errors" doc:description="Check for errors if errors are not found then processing is stopped further for this iteration" />
+                        <objectstore:store config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="#['countInvalidSFDCRecords' + flowVars.counter]" value-ref="#[&quot;&quot; + flowVars.sizeOfInvalidSFDCRecords]" doc:name="ObjectStore Store Invalid Records Count" doc:description="Store Invalid Records Count in Object Store so that it can be retrieved after Batch Process"/>
+                    <!-- <set-session-variable variableName="fsflogloadSFDCUpdateErrorCount" value="#[payload.split(&quot;\n&quot;).length]" encoding="windows-1256" doc:name="Session Variable : Total SFDC Update Error Record Count"/> -->
+                    <!-- <objectstore:store config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="#[flowVars.jobId]" value-ref="#[payload]" doc:name="ObjectStore"/> -->
+                    <!-- <logger message="Hello!" level="INFO" doc:name="Logger"/> -->
+                    <object-to-string-transformer doc:name="Object to String" doc:description="Convert InputStream to String to make it serializable"/>
+                            
+                    <objectstore:store config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="#[flowVars.jobId]" value-ref="#[payload]" doc:name="ObjectStore : Store SFDC result" doc:description="Store SFDC result in Object Store so that it can be retrieved after Batch Process"/>
+                    </foreach>
+                    <!-- <vm:outbound-endpoint exchange-pattern="request-response" path="VM1" doc:name="VM"/> -->
+
+
+                </batch:commit>
+            </batch:step>
+<!-- 	        <batch:step name="UpdateStatus_Batch_Step" accept-expression="#[payload.valid==true]">
+                <batch:commit doc:name="Batch Commit" size="10000">
+                	        
+    	<sfdc:update-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Vendor__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update-bulk>
+        <until-successful maxRetries="50" millisBetweenRetries="2000" synchronous="true" doc:name="Until Successful">
+            <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce - Get Batch Result Stream"/>
+        </until-successful>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <enricher source="#[payload]" target="#[flowVars.batchResult]" doc:name="Message Enricher">
+            <flow-ref name="inf031-fsf-vendor-log-loadSub_Flow" doc:name="inf031-fsf-vendor-log-loadSub_Flow"/>
+        </enricher>
+
+        
+		<dw:transform-message doc:name="Transform Message : Filter SFDC Errors">
+						<dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml 
+%output application/csv  
+-
+payload.results.*result map {
+		record : records[$$].payload,
+		'Update Error': ("|Fields : " ++ $.errors.fields ++ " Message : " ++ $.errors.message ++ " Status Code : " ++ $.errors.statusCode ) when $.errors.fields != null otherwise null
+} filter $.'ERROR-MESSAGE' != null and $.'ERROR-MESSAGE' !='']]></dw:set-payload>
+					</dw:transform-message>
+                </batch:commit>
+            </batch:step> -->
+
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>                    
+                    <objectstore:store config-ref="FSF_Vendor_Log_Load_Error_ObjectStore__Connector" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="FSF_Vendor_Log_Load_Error_ObjectStore__Connector" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+                </batch:commit>
+            </batch:step>        
+        </batch:process-records>
+      
+        <batch:on-complete>
+        
+        <objectstore:retrieve-all-keys config-ref="FSF_Vendor_Log_Load_Error_ObjectStore__Connector" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys"/>
+           <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>            
+            <foreach doc:name="For Each" doc:description="Iterate over each Object Store Key">
+                <choice doc:name="Choice : Route Error Count and Error Report" doc:description="Choice : Route Error Count and Error Report">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="FSF_Vendor_Log_Load_Error_ObjectStore__Connector" key="#[payload]" doc:name="Exception ObjectStore : Retrieve and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retreive and Remove a record having SFDC Connection Exception Count"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Update Total SFDC Connection Error Count" doc:description="Message Properties: Update Total SFDC Connection Error Count">
+                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="FSF_Vendor_Log_Load_Error_ObjectStore__Connector" key="#[payload]" doc:name="Exception ObjectStore : Retrieve and Remove a record having Exception Details" doc:description="Exception ObjectStore : Retrieve and Remove a record having Exception Details"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+                            <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+
+            </foreach>
+          <flow-ref name="inf031-vendor-log-load-handle-batch-errors-Flow" doc:name="inf031-vendor-log-load-handle-batch-errors-Flow" doc:description="Invoke Flow to handle Batch errors"/>        
+            <choice doc:name="Choice : Route when No Exception Occured" doc:description="Choice : Route when No Exception Occured">
+                <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" doc:name="ObjectStore : Retrieve all Keys" doc:description="Retrieve all Keys for this Load"/>
+
+                    <foreach doc:name="For Each : Iterate over each Entry" doc:description="Iterate over each Entry">
+                        <objectstore:remove config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove Each Entry" doc:description="Remove Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+
+                    </foreach>
+                </when>
+                <otherwise>
+            <message-properties-transformer scope="session" doc:name="Message Properties : Set Total Error Count" doc:description="Initialize Total Error Count">
+                <add-message-property key="totalErrorCount" value="#[0]"/>
+            </message-properties-transformer>
+            <objectstore:retrieve-all-keys config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" doc:name="ObjectStore : Retrieve all keys for this Load" doc:description="Retrieve all keys for this Load"/>
+            <foreach doc:name="For Each" doc:description="Iterate for all Keys">
+                
+                <choice doc:name="Choice Route Counting and Missing Field enteries">
+                    <when expression="#[payload.contains('countInvalidSFDCRecords')]">
+                                <objectstore:remove config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore" doc:description="Remove the Entry from Object store using Key and Store the value of Entry as payload"/>
+
+                       <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update totalErrorCount" doc:description="Update totalErrorCount">
+                            <add-message-property key="totalErrorCount" value="#[sessionVars.totalErrorCount == 0? (new java.lang.Integer(payload)) : sessionVars.totalErrorCount + (new java.lang.Integer(payload))]"/>
+                            <!-- <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment == null ? &quot;&quot; + payload + '\n' : sessionVars.ErrorAttachment +  payload + '\n' ]"/> -->
+                       </message-properties-transformer>
+                    </when>
+                    <when expression="#[payload.contains('MissingFieldReport') || payload.contains('InvalidLengthReport')]">
+                    	<objectstore:remove config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore" doc:description="Remove the Entry from Object store using Key and Store the value of Entry as payload"/>
+                        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update totalErrorCount, ErrorAttachment" doc:description="Update totalErrorCount, ErrorAttachment">
+                            <add-message-property key="totalErrorCount" value="#[sessionVars.totalErrorCount == 0? (payload.split(&quot;\n&quot;).length) : sessionVars.totalErrorCount + (payload.split(&quot;\n&quot;).length)]"/>
+                            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment == null ? &quot;&quot; + payload + '\n' : sessionVars.ErrorAttachment +  payload + '\n' ]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <!-- MissingFieldReport,InvalidLengthReport -->
+                    <otherwise>
+                    <objectstore:remove config-ref="FSF_Vendor_Log_Load_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore Remove Entry" doc:description="Remove the Entry from Object store using Key and Store the value of Entry as payload"/>
+                        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update totalErrorCount, ErrorAttachment" doc:description="Update totalErrorCount, ErrorAttachment">
+                            <!-- <add-message-property key="totalErrorCount" value="#[sessionVars.totalErrorCount == 0? (payload.split(&quot;\n&quot;).length) : sessionVars.totalErrorCount + (payload.split(&quot;\n&quot;).length)]"/> -->
+                            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment == null ? &quot;&quot; + payload + '\n' : sessionVars.ErrorAttachment +  payload + '\n' ]"/>
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+
+            </foreach>
+
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Set Success Count, Record Status" doc:description="Set Success Count, Record Status
+These metrics will be used in Logging framework">
+			<add-message-property key="totalSuccCount"
+				value="#[sessionVars.totalRecCount -  sessionVars.totalErrorCount]" />
+			<add-message-property key="recStatus"
+				value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+		</message-properties-transformer>
+
+			<set-payload
+				value="{&quot;InterfaceID&quot;: &quot;INF031&quot;, &quot;InterfaceName&quot;: &quot;FSF Vendor Log Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_VendorLogLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}"
+				mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework"/>
+			<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Log Transaction Sub Flow to complete Transaction"/>
+                                
+                </otherwise>
+             </choice>        
+        
+        
+        </batch:on-complete>
+    </batch:job>
+	<sub-flow name="VendorLogLoadLogInProgressTransaction_Sub_Flow">
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF031&quot;, &quot;InterfaceName&quot;: &quot;FSF Vendor Log Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DGL005_370000_370640_log&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework"/>
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Log Transaction Sub Flow to Start a transaction"/>
+		<!-- <logger message="Session : #[sessionVars]" level="INFO" doc:name="Logger"/> -->
+	</sub-flow>
+     <flow name="inf031-vendor-log-load-handle-batch-errors-Flow">
+        <!-- <logger message="FlowVars From Flow #[flowVars]" level="INFO" doc:name="Logger"/> -->
+   		<validation:custom-validator doc:name="Validation : Validate for Batch Techincal Errors" exceptionClass="org.mule.api.ConnectionException" class="gov.delaware.validation.DelawareValidator" config-ref="Validation_Configuration" doc:description="Validate for Batch Exceptions, if Batch Technical Errors are present a Exception is thrown depending on the nature of the Batch Exceptions"/>
+        <!-- <logger message="After Validation : In flow" level="INFO" doc:name="Logger"/> -->
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/> 
+    </flow>   	
+
+   	
+</mule>

@@ -1,0 +1,9 @@
+form: FIXEDWIDTH
+name: 'fsf-data-header'
+values: 
+- { name: 'Header', usage: M, type: String, length: 1 }
+- { name: 'VendorID', usage: M, type: String, length: 10 }
+- { name: 'ETIN', usage: M, type: String, length: 20 }
+- { name: 'VendorName', usage: M, type: String, length: 40 }
+- { name: 'Withholding', usage: M, type: String, length: 1 }
+- { name: 'Whitespaces', usage: M, type: String, length: 142 }

@@ -1,0 +1,6 @@
+form: FIXEDWIDTH
+name: 'fsf-data-withholding'
+values: 
+- { name: 'RecordType', usage: M, type: String, length: 1 }
+- { name: 'WithholdingType', usage: M, type: String, length: 5 }
+- { name: 'WithholdingClass', usage: M, type: String, length: 5 }

@@ -1,0 +1,13 @@
+form: FIXEDWIDTH
+name: 'fsf-data-address'
+values: 
+- { name: 'RecordType', usage: M, type: String, length: 1 }
+- { name: 'VendorID', usage: M, type: String, length: 10 }
+- { name: 'AddressSequenceNumber', usage: M, type: String, length: 5 }
+- { name: 'Description', usage: M, type: String, length: 30 }
+- { name: 'AddressDate', usage: M, type: String, length: 10 }
+- { name: 'Address1', usage: M, type: String, length: 55 }
+- { name: 'Address2', usage: M, type: String, length: 55 }
+- { name: 'City', usage: M, type: String, length: 30 }
+- { name: 'State', usage: M, type: String, length: 6 }
+- { name: 'ZipCode', usage: M, type: String, length: 12 }

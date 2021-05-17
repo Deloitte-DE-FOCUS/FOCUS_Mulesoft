@@ -1,0 +1,5 @@
+form: FIXEDWIDTH
+name: 'FinalFFD'
+values: 
+- { name: 'Dept_ID', usage: M, type: String, length: 10 }
+- { name: 'ETIN', usage: M, type: String, length: 20 }

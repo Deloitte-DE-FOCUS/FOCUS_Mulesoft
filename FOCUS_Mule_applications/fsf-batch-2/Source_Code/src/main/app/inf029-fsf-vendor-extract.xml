@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd">
+<!--     <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans>
+   	<spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans> -->
+   	<spring:beans> 
+         <spring:import resource="classpath:/test-framework.xml" />   
+   	</spring:beans>
+ 
+   	 
+   <!--  <sfdc:config name="Salesforce__Basic_Authentication1" username="Bbansal@state.de.us.focusdev" password="WelcomeYou%5" url="https://dscyfkidsfocusdev.cs32.my.salesforce.com/services/Soap/u/37.0" doc:name="Salesforce: Basic Authentication"/> -->
+   
+    
+   
+    <flow name="inf029-fsf-vendor-extract-Flow" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="This is a Mule schedular which Polls SFDC to extract data everyday at 5 PM">
+            <schedulers:cron-scheduler expression="0 0 17 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF029" doc:name="Set Payload"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID"/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT  DEL_FSF_TIN__c from Account where DEL_FSF_TIN__c !='' and DEL_FSF_TIN__c !=null" doc:name="Salesforce" doc:description="Thw Query defined in the SFDC connector fecthes all records which has TIN number from the Provider object"/>
+        </until-successful>
+        <enricher doc:name="Message Enricher" doc:description="Mesage Enricher is used to call the loggin framework so that the Payload is not changed.">
+            <flow-ref name="In-Progress-FSF-Extract" doc:name="In-Progress-FSF-Extract" doc:description="Call the Subflow to create In Progress Transaction in interface tab in SFDC"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf029-fsf-extract-NoPayload_Flow" doc:name="inf029-fsf-extract-NoPayload_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+         <expression-filter expression="#[payload.size()!=0]" doc:name="Expression"/>
+        <dw:transform-message doc:name="TM:Convert Query to map"  metadata:id="d42f62a7-56bf-4254-9425-ac3902c88a00">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//Convert the stream query output to arraylist
+%dw 1.0
+%output application/java
+---
+payload map {
+	Dept_ID:'370000',
+	ETIN: $.DEL_FSF_TIN__c
+}]]></dw:set-payload>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+            <add-message-property key="AllRecords" value="#[payload]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload distinctBy $.ETIN]]></dw:set-payload>
+            <dw:set-variable variableName="UniqueRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+sessionVars.AllRecords groupBy $.ETIN  ]]></dw:set-variable>
+        </dw:transform-message>
+
+
+      <!--   <set-payload value="#[sessionVars.InitialPayload]" mimeType="application/java" metadata:id="01599567-0ed2-4f83-bc66-551d96740070" doc:name="Set Payload to Initial Payload"/> -->
+
+        
+
+        <logger message="Query:  #[payload]" level="INFO" doc:name="Logger" doc:description=" Output the Payload (Query result)"/>
+        <dw:transform-message metadata:id="079a6766-468a-4093-9b18-fdc2e71ce3d5" doc:name="TM: Create Fixed Width File">
+            <dw:input-payload doc:sample="sample_data\list_Java-Payload.dwl"/>
+            <dw:input-variable mimeType="application/java" variableName="RecordCount"/>
+            <dw:set-payload><![CDATA[//Convert the arraylist to fixed width file with LF
+%dw 1.0
+%output text/plain schemaPath = "FinalFFD.ffd" ,recordTerminator="lf"
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	Dept_ID: payload01.Dept_ID,
+	ETIN: payload01.ETIN
+} )]]></dw:set-payload>
+            <dw:set-variable variableName="SkippedRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+flatten (flowVars.UniqueRecords filter (sizeOf $) > 1 map $[1..-1] default [] )]]></dw:set-variable>
+
+
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <dw:transform-message doc:name="TM:Create Skipped Record Warning">
+            <dw:set-variable variableName="SkippedAttachment"><![CDATA[%dw 1.0
+%output application/csv
+---
+flowVars.SkippedRecords map {
+	"Error" :"Data Warning",
+	"Field Name in Error":"ETIN",
+	"Field Value in Error":$.ETIN,
+	"Error Description":"Duplicate ETIN Found"
+}]]></dw:set-variable>
+        </dw:transform-message>
+
+        <message-properties-transformer overwrite="true" scope="session" metadata:id="32690d77-a9e8-4d27-a862-66e925480bfc" doc:name="MP:Set Record-Error,Count,Success " doc:description="Set Record-Error, Record Count and Record Success ">
+            <add-message-property key="RecordError" value="#[0]"/>
+            <add-message-property key="RecordSuccess" value="#[payload.split(&quot;\n&quot;).length]"/>
+            <add-message-property key="RecordSkippedCount" value="#[payload.split(&quot;\n&quot;).length]"/>
+            <add-message-property key="ErrorAttachment" value="#[flowVars.SkippedAttachment]"/>
+
+        </message-properties-transformer>
+
+        <flow-ref name="Write_to_SFTP-FSF" doc:name="Write_to_SFTP-FSF" doc:description="Call the subflow Write to SFTP FSF for writing the files to SFTP archive and main folder"/>
+
+       <set-payload value="{&quot;InterfaceID&quot;: &quot;INF029&quot;, &quot;InterfaceName&quot;: &quot;FSF Vendor Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_FSFVendorExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DAP031_370000_IN_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;RecordSkipped&quot;:&quot;#[sessionVars.RecordSkipped]&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="Create A JSON Payload with the required information to create a In Progress transaction in SFDC "/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call Logging framework to create Completed with Errors/Success transaction in SFDC."/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Output the payload (result of logging framework )"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+        
+        </flow>
+    <sub-flow name="In-Progress-FSF-Extract" doc:description="Sub flow for creating In Progress transaction in SFDC">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF029&quot;, &quot;InterfaceName&quot;: &quot;FSF Vendor Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework" doc:description="Create A JSON Payload with the required information to create a In Progress transaction in SFDC "/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the Logging framework to create the In Progress Transaction."/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description=" Output the Payload (result of in progress create in SFDC)"/>
+    </sub-flow>
+    <sub-flow name="Write_to_SFTP-FSF">
+        <logger message="Final File Prepared" level="INFO" doc:name="Logger" doc:description="Output the Payload (Final fixed width file)"/>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-1" outputPattern="${sftp.fsfextract.transaction.filename}" host="${sftp.fsfextract.transaction.host}" port="${sftp.fsfextract.transaction.port}" path="${sftp.fsfextract.transaction.path}" user="${sftp.fsfextract.transaction.username}" password="${sftp.fsfextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder" doc:description="Write the Extracted fixed width file to the sftp main folder"/>
+        </until-successful>
+
+        <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment" overwrite="true" doc:description="Create TransAttachment for creating a back up of the extracted file in SFDC">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="RecordSkipped" value="#[sessionVars.RecordCount - sessionVars.RecordSkippedCount]"/>
+        </message-properties-transformer>
+        <until-successful maxRetries="3" millisBetweenRetries="20000" synchronous="true" doc:name="Until Successful">
+            <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-1" outputPattern="${sftp.fsfextract.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.fsfextract.archive.host}" port="${sftp.fsfextract.archive.port}" path="${sftp.fsfextract.archive.path}" user="${sftp.fsfextract.archive.username}" password="${sftp.fsfextract.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" doc:description="Write the Final Extracted Fixed width file to the Archive folder"/>
+        </until-successful>
+    </sub-flow>
+
+ <sub-flow name="inf029-fsf-extract-NoPayload_Flow">
+        <choice doc:name="Choice">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF029&quot;, &quot;InterfaceName&quot;: &quot;FSF Vendor Extract&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </when>
+            <otherwise>
+                <logger message="Payload Extracted" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+
+    
+    </mule>
