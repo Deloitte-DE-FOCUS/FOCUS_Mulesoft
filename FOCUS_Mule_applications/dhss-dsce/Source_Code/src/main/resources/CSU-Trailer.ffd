@@ -1,0 +1,7 @@
+form: FIXEDWIDTH
+name: 'CSU-Trailer'
+values: 
+- { name: 'Identifier', usage: M, type: String, length: 1 }
+- { name: 'Pad', usage: M, type: String, length: 20 }
+- { name: 'Count', usage: M, type: String, length: 10 }
+- { name: 'Fillers', usage: M, type: String, length: 162 }

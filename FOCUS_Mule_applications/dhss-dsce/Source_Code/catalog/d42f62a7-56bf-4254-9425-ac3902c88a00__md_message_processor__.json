@@ -1,0 +1,13 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "sessionVariables": {
+            "Header": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "CSU-Header"
+            }
+        }
+    },
+    "id": "d42f62a7-56bf-4254-9425-ac3902c88a00",
+    "version": "5.2.0.0"
+}

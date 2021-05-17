@@ -1,0 +1,22 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "csv"
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "StarsLoadXML"
+        },
+        "flowVariables": {
+            "ExportDate": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "ExportDate"
+            }
+        }
+    },
+    "id": "350fd812-16b1-4938-8420-2dde4c56ddba",
+    "version": "5.2.0.0"
+}

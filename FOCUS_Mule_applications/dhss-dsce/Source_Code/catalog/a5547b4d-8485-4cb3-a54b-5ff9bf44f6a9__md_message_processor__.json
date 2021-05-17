@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "UpdateFlagResult"
+        }
+    },
+    "id": "a5547b4d-8485-4cb3-a54b-5ff9bf44f6a9",
+    "version": "5.2.0.0"
+}

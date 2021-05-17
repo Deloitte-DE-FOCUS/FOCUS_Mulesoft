@@ -1,0 +1,22 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "MAP"
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "CSV"
+        },
+        "flowVariables": {
+            "MCImissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "CSV"
+            }
+        }
+    },
+    "id": "1a0b9500-704d-4f97-8881-6cd151216fba",
+    "version": "5.2.0.0"
+}

@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+        <http:listener-config name="HTTP_Listener_Configuration"  host="0.0.0.0" port="${https.port}"  doc:name="HTTP Listener Configuration" protocol="HTTPS" connectionIdleTimeout="120000">
+        <tls:context>
+            <tls:key-store path="clientkeystore.jks" keyPassword="password" password="password"/>
+        </tls:context>
+        	<http:worker-threading-profile maxThreadsActive="3" maxThreadsIdle="2" poolExhaustedAction="WAIT" threadWaitTimeout="-1"/>
+        </http:listener-config>
+
+	<http:request-config name="HTTP_Request_dsce_Solr_Configuration"
+		host="${solr.dsce.host}" port="${solr.dsce.port}" basePath="${solr.dsce.path}"
+		doc:name="HTTP Request Configuration" protocol="HTTPS">
+		<http:basic-authentication username="${solr.dsce.auth.userName}"
+			password="${solr.dsce.auth.pwd}" preemptive="true" />
+	</http:request-config>
+        
+        <apikit:config name="solr_intake_api-config" raml="solr_intake_api.raml"
+		consoleEnabled="false" doc:name="Router" keepRamlBaseUri="false"/>
+    <flow name="apiFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/api/*" doc:name="HTTP"/>
+        <logger message="Input from FOCUS #[payload] " level="INFO" doc:name="Logger"/>
+        <apikit:router config-ref="solr_intake_api-config" doc:name="APIkit Router" />
+<exception-strategy ref="api-apiKitGlobalExceptionMapping"
+			doc:name="Reference Exception Strategy" />        
+    </flow>
+
+	<flow name="get:/ConnectivityTest:solr_intake_api-config">
+		<flow-ref name="TestFramework" doc:name="TestFramework"/>	
+	</flow>
+
+ 	<flow name="post:/intakeUpsert:solr_intake_api-config">
+		<object-to-string-transformer mimeType="application/xml"
+			doc:name="Object to String : Set Mime Type" />
+        <logger message="Input Intake Payload : #[payload]" level="INFO" doc:name="Logger"/>
+		<dw:transform-message doc:name="TM : Collect SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="TM : Combine SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+		</dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Name, RecordType.DeveloperName, Intake_Type__c, First_Name_Intake__c, Last_Name_Organization_Name_Intake__c, Last_Name_Organization_Name__r.Name, Intake_First_Name__c, Intake_Last_Name__c, Completed_Date__c, Date_Completed__c, Status__c, Program__c, County__c, Provider_ID__c, Last_Name_Organization_Name__c, Case_Number__r.Name, Investigation_Number__r.Name from DEL_Intake__c where Id IN (#[payload])" doc:name="Salesforce : Get Intake Details from FOCUS" doc:description="Get Intake Details from FOCUS"/>
+        <dw:transform-message doc:name="Transformation on Intake Data">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {	
+	"CLNT_ID" : $.Id,
+	"Name" : $.Name,
+	"Type" : "Intake",
+	"Record_Type" : $.RecordType.DeveloperName,
+	"Intake_Type" : $.Intake_Type__c,
+	"First_Name_Intake" : $.First_Name_Intake__c,
+	//"First_Name_Intake_syn" : $.First_Name_Intake__c,
+	"Last_Name_Org_Name_Intake" : $.Last_Name_Organization_Name_Intake__c,
+	"Last_Name_Org_Name" : $.Last_Name_Organization_Name__r.Name,
+	"Intake_First_Name" : $.Intake_First_Name__c,
+	//"Intake_First_Name_syn" : $.Intake_First_Name__c,
+	"Intake_Last_Name" : $.Intake_Last_Name__c,
+	"Completed_Date" : $.Completed_Date__c default '',
+	"Date_Completed" : $.Date_Completed__c default '',
+	"Status" : $.Status__c,
+	"Program" : $.Program__c,
+	"County" : $.County__c,
+	"Provider_ID" : $.Provider_ID__c,
+	"Last_Name_Organization_Name" : $.Last_Name_Organization_Name__c,
+	//"Last_Name_Organization_Name_syn" : $.Last_Name_Organization_Name__c,
+	"Case_Number_Name" : $.Case_Number__r.Name,
+	"Investigation_Number_Name" : $.Investigation_Number__r.Name,
+	"First_Name_Intake_S" : ($.First_Name_Intake__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.First_Name_Intake__c != null otherwise '',
+	"First_Name_Intake_P" : ($.First_Name_Intake__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.First_Name_Intake__c != null otherwise '',
+	"Intake_First_Name_S" : ($.Intake_First_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Intake_First_Name__c != null otherwise '',
+	"Intake_First_Name_P" : ($.Intake_First_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Intake_First_Name__c != null otherwise '',
+	"Intake_Last_Name_S" : ($.Intake_Last_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Intake_Last_Name__c != null otherwise '',
+	"Intake_Last_Name_P" : ($.Intake_Last_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Intake_Last_Name__c != null otherwise '',
+	"Last_Name_Org_Name_Intake_S" : ($.Last_Name_Organization_Name_Intake__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Last_Name_Organization_Name_Intake__c != null otherwise '',
+	"Last_Name_Org_Name_Intake_P" : ($.Last_Name_Organization_Name_Intake__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Last_Name_Organization_Name_Intake__c != null otherwise ''
+}]]></dw:set-payload>
+        </dw:transform-message>					
+
+		<http:request config-ref="HTTP_Request_dsce_Solr_Configuration"
+			path="${solr.intake.core}/update" method="POST"
+			doc:name="HTTP : Solr Upsert Intake data">
+			<http:request-builder>
+                <http:query-param paramName="commit" value="true"/>
+                <http:query-param paramName="Content-Type" value="application/json"/>
+			</http:request-builder>
+		</http:request>
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" mimeType="application/json" />
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name=" Property : Set Content-Type Header" doc:description=" Set Content-Type Header"/>		
+	</flow>
+
+ 	<flow name="post:/intakeAddressUpsert:solr_intake_api-config">
+		<object-to-string-transformer mimeType="application/xml"
+			doc:name="Object to String : Set Mime Type" />
+		<logger message="Input Intake Address Payload : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<dw:transform-message doc:name="TM : Collect SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="TM : Combine SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+		</dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Name, Intake_Type__c, Intake__c, Intake__r.RecordType.DeveloperName, Address_Line_1__c, Address_Line_2__c, City__c, State__c, Zip__c, County__c, Country__c from DEL_Intake_Address__c where Id IN (#[payload])" doc:name="Salesforce : Get Intake Address Details from FOCUS" doc:description="Get Intake Details from FOCUS"/>
+        <dw:transform-message doc:name="Transformation for Intake Address">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {	
+	"CLNT_ID" : $.Id,
+	"Name" : $.Name,
+	"Type" : "Intake Address",
+	"Intake_Type" : $.Intake_Type__c,
+	"Intake" : $.Intake__c,
+	"Record_Type" : $.Intake__r.RecordType.DeveloperName,
+	"AddressId" : $.Id,
+	"AddressLine1" : $.Address_Line_1__c,
+	"AddressLine1_S" : ($.Address_Line_1__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Address_Line_1__c != null otherwise '',
+	"AddressLine1_NN" : (($.Address_Line_1__c replace /^(\d+[a-zA-Z]{0,2}\s*[(N|S|E|W|NW|NE|SW|SE)\s]{0,2}\s{1}\s*\d*)/ with "") replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Address_Line_1__c != null otherwise '',
+	"AddressLine1_P" : ($.Address_Line_1__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Address_Line_1__c != null otherwise '',
+	"AddressLine2" : $.Address_Line_2__c,
+	"City" : $.City__c,
+	"State" : $.State__c,
+	"Zip" : $.Zip__c,
+	"County" : $.County__c,
+	"Country " : $.Country__c
+}]]></dw:set-payload>
+        </dw:transform-message>					
+
+		<http:request config-ref="HTTP_Request_dsce_Solr_Configuration"
+			path="${solr.intake.addr.core}/update" method="POST"
+			doc:name="HTTP : Solr Upsert Intake Address data">
+			<http:request-builder>
+                <http:query-param paramName="commit" value="true"/>
+                <http:query-param paramName="Content-Type" value="application/json"/>
+
+			</http:request-builder>
+		</http:request>
+
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" mimeType="application/json" />
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property :  Set Content-Type Header" doc:description=" Set Content-Type Header"/>		
+	</flow>
+	
+ 	<flow name="post:/intakePersonUpsert:solr_intake_api-config">
+		<object-to-string-transformer mimeType="application/xml"
+			doc:name="Object to String : Set Mime Type" />
+		<logger message="Input Intake Person Payload : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<dw:transform-message doc:name="TM : Collect SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="TM : Combine SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+		</dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Name, Report_Date_Time__c, Alternate_Phone_Number_Text__c, Phone_Number_Text__c, RecordtypeID, Intake__c, Intake__r.RecordType.DeveloperName, Validated_PID__c, Relationship_First_Name_del__c, Relationship_Last_Name__c, First_Name_Formula__c, Last_Name_Formula__c, Middle_Name_Formula__c, Validated_Person_Name__c, Intake_Type__c, Race__c, Validated_Person_Name__r.FirstName, Validated_Person_Name__r.LastName, Last_Name__c, Middle_Name__c, First_Name__c, Suffix_Picklist__c, PID__c, DOB__c, Gender__c, Ethnicity__c, Role__c, Group_Relation__c, Alternate_Phone_Number_Extension__c, Alternate_Phone_Number__c, Phone__c, Phone_Number_Extension__c, Relationshiip_Date_of_Birth__c, Intake_Address__c from DEL_Intake_Person__c WHERE Id IN (#[payload])" doc:name="Salesforce : Get Intake Person Details from FOCUS" doc:description="Get Intake Person Details from FOCUS"/>
+        <dw:transform-message doc:name="Transformation Intake Person Data">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {	
+	"CLNT_ID" : $.Id,
+	"CORE_TYPE" : "Intake Person",
+	"Name" : $.Name,
+	"Record_Type" : $.RecordtypeID,
+	"Address" : $.Intake_Address__c,
+	"Intake" : $.Intake__c,
+	"Person" : $.Validated_Person_Name__c,
+	"Intake_Type" : $.Intake_Type__c,
+	"Intake_Record_Type" : $.Intake__r.RecordType.DeveloperName,
+	"Relationship_First_Name" : $.Relationship_First_Name_del__c,
+	"Relationship_Last_Name" : $.Relationship_Last_Name__c,
+	"Relationship_DOB" : $.Relationshiip_Date_of_Birth__c default '',
+	"First_Name_Formula" : $.First_Name_Formula__c,
+	//"First_Name_Formula_syn" : $.First_Name_Formula__c,
+	"Last_Name_Formula" : $.Last_Name_Formula__c,
+	"Middle_Name_Formula" : $.Middle_Name_Formula__c,
+	"Validated_Person" : $.Validated_Person_Name__c,
+	"Validated_Person_First_Name" : $.Validated_Person_Name__r.FirstName,
+	//"Validated_Person_First_Name_syn" : $.Validated_Person_Name__r.FirstName,
+	"Validated_Person_Last_Name" : $.Validated_Person_Name__r.LastName,
+	"First_Name" : $.First_Name__c,
+	//"First_Name_syn" : $.First_Name__c,
+	"First_Name_S" : ($.First_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.First_Name__c != null otherwise '',
+	"First_Name_P" : ($.First_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.First_Name__c != null otherwise '',
+	"Last_Name" : $.Last_Name__c,
+	"Last_Name_S" : ($.Last_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Last_Name__c != null otherwise '',
+	"Last_Name_P" : ($.Last_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Last_Name__c != null otherwise '',
+	"Middle_Name" : $.Middle_Name__c,
+	"Suffixes" : $.Suffix_Picklist__c,
+	"Del_PID" : $.PID__c,
+	"DOB" : $.DOB__c default '',
+	"Gender" : $.Gender__c,
+	"Ethnicity" : $.Ethnicity__c,
+	"Race" : $.Race__c,
+	"Phone_Number_Text" : $.Phone_Number_Text__c,
+	"Reportted_Date" : $.Report_Date_Time__c default '',
+	"Validated_PID" : $.Validated_PID__c,
+	"Role" : $.Role__c,
+	"Group_Rlation" : $.Group_Relation__c,
+	"Phone" : $.Phone__c,
+	"Phone_Number_Extn" : $.Phone_Number_Extension__c,
+	"Alt_Phone_Number" : $.Alternate_Phone_Number__c,
+	"Alt_Phone_Number_Extn" : $.Alternate_Phone_Number_Extension__c,
+	"Alt_Phone_Number_Text" : $.Alternate_Phone_Number_Text__c
+}]]></dw:set-payload>
+        </dw:transform-message>					
+
+		<http:request config-ref="HTTP_Request_dsce_Solr_Configuration"
+			path="${solr.intake.person.core}/update" method="POST"
+			doc:name="HTTP : Solr Upsert Intake Person data">
+			<http:request-builder>
+                <http:query-param paramName="commit" value="true"/>
+                <http:query-param paramName="Content-Type" value="application/json"/>
+
+
+			</http:request-builder>
+		</http:request>
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" mimeType="application/json" />
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property : Set Content-Type Header" doc:description=" Set Content-Type Header"/>		
+	</flow>
+
+ 	<flow name="post:/personIntakeUpsert:solr_intake_api-config">
+		<object-to-string-transformer mimeType="application/xml"
+			doc:name="Object to String : Set Mime Type" />
+		<logger message="Input Person Intake Payload : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<dw:transform-message doc:name="TM : Collect SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="TM : Combine SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+		</dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Name, DEL_PID__c, LastName, FirstName, MiddleName, BirthDate, DEL_Gender__c, DEL_Race_Primary__c, DEL_Age__c, DEL_Ethnicity__c, DEL_Cellphone1_Text__c, DEL_STI__c from Contact where Id IN (#[payload])" doc:name="Salesforce : Get Person Details from FOCUS" doc:description="Get Intake Details from FOCUS"/>
+        <dw:transform-message doc:name="Transformation for Person Data">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"CLNT_ID" : $.Id,
+	"CORE_TYPE" : "Person Intake",
+	"Name" : $.Name,
+	"First_Name" : $.FirstName,
+	"First_Name_S" : ($.FirstName replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.FirstName != null otherwise '',
+	"First_Name_P" : ($.FirstName replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.FirstName != null otherwise '',
+	"Last_Name" : $.LastName,
+	"Last_Name_S" : ($.LastName replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.LastName != null otherwise '',
+	"Last_Name_P" : ($.LastName replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.LastName != null otherwise '',
+	"Middle_Name" : $.MiddleName,
+	"Del_PID" : $.DEL_PID__c,
+	"DOB" : $.BirthDate default '',
+	"Gender" : $.DEL_Gender__c,
+	"Ethnicity" : $.DEL_Ethnicity__c,
+	"Race" : $.DEL_Race_Primary__c,
+	"Phone_Number_Text" : $.DEL_Cellphone1_Text__c
+}]]></dw:set-payload>
+        </dw:transform-message>					
+
+		<http:request config-ref="HTTP_Request_dsce_Solr_Configuration"
+			path="${solr.person.intake.core}/update" method="POST"
+			doc:name="HTTP : Solr Upsert Person data">
+			<http:request-builder>
+                <http:query-param paramName="commit" value="true"/>
+                <http:query-param paramName="Content-Type" value="application/json"/>
+
+
+			</http:request-builder>
+		</http:request>
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" mimeType="application/json" />
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name=" Property : Set Content-Type Header" doc:description=" Set Content-Type Header"/>		
+	</flow>
+	
+ 	<flow name="post:/personAliasIntakeUpsert:solr_intake_api-config">
+		<object-to-string-transformer mimeType="application/xml"
+			doc:name="Object to String : Set Mime Type" />
+		<logger message="Input Person Alias Intake Payload : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<dw:transform-message doc:name="TM : Collect SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="TM : Combine SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+		</dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Name, First_Name__c, Last_Name__c, Middle_Name__c, person__c, Person__r.DEL_PID__c, Person__r.LastName, Person__r.FirstName, Person__r.MiddleName, Person__r.Name, Person__r.BirthDate, Person__r.DEL_Gender__c, Person__r.DEL_Race_Primary__c, Person__r.DEL_Age__c, Person__r.DEL_Ethnicity__c, Person__r.DEL_Cellphone1_Text__c, Person__r.DEL_STI__c from DEL_Person_Alias__c where Id IN (#[payload])" doc:name="Salesforce : Get Person Alias Details from FOCUS" doc:description="Get Intake Details from FOCUS"/>
+        <dw:transform-message doc:name="Transformation for Person Alias Data">
+            <dw:input-payload mimeType="application/java" />
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"CLNT_ID" : $.Id,
+	"CORE_TYPE" : "Person Alias Intake",
+	"Name" : $.Name,
+	"First_Name_Formula" : $.Person__r.FirstName,
+	"Last_Name_Formula" : $.Person__r.LastName,
+	"Middle_Name_Formula" : $.Person__r.MiddleName,
+	"Validated_Person" : $.person__c,
+	"First_Name" : $.First_Name__c,
+	"First_Name_S" : ($.First_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.First_Name__c != null otherwise '',
+	"First_Name_P" : ($.First_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.First_Name__c != null otherwise '',
+	"Last_Name" : $.Last_Name__c,
+	"Last_Name_S" : ($.Last_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Last_Name__c != null otherwise '',
+	"Last_Name_P" : ($.Last_Name__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Last_Name__c != null otherwise '',
+	"Middle_Name" : $.Middle_Name__c,
+	"Del_PID" : $.Person__r.DEL_PID__c,
+	"DOB" : $.Person__r.BirthDate default '',
+	"Gender" : $.Person__r.DEL_Gender__c,
+	"Ethnicity" : $.Person__r.DEL_Ethnicity__c,
+	"Race" : $.Person__r.DEL_Race_Primary__c,
+	"Phone_Number_Text" : $.Person__r.DEL_Cellphone1_Text__c
+}
+]]></dw:set-payload>
+        </dw:transform-message>					
+
+		<http:request config-ref="HTTP_Request_dsce_Solr_Configuration"
+			path="${solr.person.alias.intake.core}/update" method="POST"
+			doc:name="HTTP : Solr Upsert Person Alias data">
+			<http:request-builder>
+                <http:query-param paramName="commit" value="true"/>
+                <http:query-param paramName="Content-Type" value="application/json"/>
+
+			</http:request-builder>
+		</http:request>
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" mimeType="application/json" />
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name=" Property : Set Content-Type Header" doc:description=" Set Content-Type Header"/>		
+	</flow>
+
+	<apikit:mapping-exception-strategy
+		name="api-apiKitGlobalExceptionMapping">
+		<apikit:mapping statusCode="404">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.NotFoundException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload
+				value="{ &quot;message&quot;: &quot;Resource not found&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="405">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload
+				value="{ &quot;message&quot;: &quot;Method not allowed&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="415">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload
+				value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="406">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.NotAcceptableException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="400">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.BadRequestException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Bad request&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+	</apikit:mapping-exception-strategy>
+		
+</mule>

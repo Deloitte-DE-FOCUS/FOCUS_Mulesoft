@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:imap="http://www.mulesoft.org/schema/mule/imap" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/imap http://www.mulesoft.org/schema/mule/imap/current/mule-imap.xsd">
+    <sftp:connector name="SFTPCostofCare" validateConnections="true" duplicateHandling="addSeqNo" doc:name="SFTP">
+        <reconnect count="3"/>
+    </sftp:connector>
+   	 <!-- <spring:beans> 
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans> 
+   	<spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans> -->
+   
+   
+ 
+    <flow name="inf012-child-support-cost-of-care-extract-Flow" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="This poll will trigger the mule flow every Thursday at 5 PM">
+            <schedulers:cron-scheduler expression="0 9 17 20 1/1 ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF012" doc:name="Set Payload to Interface ID" doc:description="Set the iterface ID for Exception framework to log an Error in case of an Error becasue the scope of Source is limited to poll so we are re setting
+Set the Run date to be use in the logic for getting valid records as per Business rule 1: 
+&#8226;	The client is picked up by the daily Extract Run if the Run Date falls in the Request Date Range i.e. (Request Start Date &lt;= Run Date &lt;= Request End Date for Manual Requests) OR (Request Start Date &lt;= Run Date AND Request End Date is blank for IVE Requests)."/>
+        </poll>
+        <message-properties-transformer scope="invocation" doc:name="MP: Set Interface ID and Run-Date">
+            <add-message-property key="InterfaceID" value="#[payload]"/>
+            <add-message-property key="RunDate" value="#[server.dateTime.format(&quot;yyyy-MM-dd&quot;)]"/>
+            <add-message-property key="LastYearMonth" value="#[server.dateTime.plusMonths(${costofcareextract.reduceMonths}).format(&quot;yyyyMMdd&quot;).substring(0,6)]"/>
+            <!-- <add-message-property key="Last20Years" value="#[server.dateTime.plusYears(${costofcareextract.kidage}).format('yyyy-MM-dd')]"/> -->
+        </message-properties-transformer>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties">
+            <add-message-property key="PaymentCategoryCodes" value="${costofcareextract.paymentcategorycodes}"/>
+            <add-message-property key="RecoupCategoryCodes" value="${costofcareextract.recoupcategorycodes}"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload i.e. the query result">
+            <flow-ref name="inf012-CostofCareExtract-InProgress_subflow" doc:name="inf012-CostofCareExtract-InProgress_subflow" doc:description="This flow reference calls the sub flow In-Progress_DOL-Extract to create the In-Progress transaction in SFDC interface tab for MMIS extract"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select  Id, Name, Client_Name__c, Client_Name__r.Name, Client_MCI__c, Client_PID__c, Client_Name__r.DEL_SSN_Text__c, Transaction_Status__c, Transaction_Date__c, Transaction_Category__c, Service_Start_Date__c, Service_End_Date__c, FSF_Account_Code__c, Transaction_Amount__c from DEL_Transaction__c where Transaction_Status__c != 'Abridged' AND Transaction_Date__c = LAST_N_MONTHS:1 AND Child_Age_Till_Service_Start__c &lt; 20 AND FSF_Dept_Code__c IN ${costofcareextract.fsfDeptCodes} AND ((Transaction_Type__c='Payment' AND (Transaction_Category__c IN ${costofcareextract.paymentcategorycodes} OR (Transaction_Category__c = 'Invoice' AND Transaction_Description__c='Board'))) OR (Transaction_Type__c='Recoup' AND Transaction_Category__c IN  ${costofcareextract.recoupcategorycodes})) AND Client_PID__c != null" doc:name="Salesforce: Query Transaction object to get valid records" doc:description="This Query extracts all clients who have an end-date for wage request greater than the run-date and start-date less than the run-date."/>
+        <logger message="'After salesforce query payload' #[payload]" level="INFO" doc:name="Logger"/>
+
+         <enricher doc:name="Message Enricher">
+            <flow-ref name="inf012-CostofCare-extract-NoPayload_subflow" doc:name="inf012-CostofCare-extract-NoPayload_subflow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression : If records are retrieved" doc:description="Filter expression to stop the execution of the flow if size of payload is zero i.e. no records are extracted"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[//This dataweave code converts the SFDC query output to a array list
+%dw 1.0
+%output application/java
+---
+payload map {
+	MCI : $.Client_MCI__c, 
+	PID : $.Client_PID__c,
+	SSN : $.Client_Name__r.DEL_SSN_Text__c,
+	MonthofCare : "",
+	CostofCare : $.Transaction_Amount__c,
+	TransactionID : $.Name,
+	TransactionCategory : $.Transaction_Category__c,
+	TransactionStatus : $.Transaction_Status__c,
+	TransactionDate : $.Transaction_Date__c,
+	ServiceStartDate : $.Service_Start_Date__c,
+	ServiceEndDate : $.Service_End_Date__c,
+	ClientName : $.Client_Name__r.Name
+} ]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer overwrite="true" scope="invocation" mimeType="application/java" doc:name="Message Properties : To store the Initial Payload">
+            <add-message-property key="InitialPayload" value="#[payload]"/>
+            <add-message-property key="ChildSupportPIDList" value="#[]"/>
+        </message-properties-transformer>
+        <set-variable variableName="ChildSupportPIDList" value="" mimeType="application/java" doc:name="Variable : To store the PIDs from Child Support Application"/>
+        <foreach batchSize="300" doc:name="For Each">
+            <dw:transform-message doc:name="TM: Prepare , separated PIDs">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.PID ++ "'" )) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Childs_ID__r.Person__r.DEL_PID__c from DEL_Child_Information__c where Childs_ID__r.Person__r.DEL_PID__c IN (#[payload]) AND Child_Support_Application_ID__r.Sent_To_Interface__c = 'Interfaced to DHSS'" doc:name="Salesforce : Query for PIDS for which Child Support application is submitted"/>
+            <dw:transform-message doc:name="TM : Get the PIDS for which CSA is submitted">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	ChildSupportPID : $.Childs_ID__r.Person__r.DEL_PID__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <set-variable variableName="ChildSupportPIDList" value="#[ChildSupportPIDList != null &amp;&amp; ChildSupportPIDList != '' ? (ChildSupportPIDList + payload) : payload]" mimeType="application/java" doc:name="Variable : Store the PIDS in a list"/>
+        </foreach>
+        <dw:transform-message doc:name="TM : Prepare Qualified Transactions">
+            <dw:set-payload><![CDATA[//This dataweave code converts the SFDC query output to a array list
+%dw 1.0
+%output application/java
+%var ChildSupportPIds = {( flowVars.ChildSupportPIDList map (record, index) -> {
+            (record.ChildSupportPID as :string) : record.ChildSupportPID default ""
+})}
+---
+flowVars.InitialPayload map {
+	MCI : $.MCI, 
+	PID : ChildSupportPIds[$.PID] default "",
+	SSN : $.SSN,
+	//MonthofCare : "",
+	CostofCare : $.CostofCare,
+	TransactionID : $.TransactionID,
+	TransactionCategory : $.TransactionCategory,
+	TransactionStatus : $.TransactionStatus,
+	TransactionDate : $.TransactionDate,
+	ServiceStartDate : $.ServiceStartDate,
+	ServiceEndDate : $.ServiceEndDate,
+	ClientName : $.ClientName
+} filter ($.PID != null and  $.PID != "")]]></dw:set-payload>
+        </dw:transform-message>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf012-CostofCare-extract-NoPayload_subflow" doc:name="inf012-CostofCare-extract-NoPayload_subflow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression :  If records are retrieved"/>
+        <dw:transform-message doc:name="Prepare Success and Error File">
+            <dw:set-payload><![CDATA[//This dataweave code prepares success and error file
+%dw 1.0
+%output application/java
+---
+payload map {
+	MCI : $.MCI, 
+	PID : $.PID default "",
+	SSN : $.SSN,
+	//MonthofCare : "",
+	CostofCare : $.CostofCare,
+	TransactionID : $.TransactionID
+} filter ($.MCI != null and  $.MCI != "") and  ($.CostofCare != null and  $.CostofCare != "")]]></dw:set-payload>
+            <dw:set-session-variable variableName="RequiredFieldMissingFile"><![CDATA[//This dataweave code converts the SFDC query output to a array list
+%dw 1.0
+%output application/csv
+---
+payload groupBy $.PID pluck {
+	"Field Name" : "MCI",
+	"Field Value" : $.MCI[0],
+	PID : $.PID[0],
+	"Error Description" :   (( 'MCI is Missing' )  when  ($.MCI=="" or $.MCI==null)  otherwise "")  default "" 
+} filter ($."Error Description" != null and  $."Error Description" != "")]]></dw:set-session-variable>
+
+            <dw:set-session-variable variableName="IndividualTransactions"><![CDATA[//This dataweave code prepares the individual transaction file for the backup purpose
+%dw 1.0
+%output application/csv
+---
+payload map {
+	MCI : $.MCI, 
+	PID : $.PID default "",
+	SSN : $.SSN,
+	ClientName : $.ClientName,
+	TransactionID : $.TransactionID,
+	TransactionCategory : $.TransactionCategory,
+	TransactionStatus : $.TransactionStatus,
+	TransactionDate : $.TransactionDate as :string {format:"MM/dd/yyyy"} when $.TransactionDate != null and $.TransactionDate != "" otherwise "",
+	ServiceStartDate : $.ServiceStartDate  as :string {format:"MM/dd/yyyy"} when $.ServiceStartDate != null and $.ServiceStartDate != "" otherwise "",
+	ServiceEndDate : $.ServiceEndDate  as :string {format:"MM/dd/yyyy"} when $.ServiceEndDate != null and $.ServiceEndDate != "" otherwise "",
+	CostofCare : $.CostofCare
+} filter ($.MCI != null and  $.MCI != "") orderBy $.PID]]></dw:set-session-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Group by client and sum of transaction amount">
+            <dw:set-payload><![CDATA[//This dataweave code groups by client and prepares sum of transaction amount values
+%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload groupBy $.PID pluck {
+	MCI : $.MCI[0], 
+	PID : $.PID[0],
+	SSN : $.SSN[0],
+	MonthofCare : flowVars.LastYearMonth,
+	CostofCare : (sum $.CostofCare) * -1
+} ]]></dw:set-payload>
+        </dw:transform-message>
+
+       
+        <message-properties-transformer overwrite="true" scope="invocation" metadata:id="32690d77-a9e8-4d27-a862-66e925480bfc" doc:name="MP:Set Record Error, Success Count" doc:description="This message property is used to set the total records, succesfull records and the records which errored out">
+
+            <add-message-property key="RecordSuccess" value="#[payload.size()]"/>
+            <add-message-property key="RecordError" value="#[sessionVars.RequiredFieldMissingFile != '' and sessionVars.RequiredFieldMissingFile != null ? sessionVars.RequiredFieldMissingFile.split('\n').size()-1 : 0]"/>
+
+
+        </message-properties-transformer>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Total Record Count">
+            <add-message-property key="RecordCount" value="#[RecordError + RecordSuccess]"/>
+        </message-properties-transformer>
+
+        <dw:transform-message metadata:id="d42f62a7-56bf-4254-9425-ac3902c88a00" doc:name="TM: Prepared Header, Details and Trailers details in java format">
+            <dw:input-payload doc:sample="sample_data\empty.xml" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	MCI : ( pad('0',(10 - sizeOf $.MCI )) ++ $.MCI) when ($.MCI !=null and $.MCI !='') otherwise $.MCI,
+	//PID : ($.PID) as :string {format:"0000000000"} default '0000000000' ,
+	PID : ( pad('0',(10 - sizeOf $.PID )) ++ $.PID) when ($.PID !=null and $.PID !='') otherwise $.PID,
+	SSN : ( pad('0',(9 - sizeOf $.SSN )) ++ $.SSN) when ($.SSN !=null and $.SSN !='') otherwise ' ',
+	//SSN : ( pad('0',(9 - sizeOf ($.SSN))) ++ $.SSN) when (($.SSN !=null) and ($.SSN != '') ) otherwise "000000000",
+	MonthofCare : flowVars.LastYearMonth as :string ,
+	CostofCare : ($.CostofCare as :string {format:"000000000.00"} default '000000000.00') when $.CostofCare > 0 otherwise '000000000.00'
+}]]></dw:set-payload>
+            <dw:set-variable variableName="Trailer"><![CDATA[//This dataweave code creates the array for creating trailer for the final fixed width file
+%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+{
+	RecordIdentifier:'T',
+	Count: flowVars.RecordSuccess as :number as :string {format:"0000000000"},
+	Filler: ' ' 
+}]]></dw:set-variable>
+            <dw:set-variable variableName="Header"><![CDATA[//This dataweave code creates the array for creating header for the final fixed width file
+%dw 1.0
+%output application/java
+---
+{
+	RecordIdentifier:'H',
+	RunDate:now as :date {format:"yyyyMMdd"} as :string {format:"yyyyMMdd"},
+	Filler: ' '
+}]]></dw:set-variable>
+
+        </dw:transform-message>
+ 
+ 
+
+        <dw:transform-message metadata:id="0ce64bed-014e-4438-bb61-6b5f3a956507" doc:name="TM: Preare File in Fixed Width Format">
+            <dw:input-payload doc:sample="sample_data\list_string_1.dwl"/>
+            <dw:input-variable doc:sample="sample_data\map.dwl" variableName="Trailer"/>
+
+            <dw:set-payload><![CDATA[//This dataweave code will create the Record detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "ChildSuppoprtCostofCare_FinalPayload.ffd", recordTerminator = "crlf"
+---
+payload map  {
+	RecordIdentifier:'D',
+	MCI: $.MCI, 
+	PID: $.PID, 
+	SSN: $.SSN ,
+	MonthofCare: $.MonthofCare,
+	CostofCare : $.CostofCare
+}]]></dw:set-payload>
+            <dw:set-variable variableName="TrailerFFD"><![CDATA[////This dataweave code will create the Trailer detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "ChildSuppoprtCostofCare_Trailer.ffd"
+---
+[{
+	RecordIdentifier: flowVars.Trailer.RecordIdentifier,
+	Count: flowVars.Trailer.Count as :string {format: "000000000"},
+	Filler: flowVars.Trailer.Filler
+}]]]></dw:set-variable>
+
+            <dw:set-variable variableName="HeaderFFD"><![CDATA[//////This dataweave code will create the Trailer detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "ChildSuppoprtCostofCare_Header.ffd"
+---
+[{
+	RecordIdentifier:flowVars.Header.RecordIdentifier,
+	RunDate:flowVars.Header.RunDate,
+	Filler: flowVars.Header.Filler
+}]]]></dw:set-variable>
+
+
+        </dw:transform-message>
+        <enricher doc:name="Message Enricher">
+					<flow-ref name="inf012-child-support-cost-of-care-extract--OtoSConversion-ForFV-Sub_Flow" doc:name="inf012-child-support-cost-of-care-extract--OtoSConversion-ForFV-Sub_Flow"/>
+					<enrich source="#[flowVars.HeaderFFD]" target="#[flowVars.HeaderFFD]"/>
+					<enrich source="#[flowVars.TrailerFFD]" target="#[flowVars.TrailerFFD]"/>
+				</enricher>
+
+        <set-payload value="#[flowVars.HeaderFFD + '\r\n'+ message.payloadAs(java.lang.String) +'\r\n'+ flowVars.TrailerFFD + '\r\n']" mimeType="text/plain" doc:name="Set Payload: to Final file" doc:description="This Set Payload is used to combine the Header, Record Detail and Trailer file"/>
+        <set-payload value="#[payload.split(&quot;\r\n&quot;)]" doc:name="Set Payload : Split by new line"/>
+        <dw:transform-message doc:name="TM : Remove Extra Balnk new lines">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+( payload filter ((sizeOf $) > 0 ) map ($ replace "\n" with '' replace "\r" with '' replace "\r\n" with '') ) joinBy "\r\n"]]></dw:set-payload>
+        </dw:transform-message>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf012-cost-of-care-extract_InProgress_AllTransactionsFile_Subflow" doc:name="inf012-cost-of-care-extract_InProgress_AllTransactionsFile_Subflow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+
+        <flow-ref name="inf012-CostofCare-Write_to_SFTP" doc:name="inf012-CostofCare-Write_to_SFTP" doc:description="This flow reference is used to call the sub flow Write_to_SFTP-MMIS which will write the final fixed width file to the SFTP server ."/>
+
+
+       <set-payload value="{&quot;InterfaceID&quot;: &quot;INF012&quot;, &quot;InterfaceName&quot;: &quot;Child Support Cost of Care Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_ChildSupportCostofCare_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DSCYF_COST_CARE_IN_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Monthly Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework- Final Call" doc:description="This Set Payload is used to set the Payload to a JSON for the Logging Framework"/>
+        <choice doc:name="Choice : If there are no errors remove session variable">
+            <when expression="#[sessionVars.RequiredFieldMissingFile != '' &amp;&amp; sessionVars.RequiredFieldMissingFile  != null]">
+                <set-session-variable variableName="ErrorAttachment" doc:name="Session Variable" value="#[sessionVars.RequiredFieldMissingFile]"/>
+            </when>
+            <otherwise>
+                <logger message="'There is no Business Error File'" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This Sub flow call the Logging frmaework to create the comlete/success transaction in SFTP for the MMIS Extract interface."/>
+       <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+<delete-message-property key="InterfaceID"/>
+						<delete-message-property key="ChildSupportPIDList"/>
+						<delete-message-property key="Header"/>
+						<delete-message-property key="HeaderFFD"/>
+						<delete-message-property key="InitialPayload"/>
+						<delete-message-property key="LastYearMonth"/>
+						<delete-message-property key="PaymentCategoryCodes"/>
+						<delete-message-property key="RecoupCategoryCodes"/>
+						<delete-message-property key="RecordSuccess"/>
+						<delete-message-property key="RecordCount"/>
+						<delete-message-property key="RunDate"/>
+						<delete-message-property key="Trailer"/>
+						<delete-message-property key="TrailerFFD"/>
+						<delete-message-property key="interfaceTransactionStatus"/>
+						<delete-message-property key="SubPayload"/>
+						<delete-message-property key="Tname"/>
+						<delete-message-property key="Time"/>
+						<delete-message-property key="TransactionID"/>
+						<delete-message-property key="RecordError"/>
+			</message-properties-transformer>
+			
+<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+			<delete-message-property key="IndividualTransactions"/>
+			<delete-message-property key="RequiredFieldMissingFile"/>
+			<delete-message-property key="TransAttachment"/>
+			<delete-message-property key="TID"/>
+			
+					</message-properties-transformer>
+        <logger message="#[payload]" level="INFO" doc:name="Logger: Display Interface Transaction ID" doc:description="This logger displays the result of the Logging framework transaction"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+        
+        </flow>
+    <sub-flow name="inf012-CostofCareExtract-InProgress_subflow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF012&quot;, &quot;InterfaceName&quot;: &quot;Child Support Cost of Care Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Individual Transactions Backup File&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework-Initial Call" doc:description="This Set Payload is used to set the payload for the Logging Framework to a JSON to create the In-Progress Transaction."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
+    </sub-flow>
+    <sub-flow name="inf012-cost-of-care-extract_InProgress_AllTransactionsFile_Subflow">
+        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties : Set Transaction Attachment">
+            <add-message-property key="TransAttachment" value="#[sessionVars.IndividualTransactions]"/>
+        </message-properties-transformer>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF012&quot;, &quot;InterfaceName&quot;: &quot;Child Support Cost of Care Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Individual Transactions Backup File&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework- All Transactions Backup File" doc:description="This Set Payload is used to set the payload for the Logging Framework to a JSON to create the In-Progress Transaction."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+    </sub-flow>
+    <sub-flow name="inf012-CostofCare-Write_to_SFTP">
+
+        <sftp:outbound-endpoint connector-ref="SFTPCostofCare" exchange-pattern="one-way" outputPattern="${sftp.cscostofcareextract.transaction.filename}#[server.dateTime.format(&quot;yyyyMMdd&quot;)].txt" host="${sftp.cscostofcareextract.transaction.host}" port="${sftp.cscostofcareextract.transaction.port}" path="${sftp.cscostofcareextract.transaction.path}" user="${sftp.cscostofcareextract.transaction.username}" password="${sftp.cscostofcareextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder" doc:description="This SFTP connector writes the final file to the SFTP location "/>
+
+        <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment ErrorAttachment" overwrite="true" doc:description="This message property will set the TransAttachment and ErrorAttachment for the Logging Framework">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment]"/>
+        </message-properties-transformer>
+        <sftp:outbound-endpoint connector-ref="SFTPCostofCare" exchange-pattern="one-way" outputPattern="${sftp.cscostofcareextract.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.cscostofcareextract.archive.host}" port="${sftp.cscostofcareextract.archive.port}" path="${sftp.cscostofcareextract.archive.path}" user="${sftp.cscostofcareextract.archive.username}" password="${sftp.cscostofcareextract.archive.password}" responseTimeout="10000" duplicateHandling="addSeqNo" doc:name="SFTP:Write to Archive" doc:description="This SFTP connector writes the final file to the SFTP location "/>
+
+      
+    </sub-flow>
+
+<sub-flow name="inf012-CostofCare-extract-NoPayload_subflow">
+        <choice doc:name="Choice" doc:description="Choice router will check the size of the payload and depending on the size, will direct the payload ">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF012&quot;, &quot;InterfaceName&quot;: &quot;Child Support Cost of Care Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" doc:name="Set Payload to No Payload for Logging Framework" doc:description="Set the Payload for Logging framework, this will log a bussiness error in logging framework that no records were extracted" mimeType="application/json"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Flow reference to call the logging framework"/>
+            </when>
+            <otherwise>
+                <logger message="Records Extracted Succesfully " level="INFO" doc:name="Logger" doc:description="Logger to diplay that records were extracted"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="inf012-child-support-cost-of-care-extract--OtoSConversion-ForFV-Sub_Flow">
+		<set-payload value="#[flowVars.HeaderFFD]" doc:name="Set Payload: File with Trailer"/>
+		<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+		<set-variable variableName="HeaderFFD" value="#[payload]" doc:name="FV: Set Header"/>
+
+		<set-payload value="#[flowVars.TrailerFFD]" doc:name="Set Payload: File with Trailer" />
+		<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+		<set-variable variableName="TrailerFFD" value="#[payload]" doc:name="Variable"/>
+	</sub-flow>
+
+
+    
+    </mule>

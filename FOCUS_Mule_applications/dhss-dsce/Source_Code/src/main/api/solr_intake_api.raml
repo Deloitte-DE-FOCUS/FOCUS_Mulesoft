@@ -1,0 +1,91 @@
+#%RAML 1.0
+title : Solar Interface API
+version: v1
+baseUri: http://api.samplehost.com/solarservices
+securitySchemes:
+  basic:
+    description: |
+      This API supports Basic Authentication.
+    type: Basic Authentication
+securedBy: basic
+traits: 
+  hasNotFound:
+    responses:
+      404:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string
+  isNotAcceptable:
+    responses:
+      406:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string   
+/ConnectivityTest:
+  get:
+    displayName: Test Connectivity for Interfaces
+    description: Test Connectivity for Interfaces 
+#    is: [hasNotFound,isNotAcceptable]
+    responses:
+      200:
+        body:
+          application/json:
+
+/intakeUpsert:
+  post:
+    displayName: Upsert Intake
+    description: Upsert Intake   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:
+          
+/intakeAddressUpsert:
+  post:
+    displayName: Upsert Intkae Address
+    description: Upsert Intake Address   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:
+
+/intakePersonUpsert:
+  post:
+    displayName: Upsert Intake Person
+    description: Upsert Intake Person   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:
+          
+/personIntakeUpsert:
+  post:
+    displayName: Upsert Person Intake
+    description: Upsert Person Intake   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:
+
+/personAliasIntakeUpsert:
+  post:
+    displayName: Upsert Person Alias Intake
+    description: Upsert Person Alias Intake   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:

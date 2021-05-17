@@ -1,0 +1,17 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "CSU-Trailer"
+        },
+        "sessionVariables": {
+            "Trailer": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "CSU-Trailer"
+            }
+        }
+    },
+    "id": "b6a67e54-048a-46da-956a-048d79f72ffb",
+    "version": "5.2.0.0"
+}

@@ -1,0 +1,8 @@
+form: FIXEDWIDTH
+name: 'CSU-Header'
+values: 
+- { name: 'Identifier', usage: M, type: String, length: 1 }
+- { name: 'Pad', usage: M, type: String, length: 20 }
+- { name: 'Date', usage: M, type: String, length: 8 }
+- { name: 'Label', usage: M, type: String, length: 19 }
+- { name: 'Filler', usage: M, type: String, length: 145 }

@@ -1,0 +1,1003 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    
+    <!-- <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" url="${sfdc.url}" doc:name="Salesforce: Basic Authentication" disableSessionInvalidation="true" >
+        <reconnect  count="5"/>
+    </sfdc:config> -->
+<!--  <spring:beans>
+   	</spring:beans> 
+   	 <spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans> -->
+    <objectstore:config name="ObjectStore__Connector" partition="BatchInfo" doc:name="ObjectStore: Connector"/>
+   <sftp:connector name="SFTPOverride" validateConnections="true" 
+		doc:name="SFTP" >
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+    <objectstore:config name="DSCE_ChildCaseLoad_Error" partition="DSCE_ChildCaseLoad_Error" doc:name="ObjectStore: Connector"/>    
+    <objectstore:config name="DSCE_ChildCaseLoad" partition="DSCE_ChildCaseLoad" doc:name="ObjectStore: Connector"/>
+   
+            
+    <flow name="inf010-child-support-case-loadFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll-DHSS">
+            <schedulers:cron-scheduler expression="0 0 6 ? * MON,TUE,WED,THU,FRI *" timeZone="US/Eastern"/>
+            <set-payload value="INF010" doc:name="Set Payload to Interface ID" doc:description="Set the iterface ID for Exception framework to log an Error in case of an Error"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV:Set Interface ID" doc:description="Set the iterface ID for Exception framework to log an Error in case of an Error becasue the scope of Source is limited to poll so we are re setting"/>
+        <mulerequester:request resource="sftp://${sftp.childcaseload.transaction.username}:${sftp.childcaseload.transaction.password}@${sftp.childcaseload.transaction.host}:${sftp.childcaseload.transaction.port}${sftp.childcaseload.transaction.path}?connector=SFTPOverride&amp;myfilename=${sftp.childcaseload.transaction.filename}&amp;isContainsCheckEnabled=true" timeout="120000" doc:name="Mule Requester" doc:description="Get the Child Support Case Load file from the SFTP location"/>
+        <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check if File is Present" doc:description="Check if the load file is available or not" config-ref="Validation_Configuration1"/>
+        <object-to-string-transformer mimeType="text/plain" doc:name="O to S: Change filestream to string" doc:description="Change the incoming file input stream to a readable string"/>
+  <sftp:outbound-endpoint exchange-pattern="one-way" outputPattern="${sftp.childcaseload.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.childcaseload.archive.host}" port="${sftp.childcaseload.archive.port}" path="${sftp.childcaseload.archive.path}" user="${sftp.childcaseload.archive.username}" password="${sftp.childcaseload.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" doc:description="Put the Load file in the Archive" connector-ref="SFTPOverride"/>  
+        <message-properties-transformer scope="session" doc:name="MP:Set TransAttachment" doc:description="Create TransAttachment for the Logging framework">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="HeaderDate" value="#[payload != ''?payload.substring(1,9):null]"/>
+            <add-message-property key="ErrorReasonUpdate" value="#['']"/>
+            <add-message-property key="ErrorMissingFields" value="#['']"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Call the Logging framework without altering the Payload">
+            <flow-ref name="inf010-childsupport-load-InProgress-Log-Transaction-Sub_Flow" doc:name="inf010-childsupport-load-InProgress-Log-Transaction-Sub_Flow" doc:description="Call the In-Progress Logging framework"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <validation:is-not-empty config-ref="Validation_Configuration1" message="Header Date is Missing in file" exceptionClass="java.lang.Exception" value="#[sessionVars.HeaderDate]" doc:name="Validation: Validate HeaderDate" doc:description="validate Header Date"/>
+        <enricher source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]" doc:name="Message Enricher" doc:description="Call LOV Framework without changing the Payload">
+            <flow-ref name="Call-LOV-CSC-flow" doc:name="Call-LOV-CSC-flow" doc:description="Invoke flow to get LOV data"/>
+        </enricher>
+<!--         <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload : Split Records" doc:description="Split the Incoming file into individual lines to check the width of each line"/>
+ -->        
+        <set-payload value="#[System.getProperty(&quot;childcaseload.lineseparator&quot;).equals(&quot;CRLF&quot;) ? payload.split(&quot;\r\n&quot;) : payload.split(&quot;\n&quot;)]"
+			doc:name="Set Payload : Split Records" doc:description="Splitting Payload with the configured Line terminator character"/>
+        
+        <choice doc:name="Choice" doc:description="Check If records are Present or not">
+            <when expression="#[payload.size() &lt;=2]">
+                 <set-payload value="{&quot;InterfaceID&quot;: &quot;INF010&quot;, &quot;InterfaceName&quot;: &quot;Child Support Case Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_ChildSupportCaseLoad&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Present&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to JSON for Logging Framework" doc:description="Set the JSON payload for the Loggin framework-Final call"/>
+            <logger message="JSON: #[payload]" level="INFO" doc:name="Logger" doc:description="Display the result of logging framework call"/>
+                <message-properties-transformer scope="session" doc:name="MP:Remove TransAttachment and ErrorAttachment" doc:description="Remove TransAttachment and ErrorAttachment">
+                    <delete-message-property key="TransAttachment"/>
+                    <delete-message-property key="ErrorAttachment"/>
+                </message-properties-transformer>
+
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the Loggin framework"/>
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="exceptionRecordCount"/>
+				<delete-message-property key="RecordError"/>
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="Message Properties">
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="ErrorReasonUpdate"/>
+				<delete-message-property key="HeaderDate"/>
+				<delete-message-property key="TID"/>
+			
+			</message-properties-transformer>
+            <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Display the outcome of the logging framewok"/>
+      
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message : Get Detail Records" doc:description="Get Detail Records by removing the header and the trailer of the incoming file">
+                    <dw:set-payload><![CDATA[//Remove the header and the trailer of the incoming file
+%dw 1.0
+%output application/java
+---
+payload[1..-2]]]></dw:set-payload>
+                </dw:transform-message>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Save RecordCount" doc:description="Save RecordCount">
+                    <add-message-property key="RecordCount" value="#[payload.size()]"/>
+                </message-properties-transformer>
+           
+        
+         <dw:transform-message doc:name="Transform Message : Filter Valid Records" doc:description="Filter Valid Records
+Filter Valid records whose width is as per the required width of each record">
+            <dw:input-payload doc:sample="sample_data\list_string.dwl"/>
+            <dw:set-payload><![CDATA[//Filter Valid records whose width is as per the required width of each record
+%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) == "474")) joinBy "\n"]]></dw:set-payload>
+            <dw:set-session-variable variableName="ErrorPayload"><![CDATA[%dw 1.0
+%output application/csv header=false,quoteValues=true
+---
+payload filter (((sizeOf $) as :string ) != "474") map {
+	Error: "Input Row Size Error",
+	Field_Name_in_Error: "Record Detail",
+	Field_Value_in_Error: $,
+	Error_Description:"Size of the Record Detail Row is not 474. Size received is : " ++ (sizeOf $)
+}]]></dw:set-session-variable>
+        </dw:transform-message>
+ 
+        <dw:transform-message doc:name="TM:Convert Query Output to Map" doc:description="Convert the incoming file records into an array list" metadata:id="0d32f9e7-cf30-48f6-a8f6-bca7d90d3382">
+            <dw:input-payload mimeType="text/plain" doc:sample="sample_data\list_flatfile.flatfile">
+                <dw:reader-property name="schemaPath" value="LoadPayload.ffd"/>
+            </dw:input-payload>
+            <dw:set-payload><![CDATA[//Convert the incoming file records into an array list
+%dw 1.0
+%input payload text/plain
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	RecordIdentifier: payload01."Record Identifier",
+	ReasonUpdate: payload01."Reason Update" default null,
+	ChildsMCI: payload01."Child's MCI" default null,
+	PID: payload01."Child FOCUS PID" as :number as :string default '',
+	ChildsName: (payload01."Child Name" replace "," with " "  ) default null,
+	ChildsSSN: payload01."Child SSN",
+	ChildsDFSCaseID: payload01."Child FOCUS DFS Case ID",
+	CSAStaus: payload01."Child Support Application Status",
+	ChildsPaternityEst: payload01."Child Paternity Established",
+	DatePaternityEst: payload01."Date Paternity Established",
+	MethodPaternityEst: payload01."Method of Paternity Establishment",
+	DateCSOrder: payload01."Date of Child Support Order",
+	MothersDCSSCaseID: payload01."Mother DCSS Case ID",
+	MothersDFSCaseID: payload01."Mother FOCUS DFS Case ID",
+	MothersMCI: payload01."Mother MCI" default 0,
+	MothersPID: payload01."Mother FOCUS PID" as :number as :string default '',
+	MothersName: payload01."Mother Name" replace "," with " " default "",
+	MothersOrderAmount:( payload01."Mother Order Amount" replace '+' with '' ) default 0,
+	MotherLastDatePayment: payload01."Mother Last Date of Payment",
+	MothersLastPaymentAmount: payload01."Mother Last Payment Amount",
+	MothersAddIndcator: payload01."Mother Address Indicator",
+	MothersStreet1: payload01."Mother Address Street 1",
+	MothersStreet2: payload01."Mother Address Street 2",
+	MothersState: payload01."Mother Address State",
+	MothersCity: payload01."Mother Address City",
+	MothersZip: payload01."Mother Address Zip",
+	MothersZip4: payload01."Mother Address Zip+4",
+	MothersDFSCaseOpenDate: payload01."Mother FOCUS DFS Case Open Date" ,
+	FathersDCSSCaseID: payload01."Father DCSS Case ID",
+	FathersDFSCaseID: payload01."Father FOCUS DFS Case ID",
+	FathersMCI: payload01."Father MCI" default 0,
+	FathersPID: payload01."Father FOCUS PID" as :number as :string default '',
+	FathersName: payload01."Father Name" replace "," with " " default "",
+	FathersOrderAmount:( payload01."Father Order Amount"  replace '+' with '' ) default 0,
+	FathersLastDatePayment: payload01."Father Last Date of Payment",
+	FathersLastPaymentAmount: payload01."Father Last Payment Amount",
+	FathersAddIndicator: payload01."Father Address Indicator",
+	FathersStreet1: payload01."Father Address Street 1",
+	FathersStreet2: payload01."Father Address Street 2",
+	FathersState: payload01."Father Address State",
+	FathersCity: payload01."Father Address City",
+	FathersZip: payload01."Father Address Zip",
+	FathersZip4: payload01."Father Address Zip+4",
+	FathersDFSCaseOpenDate: payload01."Father FOCUS DFS Case Open Date" 
+})
+]]></dw:set-payload>
+
+
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="97150630-b7c4-42dc-8364-7755c1243fc2" doc:name="TM:Create Error Set 1" doc:description="Generating Exception report When application status is either PM (Parent MCI Change) or PN (Parent Name Change) or CM (Child MCI Change), generate an exception file with below fields">
+            <dw:set-session-variable variableName="ErrorReasonUpdate"><![CDATA[////Create Error Report when Reason Update='PM','CM','PN' as per business rule : When application status is either PM (Parent MCI Change) or PN (Parent Name Change) or CM (Child MCI Change), generate an exception file with below fields.
+%dw 1.0
+%input payload application/java
+%output application/csv escape=" " , separator="," ,ignoreEmptyLine=true, header=true,quoteValues=true 
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	ReasonUpdate: payload01.ReasonUpdate,
+	ChildsMCI: payload01.ChildsMCI,
+	ChildsPID: payload01.PID,
+	ChildsName: payload01.ChildsName replace "," with " " default " ",
+	ChildsSSN: payload01.ChildsSSN,
+	ChildsDFSCaseID: payload01.ChildsDFSCaseID,
+	MothersDFSCaseID: payload01.MothersDFSCaseID,
+	MothersMCI: payload01.MothersMCI,
+	MothersPID: payload01.MothersPID,
+	MothersName: payload01.MothersName replace "," with " " default " ",
+	FathersDFSCaseID: payload01.FathersDFSCaseID,
+	FathersMCI: payload01.FathersMCI,
+	FathersPID: payload01.FathersPID,
+	FathersName: payload01.FathersName replace "," with " " default " ",
+	Error_Description:'Reason Update = ' ++ ( payload01.ReasonUpdate ) when ( payload01.ReasonUpdate != null ) otherwise ''
+}) filter ( (payload[$$].ReasonUpdate=='CM') or (payload[$$].ReasonUpdate=='PM') or (payload[$$].ReasonUpdate=='PN') and (payload[$$].ReasonUpdate !=null) )
+]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="ErrorMissingFields"><![CDATA[//Create Error Report for missing mandatory fields
+%dw 1.0
+%input payload application/java
+%output text/plain schemaPath = "Missing-Fields.ffd"
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	RecordIdentifier: payload01.RecordIdentifier default ' ',
+	ReasonUpdate: payload01.ReasonUpdate default ' ',
+	ChildsMCI: payload01.ChildsMCI default ' ',
+	ChildFOCUSPID: payload01.PID default ' ',
+	Child_Name: payload01.ChildsName default ' ',
+	Child_SSN: payload01.ChildsSSN default ' ',
+	Child_FOCUS_DFS_Case_ID: payload01.ChildsDFSCaseID default ' ',
+	Child_Support_Application_Status: payload01.CSAStaus default ' ',
+	Child_Paternity_Established: payload01.ChildsPaternityEst default ' ',
+	Date_Paternity_Established: payload01.DatePaternityEst as :string {format:"yyyyMMdd"} default ' ',
+	Method_of_Paternity_Establishment: payload01.MethodPaternityEst default ' ',
+	Date_of_Child_Support_Order: payload01.DateCSOrder as :string {format:"yyyyMMdd"} default ' ',
+	Mother_DCSS_Case_ID: payload01.MothersDCSSCaseID default ' ',
+	Mother_FOCUS_DFS_Case_ID: payload01.MothersDFSCaseID default ' ',
+	Mother_MCI: payload01.MothersMCI default ' ',
+	Mother_FOCUS_PID: payload01.MothersPID default ' ',
+	Mother_Name: payload01.MothersName default ' ',
+	Mother_Order_Amount: payload01.MothersOrderAmount default ' ',
+	Mother_Last_Date_of_Payment: payload01.MotherLastDatePayment as :string {format:"yyyyMMdd"} default ' ',
+	Mother_Last_Payment_Amount: payload01.MothersLastPaymentAmount default ' ',
+	Mother_Address_Indicator: payload01.MothersAddIndcator default ' ',
+	Mother_Address_Street_1: payload01.MothersStreet1 default ' ',
+	Mother_Address_Street_2: payload01.MothersStreet2 default ' ',
+	Mother_Address_State: payload01.MothersState default ' ',
+	Mother_Address_City: payload01.MothersCity default ' ',
+	Mother_Address_Zip: payload01.MothersZip default ' ',
+	Mother_Address_Zip4: payload01.MothersZip4 default ' ',
+	Mother_FOCUS_DFS_Case_Open_Date: payload01.MothersDFSCaseOpenDate as :string {format:"yyyyMMdd"} default ' ',
+	Father_DCSS_Case_ID: payload01.FathersDCSSCaseID default ' ',
+	Father_FOCUS_DFS_Case_ID: payload01.FathersDFSCaseID default ' ',
+	Father_MCI: payload01.FathersMCI default ' ',
+	Father_FOCUS_PID: payload01.FathersPID default ' ',
+	Father_Name: payload01.FathersName default ' ',
+	Father_Order_Amount: payload01.FathersOrderAmount default ' ',
+	Father_Last_Date_of_Payment: payload01.FathersLastDatePayment as :string {format:"yyyyMMdd"} default ' ',
+	Father_Last_Payment_Amount: payload01.FathersLastPaymentAmount default ' ',
+	Father_Address_Indicator: payload01.FathersAddIndicator default ' ',
+	Father_Address_Street_1: payload01.FathersStreet1 default ' ',
+	Father_Address_Street_2: payload01.FathersStreet2 default ' ',
+	Father_Address_State: payload01.FathersState default ' ' ,
+	Father_Address_City: payload01.FathersCity default ' ' ,
+	Father_Address_Zip: payload01.FathersZip default ' ' ,
+	Father_Address_Zip4: payload01.FathersZip4 default ' ' ,
+	Father_FOCUS_DFS_Case_Open_Date: payload01.FathersDFSCaseOpenDate as :string {format:"yyyyMMdd"} default ' ',
+	Error_Description:"Reason Update Missing. " when (payload01.ReasonUpdate==null) otherwise '' ++ ( ("Child's MCI is Missing. ") when (payload01.ChildsMCI==null) otherwise '' ) ++ (("Child's Name is Missing. ") when (payload01.ChildsName==null) otherwise '' ) ++ (("Method of Paternity Established is Missing") when (payload01.ChildsPaternityEst=='Y' and payload01.MethodPaternityEst==null) otherwise '' ) ++ (("Date of Paternity Established is Missing") when (payload01.ChildsPaternityEst=='Y' and payload01.DatePaternityEst==null) otherwise '')
+}) filter ( (payload[$$].ReasonUpdate==null or payload[$$].ReasonUpdate=='' ) or (payload[$$].ChildsMCI==null) or (payload[$$].ChildsName==null) or (payload[$$].ChildsPaternityEst=='Y' and payload[$$].DatePaternityEst==null) or (payload[$$].ReasonUpdate=='SO' and payload[$$].DateCSOrder==null) or ( (payload[$$].ReasonUpdate=='AS') and (payload[$$].CSAStaus =='C') and (payload[$$].MothersDCSSCaseID == '0000000000') and ( payload[$$].MothersMCI !='0000000000')) or ( (payload[$$].ReasonUpdate=='AS') and (payload[$$].CSAStaus =='C') and (payload[$$].FathersDCSSCaseID =='0000000000' ) and ( payload[$$].FathersMCI !='0000000000')))]]></dw:set-session-variable>
+        </dw:transform-message>
+                <enricher source="#[sessionVars.ErrorMissingFields]" target="#[sessionVars.ErrorMissingFields]" doc:name="Message Enricher">
+                    <flow-ref name="inf010-child_support_case-loadSub_Flow" doc:name="inf010-child_support_case-loadSub_Flow"/>
+                </enricher>
+
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set Initial Payload" doc:description="Set the Error Record Count, Total Record Count and Success Record Count">
+
+            <add-message-property key="RecordSuccess" value="#[0]"/>
+            <add-message-property key="ErrorPayloadCount" value="#[sessionVars.ErrorPayload != ''?sessionVars.ErrorPayload.split(&quot;\n&quot;).length:0]"/>
+            <add-message-property key="ErrorAttachment" value="#['Error,Field Name in Error,Field Value in Error,Error Description' + '\n' + sessionVars.ErrorPayload.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;)]"/>
+
+            <add-message-property key="ErrorMissingValuesCount" value="#[sessionVars.ErrorMissingFields != ''?sessionVars.ErrorMissingFields.split(&quot;\n&quot;).length:0]"/>
+            <add-message-property key="ReasonUpdateErrorCount" value="#[sessionVars.ErrorReasonUpdate != ''?(sessionVars.ErrorReasonUpdate.split(&quot;\n&quot;).length - 1):0]"/>
+        </message-properties-transformer>
+
+
+      <batch:execute name="BatchLoad" doc:name="BatchLoad" doc:description="Call the Batch step for execution "/>  
+ </otherwise>
+        </choice>
+        
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>           
+          </flow>
+    <sub-flow name="inf010-child_support_case-loadSub_Flow">
+        <set-payload doc:name="Set Payload" value="#[sessionVars.ErrorMissingFields]"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-session-variable variableName="ErrorMissingFields" value="#[payload]" doc:name="Session Variable"/>
+    </sub-flow>
+    <batch:job name="BatchLoad" max-failed-records="-1" block-size="200" doc:description="Batch Step to split records into Valid chunks so as to not break Governor limit of SFDC">
+        <batch:process-records>
+            <batch:step name="Batch_Step" accept-policy="ALL" doc:description="Batch Step to split records and process into Valid chunks so as to not break Governor limit of SFDC">
+                <batch:commit size="200" doc:name="Batch Commit" doc:description="Batch Step to split records and process into Valid chunks so as to not break Governor limit of SFDC">
+                    <message-properties-transformer scope="invocation" doc:name="MP:Save Array" doc:description="Save the Incoming Array ">
+                        <add-message-property key="BatchArray" value="#[payload]"/>
+                        <add-message-property key="Query" value="#['']"/>
+                        <add-message-property key="QueryFather" value="#['']"/>
+                        <add-message-property key="HeaderDate" value="#[dw('sessionVars.HeaderDate as :date {format:&quot;yyyyMMdd&quot;}')]"/>
+                    </message-properties-transformer>
+                    <logger message="batch :::#[flowVars.BatchArray]" level="INFO" doc:name="Logger"/>
+                    <dw:transform-message doc:name="TM:Create Where Clause" doc:description="Create Where Clause for SOQL query">
+                        <dw:set-payload><![CDATA[//Create Where Clause for SOQL query
+%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.PID ++ "'") ) joinBy ","]]></dw:set-payload>
+                    </dw:transform-message>
+
+                    <logger message="#[flowVars.Query]" level="INFO" doc:name="Logger" doc:description="Display Created query"/>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id,Person_PID__c from DEL_Person_Type__c  where Person_PID__c in (#[payload]) and recordType.name ='Client'" doc:name="SFDC:Query PID" doc:description="Query SFDC to get the SFDC-ID of the Child PID"/>
+                    <dw:transform-message doc:name="TM: Parse Query Result" doc:description="Parse the Query Result">
+                        <dw:set-variable variableName="IdPayload"><![CDATA[//Parse the Query Result
+%dw 1.0
+%output application/java
+---
+payload map {	
+	
+
+    PID	:$.Person_PID__c,
+	Id:$.Id
+	
+	}]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message metadata:id="97150630-b7c4-42dc-8364-7755c1243fc2" doc:name="TM: Create Array for Case Load" doc:description="Create Array for Case Load base on the Reason Update and the Status as per business rule 1 for Mother
+Create Array for Case Load base on the Reason Update and the Status as per business rule 1 for Father
+Remove Court Order details from the Mother Record
+Remove Court Order details from the Father Record
+Create Error if PID is not found in FOCUS for Father
+Create Error if PID is not found in FOCUS for Mother">
+                        <dw:set-variable variableName="CaseLoadMother"><![CDATA[//Create Array for Case Load base on the Reason Update and the Status as per business rule 1 for Mother
+%dw 1.0
+%input payload application/java
+%output application/java
+%var ID = {( flowVars.IdPayload map {	
+	($.PID as :string):$.Id
+})}
+---
+flowVars.BatchArray map  {	
+	Person_Type__c:ID[$.PID],
+	External_Id__c:($.MothersPID  ++ '-' ++ $.PID ) as :string,
+	ChildNameUnformatted : $.ChildsName default "",
+	ChildsMCI : $.ChildsMCI default "",
+(   Client_Name_Change_Alert__c:$.ChildsName ) when ($.ReasonUpdate=='CN'),
+(	Child_Support_Application_Received_by_DC__c	: sessionVars.HeaderDate as :date {format: "yyyyMMdd"} ) when ($.ReasonUpdate=='AS' and $.CSAStaus=='P' and $.MothersMCI != null),
+(	DCSE_Case_Created__c:sessionVars.HeaderDate as :date {format: "yyyyMMdd"}  ) when ($.ReasonUpdate=='AS' and $.CSAStaus=='C' and $.MothersMCI != null),
+(	Case_Number__c:$.MothersDCSSCaseID )  when ($.MothersDCSSCaseID !='0000000000' and ($.ReasonUpdate=='AS' and $.CSAStaus=='C' and $.MothersMCI != null)),
+(   DCSE_Court_Filed__c:sessionVars.HeaderDate as :date {format: "yyyyMMdd"}  ) when ($.ReasonUpdate=='AS' and $.CSAStaus=='F' and $.MothersMCI != null),
+(   DCSE_Court_Scheduled__c:(flowVars.HeaderDate as :date {format: "yyyy/MM/dd"})   ) when ($.ReasonUpdate=='AS' and $.CSAStaus=='S' and $.MothersMCI != null),
+(   DCSS_Case_Closure__c:sessionVars.HeaderDate as :date {format: "yyyyMMdd"}  ) when ($.ReasonUpdate=='CC' and $.MothersMCI != null),
+(   Mothers_Court_Order_Amount:$.MothersOrderAmount) when (($.MothersMCI != null) and ($.MothersOrderAmount != null )),
+(   Mothers_Court_Order_Date:$.DateCSOrder as :date {format: "yyyyMMdd"}  ) when (($.MothersMCI != null) and ($.DateCSOrder != null)),   
+	Mothers_MCI:$.MothersMCI as :number
+} filter ( (flowVars.BatchArray[$$].ReasonUpdate !='CM') and (flowVars.BatchArray[$$].ReasonUpdate !='PM') and (flowVars.BatchArray[$$].ReasonUpdate !='PN') ) and ( (flowVars.BatchArray[$$].ReasonUpdate !=null or flowVars.BatchArray[$$].ReasonUpdate !='' ) and (flowVars.BatchArray[$$].ChildsMCI !=null) and (flowVars.BatchArray[$$].ChildsName !=null) )
+]]></dw:set-variable>
+                        <dw:set-variable variableName="CaseLoadFather"><![CDATA[//Create Array for Case Load base on the Reason Update and the Status as per business rule 1 for Father
+%dw 1.0
+%input payload application/java
+%output application/java
+%var ID = {( flowVars.IdPayload map {	
+	($.PID as :string):$.Id
+})}
+%var Method = {( {	
+	"AO" : "Birth Certificate Other Jurisdiction",
+	"CO" : "Court Order Delaware",
+	"CJ" : "Court Order Other Jurisdiction",
+	"BM" : "Born of Marriage",
+	"LA" : "Legal adoption",
+	"NM" : "Natural Mother",
+	"UK" : "Unknown" ,
+	"AH" : "Voluntary acknowledgement of Paternity"
+})}
+---
+flowVars.BatchArray map  {	
+	Person_Type__c:ID[$.PID],
+	External_Id__c:($.FathersPID ++ '-' ++ $.PID ) as :string,
+	ChildNameUnformatted : $.ChildsName default "",
+	ChildsMCI : $.ChildsMCI default "",
+(   Client_Name_Change_Alert__c:$.ChildsName ) when ($.ReasonUpdate=='CN'),
+(	Child_Support_Application_Received_by_DC__c: sessionVars.HeaderDate as :date {format: "yyyyMMdd"}  ) when ($.ReasonUpdate=='AS' and $.CSAStaus=='P' and $.FathersMCI != null),
+(	DCSE_Case_Created__c:sessionVars.HeaderDate as :date {format: "yyyyMMdd"}) when ($.ReasonUpdate=='AS' and $.CSAStaus=='C' and $.FathersMCI != null),
+(	Case_Number__c:$.FathersDCSSCaseID ) when ( $.FathersDCSSCaseID != '0000000000' and ($.ReasonUpdate=='AS' and $.CSAStaus=='C' and $.FathersMCI != null)),
+(   DCSE_Court_Filed__c:sessionVars.HeaderDate as :date {format: "yyyyMMdd"}  ) when ($.ReasonUpdate=='AS' and $.CSAStaus=='F' and $.FathersMCI != null),
+(   DCSE_Court_Scheduled__c:sessionVars.HeaderDate as :date {format: "yyyyMMdd"}  ) when ($.ReasonUpdate=='AS' and $.CSAStaus=='S' and $.FathersMCI != null),
+(   DCSS_Case_Closure__c:sessionVars.HeaderDate as :date {format: "yyyyMMdd"}  ) when ($.ReasonUpdate=='CC' and $.FathersMCI != null),
+(   Name__c:$.FathersName ) when ($.ChildsPaternityEst=='Y' and $.FathersMCI !=null and $.FathersName != null and $.DatePaternityEst != null ),
+(	Method__c:flowVars.LOVReturned[("METHOD_CS_LOAD-" ++ $.MethodPaternityEst)][0] default "") when ( $.ChildsPaternityEst=='Y' and $.FathersMCI !=null  and $.DatePaternityEst != null ),
+(	Date__c:$.DatePaternityEst as :date {format: "yyyyMMdd"}  ) when ( $.ChildsPaternityEst=='Y' and $.FathersMCI !=null and $.DatePaternityEst != null),
+(   Fathers_Court_Order_Amount:$.FathersOrderAmount)  when (($.FathersMCI != null) and ($.FathersOrderAmount != null)),
+(   Fathers_Court_Order_Date:$.DateCSOrder as :date {format: "yyyyMMdd"}  ) when (($.FathersMCI != null) and ($.DateCSOrder != null)),
+	Fathers_MCI:$.FathersMCI as :number
+	
+	} filter ( (flowVars.BatchArray[$$].ReasonUpdate !='CM') and (flowVars.BatchArray[$$].ReasonUpdate !='PM') and (flowVars.BatchArray[$$].ReasonUpdate !='PN') ) and ( (flowVars.BatchArray[$$].ReasonUpdate !=null or flowVars.BatchArray[$$].ReasonUpdate !='' ) and (flowVars.BatchArray[$$].ChildsMCI !=null) and (flowVars.BatchArray[$$].ChildsName !=null) )]]></dw:set-variable>
+
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Remove Extra Fields">
+                        <dw:set-variable variableName="MotherRecord"><![CDATA[////Remove Court Order details from the Mother Record
+%dw 1.0
+%output application/java
+---
+flowVars.CaseLoadMother filter (($.Mothers_MCI != 0)  and ($.Person_Type__c !=null)) map {
+	($ - "Mothers_Court_Order_Amount" - "Mothers_Court_Order_Date"  - "Mothers_MCI" - "ChildNameUnformatted" - "ChildsMCI")
+} 
+ ]]></dw:set-variable>
+                        <dw:set-variable variableName="FatherRecord"><![CDATA[//Remove Court Order details from the Father Record
+%dw 1.0
+%output application/java
+---
+flowVars.CaseLoadFather  filter ( ($.Fathers_MCI != 0 )  and ($.Person_Type__c !=null) ) map {
+	($ - "Fathers_Court_Order_Amount" - "Fathers_Court_Order_Date"  - "Fathers_MCI" - "ChildNameUnformatted" - "ChildsMCI" )
+} ]]></dw:set-variable>
+                        <dw:set-variable variableName="MRecordError"><![CDATA[//Create Error if PID is not found in FOCUS
+%dw 1.0
+%output application/csv header = false,quoteValues=true
+---
+flowVars.CaseLoadMother filter (($.Mothers_MCI != 0)  and ($.Person_Type__c ==null)) map {
+	Error: "Data Error",
+	Field_Name_in_Error: "Child's PID",
+	Field_Value_in_Error: ($.External_Id__c splitBy "-")[1],
+	Error_Description: ( ("No Child PID returned by DCSS ") when ( (((($.External_Id__c splitBy "-")[1] default "0") as :string) == "0") or (((($.External_Id__c splitBy "-")[1] default "") as :string) == "") ) otherwise (("Child PID not found in FOCUS or Child does not have a person type Client.") ++ "| Child's PID: " ++ (($.External_Id__c splitBy "-")[1] default "") ) ) ++ "| Child's MCI " ++ ($.ChildsMCI as :number)  ++ " | Child's Name " ++ ($.ChildNameUnformatted default "")
+} 
+ ]]></dw:set-variable>
+                        <dw:set-variable variableName="FRecordError"><![CDATA[//Create Error if PID is not found in FOCUS
+%dw 1.0
+%output application/csv header = false,quoteValues=true
+---
+flowVars.CaseLoadFather filter (($.Fathers_MCI != 0)  and ($.Person_Type__c ==null)) map {
+	Error: "Data Error",
+	Field_Name_in_Error: "Child's PID",
+	Field_Value_in_Error: ($.External_Id__c splitBy "-")[1],
+	Error_Description: ( ("No Child PID returned by DCSS ") when ( (((($.External_Id__c splitBy "-")[1] default "0") as :string) == "0") or (((($.External_Id__c splitBy "-")[1] default "") as :string) == "") ) otherwise (("Child PID not found in FOCUS or Child does not have a person type Client.") ++ "| Child's PID: " ++ (($.External_Id__c splitBy "-")[1] default "") ) ) ++ "| Child's MCI " ++ ($.ChildsMCI as :number)  ++ " | Child's Name " ++ ($.ChildNameUnformatted default "")
+} 
+ ]]></dw:set-variable>
+
+                    </dw:transform-message>
+
+<dw:transform-message doc:name="TM: Remove Extra Fields from Mother and Father Case Load records">
+<dw:set-variable variableName="CaseLoadMother"><![CDATA[////Remove Court Order details from the Mother Record
+%dw 1.0
+%output application/java
+---
+flowVars.CaseLoadMother map {
+	($ - "ChildNameUnformatted" - "ChildsMCI")
+} 
+ ]]></dw:set-variable>
+<dw:set-variable variableName="CaseLoadFather"><![CDATA[////Remove Court Order details from the Mother Record
+%dw 1.0
+%output application/java
+---
+flowVars.CaseLoadFather map {
+	($ - "ChildNameUnformatted" - "ChildsMCI")
+} 
+ ]]></dw:set-variable>
+</dw:transform-message>
+
+                    <logger message="#[flowVars.CaseLoadMother]" level="INFO" doc:name="Logger"/>
+                    <logger message="choice #[flowVars.MotherRecord]" level="INFO" doc:name="Logger"/>
+                    <choice doc:name="Choice" doc:description="To Implement various options of updating the Case Load Object">
+                        <when expression="#[flowVars.FatherRecord.size() == 0 &amp;&amp; flowVars.MotherRecord.size() != 0]">
+                            <flow-ref name="Mother_Record_Sub_Flow" doc:name="Mother_Record_Sub_Flow" doc:description="Call the Subflow for Updating the Mothers Record"/>
+                        </when>
+                        <when expression="#[flowVars.MotherRecord.size() == 0 &amp;&amp; flowVars.FatherRecord.size() != 0]">
+                            <flow-ref name="Father_Record_Sub_Flow" doc:name="Father_Record_Sub_Flow" doc:description="Call the Subflow for Updating the Fathers Record"/>
+                        </when>
+                        <when expression="#[flowVars.MotherRecord.size() != 0 &amp;&amp; flowVars.FatherRecord.size() != 0]">
+                            <logger message="Default" level="INFO" doc:name="Both" doc:description="Call the Subflow for Updating the Mothers Record and Call the Subflow for Updating the Fathers Record both"/>
+                            <flow-ref name="Mother_Record_Sub_Flow" doc:name="Mother_Record_Sub_Flow" doc:description="Call the Subflow for Updating the Mothers Record "/>
+                            <flow-ref name="Father_Record_Sub_Flow" doc:name="Father_Record_Sub_Flow" doc:description=" Call the Subflow for Updating the Fathers Record "/>
+                        </when>
+                        <otherwise>
+                            <logger message="No Valid Records" level="INFO" doc:name="No Records" doc:description="If no Valid CaseLoad records are present for mother and father both"/>
+							 <objectstore:store config-ref="DSCE_ChildCaseLoad" key="BatchInfo_#[server.nanoTime()]" value-ref="#[flowVars.FRecordError + flowVars.MRecordError]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+                        </otherwise>
+                    </choice>
+
+
+
+                    <!-- <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP: Save JobID">
+                        <add-message-property key="JobId" value="#[payload.jobId]"/>
+                        <add-message-property key="JobResponse" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <until-successful maxRetries="50" millisBetweenRetries="2000" failureExpression="#[payload.state== 'Queued' || payload.state == 'InProgress' ]" synchronous="true" doc:name="Until Successful">
+                        <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Upsert Result">
+                            <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
+                        </sfdc:batch-result-stream>
+                    </until-successful>
+                    <object-to-string-transformer mimeType="application/xml" doc:name="O to S: Change Filestream to XML"/> -->
+
+
+                    <set-payload value="#[[]]" doc:name="Set Payload: To empty List" doc:description="Set Payload to a null arraylist so that an exception is not thrown by the process step og the batch"/>
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>
+                    <objectstore:store config-ref="DSCE_ChildCaseLoad_Error" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="DSCE_ChildCaseLoad_Error" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+
+                </batch:commit>
+            </batch:step>
+
+        </batch:process-records>
+        <batch:on-complete>
+            <json:object-to-json-transformer doc:name="Object to JSON : Convert Batch Summary" doc:description="Parse the the Batch Summary into a JSON"/>
+            <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Diplay the Batch Summary"/>
+            <message-properties-transformer overwrite="true" scope="session" metadata:id="8617142e-cbbc-492e-af72-ffb26fa94f26" doc:name="MP: Set RecordCount,RecordError,RecordSuccess" doc:description="Update the Error Count, Total Record Count, Succesfull Record Count">
+                <add-message-property key="RecordSuccess" value="#[json:/successfulRecords]"/>
+                <add-message-property key="RecordError" value="#[sessionVars.ErrorMissingValuesCount + ReasonUpdateErrorCount + ErrorPayloadCount]"/>
+                <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment  +'\n' + sessionVars.ErrorMissingFields  + '\n' ]"/>
+                <add-message-property key="TransAttachment" value="#[sessionVars.ErrorReasonUpdate != ''?sessionVars.ErrorReasonUpdate:null]"/>
+                <delete-message-property key="TransAttachment"/>
+            </message-properties-transformer>
+             <objectstore:retrieve-all-keys config-ref="DSCE_ChildCaseLoad_Error" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys"/>
+           <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>
+            <foreach doc:name="For Each : Iterate over Exception Keys" doc:description="For Each : Iterate over Exception Keys">
+                <choice doc:name="Check SFDC Connection Count" doc:description="Check SFDC Connection Count and increment the counter">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="DSCE_ChildCaseLoad_Error" key="#[payload]" doc:name="Exception ObjectStore : Retrieve and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count"/>
+
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:description="Message Properties: Update Total SFDC Connection Error Count" doc:name="Message Properties: Update Total SFDC Connection Error Count">
+	                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+	                    </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="DSCE_ChildCaseLoad_Error" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details" doc:description="Exception ObjectStore : Retrive and Remove a record having Exception Details"/>
+		                <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+		                      <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+		                </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </foreach>
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if Exceptions occured" doc:description="Choice : Route to process Further if Exceptions occured
+If Exceptions occured flow is passed to a different branch which will handle clean up">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="DSCE_ChildCaseLoad_Error" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="For Each : Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="DSCE_ChildCaseLoad_Error" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Removes all the enteries and Clean Object Store"/>
+
+                    </foreach>
+                    <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow" doc:description="Invoke Flow to hangle batch Errors"/>
+              </when>
+              <otherwise>
+
+            <objectstore:retrieve-all-keys config-ref="DSCE_ChildCaseLoad" doc:name="ObjectStore: Retrieve Stored Objects" doc:description="Retrieve the Error Messsage stored in the Object Store"/>
+            <foreach doc:name="For Each" doc:description="For Each For PArsin the Error Report from the Object store one by one">
+                <objectstore:remove config-ref="DSCE_ChildCaseLoad" key="#[payload]" doc:name="ObjectStore: Read Stored Objects" doc:description="Remove the Error Report from the object store"/>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Create Error Attachment" doc:description="Append the Error report retrieved from the object store into the ErrorAttachment variable">
+                    <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + payload]"/>
+                    <add-message-property key="RecordError" value="#[payload != ''?sessionVars.RecordError + payload.split(&quot;\n&quot;).length:sessionVars.RecordError]"/>
+
+                </message-properties-transformer>
+            </foreach>
+            <message-properties-transformer doc:name="Message Properties : Get Record Error" scope="invocation" doc:description="Generate Record Error">
+                <add-message-property key="RecordError" value="#[sessionVars.RecordError&lt;sessionVars.RecordCount ? sessionVars.RecordError:sessionVars.RecordCount]"/>
+            </message-properties-transformer>
+            <message-properties-transformer overwrite="true" scope="session" metadata:id="9109bd5b-8548-49c1-9c54-aeba7188f064" doc:name="MP: Update RecordCount,RecordError,RecordSuccess" doc:description="Update the Error Count, Success Count and the Total Count">
+
+                <add-message-property key="RecordSuccess" value="#[sessionVars.RecordCount - sessionVars.RecordError]"/>
+                <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;)]"/>
+
+            </message-properties-transformer>
+                    <choice doc:name="Check if Record Errors are present" doc:description="Check if Record Errors are present and delete Error Attachment if no errors are present">
+                        <when expression="#[sessionVars.RecordError &gt; 0]">
+                            <logger level="INFO" doc:name="Logger"/>
+                        </when>
+                        <otherwise>
+                            <message-properties-transformer scope="session" doc:name="MP : Delete Error Attachment" doc:description="Delete Error Attachment since there are no errors
+This is done so that empty error Error Attachment is not formed through the framework">
+                                <delete-message-property key="ErrorAttachment"/>
+                            </message-properties-transformer>
+                        </otherwise>
+                    </choice>
+
+            <set-payload value="{&quot;InterfaceID&quot;: &quot;INF010&quot;, &quot;InterfaceName&quot;: &quot;Child Support Case Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_ChildSupportCaseLoad&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Error_Application_Status_PMPNCM&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[(sessionVars.RecordSuccess==0 and sessionVars.RecordCount&gt;1)?'Error':sessionVars.RecordError==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordError != 0 ?'Business':'']&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to JSON for Logging Framework" doc:description="Set the JSON payooad for the Loggin framework-Final call"/>
+            <logger message="JSON: #[payload]" level="INFO" doc:name="Logger" doc:description="Display the result of logging framework call"/>
+
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the Logging framework"/>
+           <message-properties-transformer scope="invocation" doc:name="MP:Deleting FV">
+
+						<delete-message-property key="InterfaceID"/>
+						<delete-message-property key="interfaceTransactionStatus"/>
+						<delete-message-property key="LOVReturned"/>
+						<delete-message-property key="SubPayload"/>
+						<delete-message-property key="Tname"/>
+						<delete-message-property key="Time"/>
+						<delete-message-property key="TransactionID"/>
+						<delete-message-property key="exceptionRecordCount"/>
+						<delete-message-property key="RecordError"/>
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP:Deleting SV">
+			<delete-message-property key="ErrorAttachment"/>
+			<delete-message-property key="ErrorMissingFields"/>
+			<delete-message-property key="ErrorMissingValues"/>
+			<delete-message-property key="ErrorPayload"/>
+			<delete-message-property key="ErrorPayloadCount"/>
+			<delete-message-property key="ErrorReasonUpdate"/>
+			<delete-message-property key="HeaderDate"/>
+			<delete-message-property key="ReasonUpdateErrorCount"/>
+			<delete-message-property key="RecordError"/>
+			<delete-message-property key="RecordCount"/>
+			<delete-message-property key="RecordSuccess"/>
+			<delete-message-property key="TID"/>
+			
+					</message-properties-transformer>
+            <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Display the outcome of the logging framewok"/>
+       </otherwise>
+       </choice>
+        </batch:on-complete>
+    </batch:job>
+    <sub-flow name="Father_Record_Sub_Flow">
+        <dw:transform-message doc:name="TM:Create Where Clause" doc:description="Create where clause for SOQL Query">
+            <dw:set-variable variableName="QueryFather"><![CDATA[//Create where clause for Query
+%dw 1.0
+%output application/java
+---
+(flowVars.CaseLoadFather map ("'" ++ $.External_Id__c ++ "'" )) joinBy ","]]></dw:set-variable>
+
+        </dw:transform-message>
+
+
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,External_Id__c FROM DEL_Child_Support_Case_Load_View__c WHERE External_Id__c in (#[flowVars.QueryFather])" doc:name="SFDC: Query CaseLoad to get ID" doc:description=" Query SFDC for getting the ID of the Case Load for Father for updating it"/>
+        <dw:transform-message doc:name="TM:Parse Query Result" doc:description="Parse the Query result for the SFDC ID for Father">
+            <dw:set-variable variableName="CaseLoadIDF"><![CDATA[//Parse the Query result for the SFDC ID for Father
+%dw 1.0
+%input payload application/java
+%output application/java
+---
+payload map {
+	Id:$.Id,
+	External_Id:$.External_Id__c
+} ]]></dw:set-variable>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Create record for Father CaseLoad" doc:description="Updating the Father Record for Case Load with the ID of the Case Load">
+            <dw:set-variable variableName="FRecordCaseLoad"><![CDATA[//Updating the Father Record for Case Load with the ID of the Case Load
+%dw 1.0
+%input payload application/java
+%output application/java
+%var External = {( flowVars.CaseLoadIDF map {	
+	($.External_Id as :string):$.Id
+})}
+---
+(flowVars.FatherRecord  map {
+	ID:External[$.External_Id__c],
+	($ )
+}) ]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Filter Records" doc:description="Filter records not found in FOCUS">
+            <dw:set-payload><![CDATA[//Filter records not found in FOCUS
+%dw 1.0
+%output application/java
+---
+flowVars.FRecordCaseLoad filter ($.ID !=null) map {
+	($ - "External_Id__c" )
+}]]></dw:set-payload>
+            <dw:set-variable variableName="FRecordCaseLoadError"><![CDATA[%dw 1.0
+%output application/csv header= false,quoteValues=true
+---
+flowVars.FRecordCaseLoad filter ($.ID == null) map {
+	Error: "Data Error",
+	Field_Name_in_Error: "Father's PID/Child's PID",
+	Field_Value_in_Error: "Father's PID : " ++ ( ($.External_Id__c splitBy "-")[0] default "") ++ "| Child's PID : " ++ ( ($.External_Id__c splitBy "-")[1] default ""),
+	Error_Description: "Father's PID is 0 on the incoming Case Load file" when (((($.External_Id__c splitBy "-")[0] default "0") as :string) == "0") otherwise "For Father and Child PID combination, no caseload shell record was found in FOCUS. Please verify Father's PID on the file against father's PID in FOCUS for the given child"
+} ]]></dw:set-variable>
+        </dw:transform-message>
+
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Child_Support_Case_Load_View__c" doc:name="SFDC : Update Case Load Record" doc:description="Update the Case Load with the Father Record created in the previous step">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+        <logger message="Case Load ::::#[payload]" level="INFO" doc:name="Logger" doc:description="Output the Result of Updation call"/>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to query SFDC without changing the Payload">
+            <processor-chain doc:name="Processor Chain" doc:description="Prcoessor Chain is used si that more than one connector can be used inside Message Enricher">
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id from RecordType where Name =${fathers.court.order} and SobjectType ='DEL_Court_Order__c'" doc:name="SFDC:Get RecordType" doc:description="Query SFDC to get RecordType ID"/>
+                <dw:transform-message doc:name="TM: Parse Query Result">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {ID: $.Id}]]></dw:set-payload>
+                </dw:transform-message>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </processor-chain>
+            <enrich source="#[payload[0].ID]" target="#[flowVars.RecordTypeFather]"/>
+        </enricher>
+
+        <dw:transform-message metadata:id="fd78efa0-33ac-4093-a779-6f39b4c55729" doc:name="TM:Create Court Order Record for Father">
+            <dw:input-payload doc:sample="sample_data\string.dwl" mimeType="application/java"/>
+            <dw:set-variable variableName="SFDCError1"><![CDATA[//Create Error Report if the Updation Call has errored out
+%output application/csv ignoreEmptyLine=true ,header = false , separator = "|",quoteValues=true
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode,
+	Field_Name_in_Error: payload[$$].errors[0].fields[0],
+	Field_Value_in_Error: payload[$$].errors[0].message,
+	Error_Description:payload[$$].errors[0].message
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+            <dw:set-variable variableName="FRecordCourtOrder"><![CDATA[//Create the Court Order Record for Father
+%dw 1.0
+%output application/java
+%var External = {( flowVars.CaseLoadIDF map {	
+	($.External_Id as :string):$.Id
+})}
+---
+flowVars.CaseLoadFather map {
+(	Child_Support_Case_Load_View_Father__c:External[$.External_Id__c] ) when (($.Fathers_MCI != null) and ($.Fathers_MCI !=0)),
+(	Father_s_Court_Ordered_Amount__c:$.Fathers_Court_Order_Amount ) when (($.Fathers_MCI != null) and ($.Fathers_MCI !=0) and ($.Fathers_Court_Order_Amount != null)),
+(	Father_s_Court_Ordered_Date__c:$.Fathers_Court_Order_Date) when (($.Fathers_MCI != null) and ($.Fathers_MCI !=0) and ($.Fathers_Court_Order_Date != null)),
+(   "RecordTypeId":flowVars.RecordTypeFather ) when (($.Fathers_MCI != null) and ($.Fathers_MCI !=0)),
+(	Interface_External_ID__c:($.External_Id__c default "") ++ "-" ++ ( flowVars.RecordTypeFather default "") ++ "-" ++  ($.Fathers_Court_Order_Amount default "") ++ "-" ++  ( $.Fathers_Court_Order_Date as :date as :string {format:"dd/MM/yyyy"} default "") ) when (($.Fathers_MCI != null) and ($.Fathers_MCI !=0))
+}  filter ( ( $.Child_Support_Case_Load_View_Father__c !=null ) and ($.Father_s_Court_Ordered_Date__c != null) ) ]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Create Where Clause">
+            <dw:set-variable variableName="FatherExternalIDList"><![CDATA[//Create Where Clause
+%dw 1.0
+%output application/java
+---
+( flowVars.FRecordCourtOrder map ("'" ++ $.Interface_External_ID__c ++ "'" ))  joinBy "," ]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Interface_External_Id__c from DEL_Court_Order__c where Interface_External_ID__c in (#[flowVars.FatherExternalIDList == &quot;&quot;?&quot;'X'&quot;:flowVars.FatherExternalIDList])" doc:name="SFDC: Query SFDC to get Extrenal ID" doc:description="SFDC: Query SFDC to get ID and External ID for Court Order Create"/>
+        <dw:transform-message doc:name="TM: Parse Query Result">
+            <dw:set-variable variableName="DuplicateCourtFatherList"><![CDATA[//Parse Query Result
+%dw 1.0
+%output application/java
+---
+payload map {
+	Id:$.Id default "",
+	Interface_External_Id:$.Interface_External_Id__c default "123"
+} groupBy $.Interface_External_Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Group Query Result">
+            <dw:set-payload><![CDATA[//Use Filter to check if Court Order with the same External ID is present or not.
+%dw 1.0
+%output application/java
+---
+flowVars.FRecordCourtOrder filter (flowVars.DuplicateCourtFatherList[$.Interface_External_ID__c][0].Id == null) map $]]></dw:set-payload>
+            <dw:set-variable variableName="FDuplicateCOError"><![CDATA[%dw 1.0
+%output application/csv header = false,quoteValues=true
+---
+flowVars.FRecordCourtOrder filter (flowVars.DuplicateCourtFatherList[$.Interface_External_ID__c][0].Id != null) map {
+	Error: "Duplicate Court Order Warning",
+	Field_Name_in_Error: "Court Order",
+	Field_Value_in_Error: "",
+	Error_Description:"Court Order for the following values already exists | " ++ "Fathers PID: " ++ (($.Interface_External_ID__c splitBy "-")[0] default "")
+		++ " | Child's PID: " ++ (($.Interface_External_ID__c splitBy "-")[1] default "") ++ " | Amount: " ++ (($.Interface_External_ID__c splitBy "-")[3] default "")
+		++ " | Date: " ++ (($.Interface_External_ID__c splitBy "-")[4] default "")
+} ]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="DEL_Court_Order__c" doc:name="SFDC: Create Court Order" doc:description="Create the Court Order Record for Father">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+        <dw:transform-message doc:name="TM: Parse Output  and Create Error Message">
+            <dw:set-variable variableName="SFDCError2"><![CDATA[//Create the Error report In case of an Error in the Create call for Court Order
+%output application/csv ignoreEmptyLine=true ,header = false,quoteValues=true 
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode,
+	Field_Name_in_Error: payload[$$].errors[0].fields[0],
+	Field_Value_in_Error: payload[$$].errors[0].message,
+	Error_Description:payload[$$].errors[0].message
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+            <dw:set-variable variableName="FCourtOrderOutput"><![CDATA[//Parse the Output of the SFDC Create call
+%dw 1.0
+%output application/java
+---
+payload map {
+	Id:$.id
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="#[flowVars.SFDCError1 + flowVars.SFDCError2]" level="INFO" doc:name="Logger"/>
+        <objectstore:store config-ref="DSCE_ChildCaseLoad" key="BatchInfo_#[server.nanoTime()]" value-ref="#[flowVars.SFDCError1 + flowVars.SFDCError2 + flowVars.FDuplicateCOError + flowVars.FRecordCaseLoadError + flowVars.FRecordError]" doc:name="ObjectStore:Store Error CSV" doc:description="Store the Generated Errors in the Object store because the scope of Object store is the entire application"/>
+
+
+    </sub-flow>
+    <sub-flow name="Mother_Record_Sub_Flow">
+        <dw:transform-message doc:name="TM: Create Where Clause">
+            <dw:set-variable variableName="QueryMother"><![CDATA[//Create Where Clause for Query
+%dw 1.0
+%output application/java
+---
+(flowVars.CaseLoadMother map ("'" ++ $.External_Id__c ++ "'" )) joinBy ","]]></dw:set-variable>
+        </dw:transform-message>
+
+        <logger message="#[flowVars.QueryMother]" level="INFO" doc:name="Logger"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,External_Id__c FROM DEL_Child_Support_Case_Load_View__c WHERE  External_Id__c in (#[flowVars.QueryMother])" doc:name="SFDC: Query CaseLoad to get ID" doc:description=" Query SFDC for getting the ID of the Case Load for Mother for updating it"/>
+        <dw:transform-message doc:name="TM:Parse Query Result">
+            <dw:set-variable variableName="CaseLoadIDM"><![CDATA[//Parse the Query result for the SFDC ID for Mother
+%dw 1.0
+%input payload application/java
+%output application/java
+---
+payload map {
+	Id:$.Id,
+	External_Id:$.External_Id__c 
+	
+	}]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Create record for Mother CaseLoad">
+            <dw:set-variable variableName="MRecordCaseLoad"><![CDATA[//Updating the Mother Record for Case Load with the ID of the Case Load
+%dw 1.0
+%input payload application/java
+%output application/java
+%var External = {( flowVars.CaseLoadIDM map {	
+	($.External_Id as :string):$.Id
+})}
+---
+(flowVars.MotherRecord map {
+	ID:External[$.External_Id__c],
+	($ )
+}) ]]></dw:set-variable>
+        </dw:transform-message>
+
+        <dw:transform-message doc:name="TM:Filter Records">
+            <dw:set-payload><![CDATA[//Filter Records
+%dw 1.0
+%output application/java
+---
+flowVars.MRecordCaseLoad filter ($.ID != null) map {
+	($ - "External_Id__c" )
+} ]]></dw:set-payload>
+            <dw:set-variable variableName="MRecordCaseLoadError"><![CDATA[%dw 1.0
+%output application/csv header = false,quoteValues=true
+---
+flowVars.MRecordCaseLoad filter ($.ID == null) map {
+	Error: "Data Error",
+	Field_Name_in_Error: "Mother's PID/Child's PID",
+	Field_Value_in_Error: "Mother's PID : " ++ ( ($.External_Id__c splitBy "-")[0] default "") ++ "| Child's PID : " ++ ( ($.External_Id__c splitBy "-")[1] default ""),
+	Error_Description: "Mother's PID is 0 on the incoming Case Load file" when (((($.External_Id__c splitBy "-")[0] default "0") as :string) == "0") otherwise "For Mother and Child PID combination, no Case Load shell record was found in FOCUS. Please verify Mother's PID on the file against mother's PID in FOCUS for the given child"
+} ]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Child_Support_Case_Load_View__c" doc:name="SFDC : Update Case Load Record" doc:description="Update the Case Load with the Mother Record created in the previous step">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Output the Result of Updation call"/>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to query SFDC without changing the Payload">
+            <processor-chain doc:name="Processor Chain" doc:description="Prcoessor Chain is used si that more than one connector can be used inside Message Enricher">
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id from RecordType where Name =${mothers.court.order} and SobjectType ='DEL_Court_Order__c'" doc:name="SFDC:Get RecordType" doc:description="Query SFDC to get RecordType ID"/>
+
+                <dw:transform-message doc:name="TM:Parse Query Result">
+                    <dw:set-payload><![CDATA[//Parse Query Result
+%dw 1.0
+%output application/java
+---
+payload map {ID: $.Id}]]></dw:set-payload>
+                </dw:transform-message>
+
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </processor-chain>
+            <enrich source="#[payload.size() &gt; 0 ? payload[0].ID:&quot;&quot;]" target="#[flowVars.RecordTypeMother]"/>
+        </enricher>
+        <dw:transform-message metadata:id="fd78efa0-33ac-4093-a779-6f39b4c55729" doc:name="TM:Create Court Order Record for Mother">
+            <dw:input-payload doc:sample="sample_data\string.dwl" mimeType="application/java"/>
+            <dw:set-variable variableName="SFDCErrorM1"><![CDATA[//Create Error Report if the Update Call has errored out
+%output application/csv ignoreEmptyLine = true , header = false , separator = "|",quoteValues=true
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode,
+	Field_Name_in_Error: payload[$$].errors[0].fields[0],
+	Field_Value_in_Error: payload[$$].errors[0].message,
+	Error_Description:payload[$$].errors[0].message
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+            <dw:set-variable variableName="MRecordCourtOrder"><![CDATA[//Create the Court Order Record for Mother
+%dw 1.0
+%output application/java
+%var External = {( flowVars.CaseLoadIDM map {	
+	($.External_Id as :string):$.Id
+})}
+---
+flowVars.CaseLoadMother map {
+(	Child_Support_Case_Load_View_Mother__c:External[$.External_Id__c]) when (($.Mothers_MCI != null) and ($.Mothers_MCI !=0)),
+(	Mother_s_Court_Ordered_Amount__c:$.Mothers_Court_Order_Amount ) when (($.Mothers_MCI != null) and ($.Mothers_MCI !=0) and ($.Mothers_Court_Order_Amount != null)),
+(	Mother_s_Court_Ordered_Date__c:$.Mothers_Court_Order_Date) when (($.Mothers_MCI != null) and ($.Mothers_MCI !=0) and ($.Mothers_Court_Order_Date != null)),
+(   "RecordTypeId":flowVars.RecordTypeMother ) when (($.Mothers_MCI != null) and ($.Mothers_MCI !=0)),
+(	Interface_External_ID__c:($.External_Id__c default "") ++ "-" ++ (flowVars.RecordTypeMother default "") ++ "-" ++  ($.Mothers_Court_Order_Amount default "") ++ "-" ++  ($.Mothers_Court_Order_Date as :date as :string {format:"dd/MM/yyyy"} default "")
+) when (($.Mothers_MCI != null) and ($.Mothers_MCI !=0))
+}  filter ( ( $.Child_Support_Case_Load_View_Mother__c !=null ) and ($.Mother_s_Court_Ordered_Date__c != null) ) ]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Create where Clause">
+            <dw:set-variable variableName="MotherExternalIDList"><![CDATA[//Create where Clause
+%dw 1.0
+%output application/java
+---
+( flowVars.MRecordCourtOrder map ("'" ++ $.Interface_External_ID__c ++ "'" ))  joinBy ","]]></dw:set-variable>
+
+        </dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Interface_External_Id__c from DEL_Court_Order__c where Interface_External_ID__c in (#[flowVars.MotherExternalIDList == &quot;&quot; ? &quot;'X'&quot;:flowVars.MotherExternalIDList ])" doc:name="SFDC: Query SFDC to get Extrenal ID" doc:description="SFDC: Query SFDC to get ID"/>
+        <dw:transform-message doc:name="TM:Duplicates Present">
+            <dw:set-variable variableName="DuplicateCourtMotherList"><![CDATA[//Parse Query Result
+%dw 1.0
+%output application/java
+---
+payload map {
+	Id:$.Id default " ",
+	Interface_External_Id:$.Interface_External_Id__c default "123X"
+} groupBy $.Interface_External_Id]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Group Duplicates Present">
+            <dw:set-payload><![CDATA[//Use Filter to check if Court Order with the same External ID is present or not.
+%dw 1.0
+%output application/java 
+---
+flowVars.MRecordCourtOrder filter (flowVars.DuplicateCourtMotherList[$.Interface_External_ID__c][0].Id == null) map $]]></dw:set-payload>
+            <dw:set-variable variableName="MDuplicateCOError"><![CDATA[%dw 1.0
+%output application/csv header = false,quoteValues=true
+---
+flowVars.MRecordCourtOrder filter (flowVars.DuplicateCourtMotherList[$.Interface_External_ID__c][0].Id != null) map {
+	Error: "Duplicate Court Order Warning",
+	Field_Name_in_Error: "Court Order",
+	Field_Value_in_Error: "",
+	Error_Description:"Court Order for the following values already exists | " ++ "Mothers PID: " ++ (($.Interface_External_ID__c splitBy "-")[0] default "")
+		++ " | Child's PID: " ++ (($.Interface_External_ID__c splitBy "-")[1] default "") ++ " | Amount: " ++ (($.Interface_External_ID__c splitBy "-")[3] default "")
+		++ " | Date: " ++ (($.Interface_External_ID__c splitBy "-")[4] default "")
+} ]]></dw:set-variable>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="DEL_Court_Order__c" doc:name="SFDC: Create Court Order" doc:description="Create the Court Order Record for Mother">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+        <dw:transform-message doc:name="TM: Parse Output  and Create Error Message">
+            <dw:set-variable variableName="SFDCErrorM2"><![CDATA[//Create the Error report In case of an Error in the Create call for Court Order
+%output application/csv ignoreEmptyLine=true ,header = false,quoteValues=true 
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode,
+	Field_Name_in_Error: payload[$$].errors[0].fields[0],
+	Field_Value_in_Error: payload[$$].errors[0].message,
+	Error_Description:payload[$$].errors[0].message
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+            <dw:set-variable variableName="MRecordCourtOrderOutput"><![CDATA[//Parse the output of the Create Call
+%dw 1.0
+%output application/java
+---
+payload map {
+	Id:$.id
+}]]></dw:set-variable>
+        </dw:transform-message>
+         <logger message="#[flowVars.SFDCErrorM1 + flowVars.SFDCErrorM2]" level="INFO" doc:name="Logger"/>
+        <objectstore:store config-ref="DSCE_ChildCaseLoad" key="BatchInfo_#[server.nanoTime()]" value-ref="#[flowVars.SFDCErrorM1 + flowVars.SFDCErrorM2 + flowVars.MDuplicateCOError + flowVars.MRecordCaseLoadError + flowVars.MRecordError]" doc:name="ObjectStore:Store Error CSV" doc:description="Store the Generated Errors in the Object store because the scope of Object store is the entire application"/>
+ 
+    </sub-flow>
+    <sub-flow name="inf010-childsupport-load-InProgress-Log-Transaction-Sub_Flow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF010&quot;, &quot;InterfaceName&quot;: &quot;Child Support Case Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_FOSTER_CARE_CASES&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP:Set JSON payload for logging Framework" doc:description="Set the JSON Payload for Logging Framework Call"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the logging framework "/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Display the result of logging framework call"/>
+    </sub-flow>
+    <sub-flow name="Call-LOV-CSC-flow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'METHOD_CS_LOAD'&quot;}" doc:name="Set Payload to JSON for LOV Framework"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+    <flow name="Interface-handle-batch-errors-Flow">
+        <validation:custom-validator config-ref="Validation_Configuration1" exceptionClass="org.mule.api.ConnectionException"  doc:name="Validation : Validate for Batch Techincal Errors" doc:description="Validate for Batch Exceptions, if Batch Technical Errors are present a Exception is thrown depending on the nature of the Batch Exceptions"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+
+
+
+    
+    </mule>

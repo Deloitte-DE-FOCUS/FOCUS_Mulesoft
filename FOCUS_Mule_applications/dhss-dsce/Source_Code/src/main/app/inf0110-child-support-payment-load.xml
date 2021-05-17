@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	
+<!-- 	<spring:beans>
+		<spring:import resource="classpath:/loggingframework.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/errorhandling.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/queryframework.xml" />
+	</spring:beans> -->
+	
+	<configuration doc:name="Configuration">
+    	<expression-language>
+     	   <global-functions file = "GlobalUtilityFunctions.mvel">
+				def isValidNumber(textNumber) { org.mule.util.NumberUtils.isNumber(textNumber) }
+           </global-functions> 
+    	</expression-language>
+    </configuration> 
+	
+	<validation:config name="Validation_Configuration" doc:name="Validation Configuration">
+        <validation:exception-factory class="gov.delaware.validation.DelawareValidationExceptionFactory"/>
+    </validation:config>
+    <validation:config name="Validation_Configuration1" doc:name="Validation Configuration"/>
+    <objectstore:config name="Child_Support_Payment_Load_ObjectStore__Connector" partition="FSF_Payment_Details_Partition" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="Child_Support_Payment_Load__Error_ObjectStore__Connector" partition="FSF_Payment_Error_Details_Partition" doc:name="ObjectStore: Connector"/>
+    <flow name="inf011-child-support-payment-loadFlow">
+        <poll doc:name="Poll : Child Support Payment Load" doc:description="Polls and triggers the flow Every Month on the 5th day at 7 05 AM
+Poller run's in EST timezone ">
+             <schedulers:cron-scheduler expression="0 5 7 5 1/1 ? *" timeZone="US/Eastern"/>   
+              
+            <set-payload value="INF011" doc:name="Set Payload to Interface ID for Child Support Payment Load Interface" doc:description="Set Interface ID in payload so that the flow is triggered.
+Interface ID is required in the Logging Framework" mimeType="text/plain"/>
+        </poll>
+
+  
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Interface is stored in flow variable InterfaceID which is used by the Logging framework " mimeType="text/plain"/>
+<!--         <logger message="Is Valid Date : #[isInvalidDate(&quot;20150527&quot;,&quot;yyyyMMdd&quot;)]    Is Valid Number #[isValidNumber(&quot;234&quot;)]   Is Valid Number #[isValidNumber(&quot;2rytrt34&quot;)]" level="INFO" doc:name="Logger"/> -->
+		<mulerequester:request resource="sftp://${sftp.dhss.childsupportpaymentload.transaction.username}:${sftp.dhss.childsupportpaymentload.transaction.password}@${sftp.dhss.childsupportpaymentload.transaction.host}:${sftp.dhss.childsupportpaymentload.transaction.port}${sftp.dhss.childsupportpaymentload.transaction.path}?connector=SFTPOverride&amp;myfilename=${sftp.dhss.childsupportpaymentload.transaction.filename}" timeout="180000" doc:name="Mule Requester: Retrieve Child Support Payment detail Load File" doc:description="Retrieve Child Support Payment Load File if available. The Filename is passed to the Requester If the File is not found then Null is returned"/>
+        <validation:is-not-null config-ref="Validation_Configuration1" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown"/>
+        <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Consume Payload" doc:description="Consume Payload to convert Payload Input Stream to a Textual format with mime type text/plain"/>
+		<set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="Set TransAttachment" doc:description="Creating TransAttachment for the Logging framework, this is backup of the file to be Stored in Salesforce Interface Transaction record"/>
+		
+    	<enricher doc:name="Message Enricher : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+			<flow-ref name="INF011_child_support_payment_load_LogInProgressTransaction_Sub_Flow" doc:name="INF011_child_support_payment_load_LogInProgressTransaction_Sub_Flow" doc:description="Invoke Logging Framework Sub Flow to start Logging"/>
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+			<enrich source="#[flowVars.InterfaceLastProcessedDate]" target="#[flowVars.InterfaceLastProcessedDate]"/>
+			<enrich source="#[flowVars.InterfaceSalesforceId]" target="#[flowVars.InterfaceSalesforceId]"/>  			
+		</enricher>
+        <message-properties-transformer scope="session" doc:name="Message Properties : Delete TransAttachment" doc:description="Delete TransAttachment so that we do not get File backup in further Interface Transactions">
+            <delete-message-property key="TransAttachment"/>
+        </message-properties-transformer>
+        <sftp:outbound-endpoint exchange-pattern="one-way"
+			connector-ref="SFTPOverride"
+			outputPattern="${sftp.dhss.childsupportpaymentload.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt"
+			host="${sftp.dhss.childsupportpaymentload.archive.host}" port="${sftp.dhss.childsupportpaymentload.archive.port}" path="${sftp.dhss.childsupportpaymentload.archive.path}"
+			user="${sftp.dhss.childsupportpaymentload.archive.username}" password="${sftp.dhss.childsupportpaymentload.archive.password}"
+			responseTimeout="180000" doc:name="SFTP : Archive File "
+			duplicateHandling="overwrite" doc:description="SFTP Archive to create a backup of the file. Also Timeout is set sufficiently to allow writing of the file till that time"/>
+		
+		<!-- <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload : Split payload With Line Feed character" doc:description="Split payload With Line Feed character"/>
+		 -->
+		<set-payload value="#[System.getProperty(&quot;childsupportpaymentload.lineseparator&quot;).equals(&quot;CRLF&quot;) ? payload.split(&quot;\r\n&quot;) : payload.split(&quot;\n&quot;)]"
+			doc:name="Set Payload : Split Records" doc:description="Splitting Payload with the configured Line terminator character"/>
+		
+        <validation:is-true config-ref="Validation_Configuration1" message="Header Record not found or Invalid Header Date" expression="#[payload[0].length() == 154 &amp;&amp; payload[0].startsWith(&quot;H&quot;) &amp;&amp; !isInvalidDate(payload[0].substring(1,9),&quot;yyyyMMdd&quot;)]" doc:name="Validation : Validate Header Record" doc:description="Validating Header Record With expected length 154 and also checking that the date is Valid in the header"/>
+        <set-variable variableName="fileReceivedDate" value="#[dw('payload[0][1..8] as :date {format : &quot;yyyyMMdd&quot;}')]" doc:name="Variable : Get File Received Date" doc:description="Get File Received Date from the header record, this will be used during Record creation in Salesforce
+This take care of the Business Rule 1a (&quot;Interface will stamp File Received Date against all Payment records received on the file.&quot;)"/>
+        <enricher source="#[flowVars.interfaceHeaderDate]" target="#[flowVars.interfaceHeaderDate]" doc:name="Message Enricher" doc:description="Message Enricher is used so that the payload is not modified while invoking the Logging Framework
+Flow Variable interfaceHeaderDate is retrieved back from the framework">
+            <processor-chain doc:name="Processor Chain" doc:description="Processor Chain is used since we need more than 1 Mule components within the Enricher.">
+        <dw:transform-message doc:name="Transform Message Prepare Payload for Framework" doc:description="Passing Header date and Interface Id to the framework">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+ "headerDate" : flowVars.fileReceivedDate as :date as :string {format : "yyyy-MM-dd"} //Result in yyyy-MM-dd format
+}]]></dw:set-payload>
+        </dw:transform-message>
+                <flow-ref name="CheckForExistingLoadUsingHeaderDateSub_Flow" doc:name="CheckForExistingLoadUsingHeaderDateSub_Flow" doc:description="Invoke Flow to check whether the File has been already processed or not"/>
+            </processor-chain>
+        </enricher>
+        <dw:transform-message doc:name="Transform Message : Get Detail Level Records" doc:description="This Transformation fetches only Detail Records from all the records in the File">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[1..-2]]]></dw:set-payload>
+        </dw:transform-message>
+        <validation:validate-size config-ref="Validation_Configuration1" message="No Detail Records Found" exceptionClass="java.lang.Exception" value="#[payload]" min="1" doc:name="Validate Size" doc:description="Validate Size greater than 1 to check if detail level records are present."/>
+        <message-properties-transformer scope="session" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables 
+Total Error Count for the dashboard and a temporary Error Attachment">
+            <add-message-property key="totalErrorCount" value="#[0]"/>
+            <add-message-property key="ErrorAttachment1" value="#[&quot;&quot;]"/>
+        </message-properties-transformer>
+        <set-session-variable variableName="totalRecCount" value="#[payload.size()]" doc:name="Session Variable : Set Total Record Count" doc:description="Set Total Record Count in session Variable, this will be retrieved after completion of the Batch and will be shown in the Interface Dashboard"/>            
+        <dw:transform-message doc:name="Filter InValid Length Detail Level Records" doc:description="This Transformation Filters out records which are not of Correct length or have header missing for a Detail record
+Also this step creates a Error Report for these records
+This will be added to Error Attachment after some processing">
+            <dw:set-variable variableName="invalidLengthRecords"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+payload filter (((sizeOf $) != 154 ) or ( not ($ startsWith "D")) ) map {
+	record : $,
+	error-message : ("Length of the record is " ++ (sizeOf $) ++ " But expected size is 154") when ((sizeOf $) != 154 ) otherwise "Missing Record Identifier D or Invalid Record Identifier"
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Filter Valid Length Detail Level Records" doc:description="This Transformation filters out valid Length Records and Valid Detail records having Header 
+Also this step creates a Fixed Width payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter ( ((sizeOf $) == 154 ) and ($ startsWith "D") ) ) joinBy "\n"
+]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-component doc:name="Expression : Add Invalid Length records Error Report to Interface Error Attachment" doc:description="Add Invalid Length Records Error To Error Attachment
+These errors will be shown as business Exceptions in the dashboard"><![CDATA[sessionVars.ErrorAttachment1 = sessionVars.ErrorAttachment1 + (flowVars.invalidLengthRecords) ]]></expression-component>                           
+        <expression-component doc:name="Expression : Update Total Error Count" doc:description="Update Total Error Count by adding Invalid Length Records Count"><![CDATA[sessionVars.totalErrorCount = sessionVars.totalErrorCount + (flowVars.invalidLengthRecords.equals("") ? new Integer("0") : flowVars.invalidLengthRecords.split("\n").length)]]></expression-component>
+        <choice doc:name="Choice : Check Number of Error Records" doc:description="Check Number of Error Records, Route to further processing only if atleast one record is successfull">
+            <when expression="#[sessionVars.totalErrorCount &lt; sessionVars.totalRecCount]">
+                <dw:transform-message doc:name="Fixed Width Transform Filter Detail Level Records" doc:description="This Transformation performs Fixed Width Transformation and converts Fixed Widt Payload to Java payload of List of Maps">
+                    <dw:input-payload mimeType="text/plain">
+                        <dw:reader-property name="schemaPath" value="child-support-payment-load-data.ffd"/>
+                    </dw:input-payload>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload ]]></dw:set-payload>
+                </dw:transform-message>
+                <set-session-variable variableName="totalErrorCount" value="#[ sessionVars.totalRecCount - payload.size()]" doc:name="Session Variable : Set Total Record Count" doc:description="Set Total Record Count in session Variable, this will be retrieved after completion of the Batch."/>
+                <flow-ref name="inf0110-child-support-payment-load_retrieve_PersonIDList_Sub_Flow" doc:name="inf0110-child-support-payment-load_retrieve_PersonIDList_Sub_Flow"/>
+                <!-- <flow-ref name="inf0110-child-support-payment-load_retrieve_load_status_Sub_Flow" doc:name="inf0110-child-support-payment-load_retrieve_load_status_Sub_Flow"/> -->
+                <dw:transform-message doc:name="Transform Message : Filter Missing/Invalid data" doc:description="This Transformation creates a Error Report for all Invalid records which have Missing Field or Incorrect Format of data
+This will be added to Error Attachment after some processing">
+                    <dw:set-variable variableName="MissingAndInvalidRecords"><![CDATA[%dw 1.0
+%output text/plain schemaPath="child-support-payment-load-data-with-errors.ffd"
+---
+payload filter (
+	( $.Child-MCI == null ) or 
+	(( $.Child-MCI != null ) and ( not (isValidNumber((trim $.Child-MCI ) )) ))
+	or ( ( $.Child-FOCUS-PID != null ) and ( not (isValidNumber((trim $.Child-FOCUS-PID) )) ) )
+	or ( ( $.Child-SSN != null ) and ( not (isValidNumber((trim $.Child-SSN) )) ) )
+	
+	or ( ( $.Mother-DSCE-Case-ID != null ) and ( not (isValidNumber((trim $.Mother-DSCE-Case-ID) )) ) )
+	or ( ( $.Mother-MCI != null ) and ( not (isValidNumber((trim $.Mother-MCI) )) ) )
+	or ( ( $.Mother-FOCUS-PID != null ) and ( not (isValidNumber((trim $.Mother-FOCUS-PID) )) ) )
+
+	or ( ( $.Father-DSCE-Case-ID != null ) and ( not (isValidNumber((trim $.Father-DSCE-Case-ID) )) ) )
+	or ( ( $.Father-MCI != null ) and ( not (isValidNumber((trim $.Father-MCI) )) ) )
+	or ( ( $.Father-FOCUS-PID != null ) and ( not (isValidNumber((trim $.Father-FOCUS-PID) )) ) )
+	
+	or ( ( $.Mother-Payment-Date != null ) and  ( isInvalidDate($.Mother-Payment-Date,"yyyyMMdd") )  )
+	or ( ( $.Father-Payment-Date != null ) and  ( isInvalidDate($.Father-Payment-Date,"yyyyMMdd") )  )
+		
+	or ( ( $.Mother-Payment-Amount != null ) and ( not (isValidNumber( ((trim $.Mother-Payment-Amount) replace "+" with "" )  )) ) )
+	or ( ( $.Father-Payment-Amount != null ) and ( not (isValidNumber( ((trim $.Father-Payment-Amount) replace "+" with "" )  )) ) )
+
+	or (( $.Mother-Payment-Date == null) and ( ($.Mother-Payment-Amount != null) and (( ((trim $.Mother-Payment-Amount) replace "+" with "" ) as :number ) > 0)  ))  
+	or (( $.Father-Payment-Date == null) and ( ($.Father-Payment-Amount != null) and (( ((trim $.Father-Payment-Amount) replace "+" with "" ) as :number ) > 0)  ))  
+	or (( $.Mother-Payment-Date != null) and ( ($.Mother-Payment-Amount == null)  or ( ($.Mother-Payment-Amount != null) and (( ((trim $.Mother-Payment-Amount) replace "+" with "" ) as :number ) <= 0)  ) ))  
+	or (( $.Father-Payment-Date != null) and ( ($.Father-Payment-Amount == null)  or ( ($.Father-Payment-Amount != null) and (( ((trim $.Father-Payment-Amount) replace "+" with "" ) as :number ) <= 0)  ) ))
+	
+	or (  ($.Child-MCI != null) and ( isValidNumber((trim $.Child-MCI ) ) )  and  ( flowVars.contactIDMap[((trim $.Child-MCI ) as :number as :string)] == null )  )
+	
+	
+) map {
+	Record-Identifier : $.Record-Identifier default "",
+	Child-MCI : $.Child-MCI default "",
+	Child-FOCUS-PID : $.Child-FOCUS-PID default "",
+	Child-SSN : $.Child-SSN default "",
+	Child-Last-Name : $.Child-Last-Name default "",
+	Mother-DSCE-Case-ID : $.Mother-DSCE-Case-ID default "",
+	Mother-MCI : $.Mother-MCI default "",
+	Mother-FOCUS-PID : $.Mother-FOCUS-PID default "",
+	Mother-Payment-Amount : $.Mother-Payment-Amount default "",
+	Mother-Payment-Date : $.Mother-Payment-Date default "",
+	Father-DSCE-Case-ID : $.Father-DSCE-Case-ID default "",
+	Father-MCI : $.Father-MCI default "",
+	Father-FOCUS-PID : $.Father-FOCUS-PID default "",
+	Father-Payment-Amount : $.Father-Payment-Amount default "",
+	Father-Payment-Date : $.Father-Payment-Date default "",
+	Error-Description :   (",Missing Child MCI" when ($.Child-MCI == null) otherwise "") 
+				++ (",Invalid Child FOCUS PID " when ( ( $.Child-FOCUS-PID != null ) and ( not (isValidNumber((trim $.Child-FOCUS-PID) )) ) ) otherwise "")
+				++ (",Invalid Child SSN " when ( ( $.Child-SSN != null ) and ( not (isValidNumber((trim $.Child-SSN) )) ) ) otherwise "") 
+				++ (",Invalid Mother's DSCE CASE ID " when ( ( $.Mother-DSCE-Case-ID != null ) and ( not (isValidNumber((trim $.Mother-DSCE-Case-ID) )) ) ) otherwise "")
+				++ (",Invalid Mother's MCI " when ( ( $.Mother-MCI != null ) and ( not (isValidNumber((trim $.Mother-MCI) )) ) ) otherwise "") 
+				++ (",Invalid Mother's FOCUS PID " when ( ( $.Mother-FOCUS-PID != null ) and ( not (isValidNumber((trim $.Mother-FOCUS-PID ) )) ) ) otherwise "") 
+				++ (",Invalid Mother's Payment Amount" when ( ( $.Mother-Payment-Amount != null ) and ( not (isValidNumber( ((trim $.Mother-Payment-Amount) replace "+" with "" )  )) ) ) otherwise "") 
+				++ (",Invalid Mother's Payment Date " when ( ( $.Mother-Payment-Date != null ) and (  (isInvalidDate((trim $.Mother-Payment-Date ),"yyyyMMdd" )) ) ) otherwise "") 
+				++ (",Invalid Father's DSCE CASE ID " when ( ( $.Father-DSCE-Case-ID != null ) and ( not (isValidNumber((trim $.Father-DSCE-Case-ID) )) ) ) otherwise "")
+				++ (",Invalid Father's MCI " when ( ( $.Father-MCI != null ) and ( not (isValidNumber((trim $.Father-MCI) )) ) ) otherwise "") 
+				++ (",Invalid Father's FOCUS PID " when ( ( $.Father-FOCUS-PID != null ) and ( not (isValidNumber((trim $.Father-FOCUS-PID ) )) ) ) otherwise "") 
+				++ (",Invalid Father's Payment Amount" when ( ( $.Father-Payment-Amount != null ) and ( not (isValidNumber( ((trim $.Father-Payment-Amount) replace "+" with "" )  )) ) ) otherwise "") 
+				++ (",Invalid Father's Payment Date " when ( ( $.Father-Payment-Date != null ) and (  (isInvalidDate((trim $.Father-Payment-Date ),"yyyyMMdd" )) ) ) otherwise "") 
+				++ (",Missing Father's Payment Date " when ( ( $.Father-Payment-Date == null ) and ( ( $.Father-Payment-Amount != null ) and (  (isValidNumber( ((trim $.Father-Payment-Amount) replace "+" with "" )  )) ) and (( ((trim $.Father-Payment-Amount) replace "+" with "" ) as :number ) > 0) ) ) otherwise "") 
+				++ (",Missing Mother's Payment Date " when ( ( $.Mother-Payment-Date == null ) and ( ( $.Mother-Payment-Amount != null ) and (  (isValidNumber( ((trim $.Mother-Payment-Amount) replace "+" with "" )  )) ) and (( ((trim $.Mother-Payment-Amount) replace "+" with "" ) as :number ) > 0) ) ) otherwise "") 
+				++ (",Mother's Payment Amount not present or is not greater than Zero but Payment Date is present " when (( $.Mother-Payment-Date != null) and ( ($.Mother-Payment-Amount == null)  or ( ($.Mother-Payment-Amount != null) and (( ((trim $.Mother-Payment-Amount) replace "+" with "" ) as :number ) <= 0)  ) )) otherwise "") 
+				++ (",Father's Payment Amount not present or is not greater than Zero but Payment Date is present " when (( $.Father-Payment-Date != null) and ( ($.Father-Payment-Amount == null)  or ( ($.Father-Payment-Amount != null) and (( ((trim $.Father-Payment-Amount) replace "+" with "" ) as :number ) <= 0)  ) )) otherwise "")
+				++ (",No Person Record found using the Child MCI " when (  ($.Child-MCI != null) and ( isValidNumber((trim $.Child-MCI ) ))  and  ( flowVars.contactIDMap[((trim $.Child-MCI ) as :number as :string)] == null )  ) otherwise "")  
+				
+}]]></dw:set-variable>
+                </dw:transform-message>
+                <enricher doc:name="Message Enricher">
+					<flow-ref name="inf110-child-support-cost-of-care-extract--OtoSConversion-ForFV-Sub_Flow" doc:name="inf110-child-support-cost-of-care-extract--OtoSConversion-ForFV-Sub_Flow"/>
+					<enrich source="#[flowVars.MissingAndInvalidRecords]" target="#[flowVars.MissingAndInvalidRecords]"/>
+					
+				</enricher>
+                <!-- <set-variable variableName="MissingAndInvalidRecordString" value="#[]" doc:name="Variable : Store Missing and Invalid records error Report" doc:description="Store Missing and Invalid records error Report"/> -->
+                    <expression-component doc:name="Expression : Add Missing And Invalid Error Report to Interface Error Attachment" doc:description="Adding Missing or Invalid fields Error To Error Attachment
+This will be shown in the Business Exception file in the Interface dashboard"><![CDATA[sessionVars.ErrorAttachment1 = sessionVars.ErrorAttachment1 + ((flowVars.MissingAndInvalidRecords:java.lang.String).toString()) ]]></expression-component>
+                    <expression-component doc:name="Expression : Add Missing And Invalid record Count to Interface Error Count" doc:description="Adding Missing or Invalid fields Error To Error Attachment
+This will be shown in the Business Exception file in the Interface dashboard"><![CDATA[sessionVars.totalErrorCount = sessionVars.totalErrorCount + ((flowVars.MissingAndInvalidRecords:java.lang.String).toString().equals("") ? new Integer("0") : (flowVars.MissingAndInvalidRecords:java.lang.String).toString().split("\n").length ) ]]></expression-component>
+                    
+                <choice doc:name="Choice : Check Number of Error Records" doc:description="Check Number of Error Records Route to processing branch only if atleast one record is successfull
+Otherwise route to Log completion">
+                    <when expression="#[sessionVars.totalRecCount &gt; sessionVars.totalErrorCount ]">
+                        <dw:transform-message doc:name="Transform Message : Filter and Separate Mother and Father data" doc:description="This transform step filters out Valid data and separates Mother and Father data
+This Transform Step takes care of the Business Rule 1c (&quot;Each row on the Payment Load interface file will be split into two rows on the screen - a Father row and a Mother row. Payee Type should be set to Mother or Father based on Mothers DACES case Id or Fathers DACES Case Id.&quot;) 
+Also takes of Business Rule 1d &quot;Amount field will be updated with the amount for father or mother&quot;">
+                            <dw:set-variable variableName="validMergedData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (
+	(( $.Child-MCI != null ) and isValidNumber((trim $.Child-MCI ) ) )
+	and ( ($.Child-FOCUS-PID == null) or (( $.Child-FOCUS-PID != null ) and isValidNumber((trim $.Child-FOCUS-PID) ) ) )
+	and ( ($.Child-SSN == null) or (( $.Child-SSN != null ) and isValidNumber((trim $.Child-SSN) ) ) )
+	
+	and ( ($.Mother-DSCE-Case-ID == null) or (( $.Mother-DSCE-Case-ID != null ) and isValidNumber((trim $.Mother-DSCE-Case-ID) ) ) )
+	and ( ($.Mother-MCI == null) or (( $.Mother-MCI != null ) and isValidNumber((trim $.Mother-MCI) ) ) )
+	and ( ($.Mother-FOCUS-PID == null) or (( $.Mother-FOCUS-PID != null ) and isValidNumber((trim $.Mother-FOCUS-PID) ) ) )
+
+	and ( ($.Father-DSCE-Case-ID == null) or (( $.Father-DSCE-Case-ID != null ) and isValidNumber((trim $.Father-DSCE-Case-ID) ) ) )
+	and ( ($.Father-MCI == null) or (( $.Father-MCI != null ) and isValidNumber((trim $.Father-MCI) ) ) )
+	and ( ($.Father-FOCUS-PID == null) or (( $.Father-FOCUS-PID != null ) and isValidNumber((trim $.Father-FOCUS-PID) ) ) )
+	
+	and ( ( $.Mother-Payment-Date == null ) or ( ($.Mother-Payment-Date != null) and ( not (isInvalidDate($.Mother-Payment-Date,"yyyyMMdd")) ) ) )	
+	and ( ( $.Father-Payment-Date == null ) or ( ($.Father-Payment-Date != null) and ( not (isInvalidDate($.Father-Payment-Date,"yyyyMMdd")) ) ) )	
+	and ( ( $.Mother-Payment-Amount == null ) or ( ($.Mother-Payment-Amount != null) and isValidNumber(((trim $.Mother-Payment-Amount) replace "+" with "" )) ) )
+	and ( ( $.Father-Payment-Amount == null ) or ( ($.Father-Payment-Amount != null) and isValidNumber(((trim $.Father-Payment-Amount) replace "+" with "" )) ) )
+
+	and (
+		(( $.Mother-Payment-Date !=null) and ( $.Mother-Payment-Amount !=null and ((((trim $.Mother-Payment-Amount) replace "+" with "" ) as :number) > 0)  )) or 
+		(( $.Mother-Payment-Date ==null) and ( $.Mother-Payment-Amount == null)) or
+		(( $.Mother-Payment-Date ==null) and ( (((trim $.Mother-Payment-Amount) replace "+" with "" ) as :number) <= 0))
+	) 
+	and (
+		(( $.Father-Payment-Date !=null) and ( $.Father-Payment-Amount !=null and ((((trim $.Father-Payment-Amount) replace "+" with "" ) as :number) > 0)  )) or 
+		(( $.Father-Payment-Date ==null) and ( $.Father-Payment-Amount == null)) or
+		(( $.Father-Payment-Date ==null) and ( (((trim $.Father-Payment-Amount) replace "+" with "" ) as :number) <= 0))
+	)
+	and (($.Child-MCI != null) and ( isValidNumber((trim $.Child-MCI ) ) ) and ( flowVars.contactIDMap[((trim $.Child-MCI ) as :number as :string )] != null )  )
+	
+	
+) reduce ((val, acc = []) -> acc ++ 
+	(
+		(( [val ++ {"Parent_Payee__c" : "Mother"} ++ {"DSCE_Case_Id__c" : val.Mother-DSCE-Case-ID }  ++ {"Parent_PID__c" : ((trim val.Mother-FOCUS-PID) as :number as :string) }  ++ {"Payment_Amount__c" : ((trim val.Mother-Payment-Amount) replace "+" with "" ) }  ++ {"Payment_Date__c" : val.Mother-Payment-Date }  ++ {"Interface_External_Id__c" : val.Child-MCI ++ "-" ++ (val.Mother-FOCUS-PID default "") ++ "-" ++ (val.Mother-DSCE-Case-ID default "") ++ "-" ++ (val.Mother-Payment-Date default "") }  ]) when (((val.Mother-DSCE-Case-ID as :number) != 0) ) otherwise []) ++ 
+		(( [val ++ {"Parent_Payee__c" : "Father"} ++ {"DSCE_Case_Id__c" : val.Father-DSCE-Case-ID }  ++ {"Parent_PID__c" : ((trim val.Father-FOCUS-PID) as :number as :string) }  ++ {"Payment_Amount__c" : ((trim val.Father-Payment-Amount) replace "+" with "" ) }  ++ {"Payment_Date__c" : val.Father-Payment-Date }  ++ {"Interface_External_Id__c" : val.Child-MCI ++ "-" ++ (val.Father-FOCUS-PID default "") ++ "-" ++ (val.Father-DSCE-Case-ID default "") ++ "-" ++ (val.Father-Payment-Date default "") }  ]) when (((val.Father-DSCE-Case-ID as :number) != 0) ) otherwise [])
+		  
+)
+)]]></dw:set-variable>
+                        </dw:transform-message>
+<flow-ref name="inf0110-child-support-payment-load_retrieve_load_status_Sub_Flow" doc:name="inf0110-child-support-payment-load_retrieve_load_status_Sub_Flow"/>
+
+                <dw:transform-message doc:name="Transform Message : Filter Records having Completed Status already" doc:description="This Transformation filters out Invalid data records which already have Completed Status">
+                    <dw:set-variable variableName="MissingAndInvalidRecords"><![CDATA[%dw 1.0
+%output text/plain schemaPath="child-support-payment-load-data-with-errors.ffd"
+---
+flowVars.validMergedData filter (
+	 ( flowVars.ExternalIdIDMap[($.Interface_External_Id__c)] != null)	
+) map {
+	Record-Identifier : $.Record-Identifier default "",
+	Child-MCI : $.Child-MCI default "",
+	Child-FOCUS-PID : $.Child-FOCUS-PID default "",
+	Child-SSN : $.Child-SSN default "",
+	Child-Last-Name : $.Child-Last-Name default "",
+	Mother-DSCE-Case-ID : $.Mother-DSCE-Case-ID default "",
+	Mother-MCI : $.Mother-MCI default "",
+	Mother-FOCUS-PID : $.Mother-FOCUS-PID default "",
+	Mother-Payment-Amount : $.Mother-Payment-Amount default "",
+	Mother-Payment-Date : $.Mother-Payment-Date default "",
+	Father-DSCE-Case-ID : $.Father-DSCE-Case-ID default "",
+	Father-MCI : $.Father-MCI default "",
+	Father-FOCUS-PID : $.Father-FOCUS-PID default "",
+	Father-Payment-Amount : $.Father-Payment-Amount default "",
+	Father-Payment-Date : $.Father-Payment-Date default "",
+	Error-Description : ((",The " ++ ($.Parent_Payee__c default "") ++ " payment record is already in Completed state ") when ( flowVars.ExternalIdIDMap[($.Interface_External_Id__c)] != null) otherwise "")				
+				
+}]]></dw:set-variable>
+                </dw:transform-message>
+                <enricher doc:name="Message Enricher">
+					<flow-ref name="inf110-child-support-cost-of-care-extract--OtoSConversion-ForFV-Sub_Flow" doc:name="inf110-child-support-cost-of-care-extract--OtoSConversion-ForFV-Sub_Flow"/>
+					<enrich source="#[flowVars.MissingAndInvalidRecords]" target="#[flowVars.MissingAndInvalidRecords]"/>
+					
+				</enricher>
+        <expression-component doc:name="Expression : Add Missing And Invalid Error Report to Interface Error Attachment" doc:description="Add Missing and Invalid Records to the Error Attachment"><![CDATA[sessionVars.ErrorAttachment1 = sessionVars.ErrorAttachment1 + (System.lineSeparator()) + ((flowVars.MissingAndInvalidRecords:java.lang.String).toString()) ]]></expression-component>
+                    
+                        <dw:transform-message doc:name="Transform Message : Prepare Data for Upsert" doc:description="This Transformation prepares data for Upsert and maps data as per field of the Corresponding Object in Salesforce
+Also it filters out Valid records not having Completed Status already">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.validMergedData filter (
+	 ( flowVars.ExternalIdIDMap[($.Interface_External_Id__c)] == null)	
+) map {
+	Client_MCI__c : $.Child-MCI,	
+	SSN__c : $.Child-SSN,
+	DSCE_Case_Id__c : $.DSCE_Case_Id__c,
+	Parent_PID__c : $.Parent_PID__c,
+	
+	Payment_Amount__c : $.Payment_Amount__c,
+	Payment_Date__c : $.Payment_Date__c as :date {format : "yyyyMMdd"},
+	Interface_External_Id__c : $.Interface_External_Id__c,
+	File_Received_Date__c : flowVars.fileReceivedDate,
+	Parent_Payee__c : $.Parent_Payee__c,
+	Person__c : flowVars.contactIDMap[((trim $.Child-MCI) as :number as :string )]
+}]]></dw:set-payload>
+                        </dw:transform-message>
+                        <foreach batchSize="10000" doc:name="For Each : Iterate 10000 records" doc:description="Iterate 10000 records at a time, this is done to Upsert records in Salesforce in Bulk, The maximum capacity of Upsert Bulk is 10000 hence the limit">
+                            <message-properties-transformer scope="invocation" doc:name="Message Properties : Delete Root Message" doc:description="Delete Root Message to avoid unneccesary Serialization">
+                                <delete-message-property key="rootMessage"/>
+                            </message-properties-transformer>
+                            <dw:transform-message doc:name="Transform Message : Get Mule Payload from Mule Message" doc:description="This Transformation retrieves the actual Payload which was enveloped in Mule Message">
+                                <dw:set-variable variableName="updatePayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+                            </dw:transform-message>
+                            <sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Child_Support_Income__c" externalIdFieldName="Interface_External_Id__c" doc:name="Salesforce : Upsert Child Support Payment Data in Bulk" doc:description="Upsert Child Support Payment Data 10000 records at a time in the FOCUS system This step thus fulfils the Business rule 1 (&quot;The Child Support Payment Load interface will process the file and load the records into Child Support Payment Load screen&quot;) and Business Rule 2 &quot;The Child Support Payment Load interface only inserts records into the FOCUS Child Support Payment object once and logs when the overall load has been completed successfully to prevent multiple entries&quot; which required us to load Child Support Payment Data in FOCUS ">
+                                <sfdc:objects ref="#[payload]"/>
+                            </sfdc:upsert-bulk>
+                            <set-variable variableName="jobInfo" value="#[payload]" doc:name="Variable : Store Bulk job Info" doc:description="Store Bulk job Info This will be used to retrieve Batch Result Stream and to close the job later"/>
+                            <until-successful maxRetries="50" millisBetweenRetries="30000" synchronous="true" doc:name="Until Successful : Retrieve Batch Result Sream when ready" doc:description="Retrieve Batch Result Sream when it is ready in Salesforce. Retrieving Batch result stream prematurely results in a Exception, thus we are using Until Successfull to retrieve data effectively">
+                                <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Retrieve Bulk Job Result Stream" doc:description="Retrieve Bulk Job Result Stream">
+                                    <sfdc:batch-info ref="#[payload]"/>
+                                </sfdc:batch-result-stream>
+                            </until-successful>
+                            <object-to-string-transformer mimeType="application/xml" doc:name="Object to String : Consume Stream" doc:description="Consume Batch Result Sream"/>
+                            <enricher source="#[payload]" target="#[flowVars.closeJobResult]" doc:name="Message Enricher : Invoke Close Bulk Job" doc:description="Store the Close Job Result Invoked Close job operation in a message enricher so that the payload is not disturbed">
+                                <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.jobInfo.jobId]" doc:name="Salesforce : Close Bulk Job" doc:description="Close Bulk Job using the Job Id"/>
+                            </enricher>
+                            <dw:transform-message doc:name="Transform Message : Get SFDC Error Report List" doc:description="This Transformation creates a Error Report List for all the records which failed in Salesforce
+This will be added to Error Attachment after some processing">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace ns0 http://www.force.com/2009/06/asyncapi/dataload
+---
+payload.ns0#results.*ns0#result map {
+	Record-Identifier : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Record-Identifier default "", 
+	Child-MCI : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Child-MCI default "", 
+	Child-FOCUS-PID : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Child-FOCUS-PID default "", 
+	Child-SSN : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Child-SSN default "",
+	Child-Last-Name : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Child-Last-Name default "", 
+	Mother-DSCE-Case-ID : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Mother-DSCE-Case-ID default "",
+	Mother-MCI : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Mother-MCI default "",
+	Mother-FOCUS-PID : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Mother-FOCUS-PID default "",
+	Mother-Payment-Amount : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Mother-Payment-Amount default "", 
+	Mother-Payment-Date : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Mother-Payment-Date default "", 
+	Father-DSCE-Case-ID : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Father-DSCE-Case-ID default "",
+	Father-MCI : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Father-MCI default "",
+	Father-FOCUS-PID : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Father-FOCUS-PID default "",
+	Father-Payment-Amount : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Father-Payment-Amount default "", 
+	Father-Payment-Date : flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Father-Payment-Date default "", 
+	Error-Description : ((",No Record found using the Child MCI " ++ (flowVars.validMergedData[$$ + ((flowVars.counter - 1) * 10000)].Child-MCI default "")) when ($.errors.statusCode == "INVALID_ID_FIELD") otherwise (",Fields : " ++ $.errors.fields ++ ";Message : " ++ $.errors.message ++ ";Status Code : " ++ $.errors.statusCode) ) when $.errors.fields != null otherwise null 		
+	
+} filter $.Error-Description != null]]></dw:set-payload>
+                            </dw:transform-message>
+<set-variable variableName="SFDCErrorCount" value="#[dw('sizeOf (payload distinctBy $.Child-MCI)')]" doc:name="Variable : SFDC Error Count" doc:description="Store SFDC Error Count, this will be added to overall error count"/>
+                            <dw:transform-message doc:name="Transform Message : Get SFDC Error Report" doc:description="Creating a Fixed Width Error Report">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath="child-support-payment-load-data-with-errors.ffd" 
+---
+payload]]></dw:set-payload>
+                            </dw:transform-message>
+                            
+                            <object-to-string-transformer mimeType="text/plain" doc:name="Object to String : Consume Stream" doc:description="Consume Stream resulting from dataweave transformation for The SFDC Error report and Convert it into Stream so that we can manipulate it later"/>
+                            <!-- <set-variable variableName="SFDCErrorCount" value="#[ payload.equals(&quot;&quot;) ? new Integer(&quot;0&quot;) : payload.split(&quot;\n&quot;).length ]" doc:name="Variable : SFDC Error Count" doc:description="SFDC Error Count"/> -->
+                            <expression-filter expression="#[flowVars.SFDCErrorCount &gt; 0]" doc:name="Expression : Check if SFDC Error Exists" doc:description=" Check if SFDC Error Exists If Error Exits then add the error report and count to interface error count"/>
+                            <expression-component doc:name="Expression : Add SFDC errors To Error Attachment" doc:description="Add SFDC Error To Error Attachment.
+The Error Attachment will be present in the Business exception File in the Inerface Dashboard"><![CDATA[sessionVars.ErrorAttachment1 = sessionVars.ErrorAttachment1 + (sessionVars.ErrorAttachment1.endsWith("\n") ? "" : "\n" ) + payload ]]></expression-component>
+                            <!-- <expression-component doc:name="Expression : Add SFDC Error Count to Interface Error Count" doc:description="Add SFDC Error Count to Interface Error Count"><![CDATA[sessionVars.totalErrorCount = sessionVars.totalErrorCount + flowVars.SFDCErrorCount]]></expression-component> -->
+                        </foreach>
+                        <flow-ref name="INF011_child_support_payment_load_LogCompleteTransaction_Sub_Flow" doc:name="INF011_child_support_payment_load_LogCompleteTransaction_Sub_Flow"/>
+                    </when>
+                    <otherwise>
+                        <flow-ref name="INF011_child_support_payment_load_LogCompleteTransaction_Sub_Flow" doc:name="INF011_child_support_payment_load_LogCompleteTransaction_Sub_Flow"/>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <flow-ref name="INF011_child_support_payment_load_LogCompleteTransaction_Sub_Flow" doc:name="INF011_child_support_payment_load_LogCompleteTransaction_Sub_Flow"/>
+            </otherwise>
+        </choice>
+
+
+                                            
+<!--         <dw:transform-message doc:name="Transform Message : Merge Father and Mother Data">
+            <dw:input-payload doc:sample="sample_data\string.dwl"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+-
+payload reduce ((val, acc = []) -> acc ++ 
+	(
+		(( [val ++ {"Parent_Payee__c" : "Mother"}]) when ((val.Mother-DSCE-Case-ID as :number) != 0) otherwise []) ++ 
+		(( [val ++ {"Parent_Payee__c" : "Father"}]) when ((val.Father-DSCE-Case-ID as :number) != 0) otherwise [])  
+)
+)]]></dw:set-payload>
+        </dw:transform-message> -->
+        <logger message="Payload #[payload]" level="INFO" doc:name="Logger"/>
+        
+        <!-- <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload : Split payload With Line Feed character" doc:description="Split payload With Line Feed character"/> -->
+
+         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/> 
+    </flow>
+    <sub-flow name="inf0110-child-support-payment-load_retrieve_PersonIDList_Sub_Flow">
+        <dw:transform-message doc:name="Transform Message : Get MCI List" doc:description="This transformation creates a List of all Valid MCI numbers">
+            <dw:set-variable variableName="ChildMCIList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (($.Child-MCI !=null) and (isValidNumber((trim $.Child-MCI ) )) ) map ((trim $.Child-MCI ) as :number)]]></dw:set-variable>
+        </dw:transform-message>
+        <foreach collection="#[flowVars.ChildMCIList]" batchSize="150" doc:name="For Each" doc:description="Iterate 150 records from Person MCI List at a time. This is done because of the where clause charcter limit of 4000 charcters for an SOQL Query">
+            <dw:transform-message doc:name="Transform Message : prepare Payload for Salesforce Query" doc:description="This Transformation creates a Command Separated List of MCO to be used in Salesforce Query">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ("'" ++ $ ++ "'") joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id,DEL_MCI__c from Contact where DEL_MCI__c IN (#[payload])" doc:name="Salesforce : Query Contact ID " doc:description="Query Contact ID using MCI number of the person"/>
+            <dw:transform-message doc:name="Transform Message : Create Contact ID  Map" doc:description="This Transformation creates a lookup with MCI as Key and Salesforce Conatct ID as Value">
+                <dw:set-variable variableName="contactIDMap"><![CDATA[%dw 1.0
+%output application/java
+---
+payload reduce ((val, acc = (flowVars.contactIDMap default {}) ) -> acc ++ (( { (val.DEL_MCI__c as :string) : (val.Id) } )))]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+        
+    </sub-flow>
+
+    <sub-flow name="inf0110-child-support-payment-load_retrieve_load_status_Sub_Flow">
+        <dw:transform-message doc:name="Transform Message : Get External ID List" doc:description="This Transformation creates a List of unique External ID">
+            <dw:set-variable variableName="ExternalIdList"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.validMergedData.Interface_External_Id__c ) default [] distinctBy $]]></dw:set-variable>
+        </dw:transform-message>
+        
+        <foreach collection="#[flowVars.ExternalIdList]" batchSize="80" doc:name="For Each" doc:description="Iterate 150 records from Person MCI List at a time. This is done because of the where clause charcter limit of 4000 charcters for an SOQL Query">
+            <dw:transform-message doc:name="Transform Message : prepare Payload for Salesforce Query" doc:description="This Transformation creates a Command Separated List of External ID to be used in Salesforce Query">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ("'" ++ $ ++ "'") joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <logger message="Query : select Id,Interface_External_Id__c,Status__c from DEL_Child_Support_Income__c where Status__c = 'Completed' and Interface_External_Id__c IN (#[payload])" level="INFO" doc:name="Logger"/>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id,Interface_External_Id__c,Status__c from DEL_Child_Support_Income__c where Status__c = 'Completed' and Interface_External_Id__c IN (#[payload])" doc:name="Salesforce : Query Status " doc:description="Query Status using External ID"/>
+            <dw:transform-message doc:name="Transform Message : Create External ID  Map" doc:description="This Transformation creates a lookup with Exteranl ID as Key and Child Support Income Status as Value">
+                <dw:set-variable variableName="ExternalIdIDMap"><![CDATA[%dw 1.0
+%output application/java
+---
+payload reduce ((val, acc = (flowVars.ExternalIdIDMap default {}) ) -> acc ++ (( { (val.Interface_External_Id__c as :string) : (val.Status__c) } )))]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+        <logger message="Hi" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+
+    <sub-flow name="INF011_child_support_payment_load_LogInProgressTransaction_Sub_Flow">
+    	<set-payload
+			value="{ &quot;InterfaceID&quot;: &quot;INF011&quot;, &quot;InterfaceName&quot;: &quot;Child Support Payment Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_childsupportpaymentload&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+	</sub-flow>
+    <sub-flow name="INF011_child_support_payment_load_LogCompleteTransaction_Sub_Flow">
+			<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Record Status, ErrorAttachment" doc:description="Message Properties : Update Record Status, ErrorAttachment
+Error Attachment contains the Business Exception details, which will can be found in a file in the Interface Dashboard after the Interface run">
+				<add-message-property key="recStatus"
+					value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+				<add-message-property key="ErrorAttachment" value="#[sessionVars.totalErrorCount==0  ? null : sessionVars.ErrorAttachment1 ]"/>
+            <add-message-property key="totalSuccCount" value="#[ sessionVars.totalRecCount - sessionVars.totalErrorCount ]"/> 
+			</message-properties-transformer>
+			<set-payload
+				value="{&quot;InterfaceID&quot;: &quot;INF011&quot;, &quot;InterfaceName&quot;: &quot;Child Support Payment Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_ChildSupportPaymentLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+				mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON for Log Completion for the Interface dashboard"/>      	
+    	<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+		<message-properties-transformer scope="invocation" doc:name="MP:Deleting FV">
+<delete-message-property key="InterfaceID"/>
+						<delete-message-property key="ChildMCIList"/>
+						<delete-message-property key="contactIDMap"/>
+						<delete-message-property key="ExternalIdIDMap"/>
+						<delete-message-property key="ExternalIdList"/>
+						<delete-message-property key="fileReceivedDate"/>
+						<delete-message-property key="interfaceHeaderDate"/>
+						<delete-message-property key="InterfaceSalesforceId"/>
+			<delete-message-property key="InterfaceLastProcessedDate"/>
+						<delete-message-property key="invalidLengthRecords"/>
+						<delete-message-property key="MissingAndInvalidRecords"/>
+						<delete-message-property key="SFDCErrorCount"/>
+						
+						<delete-message-property key="validMergedData"/>
+						
+						
+						<delete-message-property key="interfaceTransactionStatus"/>
+						<delete-message-property key="TransactionID"/>
+						<delete-message-property key="SubPayload"/>
+						<delete-message-property key="Tname"/>
+						<delete-message-property key="Time"/>
+						
+						<delete-message-property key="updatePayload"/>
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP:Deleting SV">
+			<delete-message-property key="ErrorAttachment1"/>
+			<delete-message-property key="recStatus"/>
+			
+			<delete-message-property key="totalErrorCount"/>
+			<delete-message-property key="totalSuccCount"/>
+			<delete-message-property key="totalRecCount"/>
+			
+			<delete-message-property key="TID"/>
+			
+					</message-properties-transformer>
+		<logger message="LogTransactionFlow" level="INFO" doc:name="Logger"/>
+	</sub-flow>	
+<sub-flow name="inf110-child-support-cost-of-care-extract--OtoSConversion-ForFV-Sub_Flow">
+		<set-payload value="#[flowVars.MissingAndInvalidRecords]" doc:name="Set Payload: File with Trailer"/>
+		<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+		<set-variable variableName="MissingAndInvalidRecords" value="#[payload]" doc:name="FV: Set MissingAndInvalidRecords"/>
+
+	</sub-flow>
+
+
+</mule>

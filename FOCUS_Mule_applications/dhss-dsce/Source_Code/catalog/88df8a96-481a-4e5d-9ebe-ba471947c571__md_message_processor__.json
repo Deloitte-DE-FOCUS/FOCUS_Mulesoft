@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "CSU"
+        }
+    },
+    "id": "88df8a96-481a-4e5d-9ebe-ba471947c571",
+    "version": "5.2.0.0"
+}

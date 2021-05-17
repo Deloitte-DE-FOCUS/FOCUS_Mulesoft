@@ -1,0 +1,1140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+  
+     <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans> 
+   	<spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans>
+	<!-- <spring:beans> 
+         <spring:import resource="classpath:/test-framework.xml" />   
+   	</spring:beans> --> 
+   	 
+ 
+    <flow name="inf008-child-support-application-extractFlow" processingStrategy="synchronous">
+		<poll doc:name="Poll" doc:description="This poll connector will trigger the schedular at 5:05 pm every weekday in EST timezone">
+			 <schedulers:cron-scheduler expression="0 5 17 ? * MON,TUE,WED,THU,FRI *" timeZone="US/Eastern" doc:description="This poll connector will trigger the schedular at 5:05 pm every weekday in EST timezone"/>
+			<set-payload value="INF008" doc:name="Set Payload: to Interface ID" doc:description="Set the iterface ID as payload to save it in a variable, becasue the scope of Source is limited to poll connector and only the payload is available outside it"/>
+		</poll>
+
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Save the payload as IterfaceID variable for Exception framework to log an Error in case of a technical exception"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT  Id,Name,Application_Complete_Date__c,Total_Children__c,CreatedDate, County__c, Is_There_an_Existing_Court_Order_Father__c,Court_Order_File_Number_Father__c,Court_Order_Date_Father__c,City_Fathers_Insurance__c,State_Father_Insurance__c,Amount__c,Frequency__c,Is_the_Court_Order_In_Effect__c,Payments_Made_Through_Court_Or_Direct_Fa__c,Mother_First_Name__c,Mother_Last_Name__c,Mother_Middle_Name__c,MCI_Mother__c,PID_Mother__c,Mother_Social_Security_Number_SSN__c,Other_First_Name_Mother__c,Other_Last_Name_Mother__c,Other_Middle_Name_Mother__c,Mother_Date_of_Death__c,Insurance_Present_Mother__c,Insurance_Company_Name_Mother__c,Policy_Number_Mother__c,Address_Type_Mother__c,Address_Line_1_Mother__c,Address_Line_2_Mother__c,Apartment_Number_Mother__c,City_Mother__c,State_Mother__c,Zip_Code_Mother__c,Mother_Date_of_Birth__c,Mother_Race__c,Mother_Gender__c,Employer_Status_Mother__c,Employer_Name_Mother__c,Address_Line_1_Mother_Employer__c,Address_Line_2_Mother_Employer__c,City_Mother_Employer__c,State_Mother_Employer__c,Zip_Code_Mother_Employer__c,Last_Child_Support_Payment_Date_Mother__c,Last_Child_Support_Payment_Amount_Mother__c,Mothers_Arrearage_Amount__c,Mothers_Payment_Due_Date__c,Father_First_Name__c,Father_Middle_Name__c,Father_Last_Name__c,MCI_Father__c,PID_Father__c,Father_Social_Security_Number_SSN__c,Other_First_Name_Father__c,Other_Middle_Name_Father__c,Other_Last_Name_Father__c,Father_Date_of_Death__c,Insurance_Present_Father__c,Insurance_Company_Name_Father__c,Policy_Number_Father__c,Address_Type_Father__c,Address_Line_1_Father__c,Address_Line_2_Father__c,Apartment_Number_Father__c,City_Father__c,State_Father__c,Zip_Code_Father__c,Father_Date_of_Birth__c,Father_Race__c,Father_Gender__c,Employer_Status_Father__c,Employer_Name_Father__c,Address_Line_1_Father_Employer__c,Address_Line_2__c,City_Father_EMployer__c,State_Father_Employer__c,Zip_Code_Father_Employer__c,Last_Child_Support_Payment_Date_Father__c,Last_Child_Support_Payment_Amount_Father__c,Fathers_Arrearage_Amount__c,Fathers_Payment_Due_Date__c,Father__c,Mother__c,(select Name,Id,Child_MCI__c,Childs_ID__c,Childs_ID__r.Person__r.DEL_PID__c,Case_ID__r.Name,Childs_First_Name__c,SSN__c,Childs_Middle_Name__c,Childs_Last_Name__c,Child_Date_of_Birth__c,Placement_Date__c,Estimated_Monthly_Board_Payment__c,County__c FROM Child_Informations__r    ),Owner.LastName  FROM DEL_Child_Support_Application__c where Sent_To_Interface__c='Not Sent' and Child_Support_Application_Status__c='Completed'" doc:name="SFDC:Query CSA Records" doc:description="This Query Extracts all child in a CSA record where status is Completed and interface flag is Not Sent"/>
+       
+      <enricher doc:name="Message Enricher:Logging Framework" doc:description="Message Enricher is used to Call the Logging framework flow without altering the Payload and retrieve TID and Tname from the Logging framework flow which is called inside the enricher">
+            <processor-chain doc:name="Processor Chain" doc:description="Processor chain is used to use more than one connector inside the enricher">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF008&quot;, &quot;InterfaceName&quot;: &quot;Child Support Application Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework" doc:description="Set JSON payload for logging Framework for creating In Progress Transaction"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging Framework"/>
+            </processor-chain>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher> 
+        <enricher doc:name="Message Enricher: No Payload" doc:description="Message Enricher is used to Call the inf008-child-support-application-extract-NoPayload_Flow  without altering the Payload and retrieve TID">
+            <flow-ref name="inf008-child-support-application-extract-NoPayload_Flow" doc:name="inf008-child-support-application-extract-NoPayload_Flow" doc:description="Call the inf008-child-support-application-extract-NoPayload_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression:Check Payload for Records" doc:description="Check the size of the payload and stop the flow execution if payload size is zero"/> 
+        <enricher source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]" doc:name="Message Enricher:LOV" doc:description="Message Enricher is used to Call the Call-LOV-flow-CSA  without altering the Payload and retrieve all the LOVs used in the Interface">
+            <flow-ref name="Call-LOV-flow-CSA" doc:name="Call-LOV-flow-CSA"/>
+        </enricher>
+        <dw:transform-message doc:name="TM:Convert Query to map" doc:description="Parse the SFDC query to get a Java payload with the CSA details and the child Informations in the CSA
+Generate Header" metadata:id="d42f62a7-56bf-4254-9425-ac3902c88a00">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%function getDSTAdjustedDatetime(standarddatetime) (((standarddatetime >> "US/Eastern") ) - |PT1H|) when (not (isDateInDST(((standarddatetime >> "US/Eastern") >> "US/Eastern") as :date,"US/Eastern") == true)) otherwise (standarddatetime >> "US/Eastern")
+---
+payload map {
+	ID: $.Name,
+	SFDCID:$.Id,
+	ApplicationCompleteDate:$.Application_Complete_Date__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+    CreatedDate: getDSTAdjustedDatetime($.CreatedDate) as :datetime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"}
+     as :string {format: "yyyyMMdd"} ,
+    County: $.County__c,
+	TotalChildren:$.Total_Children__c,
+	ExistingCourtOrder: $.Is_There_an_Existing_Court_Order_Father__c,
+	CourtOrderFileNumber: $.Court_Order_File_Number_Father__c,
+	CourtOrderDate: $.Court_Order_Date_Father__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+	CityFatherInsurance: $.City_Fathers_Insurance__c,
+	StateFatherInsurance: $.State_Father_Insurance__c default "",
+	AmountFatherInsurance: ($.Amount__c as :number as :string  {format:"0000000000"} )  when ($.Amount__c != null and $.Amount__c !='' ) otherwise $.Amount__c,
+	Frequency: $.Frequency__c,
+	CourtOrderEffect: $.Is_the_Court_Order_In_Effect__c,
+	PaymentMadeThrough: $.Payments_Made_Through_Court_Or_Direct_Fa__c,
+	MotherFirstName: $.Mother_First_Name__c,
+	MotherLastName: $.Mother_Last_Name__c,
+	MotherMiddleName: $.Mother_Middle_Name__c,
+	MotherMCI:( pad('0',(10 - sizeOf $.MCI_Mother__c )) ++ $.MCI_Mother__c) when ($.MCI_Mother__c !=null and $.MCI_Mother__c !='') otherwise $.MCI_Mother__c,
+	MothersPID:$.PID_Mother__c as :number  as :string {format:"0000000000"} default "",
+	MothersSSN: $.Mother_Social_Security_Number_SSN__c,
+	MothersOtherFirstName: $.Other_First_Name_Mother__c,
+	MothersOtherLastName: $.Other_Last_Name_Mother__c,
+	MothersOtherMiddleName: $.Other_Middle_Name_Mother__c,
+	MothersDateOfDeath: $.Mother_Date_of_Death__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+	MothersInsuarancePresent: $.Insurance_Present_Mother__c,
+	MothersInsuranceName: $.Insurance_Company_Name_Mother__c,
+	MothersPolicyNo: $.Policy_Number_Mother__c,
+	MothersAddressType: $.Address_Type_Mother__c default "",
+	MothersAddress1: $.Address_Line_1_Mother__c,
+	MothersAddress2: $.Address_Line_2_Mother__c,
+	MothersApartmentNo: $.Apartment_Number_Mother__c,
+	MothersCity: $.City_Mother__c,
+	MothersState: $.State_Mother__c default '',
+	MothersZip: $.Zip_Code_Mother__c,
+	MothersDOB: $.Mother_Date_of_Birth__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+	MothersRace: $.Mother_Race__c,
+	MothersGender: $.Mother_Gender__c,
+	MothersEmployerStatus: $.Employer_Status_Mother__c default "",
+	MotherEmployersName: $.Employer_Name_Mother__c,
+	MothersEmployerAdd1: $.Address_Line_1_Mother_Employer__c,
+	MothersEmployerAdd2: $.Address_Line_2_Mother_Employer__c,
+	MothersEmployerCity: $.City_Mother_Employer__c,
+	MothersEmployerState:  $.State_Mother_Employer__c default '',
+	MothersEmployerZip: $.Zip_Code_Mother_Employer__c,
+	MothersLastPaymentDate: $.Last_Child_Support_Payment_Date_Mother__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+	MothersLastPaymentAmount: ($.Last_Child_Support_Payment_Amount_Mother__c as :number  as :string {format:"00000"}) when (	$.Last_Child_Support_Payment_Amount_Mother__c != null and $.Last_Child_Support_Payment_Amount_Mother__c != '') otherwise $.Last_Child_Support_Payment_Amount_Mother__c,
+	MothersArrearageAmount: ( $.Mothers_Arrearage_Amount__c as :number  as :string  {format:"00000"}) when ($.Mothers_Arrearage_Amount__c != null and $.Mothers_Arrearage_Amount__c != '') otherwise $.Mothers_Arrearage_Amount__c,
+	MothersPaymentDueDate: $.Mothers_Payment_Due_Date__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+	FathersFirstName: $.Father_First_Name__c,
+	FathersMiddleName: $.Father_Middle_Name__c,
+	FathersLastName: $.Father_Last_Name__c,
+	FathersMCI:( pad('0',(10 - sizeOf $.MCI_Father__c  )) ++ $.MCI_Father__c ) when ($.MCI_Father__c  !=null and $.MCI_Father__c  !='') otherwise $.MCI_Father__c ,
+	FathersPID:$.PID_Father__c  as :number as :string  {format:"0000000000"} default "",
+	FathersSSN: $.Father_Social_Security_Number_SSN__c,
+	FathersOtherFirstName: $.Other_First_Name_Father__c,
+	FathersOtherMiddleName: $.Other_Middle_Name_Father__c,
+	FathersOtherLastName: $.Other_Last_Name_Father__c,
+	FathersDateOfDeath: $.Father_Date_of_Death__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+	FathersInsurancePresent: $.Insurance_Present_Father__c,
+	FathersInsuranceName: $.Insurance_Company_Name_Father__c,
+	FathersPolicyNumber: $.Policy_Number_Father__c,
+	FathersAddressInd: $.Address_Type_Father__c default "",
+	FathersAddress1: $.Address_Line_1_Father__c,
+	FathersAddress2: $.Address_Line_2_Father__c,
+	FathersApartment: $.Apartment_Number_Father__c,
+	FathersCity: $.City_Father__c,
+	FathersState: $.State_Father__c default "",
+	FathersZip: $.Zip_Code_Father__c,
+	FathersDOB: $.Father_Date_of_Birth__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+	FathersRace: $.Father_Race__c,
+	FathersGender: $.Father_Gender__c,
+	FathersEmployerStatus: $.Employer_Status_Father__c default "",
+	FathersEmployerName: $.Employer_Name_Father__c,
+	FathersEmployerAddress1: $.Address_Line_1_Father_Employer__c,
+	FathersEmployerAddress2: $.Address_Line_2__c,
+	FathersEmployerCity: $.City_Father_EMployer__c default ' ',
+	FathersEmployerState: $.State_Father_Employer__c default "",
+	FathersEmployerZip: $.Zip_Code_Father_Employer__c,
+	FathersLastPaymentDate: $.Last_Child_Support_Payment_Date_Father__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+	FathersLastPaymentAmount:($.Last_Child_Support_Payment_Amount_Father__c as :number  as :string {format:"00000"}) when ($.Last_Child_Support_Payment_Amount_Father__c != null and $.Last_Child_Support_Payment_Amount_Father__c != '') otherwise $.Last_Child_Support_Payment_Amount_Father__c,
+	FathersArrearage: ($.Fathers_Arrearage_Amount__c as :number  as :string {format:"00000"}) when ($.Fathers_Arrearage_Amount__c != null and $.Fathers_Arrearage_Amount__c != '') otherwise $.Fathers_Arrearage_Amount__c,
+	FathersPaymentDueDate: $.Fathers_Payment_Due_Date__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+     MothersID:'Y' when ($.Mother__c != null and $.Mother__c != '') otherwise 'N',
+     FathersID:'Y' when ($.Father__c != null and $.Father__c != '') otherwise 'N',
+     WorkerName:$.Owner.LastName default '',
+	(   Children: $.Child_Informations__r map { 
+		Name:$.Name,
+		SFDCID:$.Id,
+		ChildsMCI:( pad('0',(10 - sizeOf $.Child_MCI__c  )) ++ $.Child_MCI__c ) when ($.Child_MCI__c  !=null and $.Child_MCI__c  !='') otherwise $.Child_MCI__c ,
+		ChildsPID:( $.Childs_ID__r.Person__r.DEL_PID__c as :number  as :string {format:"0000000000"} default "") when ($.Childs_ID__r.Person__r.DEL_PID__c  !=null and $.Childs_ID__r.Person__r.DEL_PID__c  !='') otherwise $.Childs_ID__r.Person__r.DEL_PID__c ,
+		ChildsSSN:$.SSN__c,
+		CaseID:$.Case_ID__r.Name,
+		County: $.County__c default "",
+		ChildsFirstName:$.Childs_First_Name__c,
+		ChildsMiddleName:$.Childs_Middle_Name__c,
+		ChildsLastName:$.Childs_Last_Name__c,
+		ChildID:$.Childs_ID__c,
+		ChildsDOB:$.Child_Date_of_Birth__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+		ChildsPlacementDate:$.Placement_Date__c as :date {format: "yyyy-MM-dd"}
+     as :string {format: "yyyyMMdd"} default ' ',
+		ChildsBoardPayment:( $.Estimated_Monthly_Board_Payment__c as :number  as :string {format:"0000000000"}) when ( $.Estimated_Monthly_Board_Payment__c !=null and $.Estimated_Monthly_Board_Payment__c != '' ) otherwise $.Estimated_Monthly_Board_Payment__c
+								 } ) when $.Child_Informations__r != null and $.Child_Informations__r != ''
+	
+}]]></dw:set-payload>
+            <dw:set-session-variable variableName="Header"><![CDATA[%dw 1.0
+%output text/plain schemaPath = "Header-fixed-width.ffd", recordTerminator = "crlf"
+---
+[{
+	Identifier:'H',
+	Date: (now >> "America/New_York") as :string {format: "YYYYMMdd"},
+	Filler:' '
+}]]]></dw:set-session-variable>
+        </dw:transform-message>
+
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set Initial Payload,Query" doc:description="Set
+        InitialPayload:Query result in a arraylist to be used for error generation
+        RecordDetail: Variable to store all valid Records
+        RecordCount:Total Records in Array
+        ArrayList:Initialise the arrayList to store status of Records
+        UpdateRecords:Initialise the arrayList to store succesfully updated Records">
+            <add-message-property key="InitialPayload" value="#[payload]"/>
+
+            <add-message-property key="RecordDetails" value="#[sessionVars.Header]"/>
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+            <add-message-property key="ArrayList" value="SFDCID,Status"/>
+            <add-message-property key="UpdateRecords" value="#['']"/>
+        </message-properties-transformer>
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+
+
+        <foreach collection="#[payload]" doc:name="For Each" doc:description="For Each is used to operate upon one CSA record at a time the , this is done to create extract record details with max six children per CSA">
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+            <flow-ref name="inf008-child-support-application-TestFlow" doc:name="inf008-child-support-application-TestFlow" doc:description="Call inf008-child-support-application-TestFlow which creates record detail for extract file with max six children per CSA"/>
+        </foreach>
+        <flow-ref name="inf008-child-support-application-extract-Update-Sub_Flow" doc:name="inf008-child-support-application-extract-Update-Sub_Flow" doc:description=" call inf008-child-support-application-extract-Update-Sub_Flow to Update status of valid extracted records to 'Sent to Interface'"/>
+
+        
+
+        <logger message="Query:  #[payload]" level="INFO" doc:name="Logger"/>       
+
+        
+
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP:Set Record-Error,Count,Success and ValidAttachment" metadata:id="32690d77-a9e8-4d27-a862-66e925480bfc" doc:description="Set 
+        RecordError:Total Records which had errors in updating Interface Flag,
+        RecordCount,Total Records
+        RecordSuccess:Total Success Records 
+        ValidAttachment:List of records whose Sent_to_Interface flag is succesfully updated">
+            <add-message-property key="RecordError" value="#[flowVars.ErrorUpdate.size()]"/>
+            <add-message-property key="RecordCount" value="#[sessionVars.RecordCount]"/>
+            <add-message-property key="ValidAttachment" value="#[payload]"/>
+            <add-message-property key="RecordSuccess" value="#[flowVars.UpdateSuccess.size()]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message doc:name="TM: Create Trailer" metadata:id="079a6766-468a-4093-9b18-fdc2e71ce3d5">
+            <dw:input-variable mimeType="application/java" variableName="RecordCount"/>
+            <dw:set-variable variableName="TrailerJava"><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+[{
+	Identifier: 'T',
+	Count:flowVars.RecordSuccess as :number as :string {format: "0000000000"},
+	Filler: ' '
+}]]]></dw:set-variable>
+            <dw:set-session-variable variableName="ErrorAttachment"><![CDATA[%dw 1.0
+%output application/csv 
+%var initialDataMap = {
+	(sessionVars.InitialPayload map {
+		($.ID as :string): $
+	})
+}
+---
+flowVars.ErrorUpdate map {
+	 Error: 'Data Error',
+	'Field Name in Error':$.Field default "",
+	'Field Value in Error':'',
+	'Error Description':($.Error default "" ) ++ "." ++ ( $.Description default "" ) ++ '. Please Correct the Data issue for Child Support Application Number:' ++ ( $.Name default "" ) ++ '. Child 1 MCI: ' ++ ((initialDataMap[$.Name]['Children'][0].ChildsMCI when (initialDataMap[$.Name]['Children'] != null and initialDataMap[$.Name]['Children'][0] != null and initialDataMap[$.Name]['Children'][0].ChildsMCI != null) otherwise "") when ($.Name != null and $.Name != '') otherwise "")
+}]]></dw:set-session-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Create Trailer FFD" metadata:id="fdd14be0-1ece-4182-b58d-c98217634c00">
+            <dw:input-payload/>
+            <dw:set-session-variable variableName="Trailer"><![CDATA[%dw 1.0
+%output text/plain schemaPath = "Trailer-fixed-width.ffd", recordTerminator = "crlf"
+---
+[{
+	Identifier:'T',
+	Count: flowVars.TrailerJava[0].Count as :string,
+	Filler: flowVars.TrailerJava[0].Filler
+}]]]></dw:set-session-variable>
+        </dw:transform-message>
+        <enricher doc:name="Message Enricher">
+			<flow-ref name="inf008-child-support-application-extract-OtoSConversion-For-SV-Sub_Flow" doc:name="inf008-child-support-application-extract-OtoSConversion-For-SV-Sub_Flow"/>
+			<enrich source="#[sessionVars.Header]" target="#[sessionVars.Header]"/>
+			<enrich source="#[sessionVars.Trailer]" target="#[sessionVars.Trailer]"/>
+		</enricher>
+        <choice doc:name="Choice : Check Success Records">
+            <when expression="#[flowVars.RecordSuccess == 0]">
+                <logger message="No success records to process" level="INFO" doc:name="Logger"/>
+                <set-payload value="#[sessionVars.Header + sessionVars.Trailer]" doc:name="Set Payload Combine Header and Footer"/>
+                <flow-ref name="Write_to_SFTP-CSA" doc:name="Write_to_SFTP-CSA"/>
+                <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment" doc:description="MP : Create TransAttachment">
+		            <add-message-property key="TransAttachment" value="#[payload]"/>
+		        </message-properties-transformer>
+            </when>
+            <otherwise>
+                <set-payload value="#[sessionVars.Header + '\n' + flowVars.ValidAttachment  + '\n' + sessionVars.Trailer + '\n']" doc:name="Set Payload to Final FFD" doc:description="Create Extract file by concatenating Header,RecordDetails and Trailer"/>
+				
+                <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload:Split by Newline" doc:description="Split the payload by Newline character to remove empty lines from the Payload"/>
+                <dw:transform-message doc:name="TM:Remove empty Lines">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter ((sizeOf $) > 0 ) map ($ replace "\n" with '' replace "\r" with '' replace "\r\n" with '') ) joinBy "\n"]]></dw:set-payload>
+                </dw:transform-message>
+                <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to Call Logging framework with the Extract File to attach it in Interface Dashboard without altering the main payload">
+                    <flow-ref name="inf008-child-support-application-extract-Call-Logging-Framework-2-Sub_Flow" doc:name="inf008-child-support-application-extract-Call-Logging-Framework-2-Sub_Flow" doc:description=" Call inf008-child-support-application-extract-Call-Logging-Framework-2-Sub_Flow to attach the generated file in Interface dashboard, so that file can be restored in case of SFTP exception"/>
+                    <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+                    <enrich source="#[sessionVars.ErrorAttachment]" target="#[sessionVars.ErrorAttachment]"/>
+                </enricher>
+                <flow-ref name="Write_to_SFTP-CSA" doc:name="Write_to_SFTP" doc:description="Call the Write_to_SFTP flow to write the extract file in Transaction and Archive Folder"/>
+            </otherwise>
+        </choice>
+
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF008&quot;, &quot;InterfaceName&quot;: &quot;Child Support Application Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_ChildSupportApplicationExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_FOSTER_CARE_NEW_APPLICAT_#[server.dateTime.changeTimeZone('EST').format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordSuccess==0?'Error':sessionVars.RecordError==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordError != 0 ?'Business':'']&quot;,&quot;Operation&quot;:&quot;Monthly Batch Load&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="Set Payload to JSON for Logging Framework to Complete the transaction in Interface Dashboard with the record counts"/>
+        <choice doc:name="Choice:Check RecordeError Count" doc:description="Delete ErrorAttachment if recordCount is zero to avoid attaching an empty ErrorAttachments">
+            <when expression="#[sessionVars.RecordError == 0]">
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties Remove ErrorAttachment" doc:description="Delete ErrorAttachment if recordCount is zero to avoid attaching an empty ErrorAttachments">
+                    <delete-message-property key="ErrorAttachment"/>
+                </message-properties-transformer>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger" message="Success Path"/>
+
+            </otherwise>
+        </choice>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the LogTransactionSubFlow to Complete the final transaction"/>
+       <message-properties-transformer scope="invocation" doc:name="Message Properties">
+						<delete-message-property key="ErrorUpdate"/>
+						<delete-message-property key="ParentInfo"/>
+						<delete-message-property key="RecordCount"/>
+						<delete-message-property key="TrailerJava"/>
+						<delete-message-property key="RecordSuccess"/>
+						<delete-message-property key="UpdatePayload"/>
+						<delete-message-property key="UpdateSuccess"/>
+						<delete-message-property key="ValidAttachment"/>
+						
+						
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="exceptionRecordCount"/>
+				<delete-message-property key="RecordError"/>
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="Message Properties">
+				<delete-message-property key="RecordError"/>
+				<delete-message-property key="RecordSuccess"/>
+				<delete-message-property key="RecordCount"/>
+				<delete-message-property key="RecordDetails"/>
+				<delete-message-property key="Trailer"/>
+				<delete-message-property key="TID"/>
+				<delete-message-property key="ArrayList"/>
+				<delete-message-property key="Header"/>
+				<delete-message-property key="InitialPayload"/>
+				<delete-message-property key="UpdateRecords"/>
+			
+			</message-properties-transformer>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+        
+        </flow>
+    
+    <sub-flow name="inf008-child-support-application-TestFlow" >
+        <message-properties-transformer scope="invocation" doc:name="MP: Set Parent Info" doc:description="Set Parent Info variable which stores CSA level information of the document">
+
+
+            <add-message-property key="ParentInfo" value="#[payload]"/>
+        </message-properties-transformer>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice:Check Childrens in CSA" doc:description="Check if Childrens exists in CSA">
+            <when expression="#[payload.Children != null]">
+                <foreach collection="#[payload.Children]" batchSize="${sftp.csaextract.transaction.childrenBatchSize}" doc:name="For Each" doc:description="For Each is used to operate upon 6 (This may vary so it is configurable property) children at a time per CSA, if more than 6 children are present then two CSA extract records will be sent">
+                    <flow-ref name="CreateRecordDetails-SubFlow" doc:name="CreateRecordDetails-SubFlow" doc:description="Call CreateRecordDetails-SubFlow to Create RecorDetails"/>
+                </foreach>
+            </when>
+            <otherwise>
+                <flow-ref name="CreateRecordDetails-SubFlow" doc:name="CreateRecordDetails-SubFlow" doc:description="Call CreateRecordDetails-SubFlow to Create RecorDetails"/>
+            </otherwise>
+        </choice>
+
+
+    </sub-flow>
+    <sub-flow name="CreateRecordDetails-SubFlow">
+        <dw:transform-message doc:name="TM:Process indivisual records of Array" metadata:id="3ecd394c-74c8-46a2-ad83-59011ee791e1">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+{
+ Record_Identifier:'D' ,
+ Foster_Care_Application_Date:flowVars.ParentInfo.CreatedDate default ' ',
+ Foster_Care_Approval_Date:flowVars.ParentInfo.ApplicationCompleteDate default ' ',
+ Foster_Care_Case_Status:'O',
+ County: flowVars.LOVReturned[("ADDRESS_COUNTY-" ++ flowVars.ParentInfo.County)][0],
+ Existing_Court_Order_Indicator:flowVars.LOVReturned[("COURT_ORDER_IND-" ++ flowVars.ParentInfo.ExistingCourtOrder)][0] default "",
+ Court_File_Number:flowVars.ParentInfo.CourtOrderFileNumber default ' ',
+ Court_Order_Date:flowVars.ParentInfo.CourtOrderDate default ' ',
+ Court_Order_City:flowVars.ParentInfo.CityFatherInsurance default ' ',
+ Court_Order_State:(flowVars.LOVReturned[("STATECODE-" ++ flowVars.ParentInfo.StateFatherInsurance)][0]) default ' ',
+ Court_Order_Amount:flowVars.ParentInfo.AmountFatherInsurance,
+ Court_Order_Frequency:(flowVars.LOVReturned[("COURT_ORDER_FRQ-" ++ flowVars.ParentInfo.Frequency)][0]) default ' ',
+ Court_order_Effect_Indicator:flowVars.LOVReturned[("COURT_ORDER_IND-" ++ flowVars.ParentInfo.CourtOrderEffect)][0] default "",
+ Court_Order_Payment_Type:flowVars.LOVReturned[("COURT_ORD_PYMT_TYPE-" ++ flowVars.ParentInfo.PaymentMadeThrough)][0] default "",
+ Mother_Information_Indicator:flowVars.ParentInfo.MothersID ,
+ Mothers_full_name:(flowVars.ParentInfo.MotherLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.MotherFirstName) when (flowVars.ParentInfo.MotherFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.MotherMiddleName) when (flowVars.ParentInfo.MotherMiddleName != null) otherwise ''), 
+ Mothers_MCI_Number: flowVars.ParentInfo.MotherMCI default ' ',
+ Mothers_FACTS_identifier:flowVars.ParentInfo.MothersPID default ' ',
+ Mothers_Primary_SSN:flowVars.ParentInfo.MothersSSN default ' ', 
+ Mothers_Other_SSN:'         ',
+ Mothers_Alias_Name_1:(flowVars.ParentInfo.MothersOtherLastName default ' ') ++  ((', ' ++ flowVars.ParentInfo.MothersOtherFirstName) when (flowVars.ParentInfo.MothersOtherFirstName != null) otherwise '' ) ++ ((' ' ++ flowVars.ParentInfo.MothersOtherMiddleName) when (flowVars.ParentInfo.MothersOtherMiddleName != null) otherwise ''),
+ Mothers_FACTS_DFS_Case_Number:payload[0].CaseID default ' ',
+ Mothers_Date_of_death:flowVars.ParentInfo.MothersDateOfDeath default ' ',
+ Mothers_Health_Ins_Indc:flowVars.LOVReturned[("MOTHER_HEALTH_IND-" ++ flowVars.ParentInfo.MothersInsuarancePresent)][0] default "",
+ Mothers_Health_Ins_Co_Name:flowVars.ParentInfo.MothersInsuranceName default ' ',
+ Mothers_Health_Ins_Policy_Number:flowVars.ParentInfo.MothersPolicyNo default ' ',
+ Mothers_Address_Indc:flowVars.LOVReturned[("MOTHER_ADD_IND-" ++ flowVars.ParentInfo.MothersAddressType)][0] default "",
+ Mothers_Address_Street_1:flowVars.ParentInfo.MothersAddress1 default ' ',
+ Mothers_Address_Street_2:flowVars.ParentInfo.MothersAddress2 default ' ',
+ Mothers_Address_Apt:flowVars.ParentInfo.MothersApartmentNo default ' ',
+ Mothers_Address_City:flowVars.ParentInfo.MothersCity default ' ',
+ Mothers_Address_State:flowVars.LOVReturned[("STATECODE-" ++ flowVars.ParentInfo.MothersState)][0] default "",
+ Mothers_Address_Zip:flowVars.ParentInfo.MothersZip[0..4] default ' ',
+ Mothers_Address_Zip4:flowVars.ParentInfo.MothersZip[6..9] default ' ',
+ Mothers_DOB:flowVars.ParentInfo.MothersDOB default ' ', 
+ Mothers_Race:flowVars.LOVReturned[("RACE-" ++ flowVars.ParentInfo.MothersRace)][0] default "",
+ Mothers_Sex:flowVars.LOVReturned[("GENDER-" ++ flowVars.ParentInfo.MothersGender)][0] default "",
+ Mothers_Employed_Indicator:flowVars.LOVReturned[("MOTHER_EMP_IND-" ++ flowVars.ParentInfo.MothersEmployerStatus)][0] default "",
+ Mothers_Employer_Name:flowVars.ParentInfo.MotherEmployersName default ' ', 
+ Mothers_Employer_Address_Street_1:flowVars.ParentInfo.MothersEmployerAdd1 default ' ', 
+ Mothers_Employer_Address_Street_2:flowVars.ParentInfo.MothersEmployerAdd2 default ' ',
+ Mothers_Emp_Address_City:flowVars.ParentInfo.MothersEmployerCity default ' ',
+ Mothers_Emp_Address_State:flowVars.LOVReturned[("STATECODE-" ++ flowVars.ParentInfo.MothersEmployerState)][0] default "",
+ Mothers_Emp_Address_Zip:flowVars.ParentInfo.MothersEmployerZip[0..4] default ' ',
+ Mothers_Emp_Address_Zip4:flowVars.ParentInfo.MothersEmployerZip[6..9] default ' ',
+ Mothers_Date_of_Last_Payment:flowVars.ParentInfo.MothersLastPaymentDate default ' ',
+ Mothers_Last_Payment_Amt:flowVars.ParentInfo.MothersLastPaymentAmount default "",
+ Mothers_Arrearage_Amt:flowVars.ParentInfo.MothersArrearageAmount default "",
+ Mothers_Payment_Due_Date:flowVars.ParentInfo.MothersPaymentDueDate default ' ',
+ Father_Information_Indicator:flowVars.ParentInfo.FathersID,
+ Fathers_full_name:(flowVars.ParentInfo.FathersLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.FathersFirstName) when (flowVars.ParentInfo.FathersFirstName != null) otherwise '' ) ++ ((' ' ++ flowVars.ParentInfo.FathersMiddleName) when (flowVars.ParentInfo.FathersMiddleName != null) otherwise ''), 
+ Fathers_MCI_Number:flowVars.ParentInfo.FathersMCI default ' ', 
+ Fathers_FACTS_identifier:flowVars.ParentInfo.FathersPID default ' ',
+ Fathers_Primary_SSN:flowVars.ParentInfo.FathersSSN default ' ',
+ Fathers_Other_SSN:'         ',
+ Fathers_Alias_Name_1: (flowVars.ParentInfo.FathersOtherLastName default ' ') ++  ((', ' ++ flowVars.ParentInfo.FathersOtherFirstName) when (flowVars.ParentInfo.FathersOtherFirstName != null) otherwise '' ) ++ ((' ' ++ flowVars.ParentInfo.FathersOtherMiddleName) when (flowVars.ParentInfo.FathersOtherMiddleName != null) otherwise ''),
+ Fathers_FACTS_DFS_Case_Number:payload[0].CaseID default ' ',
+ Fathers_Date_of_death:flowVars.ParentInfo.FathersDateOfDeath default ' ',
+ Fathers_Health_Ins_Indc:flowVars.LOVReturned[("FATHER_HEALTH_IND-" ++ flowVars.ParentInfo.FathersInsurancePresent)][0] default "",
+ Fathers_Health_Ins_Co_Name:flowVars.ParentInfo.FathersInsuranceName default ' ',
+ Fathers_Health_Ins_Policy_Number:flowVars.ParentInfo.FathersPolicyNumber default ' ',
+ Fathers_Address_Indc:flowVars.LOVReturned[("FATHER_ADD_IND-" ++ flowVars.ParentInfo.FathersAddressInd)][0] default "",
+ Fathers_Address_Street_1:flowVars.ParentInfo.FathersAddress1 default ' ',
+ Fathers_Address_Street_2:flowVars.ParentInfo.FathersAddress2 default ' ',
+ Fathers_Address_Apt:flowVars.ParentInfo.FathersApartment default ' ',
+ Fathers_Address_City:flowVars.ParentInfo.FathersCity default ' ',
+ Fathers_Address_State:flowVars.LOVReturned[("STATECODE-" ++ flowVars.ParentInfo.FathersState)][0] default "",
+ Fathers_Address_Zip:flowVars.ParentInfo.FathersZip[0..4] default ' ', 
+ Father_Address_Zip4:flowVars.ParentInfo.FathersZip[6..9] default ' ',
+ Fathers_DOB:flowVars.ParentInfo.FathersDOB default ' ',
+ Fathers_Race:flowVars.LOVReturned[("RACE-" ++ flowVars.ParentInfo.FathersRace)][0] default "",
+ Fathers_Sex:flowVars.LOVReturned[("GENDER-" ++ flowVars.ParentInfo.FathersGender)][0] default "",
+ Fathers_Employed_Indicator:flowVars.LOVReturned[("FATHER_EMP_IND-" ++ flowVars.ParentInfo.FathersEmployerStatus)][0] default "",
+ Fathers_Employer_Name:flowVars.ParentInfo.FathersEmployerName default ' ',
+ Fathers_Employer_Address_Street_1:flowVars.ParentInfo.FathersEmployerAddress1 default ' ',
+ Fathers_Employer_Address_Street_2:flowVars.ParentInfo.FathersEmployerAddress2 default ' ',
+ Fathers_Emp_Address_City:flowVars.ParentInfo.FathersEmployerCity default ' ',
+ Fathers_Emp_Address_State:flowVars.LOVReturned[("STATECODE-" ++ flowVars.ParentInfo.FathersEmployerState)][0] default "",
+ Fathers_Emp_Address_Zip:flowVars.ParentInfo.FathersEmployerZip[0..4] default ' ',
+ Fathers_Emp_Address_Zip4:flowVars.ParentInfo.FathersEmployerZip[6..9] default ' ',
+ Fathers_Date_of_Last_Payment:flowVars.ParentInfo.FathersLastPaymentDate default ' ',
+ Fathers_Last_Payment_Amt:flowVars.ParentInfo.FathersLastPaymentAmount,
+ Fathers_Arrearage_Amt:flowVars.ParentInfo.FathersArrearage,
+ Fathers_Payment_Due_Date:flowVars.ParentInfo.FathersPaymentDueDate default ' ',
+ Child_1_MCI:payload[0].ChildsMCI default ' ',
+ Child_1_FACTS_PID:payload[0].ChildsPID default ' ',
+ Child_1_SSN:payload[0].ChildsSSN default ' ',
+ Child_1_FACTS_DFS_Case_Number:payload[0].CaseID default ' ',
+ Child_1_Name:(( payload[0].ChildsLastName default " ") ++  ((', ' ++ payload[0].ChildsFirstName) when (payload[0].ChildsFirstName != null) otherwise "") ++ ((' ' ++ payload[0].ChildsMiddleName) when (payload[0].ChildsMiddleName != null) otherwise "")) when (payload[0].ChildID != null and payload[0].ChildID !='') otherwise ' ',
+ Child_1_DOB: payload[0].ChildsDOB default ' ', 
+ Child_1_Federally_Funded_Indc: 'N' when (payload[0].ChildID != null and payload[0].ChildID !='') otherwise ' ',
+ Child_1_Paternity_Established_Indc:'N' when (payload[0].ChildID != null and payload[0].ChildID !='') otherwise ' ', 
+ Child_1_Fathers_Name:( (flowVars.ParentInfo.FathersLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.FathersFirstName) when (flowVars.ParentInfo.FathersFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.FathersMiddleName) when (flowVars.ParentInfo.FathersMiddleName != null) otherwise '')) when (payload[0].ChildID != null and payload[0].ChildID !='') otherwise ' ', 
+ Child_1_Fathers_FACTS_DFS_Case_Number:payload[0].CaseID default ' ' ,
+ Child_1_Mothers_Name:( (flowVars.ParentInfo.MotherLastName default " ") ++ ((', ' ++  flowVars.ParentInfo.MotherFirstName) when flowVars.ParentInfo.MotherFirstName != null otherwise '') ++ ((' ' ++ flowVars.ParentInfo.MotherMiddleName) when flowVars.ParentInfo.MotherMiddleName != null otherwise '' )) when (payload[0].ChildID != null and payload[0].ChildID !='') otherwise ' ', 
+ Child_1_Mothers_FACTS_DFS_Case_Number:payload[0].CaseID default ' '  ,
+ Child_1_Covered_by_Mothers_Health_Ins_Indc:( flowVars.LOVReturned[("MOTHER_HEALTH_IND-" ++ flowVars.ParentInfo.MothersInsuarancePresent)][0] default "" ) when (payload[0].ChildID != null and payload[0].ChildID !='') otherwise ' ', 
+ Child_1_Covered_by_Fathers_Health_Ins_Indc:( flowVars.LOVReturned[("FATHER_HEALTH_IND-" ++ flowVars.ParentInfo.FathersInsurancePresent)][0] default "" ) when (payload[0].ChildID != null and payload[0].ChildID !='') otherwise ' ',
+ Child_1_Placement_Date:payload[0].ChildsPlacementDate default ' ',
+ Child_1_Estimated_Monthly_Payment:payload[0].ChildsBoardPayment default '',
+ Child_2_MCI:payload[1].ChildsMCI default ' ',
+ Child_2_FACTS_PID:payload[1].ChildsPID default ' ',
+ Child_2_SSN:payload[1].ChildsSSN default ' ',
+ Child_2_FACTS_DFS_Case_Number:payload[1].CaseID default ' ',
+ Child_2_Name:(( payload[1].ChildsLastName default " ") ++  ((', ' ++ payload[1].ChildsFirstName) when (payload[1].ChildsFirstName != null) otherwise "") ++ ((' ' ++ payload[1].ChildsMiddleName) when (payload[1].ChildsMiddleName != null) otherwise "")) when (payload[1].ChildID != null and payload[1].ChildID !='') otherwise ' ',
+ Child_2_DOB:payload[1].ChildsDOB default ' ',
+ Child_2_Federally_Funded_Indc:'N' when (payload[1].ChildID != null and payload[1].ChildID !='') otherwise ' ', 
+ Child_2_Paternity_Established_Indc:'N' when (payload[1].ChildID != null and payload[1].ChildID !='') otherwise ' ',
+ Child_2_Fathers_Name:((flowVars.ParentInfo.FathersLastName default " ") ++ ((', ' ++  flowVars.ParentInfo.FathersFirstName) when (flowVars.ParentInfo.FathersFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.FathersMiddleName) when (flowVars.ParentInfo.FathersMiddleName != null) otherwise '')) when (payload[1].ChildID != null and payload[1].ChildID !='') otherwise ' ', 
+ Child_2_Fathers_FACTS_DFS_Case_Number:payload[1].CaseID default ' ', 
+ Child_2_Mothers_Name:( (flowVars.ParentInfo.MotherLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.MotherFirstName) when (flowVars.ParentInfo.MotherFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.MotherMiddleName) when (flowVars.ParentInfo.MotherMiddleName != null) otherwise '' )) when (payload[1].ChildID != null and payload[1].ChildID !='') otherwise ' ', 
+ Child_2_Mothers_FACTS_DFS_Case_Number:payload[1].CaseID default ' ',
+ Child_2_Coveredby_Mothers_Health_Ins_Indc:( flowVars.LOVReturned[("MOTHER_HEALTH_IND-" ++ flowVars.ParentInfo.MothersInsuarancePresent)][0] default ""  ) when (payload[1].ChildID != null and payload[1].ChildID !='') otherwise ' ', 
+ Child_2_Coveredby_Fathers_Health_Ins_Indc:( flowVars.LOVReturned[("FATHER_HEALTH_IND-" ++ flowVars.ParentInfo.FathersInsurancePresent)][0] default "" ) when (payload[1].ChildID != null and payload[1].ChildID !='') otherwise ' ',
+ Child_2_Placement_Date:payload[1].ChildsPlacementDate default ' ',
+ Child_2_Estimated_Monthly_Payment:payload[1].ChildsBoardPayment default '',
+ Child_3_MCI:payload[2].ChildsMCI default ' ',
+ Child_3_FACTS_PID:payload[2].ChildsPID default ' ',
+ Child_3_SSN:payload[2].ChildsSSN default ' ',
+ Child_3_FACTS_DFS_Case_Number:payload[2].CaseID default ' ',
+ Child_3_Name:(( payload[2].ChildsLastName default " ") ++  ((', ' ++ payload[2].ChildsFirstName) when (payload[2].ChildsFirstName != null) otherwise "") ++ ((' ' ++ payload[2].ChildsMiddleName) when (payload[2].ChildsMiddleName != null) otherwise "")) when (payload[2].ChildID != null and payload[2].ChildID !='') otherwise ' ',
+ Child_3_DOB:payload[2].ChildsDOB default ' ',
+ Child_3_Federally_Funded_Indc:'N' when (payload[2].ChildID != null and payload[2].ChildID !='') otherwise ' ', 
+ Child_3_Paternity_Established_Indc:'N' when (payload[2].ChildID != null and payload[2].ChildID !='') otherwise ' ',
+ Child_3_Fathers_Name:((flowVars.ParentInfo.FathersLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.FathersFirstName) when (flowVars.ParentInfo.FathersFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.FathersMiddleName) when (flowVars.ParentInfo.FathersMiddleName != null) otherwise '' )) when (payload[2].ChildID != null and payload[2].ChildID !='') otherwise ' ',
+ Child_3_Fathers_FACTS_DFS_Case_Number:payload[2].CaseID default ' ', 
+ Child_3_Mothers_Name:((flowVars.ParentInfo.MotherLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.MotherFirstName) when (flowVars.ParentInfo.MotherFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.MotherMiddleName) when (flowVars.ParentInfo.MotherMiddleName != null) otherwise '' )) when (payload[2].ChildID != null and payload[2].ChildID !='') otherwise ' ',
+ Child_3_Mothers_FACTS_DFS_Case_Number:payload[2].CaseID default ' ',
+ Child_3_Covered_by_Mothers_Health_Ins_Indc:( flowVars.LOVReturned[("MOTHER_HEALTH_IND-" ++ flowVars.ParentInfo.MothersInsuarancePresent)][0] default "") when (payload[2].ChildID != null and payload[2].ChildID !='') otherwise ' ', 
+ Child_3_Covered_by_Fathers_Health_Ins_Indc:( flowVars.LOVReturned[("FATHER_HEALTH_IND-" ++ flowVars.ParentInfo.FathersInsurancePresent)][0] default "" ) when (payload[2].ChildID != null and payload[2].ChildID !='') otherwise ' ',
+ Child_3_Placement_Date:payload[2].ChildsPlacementDate default ' ',
+ Child_3_Estimated_Monthly_Payment:payload[2].ChildsBoardPayment default '',
+ Child_4_MCI:payload[3].ChildsMCI default ' ',
+ Child_4_FACTS_PID:payload[3].ChildsPID default ' ',
+ Child_4_SSN:payload[3].ChildsSSN default ' ',
+ Child_4_FACTS_DFS_Case_Number:payload[3].CaseID default ' ',
+ Child_4_Name:(( payload[3].ChildsLastName default " ") ++ ((', ' ++  payload[3].ChildsFirstName)  when (payload[3].ChildsFirstName != null) otherwise "") ++ ((' ' ++ payload[3].ChildsMiddleName) when (payload[3].ChildsMiddleName != null) otherwise "")) when (payload[3].ChildID != null and payload[3].ChildID !='') otherwise ' ',
+ Child_4_DOB:payload[3].ChildsDOB default ' ',
+ Child_4_Federally_Funded_Indc:'N' when (payload[3].ChildID != null and payload[3].ChildID !='') otherwise ' ', 
+ Child_4_Paternity_Established_Indc:'N' when (payload[3].ChildID != null and payload[3].ChildID !='') otherwise ' ',
+ Child_4_Fathers_Name:((flowVars.ParentInfo.FathersLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.FathersFirstName) when (flowVars.ParentInfo.FathersFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.FathersMiddleName) when (flowVars.ParentInfo.FathersMiddleName != null) otherwise '')) when (payload[3].ChildID != null and payload[3].ChildID !='') otherwise ' ', 
+ Child_4_Fathers_FACTS_DFS_Case_Number:payload[3].CaseID default ' ', 
+ Child_4_Mothers_Name:((flowVars.ParentInfo.MotherLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.MotherFirstName) when (flowVars.ParentInfo.MotherFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.MotherMiddleName) when (flowVars.ParentInfo.MotherMiddleName != null) otherwise '')) when (payload[3].ChildID != null and payload[3].ChildID !='') otherwise ' ', 
+ Child_4_Mothers_FACTS_DFS_Case_Number:payload[3].CaseID default ' ',
+ Child_4_Covered_by_Mothers_Health_Ins_Indc:(flowVars.LOVReturned[("MOTHER_HEALTH_IND-" ++ flowVars.ParentInfo.MothersInsuarancePresent)][0] default "")  when (payload[3].ChildID != null and payload[3].ChildID !='') otherwise ' ', 
+ Child_4_Covered_by_Fathers_Health_Ins_Indc:( flowVars.LOVReturned[("FATHER_HEALTH_IND-" ++ flowVars.ParentInfo.FathersInsurancePresent)][0] default "" ) when (payload[3].ChildID != null and payload[3].ChildID !='') otherwise ' ',
+ Child_4_Placement_Date:payload[3].ChildsPlacementDate default ' ',
+ Child_4_Estimated_Monthly_Payment:payload[3].ChildsBoardPayment default '',
+ Child_5_MCI:payload[4].ChildsMCI default ' ',
+ Child_5_FACTS_PID:payload[4].ChildsPID default ' ',
+ Child_5_SSN:payload[4].ChildsSSN default ' ',
+ Child_5_FACTS_DFS_Case_Number:payload[4].CaseID default ' ',
+ Child_5_Name:(( payload[4].ChildsLastName default " ") ++  ((', ' ++ payload[4].ChildsFirstName) when payload[4].ChildsFirstName != null otherwise "") ++ ((' ' ++ payload[4].ChildsMiddleName) when (payload[4].ChildsMiddleName != null) otherwise "")) when (payload[4].ChildID != null and payload[4].ChildID !='') otherwise ' ',
+ Child_5_DOB:payload[4].ChildsDOB default ' ',
+ Child_5_Federally_Funded_Indc:'N' when (payload[4].ChildID != null and payload[4].ChildID !='') otherwise ' ', 
+ Child_5_Paternity_Established_Indc:'N' when (payload[4].ChildID != null and payload[4].ChildID !='') otherwise ' ',
+ Child_5_Fathers_Name:((flowVars.ParentInfo.FathersLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.FathersFirstName) when flowVars.ParentInfo.FathersFirstName != null otherwise '') ++ ((' ' ++ flowVars.ParentInfo.FathersMiddleName) when (flowVars.ParentInfo.FathersMiddleName != null) otherwise '')) when (payload[4].ChildID != null and payload[4].ChildID !='') otherwise ' ', 
+ Child_5_Fathers_FACTS_DFS_Case_Number:payload[4].CaseID default ' ', 
+ Child_5_Mothers_Name:((flowVars.ParentInfo.MotherLastName default " ") ++ ((', ' ++  flowVars.ParentInfo.MotherFirstName) when flowVars.ParentInfo.MotherFirstName != null otherwise '') ++ ((' ' ++ flowVars.ParentInfo.MotherMiddleName) when (flowVars.ParentInfo.MotherMiddleName != null) otherwise '')) when (payload[4].ChildID != null and payload[4].ChildID !='') otherwise ' ', 
+ Child_5_Mothers_FACTS_DFS_Case_Number:payload[4].CaseID default ' ',
+ Child_5_Covered_by_Mothers_Health_Ins_Indc:( flowVars.LOVReturned[("MOTHER_HEALTH_IND-" ++ flowVars.ParentInfo.MothersInsuarancePresent)][0] default "")  when (payload[4].ChildID != null and payload[4].ChildID != '') otherwise ' ' , 
+ Child_5_Covered_by_Fathers_Health_Ins_Indc:( flowVars.LOVReturned[("FATHER_HEALTH_IND-" ++ flowVars.ParentInfo.FathersInsurancePresent)][0] default "" ) when (payload[4].ChildID != null and payload[4].ChildID != '') otherwise ' ',
+ Child_5_Placement_Date:payload[4].ChildsPlacementDate default ' ',
+ Child_5_Estimated_Monthly_Payment:payload[4].ChildsBoardPayment default '',
+ Child_6_MCI:payload[5].ChildsMCI default ' ',
+ Child_6_FACTS_PID:payload[5].ChildsPID default ' ',
+ Child_6_SSN:payload[5].ChildsSSN default ' ',
+ Child_6_FACTS_DFS_Case_Number:payload[5].CaseID default ' ',
+ Child_6_Name:(( payload[5].ChildsLastName default " ") ++  ((', ' ++ payload[5].ChildsFirstName) when payload[5].ChildsFirstName != null otherwise "") ++ ((' ' ++ payload[5].ChildsMiddleName)  when (payload[5].ChildsMiddleName != null) otherwise "")) when (payload[5].ChildID != null and payload[5].ChildID !='') otherwise ' ',
+ Child_6_DOB:payload[5].ChildsDOB default ' ',
+ Child_6_Federally_Funded_Indc:'N' when (payload[5].ChildID != null and payload[5].ChildID !='') otherwise ' ', 
+ Child_6_Paternity_Established_Indc:'N' when (payload[5].ChildID != null and payload[5].ChildID !='') otherwise ' ',
+ Child_6_Fathers_Name:( (flowVars.ParentInfo.FathersLastName default " ") ++  ((', ' ++ flowVars.ParentInfo.FathersFirstName) when (flowVars.ParentInfo.FathersFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.FathersMiddleName) when (flowVars.ParentInfo.FathersMiddleName != null) otherwise '' )) when (payload[5].ChildID != null and payload[5].ChildID !='') otherwise ' ', 
+ Child_6_Fathers_FACTS_DFS_Case_Number:payload[5].CaseID default ' ', 
+ Child_6_Mothers_Name:( (flowVars.ParentInfo.MotherLastName default " ") ++ ((', ' ++  flowVars.ParentInfo.MotherFirstName) when (flowVars.ParentInfo.MotherFirstName != null) otherwise '') ++ ((' ' ++ flowVars.ParentInfo.MotherMiddleName) when (flowVars.ParentInfo.MotherMiddleName != null) otherwise '' ))  when (payload[5].ChildID != null and payload[5].ChildID !='') otherwise ' ', 
+ Child_6_Mothers_FACTS_DFS_Case_Number:payload[5].CaseID default ' ',
+ Child_6_Covered_by_Mothers_Health_Ins_Indc:(flowVars.LOVReturned[("MOTHER_HEALTH_IND-" ++ flowVars.ParentInfo.MothersInsuarancePresent)][0] default "")  when (payload[5].ChildID != null and payload[5].ChildID !='') otherwise ' ', 
+ Child_6_Covered_by_Fathers_Health_Ins_Indc:(flowVars.LOVReturned[("FATHER_HEALTH_IND-" ++ flowVars.ParentInfo.FathersInsurancePresent)][0] default "" )  when (payload[5].ChildID != null and payload[5].ChildID !='') otherwise ' ',
+ Child_6_Placement_Date:payload[5].ChildsPlacementDate default ' ',	
+ Child_6_Estimated_Monthly_Payment:payload[5].ChildsBoardPayment default '',
+ Workers_Last_Name:(flowVars.ParentInfo.WorkerName) when ((sizeOf flowVars.ParentInfo.WorkerName) < 10) otherwise (flowVars.ParentInfo.WorkerName[0..8]) default ' ',
+ SFDCID:( flowVars.ParentInfo.SFDCID default "" ) ++ '<*>' ++ ( flowVars.ParentInfo.ID default "")
+ }]]></dw:set-payload>
+
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="2f6906fc-71c5-489f-977a-66cb11ab6a12" doc:name="TM:Convert Array to FFD">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath = "Fixed-Width-Payload.ffd", recordTerminator = "crlf"
+---
+[{
+ Record_Identifier: payload.Record_Identifier,
+ Foster_Care_Application_Date: payload.Foster_Care_Application_Date,
+ Foster_Care_Approval_Date: payload.Foster_Care_Approval_Date,
+ Foster_Care_Case_Status:payload.Foster_Care_Case_Status,
+ County:payload.County,
+ Existing_Court_Order_Indicator:payload.Existing_Court_Order_Indicator,
+ Court_File_Number:payload.Court_File_Number ,
+ Court_Order_Date:payload.Court_Order_Date ,
+ Court_Order_City:payload.Court_Order_City ,
+ Court_Order_State:payload.Court_Order_State ,
+ Court_Order_Amount:payload.Court_Order_Amount,
+ Court_Order_Frequency:payload.Court_Order_Frequency ,
+ Court_order_Effect_Indicator:payload.Court_order_Effect_Indicator ,
+ Court_Order_Payment_Type:payload.Court_Order_Payment_Type ,
+ Mother_Information_Indicator:payload.Mother_Information_Indicator,
+ Mothers_full_name:payload.Mothers_full_name when (sizeOf payload.Mothers_full_name) < 25 otherwise payload.Mothers_full_name[0..23],
+ Mothers_MCI_Number:payload.Mothers_MCI_Number ,
+ Mothers_FACTS_identifier:payload.Mothers_FACTS_identifier ,
+ Mothers_Primary_SSN:payload.Mothers_Primary_SSN ,
+ Mothers_Other_SSN:payload.Mothers_Other_SSN,
+ Mothers_Alias_Name_1:payload.Mothers_Alias_Name_1 when (sizeOf payload.Mothers_Alias_Name_1) <25 otherwise payload.Mothers_Alias_Name_1[0..23],
+ Mothers_FACTS_DFS_Case_Number:payload.Mothers_FACTS_DFS_Case_Number ,
+ Mothers_Date_of_death: payload.Mothers_Date_of_death,
+ Mothers_Health_Ins_Indc:payload.Mothers_Health_Ins_Indc ,
+ Mothers_Health_Ins_Co_Name:payload.Mothers_Health_Ins_Co_Name when (sizeOf payload.Mothers_Health_Ins_Co_Name) < 15 otherwise payload.Mothers_Health_Ins_Co_Name[0..14],
+ Mothers_Health_Ins_Policy_Number:payload.Mothers_Health_Ins_Policy_Number ,
+ Mothers_Address_Indc:payload.Mothers_Address_Indc,
+ Mothers_Address_Street_1:payload.Mothers_Address_Street_1,
+ Mothers_Address_Street_2:payload.Mothers_Address_Street_2,
+ Mothers_Address_Apt:payload.Mothers_Address_Apt when (sizeOf payload.Mothers_Address_Apt) < 5 otherwise payload.Mothers_Address_Apt[0..4],
+ Mothers_Address_City:payload.Mothers_Address_City,
+ Mothers_Address_State:payload.Mothers_Address_State,
+ Mothers_Address_Zip:payload.Mothers_Address_Zip,
+ Mothers_Address_Zip4:payload.Mothers_Address_Zip4 ,
+ Mothers_DOB:payload.Mothers_DOB,
+ Mothers_Race:payload.Mothers_Race ,
+ Mothers_Sex:payload.Mothers_Sex ,
+ Mothers_Employed_Indicator:payload.Mothers_Employed_Indicator,
+ Mothers_Employer_Name:payload.Mothers_Employer_Name,
+ Mothers_Employer_Address_Street_1:payload.Mothers_Employer_Address_Street_1 ,
+ Mothers_Employer_Address_Street_2:payload.Mothers_Employer_Address_Street_2 ,
+ Mothers_Emp_Address_City:payload.Mothers_Emp_Address_City ,
+ Mothers_Emp_Address_State:payload.Mothers_Emp_Address_State,
+ Mothers_Emp_Address_Zip: payload.Mothers_Emp_Address_Zip,
+ Mothers_Emp_Address_Zip4:payload.Mothers_Emp_Address_Zip4 ,
+ Mothers_Date_of_Last_Payment:payload.Mothers_Date_of_Last_Payment ,
+ Mothers_Last_Payment_Amt:payload.Mothers_Last_Payment_Amt ,
+ Mothers_Arrearage_Amt:payload.Mothers_Arrearage_Amt ,
+ Mothers_Payment_Due_Date:payload.Mothers_Payment_Due_Date ,
+ Father_Information_Indicator:payload.Father_Information_Indicator,
+ Fathers_full_name:payload.Fathers_full_name when (sizeOf payload.Fathers_full_name) < 25 otherwise payload.Fathers_full_name[0..23],
+ Fathers_MCI_Number:payload.Fathers_MCI_Number ,
+ Fathers_FACTS_identifier:payload.Fathers_FACTS_identifier ,
+ Fathers_Primary_SSN:payload.Fathers_Primary_SSN ,
+ Fathers_Other_SSN:payload.Fathers_Other_SSN,
+ Fathers_Alias_Name_1:payload.Fathers_Alias_Name_1 when (sizeOf payload.Fathers_Alias_Name_1) < 25 otherwise payload.Fathers_Alias_Name_1[0..23],
+ Fathers_FACTS_DFS_Case_Number:payload.Fathers_FACTS_DFS_Case_Number ,
+ Fathers_Date_of_death:payload.Fathers_Date_of_death ,
+ Fathers_Health_Ins_Indc:payload.Fathers_Health_Ins_Indc ,
+ Fathers_Health_Ins_Co_Name:payload.Fathers_Health_Ins_Co_Name when (sizeOf payload.Fathers_Health_Ins_Co_Name) < 15 otherwise payload.Fathers_Health_Ins_Co_Name[0..14],
+ Fathers_Health_Ins_Policy_Number:payload.Fathers_Health_Ins_Policy_Number,
+ Fathers_Address_Indc:payload.Fathers_Address_Indc ,
+ Fathers_Address_Street_1:payload.Fathers_Address_Street_1,
+ Fathers_Address_Street_2:payload.Fathers_Address_Street_2 ,
+ Fathers_Address_Apt:payload.Fathers_Address_Apt when (sizeOf payload.Fathers_Address_Apt) < 5 otherwise payload.Fathers_Address_Apt[0..4], 
+ Fathers_Address_City:payload.Fathers_Address_City,
+ Fathers_Address_State:payload.Fathers_Address_State ,
+ Fathers_Address_Zip:payload.Fathers_Address_Zip,
+ Father_Address_Zip4:payload.Father_Address_Zip4 ,
+ Fathers_DOB:payload.Fathers_DOB ,
+ Fathers_Race:payload.Fathers_Race ,
+ Fathers_Sex:payload.Fathers_Sex ,
+ Fathers_Employed_Indicator:payload.Fathers_Employed_Indicator ,
+ Fathers_Employer_Name:payload.Fathers_Employer_Name ,
+ Fathers_Employer_Address_Street_1:payload.Fathers_Employer_Address_Street_1 ,
+ Fathers_Employer_Address_Street_2:payload.Fathers_Employer_Address_Street_2 ,
+ Fathers_Emp_Address_City:payload.Fathers_Emp_Address_City ,
+ Fathers_Emp_Address_State:payload.Fathers_Emp_Address_State,
+ Fathers_Emp_Address_Zip:payload.Fathers_Emp_Address_Zip ,
+ Fathers_Emp_Address_Zip4: payload.Fathers_Emp_Address_Zip4,
+ Fathers_Date_of_Last_Payment:payload.Fathers_Date_of_Last_Payment ,
+ Fathers_Last_Payment_Amt:payload.Fathers_Last_Payment_Amt,
+ Fathers_Arrearage_Amt:payload.Fathers_Arrearage_Amt ,
+ Fathers_Payment_Due_Date:payload.Fathers_Payment_Due_Date ,
+ Child_1_MCI:payload.Child_1_MCI,
+ Child_1_FACTS_PID:payload.Child_1_FACTS_PID,
+ Child_1_SSN:payload.Child_1_SSN ,
+ Child_1_FACTS_DFS_Case_Number:payload.Child_1_FACTS_DFS_Case_Number ,
+ Child_1_Name:payload.Child_1_Name when (sizeOf payload.Child_1_Name) < 25 otherwise payload.Child_1_Name[0..23],
+ Child_1_DOB:payload.Child_1_DOB,
+ Child_1_Federally_Funded_Indc:payload.Child_1_Federally_Funded_Indc ,
+ Child_1_Paternity_Established_Indc:payload.Child_1_Paternity_Established_Indc,
+ Child_1_Fathers_Name:payload.Child_1_Fathers_Name when (sizeOf payload.Child_1_Fathers_Name) < 25 otherwise payload.Child_1_Fathers_Name[0..23],
+ Child_1_Fathers_FACTS_DFS_Case_Number:payload.Child_1_Fathers_FACTS_DFS_Case_Number ,
+ Child_1_Mothers_Name:payload.Child_1_Mothers_Name when (sizeOf payload.Child_1_Mothers_Name) < 25 otherwise payload.Child_1_Mothers_Name[0..23],
+ Child_1_Mothers_FACTS_DFS_Case_Number:payload.Child_1_Mothers_FACTS_DFS_Case_Number ,
+ Child_1_Covered_by_Mothers_Health_Ins_Indc:payload.Child_1_Covered_by_Mothers_Health_Ins_Indc ,
+ Child_1_Covered_by_Fathers_Health_Ins_Indc:payload.Child_1_Covered_by_Fathers_Health_Ins_Indc ,
+ Child_1_Placement_Date:payload.Child_1_Placement_Date ,
+ Child_1_Estimated_Monthly_Payment:payload.Child_1_Estimated_Monthly_Payment ,
+ Child_2_MCI:payload.Child_2_MCI,
+ Child_2_FACTS_PID:payload.Child_2_FACTS_PID,
+ Child_2_SSN:payload.Child_2_SSN ,
+ Child_2_FACTS_DFS_Case_Number:payload.Child_2_FACTS_DFS_Case_Number ,
+ Child_2_Name:payload.Child_2_Name when (sizeOf payload.Child_2_Name) < 25 otherwise payload.Child_2_Name[0..23],
+ Child_2_DOB:payload.Child_2_DOB,
+ Child_2_Federally_Funded_Indc:payload.Child_2_Federally_Funded_Indc ,
+ Child_2_Paternity_Established_Indc:payload.Child_2_Paternity_Established_Indc,
+ Child_2_Fathers_Name:payload.Child_2_Fathers_Name when (sizeOf payload.Child_2_Fathers_Name) < 25 otherwise payload.Child_2_Fathers_Name[0..23],
+ Child_2_Fathers_FACTS_DFS_Case_Number:payload.Child_2_Fathers_FACTS_DFS_Case_Number ,
+ Child_2_Mothers_Name:payload.Child_2_Mothers_Name when (sizeOf payload.Child_2_Mothers_Name) < 25 otherwise payload.Child_2_Mothers_Name[0..23],
+ Child_2_Mothers_FACTS_DFS_Case_Number:payload.Child_2_Mothers_FACTS_DFS_Case_Number ,
+ Child_2_Coveredby_Mothers_Health_Ins_Indc:payload.Child_2_Coveredby_Mothers_Health_Ins_Indc ,
+ Child_2_Coveredby_Fathers_Health_Ins_Indc:payload.Child_2_Coveredby_Fathers_Health_Ins_Indc,
+ Child_2_Placement_Date:payload.Child_2_Placement_Date ,
+ Child_2_Estimated_Monthly_Payment:payload.Child_2_Estimated_Monthly_Payment ,
+ Child_3_MCI:payload.Child_3_MCI,
+ Child_3_FACTS_PID:payload.Child_3_FACTS_PID,
+ Child_3_SSN: payload.Child_3_SSN,
+ Child_3_FACTS_DFS_Case_Number:payload.Child_3_FACTS_DFS_Case_Number ,
+ Child_3_Name:payload.Child_3_Name when (sizeOf payload.Child_3_Name) < 25 otherwise payload.Child_3_Name[0..23],
+ Child_3_DOB:payload.Child_3_DOB,
+ Child_3_Federally_Funded_Indc:payload.Child_3_Federally_Funded_Indc ,
+ Child_3_Paternity_Established_Indc:payload.Child_3_Paternity_Established_Indc,
+ Child_3_Fathers_Name:payload.Child_3_Fathers_Name when (sizeOf payload.Child_3_Fathers_Name) < 25 otherwise payload.Child_3_Fathers_Name[0..23],
+ Child_3_Fathers_FACTS_DFS_Case_Number:payload.Child_3_Fathers_FACTS_DFS_Case_Number ,
+ Child_3_Mothers_Name:payload.Child_3_Mothers_Name when (sizeOf payload.Child_3_Mothers_Name) < 25 otherwise payload.Child_3_Mothers_Name[0..23],
+ Child_3_Mothers_FACTS_DFS_Case_Number:payload.Child_3_Mothers_FACTS_DFS_Case_Number ,
+ Child_3_Covered_by_Mothers_Health_Ins_Indc:payload.Child_3_Covered_by_Mothers_Health_Ins_Indc ,
+ Child_3_Covered_by_Fathers_Health_Ins_Indc:payload.Child_3_Covered_by_Fathers_Health_Ins_Indc,
+ Child_3_Placement_Date:payload.Child_3_Placement_Date ,
+ Child_3_Estimated_Monthly_Payment:payload.Child_3_Estimated_Monthly_Payment ,
+ Child_4_MCI:payload.Child_4_MCI,
+ Child_4_FACTS_PID:payload.Child_4_FACTS_PID,
+ Child_4_SSN:payload.Child_4_SSN ,
+ Child_4_FACTS_DFS_Case_Number:payload.Child_4_FACTS_DFS_Case_Number ,
+ Child_4_Name:payload.Child_4_Name when (sizeOf payload.Child_4_Name) < 25 otherwise payload.Child_4_Name[0..23],
+ Child_4_DOB:payload.Child_4_DOB,
+ Child_4_Federally_Funded_Indc:payload.Child_4_Federally_Funded_Indc ,
+ Child_4_Paternity_Established_Indc:payload.Child_4_Paternity_Established_Indc,
+ Child_4_Fathers_Name:payload.Child_4_Fathers_Name when (sizeOf payload.Child_4_Fathers_Name) < 25 otherwise payload.Child_4_Fathers_Name[0..23],
+ Child_4_Fathers_FACTS_DFS_Case_Number:payload.Child_4_Fathers_FACTS_DFS_Case_Number ,
+ Child_4_Mothers_Name:payload.Child_4_Mothers_Name when (sizeOf payload.Child_4_Mothers_Name) < 25 otherwise payload.Child_4_Mothers_Name[0..23],
+ Child_4_Mothers_FACTS_DFS_Case_Number:payload.Child_4_Mothers_FACTS_DFS_Case_Number ,
+ Child_4_Covered_by_Mothers_Health_Ins_Indc:payload.Child_4_Covered_by_Mothers_Health_Ins_Indc ,
+ Child_4_Covered_by_Fathers_Health_Ins_Indc:payload.Child_4_Covered_by_Fathers_Health_Ins_Indc,
+ Child_4_Placement_Date:payload.Child_4_Placement_Date ,
+ Child_4_Estimated_Monthly_Payment:payload.Child_4_Estimated_Monthly_Payment ,
+ Child_5_MCI:payload.Child_5_MCI,
+ Child_5_FACTS_PID:payload.Child_5_FACTS_PID,
+ Child_5_SSN: payload.Child_5_SSN,
+ Child_5_FACTS_DFS_Case_Number: payload.Child_5_FACTS_DFS_Case_Number,
+ Child_5_Name:payload.Child_5_Name when (sizeOf payload.Child_5_Name) < 25 otherwise payload.Child_5_Name[0..23], 
+ Child_5_DOB:payload.Child_5_DOB,
+ Child_5_Federally_Funded_Indc:payload.Child_5_Federally_Funded_Indc ,
+ Child_5_Paternity_Established_Indc:payload.Child_5_Paternity_Established_Indc,
+ Child_5_Fathers_Name:payload.Child_5_Fathers_Name when (sizeOf payload.Child_5_Fathers_Name) < 25 otherwise payload.Child_5_Fathers_Name[0..23],
+ Child_5_Fathers_FACTS_DFS_Case_Number:payload.Child_5_Fathers_FACTS_DFS_Case_Number ,
+ Child_5_Mothers_Name:payload.Child_5_Mothers_Name when (sizeOf payload.Child_5_Mothers_Name) < 25 otherwise payload.Child_5_Mothers_Name[0..23],
+ Child_5_Mothers_FACTS_DFS_Case_Number:payload.Child_5_Mothers_FACTS_DFS_Case_Number ,
+ Child_5_Covered_by_Mothers_Health_Ins_Indc:payload.Child_5_Covered_by_Mothers_Health_Ins_Indc ,
+ Child_5_Covered_by_Fathers_Health_Ins_Indc:payload.Child_5_Covered_by_Fathers_Health_Ins_Indc,
+ Child_5_Placement_Date:payload.Child_5_Placement_Date ,
+ Child_5_Estimated_Monthly_Payment:payload.Child_5_Estimated_Monthly_Payment ,
+ Child_6_MCI:payload.Child_6_MCI,
+ Child_6_FACTS_PID:payload.Child_6_FACTS_PID,
+ Child_6_SSN:payload.Child_6_SSN ,
+ Child_6_FACTS_DFS_Case_Number:payload.Child_6_FACTS_DFS_Case_Number ,
+ Child_6_Name:payload.Child_6_Name when (sizeOf payload.Child_6_Name) < 25 otherwise payload.Child_6_Name[0..23],
+ Child_6_DOB:payload.Child_6_DOB,
+ Child_6_Federally_Funded_Indc:payload.Child_6_Federally_Funded_Indc ,
+ Child_6_Paternity_Established_Indc:payload.Child_6_Paternity_Established_Indc,
+ Child_6_Fathers_Name:payload.Child_6_Fathers_Name when (sizeOf payload.Child_6_Fathers_Name) < 25 otherwise payload.Child_6_Fathers_Name[0..23],
+ Child_6_Fathers_FACTS_DFS_Case_Number:payload.Child_6_Fathers_FACTS_DFS_Case_Number ,
+ Child_6_Mothers_Name:payload.Child_6_Mothers_Name when (sizeOf payload.Child_6_Mothers_Name) < 25 otherwise payload.Child_6_Mothers_Name[0..23],
+ Child_6_Mothers_FACTS_DFS_Case_Number:payload.Child_6_Mothers_FACTS_DFS_Case_Number ,
+ Child_6_Covered_by_Mothers_Health_Ins_Indc:payload.Child_6_Covered_by_Mothers_Health_Ins_Indc ,
+ Child_6_Covered_by_Fathers_Health_Ins_Indc:payload.Child_6_Covered_by_Fathers_Health_Ins_Indc,
+ Child_6_Placement_Date:payload.Child_6_Placement_Date ,
+ Child_6_Estimated_Monthly_Payment:payload.Child_6_Estimated_Monthly_Payment ,
+ Workers_Last_Name:payload.Workers_Last_Name ,
+ SFDCID:payload.SFDCID
+ }]]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String" doc:description="Convert InputSream to String"/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Create Record Details" doc:description="Create Record Details">
+            <add-message-property key="RecordDetails" value="#[sessionVars.RecordDetails +'\n'+ payload]"/>
+            <add-message-property key="UpdateRecords" value="#[sessionVars.UpdateRecords == ''? payload: sessionVars.UpdateRecords +'\n' + payload]"/>
+
+        </message-properties-transformer>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="Write_to_SFTP-CSA">
+        <logger message="Final File Prepared" level="INFO" doc:name="Logger"/>
+        <sftp:outbound-endpoint exchange-pattern="one-way" outputPattern="${sftp.csaextract.transaction.filename}#[server.dateTime.changeTimeZone('EST').format(&quot;yyyyMMdd&quot;)].TXT" host="${sftp.csaextract.transaction.host}" port="${sftp.csaextract.transaction.port}" path="${sftp.csaextract.transaction.path}" user="${sftp.csaextract.transaction.username}" password="${sftp.csaextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder" connector-ref="SFTPOverride" doc:description="Write the final extracted file in SFTP transaction folder"/>
+
+        <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment" doc:description="MP : Create TransAttachment">
+
+            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment]"/>
+            <add-message-property key="RecordCount" value="#[flowVars.RecordCount]"/>
+            <add-message-property key="RecordError" value="#[flowVars.RecordError]"/>
+            <add-message-property key="RecordSuccess" value="#[flowVars.RecordSuccess]"/>
+            <delete-message-property key="TransAttachment"/>
+        </message-properties-transformer>
+        <sftp:outbound-endpoint exchange-pattern="one-way" outputPattern="${sftp.csaextract.archive.filename}#[server.dateTime.changeTimeZone('EST').format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.csaextract.archive.host}" port="${sftp.csaextract.archive.port}" path="${sftp.csaextract.archive.path}" user="${sftp.csaextract.archive.username}" password="${sftp.csaextract.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" connector-ref="SFTPOverride" doc:description="Write the final extracted file in SFTP Archive folder"/>
+
+
+        <logger message="Salesforce update: #[payload]" level="INFO" doc:name="Salesforce Update Outcome"/>
+    </sub-flow>
+
+    <sub-flow name="inf008-child-support-application-extract-Update-Sub_Flow">
+        <set-payload value="#[sessionVars.UpdateRecords]" doc:name="Set Payload" doc:description="Set Payload to UpdateRecords variable which contains all valid records which are to be updated"/>
+        <dw:transform-message doc:name="TM:Map UpdateRecords" doc:description="Map valid records in a java payload">
+            <dw:input-payload doc:sample="sample_data\list_flatfile.flatfile" mimeType="text/plain">
+                <dw:reader-property name="schemaPath" value="Fixed-Width-Payload.ffd"/>
+            </dw:input-payload>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload text/plain 
+%output application/java
+---
+payload map {
+  Record_Identifier: $.Record_Identifier default "" ,
+ Foster_Care_Application_Date: $.Foster_Care_Application_Date default "" ,
+ Foster_Care_Approval_Date: $.Foster_Care_Approval_Date default "" ,
+ Foster_Care_Case_Status:$.Foster_Care_Case_Status default "" ,
+ County:$.County default "" ,
+ Existing_Court_Order_Indicator:$.Existing_Court_Order_Indicator default "" ,
+ Court_File_Number:$.Court_File_Number  default "" ,
+ Court_Order_Date:$.Court_Order_Date  default "" ,
+ Court_Order_City:$.Court_Order_City  default "" ,
+ Court_Order_State:$.Court_Order_State  default "" ,
+ Court_Order_Amount:$.Court_Order_Amount default "" ,
+ Court_Order_Frequency:$.Court_Order_Frequency  default "" ,
+ Court_order_Effect_Indicator:$.Court_order_Effect_Indicator  default "" ,
+ Court_Order_Payment_Type:$.Court_Order_Payment_Type  default "" ,
+ Mother_Information_Indicator:$.Mother_Information_Indicator default "" ,
+ Mothers_full_name:$.Mothers_full_name  default "" ,
+ Mothers_MCI_Number:$.Mothers_MCI_Number  default "" ,
+ Mothers_FACTS_identifier:$.Mothers_FACTS_identifier  default "" ,
+ Mothers_Primary_SSN:$.Mothers_Primary_SSN  default "" ,
+ Mothers_Other_SSN:$.Mothers_Other_SSN default "" ,
+ Mothers_Alias_Name_1:$.Mothers_Alias_Name_1  default "" ,
+ Mothers_FACTS_DFS_Case_Number:$.Mothers_FACTS_DFS_Case_Number  default "" ,
+ Mothers_Date_of_death: $.Mothers_Date_of_death default "" ,
+ Mothers_Health_Ins_Indc:$.Mothers_Health_Ins_Indc  default "" ,
+ Mothers_Health_Ins_Co_Name:$.Mothers_Health_Ins_Co_Name  default "" ,
+ Mothers_Health_Ins_Policy_Number:$.Mothers_Health_Ins_Policy_Number  default "" ,
+ Mothers_Address_Indc:$.Mothers_Address_Indc default "" ,
+ Mothers_Address_Street_1:$.Mothers_Address_Street_1 default "" ,
+ Mothers_Address_Street_2:$.Mothers_Address_Street_2 default "" ,
+ Mothers_Address_Apt:$.Mothers_Address_Apt  default "" ,
+ Mothers_Address_City:$.Mothers_Address_City default "" ,
+ Mothers_Address_State:$.Mothers_Address_State default "" ,
+ Mothers_Address_Zip:$.Mothers_Address_Zip default "" ,
+ Mothers_Address_Zip4:$.Mothers_Address_Zip4  default "" ,
+ Mothers_DOB:$.Mothers_DOB default "" ,
+ Mothers_Race:$.Mothers_Race  default "" ,
+ Mothers_Sex:$.Mothers_Sex  default "" ,
+ Mothers_Employed_Indicator:$.Mothers_Employed_Indicator default "" ,
+ Mothers_Employer_Name:$.Mothers_Employer_Name default "" ,
+ Mothers_Employer_Address_Street_1:$.Mothers_Employer_Address_Street_1  default "" ,
+ Mothers_Employer_Address_Street_2:$.Mothers_Employer_Address_Street_2  default "" ,
+ Mothers_Emp_Address_City:$.Mothers_Emp_Address_City  default "" ,
+ Mothers_Emp_Address_State:$.Mothers_Emp_Address_State default "" ,
+ Mothers_Emp_Address_Zip: $.Mothers_Emp_Address_Zip default "" ,
+ Mothers_Emp_Address_Zip4:$.Mothers_Emp_Address_Zip4  default "" ,
+ Mothers_Date_of_Last_Payment:$.Mothers_Date_of_Last_Payment  default "" ,
+ Mothers_Last_Payment_Amt:$.Mothers_Last_Payment_Amt  default "" ,
+ Mothers_Arrearage_Amt:$.Mothers_Arrearage_Amt  default "" ,
+ Mothers_Payment_Due_Date:$.Mothers_Payment_Due_Date  default "" ,
+ Father_Information_Indicator:$.Father_Information_Indicator default "" ,
+ Fathers_full_name:$.Fathers_full_name  default "" ,
+ Fathers_MCI_Number:$.Fathers_MCI_Number  default "" ,
+ Fathers_FACTS_identifier:$.Fathers_FACTS_identifier  default "" ,
+ Fathers_Primary_SSN:$.Fathers_Primary_SSN  default "" ,
+ Fathers_Other_SSN:$.Fathers_Other_SSN default "" ,
+ Fathers_Alias_Name_1:$.Fathers_Alias_Name_1 default "" ,
+ Fathers_FACTS_DFS_Case_Number:$.Fathers_FACTS_DFS_Case_Number  default "" ,
+ Fathers_Date_of_death:$.Fathers_Date_of_death  default "" ,
+ Fathers_Health_Ins_Indc:$.Fathers_Health_Ins_Indc  default "" ,
+ Fathers_Health_Ins_Co_Name:$.Fathers_Health_Ins_Co_Name  default "" ,
+ Fathers_Health_Ins_Policy_Number:$.Fathers_Health_Ins_Policy_Number default "" ,
+ Fathers_Address_Indc:$.Fathers_Address_Indc  default "" ,
+ Fathers_Address_Street_1:$.Fathers_Address_Street_1 default "" ,
+ Fathers_Address_Street_2:$.Fathers_Address_Street_2  default "" ,
+ Fathers_Address_Apt:$.Fathers_Address_Apt  default "" , 
+ Fathers_Address_City:$.Fathers_Address_City default "" ,
+ Fathers_Address_State:$.Fathers_Address_State  default "" ,
+ Fathers_Address_Zip:$.Fathers_Address_Zip default "" ,
+ Father_Address_Zip4:$.Father_Address_Zip4  default "" ,
+ Fathers_DOB:$.Fathers_DOB  default "" ,
+ Fathers_Race:$.Fathers_Race  default "" ,
+ Fathers_Sex:$.Fathers_Sex  default "" ,
+ Fathers_Employed_Indicator:$.Fathers_Employed_Indicator  default "" ,
+ Fathers_Employer_Name:$.Fathers_Employer_Name  default "" ,
+ Fathers_Employer_Address_Street_1:$.Fathers_Employer_Address_Street_1  default "" ,
+ Fathers_Employer_Address_Street_2:$.Fathers_Employer_Address_Street_2  default "" ,
+ Fathers_Emp_Address_City:$.Fathers_Emp_Address_City  default "" ,
+ Fathers_Emp_Address_State:$.Fathers_Emp_Address_State default "" ,
+ Fathers_Emp_Address_Zip:$.Fathers_Emp_Address_Zip  default "" ,
+ Fathers_Emp_Address_Zip4: $.Fathers_Emp_Address_Zip4 default "" ,
+ Fathers_Date_of_Last_Payment:$.Fathers_Date_of_Last_Payment  default "" ,
+ Fathers_Last_Payment_Amt:$.Fathers_Last_Payment_Amt default "" ,
+ Fathers_Arrearage_Amt:$.Fathers_Arrearage_Amt  default "" ,
+ Fathers_Payment_Due_Date:$.Fathers_Payment_Due_Date  default "" ,
+ Child_1_MCI:$.Child_1_MCI default "" ,
+ Child_1_FACTS_PID:$.Child_1_FACTS_PID default "" ,
+ Child_1_SSN:$.Child_1_SSN  default "" ,
+ Child_1_FACTS_DFS_Case_Number:$.Child_1_FACTS_DFS_Case_Number  default "" ,
+ Child_1_Name:$.Child_1_Name  default "" ,
+ Child_1_DOB:$.Child_1_DOB default "" ,
+ Child_1_Federally_Funded_Indc:$.Child_1_Federally_Funded_Indc  default "" ,
+ Child_1_Paternity_Established_Indc:$.Child_1_Paternity_Established_Indc default "" ,
+ Child_1_Fathers_Name:$.Child_1_Fathers_Name  default "" ,
+ Child_1_Fathers_FACTS_DFS_Case_Number:$.Child_1_Fathers_FACTS_DFS_Case_Number  default "" ,
+ Child_1_Mothers_Name:$.Child_1_Mothers_Name  default "" ,
+ Child_1_Mothers_FACTS_DFS_Case_Number:$.Child_1_Mothers_FACTS_DFS_Case_Number  default "" ,
+ Child_1_Covered_by_Mothers_Health_Ins_Indc:$.Child_1_Covered_by_Mothers_Health_Ins_Indc  default "" ,
+ Child_1_Covered_by_Fathers_Health_Ins_Indc:$.Child_1_Covered_by_Fathers_Health_Ins_Indc  default "" ,
+ Child_1_Placement_Date:$.Child_1_Placement_Date  default "" ,
+ Child_1_Estimated_Monthly_Payment:$.Child_1_Estimated_Monthly_Payment  default "" ,
+ Child_2_MCI:$.Child_2_MCI default "" ,
+ Child_2_FACTS_PID:$.Child_2_FACTS_PID default "" ,
+ Child_2_SSN:$.Child_2_SSN  default "" ,
+ Child_2_FACTS_DFS_Case_Number:$.Child_2_FACTS_DFS_Case_Number  default "" ,
+ Child_2_Name:$.Child_2_Name  default "" ,
+ Child_2_DOB:$.Child_2_DOB default "" ,
+ Child_2_Federally_Funded_Indc:$.Child_2_Federally_Funded_Indc  default "" ,
+ Child_2_Paternity_Established_Indc:$.Child_2_Paternity_Established_Indc default "" ,
+ Child_2_Fathers_Name:$.Child_2_Fathers_Name  default "" ,
+ Child_2_Fathers_FACTS_DFS_Case_Number:$.Child_2_Fathers_FACTS_DFS_Case_Number  default "" ,
+ Child_2_Mothers_Name:$.Child_2_Mothers_Name  default "" ,
+ Child_2_Mothers_FACTS_DFS_Case_Number:$.Child_2_Mothers_FACTS_DFS_Case_Number  default "" ,
+ Child_2_Coveredby_Mothers_Health_Ins_Indc:$.Child_2_Coveredby_Mothers_Health_Ins_Indc  default "" ,
+ Child_2_Coveredby_Fathers_Health_Ins_Indc:$.Child_2_Coveredby_Fathers_Health_Ins_Indc default "" ,
+ Child_2_Placement_Date:$.Child_2_Placement_Date  default "" ,
+ Child_2_Estimated_Monthly_Payment:$.Child_2_Estimated_Monthly_Payment  default "" ,
+ Child_3_MCI:$.Child_3_MCI default "" ,
+ Child_3_FACTS_PID:$.Child_3_FACTS_PID default "" ,
+ Child_3_SSN: $.Child_3_SSN default "" ,
+ Child_3_FACTS_DFS_Case_Number:$.Child_3_FACTS_DFS_Case_Number  default "" ,
+ Child_3_Name:$.Child_3_Name  default "" ,
+ Child_3_DOB:$.Child_3_DOB default "" ,
+ Child_3_Federally_Funded_Indc:$.Child_3_Federally_Funded_Indc  default "" ,
+ Child_3_Paternity_Established_Indc:$.Child_3_Paternity_Established_Indc default "" ,
+ Child_3_Fathers_Name:$.Child_3_Fathers_Name  default "" ,
+ Child_3_Fathers_FACTS_DFS_Case_Number:$.Child_3_Fathers_FACTS_DFS_Case_Number  default "" ,
+ Child_3_Mothers_Name:$.Child_3_Mothers_Name default "" ,
+ Child_3_Mothers_FACTS_DFS_Case_Number:$.Child_3_Mothers_FACTS_DFS_Case_Number  default "" ,
+ Child_3_Covered_by_Mothers_Health_Ins_Indc:$.Child_3_Covered_by_Mothers_Health_Ins_Indc  default "" ,
+ Child_3_Covered_by_Fathers_Health_Ins_Indc:$.Child_3_Covered_by_Fathers_Health_Ins_Indc default "" ,
+ Child_3_Placement_Date:$.Child_3_Placement_Date  default "" ,
+ Child_3_Estimated_Monthly_Payment:$.Child_3_Estimated_Monthly_Payment  default "" ,
+ Child_4_MCI:$.Child_4_MCI default "" ,
+ Child_4_FACTS_PID:$.Child_4_FACTS_PID default "" ,
+ Child_4_SSN:$.Child_4_SSN  default "" ,
+ Child_4_FACTS_DFS_Case_Number:$.Child_4_FACTS_DFS_Case_Number  default "" ,
+ Child_4_Name:$.Child_4_Name  default "" ,
+ Child_4_DOB:$.Child_4_DOB default "" ,
+ Child_4_Federally_Funded_Indc:$.Child_4_Federally_Funded_Indc  default "" ,
+ Child_4_Paternity_Established_Indc:$.Child_4_Paternity_Established_Indc default "" ,
+ Child_4_Fathers_Name:$.Child_4_Fathers_Name  default "" ,
+ Child_4_Fathers_FACTS_DFS_Case_Number:$.Child_4_Fathers_FACTS_DFS_Case_Number  default "" ,
+ Child_4_Mothers_Name:$.Child_4_Mothers_Name  default "" ,
+ Child_4_Mothers_FACTS_DFS_Case_Number:$.Child_4_Mothers_FACTS_DFS_Case_Number  default "" ,
+ Child_4_Covered_by_Mothers_Health_Ins_Indc:$.Child_4_Covered_by_Mothers_Health_Ins_Indc  default "" ,
+ Child_4_Covered_by_Fathers_Health_Ins_Indc:$.Child_4_Covered_by_Fathers_Health_Ins_Indc default "" ,
+ Child_4_Placement_Date:$.Child_4_Placement_Date  default "" ,
+ Child_4_Estimated_Monthly_Payment:$.Child_4_Estimated_Monthly_Payment  default "" ,
+ Child_5_MCI:$.Child_5_MCI default "" ,
+ Child_5_FACTS_PID:$.Child_5_FACTS_PID default "" ,
+ Child_5_SSN: $.Child_5_SSN default "" ,
+ Child_5_FACTS_DFS_Case_Number: $.Child_5_FACTS_DFS_Case_Number default "" ,
+ Child_5_Name:$.Child_5_Name  default "" , 
+ Child_5_DOB:$.Child_5_DOB default "" ,
+ Child_5_Federally_Funded_Indc:$.Child_5_Federally_Funded_Indc  default "" ,
+ Child_5_Paternity_Established_Indc:$.Child_5_Paternity_Established_Indc default "" ,
+ Child_5_Fathers_Name:$.Child_5_Fathers_Name  default "" ,
+ Child_5_Fathers_FACTS_DFS_Case_Number:$.Child_5_Fathers_FACTS_DFS_Case_Number  default "" ,
+ Child_5_Mothers_Name:$.Child_5_Mothers_Name  default "" ,
+ Child_5_Mothers_FACTS_DFS_Case_Number:$.Child_5_Mothers_FACTS_DFS_Case_Number  default "" ,
+ Child_5_Covered_by_Mothers_Health_Ins_Indc:$.Child_5_Covered_by_Mothers_Health_Ins_Indc  default "" ,
+ Child_5_Covered_by_Fathers_Health_Ins_Indc:$.Child_5_Covered_by_Fathers_Health_Ins_Indc default "" ,
+ Child_5_Placement_Date:$.Child_5_Placement_Date  default "" ,
+ Child_5_Estimated_Monthly_Payment:$.Child_5_Estimated_Monthly_Payment  default "" ,
+ Child_6_MCI:$.Child_6_MCI default "" ,
+ Child_6_FACTS_PID:$.Child_6_FACTS_PID default "" ,
+ Child_6_SSN:$.Child_6_SSN  default "" ,
+ Child_6_FACTS_DFS_Case_Number:$.Child_6_FACTS_DFS_Case_Number  default "" ,
+ Child_6_Name:$.Child_6_Name  default "" ,
+ Child_6_DOB:$.Child_6_DOB default "" ,
+ Child_6_Federally_Funded_Indc:$.Child_6_Federally_Funded_Indc  default "" ,
+ Child_6_Paternity_Established_Indc:$.Child_6_Paternity_Established_Indc default "" ,
+ Child_6_Fathers_Name:$.Child_6_Fathers_Name  default "" ,
+ Child_6_Fathers_FACTS_DFS_Case_Number:$.Child_6_Fathers_FACTS_DFS_Case_Number  default "" ,
+ Child_6_Mothers_Name:$.Child_6_Mothers_Name  default "" ,
+ Child_6_Mothers_FACTS_DFS_Case_Number:$.Child_6_Mothers_FACTS_DFS_Case_Number  default "" ,
+ Child_6_Covered_by_Mothers_Health_Ins_Indc:$.Child_6_Covered_by_Mothers_Health_Ins_Indc  default "" ,
+ Child_6_Covered_by_Fathers_Health_Ins_Indc:$.Child_6_Covered_by_Fathers_Health_Ins_Indc default "" ,
+ Child_6_Placement_Date:$.Child_6_Placement_Date  default "" ,
+ Child_6_Estimated_Monthly_Payment:$.Child_6_Estimated_Monthly_Payment  default "" ,
+ Workers_Last_Name:$.Workers_Last_Name default "" ,
+ SFDCID:($.SFDCID  splitBy "<*>")[0] default "",
+ Name:($.SFDCID  splitBy "<*>")[1] default ""
+ }
+ ]]></dw:set-payload>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Create Update Array for SFDC" metadata:id="b330c174-e4a9-4ded-85a4-250218ce87d4" doc:description="Parse the Jave payload generated in last Transfrom Message to update status to 'Interfaced to DHSS'">
+            <dw:input-payload doc:sample="sample_data\list_csv.csv" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	Id:payload01.SFDCID,
+	Sent_To_Interface__c: "Interfaced to DHSS"
+})]]></dw:set-payload>
+            <dw:set-variable variableName="UpdatePayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="View Success/Failure Message"/>
+        <sfdc:update-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Child_Support_Application__c" doc:name="SFDC:Update Records " doc:description="SFDC:Update Records with the payload genrated in last step, with ten thousand as governor limit">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update-bulk>
+        <message-properties-transformer scope="invocation" doc:name="MP:Save JobId" doc:description="JobId: ID of the batch job which is used to close the job">
+            <add-message-property key="JobId" value="#[payload.jobId]"/>
+        </message-properties-transformer>
+        <until-successful maxRetries="50" millisBetweenRetries="5000" synchronous="true" doc:name="Until Successful" doc:description="Untill successful is used to get the batch result every 2 secs until the batch job completes ">
+            <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce"/>
+        </until-successful>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" doc:description="Convert InputStream to String"/>
+        <dw:transform-message doc:name="TM:Parse Succesfull and Error Records" metadata:id="a5547b4d-8485-4cb3-a54b-5ff9bf44f6a9">
+            <dw:set-variable variableName="UpdateSuccess"><![CDATA[%dw 1.0
+%output application/java
+---
+( payload.results.*result map {
+	ID:$.id default '',
+	Success:$.success
+} filter $.ID != '' ) ]]></dw:set-variable>
+            <dw:set-variable variableName="ErrorUpdate"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.results.*result map {
+	ID:$.id default '',
+	Field:$.errors.fields,
+	Name:flowVars.UpdatePayload[$$].Name,
+	Error:$.errors.statusCode,
+	Description:$.errors.message
+} filter $.ID == '' ]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.JobId]" doc:name="SFDC: Close Job"/>
+        <dw:transform-message doc:name="TM:Group Successfull Records" doc:description="Group Successfull Records">
+            <dw:set-variable variableName="UpdateSuccess"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.UpdateSuccess groupBy $.ID default {}]]></dw:set-variable>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Filter Valid Records" doc:description="Filter Valid Records">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.UpdatePayload filter (flowVars.UpdateSuccess[($.SFDCID splitBy "<*>")[0]].ID != null) map ($) - "SFDCID"]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Create Fixed Width Payload" doc:description="Create Fixed Width Payload from the processed data">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath = "Fixed-Width-CSA.ffd"
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String" doc:description="Convert InputSream to String"/>
+
+    </sub-flow>
+    <sub-flow name="inf008-child-support-application-extract-NoPayload_Flow" doc:description="Flow to check payload size equal to zero">
+        <choice doc:name="Choice:Check Payload size" doc:description="Check payload size and log a business error id extracted records is zero, else continue the flow">
+            <when expression="#[payload.size()==0]">
+                <dw:transform-message doc:name="Creater Header and Trailer">
+                    <dw:set-variable variableName="Header"><![CDATA[%dw 1.0
+%output text/plain schemaPath = "Header-fixed-width.ffd"
+---
+[{
+	Identifier:'H',
+	Date: (now >> "America/New_York") as :string {format: "YYYYMMdd"},
+	Filler:' '
+}]]]></dw:set-variable>
+                    <dw:set-variable variableName="Trailer"><![CDATA[%dw 1.0
+%output text/plain schemaPath = "Trailer-fixed-width.ffd"
+---
+[{
+	Identifier:'T',
+	Count: 0  as :number as :string {format: "0000000000"},
+	Filler: ' '
+}]]]></dw:set-variable>
+                </dw:transform-message>
+                <enricher doc:name="Message Enricher">
+					<flow-ref name="inf008-child-support-application-extract-OtoSConversion-ForFV-Sub_Flow" doc:name="inf008-child-support-application-extract-OtoSConversion-ForFV-Sub_Flow"/>
+					<enrich source="#[flowVars.Header]" target="#[flowVars.Header]"/>
+					<enrich source="#[flowVars.Trailer]" target="#[flowVars.Trailer]"/>
+				</enricher>
+                <set-payload doc:name="Set Payload Comibine Header and footer" value="#[flowVars.Header + flowVars.Trailer]"/>
+                <flow-ref name="Write_to_SFTP-CSA" doc:name="Write_to_SFTP-CSA"/>
+                <set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="SV Create TransAttachment"/>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF008&quot;, &quot;InterfaceName&quot;: &quot;Child Support Application Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;Backup_FOSTER_CARE_NEW_APPLICAT_#[server.dateTime.changeTimeZone('EST').format(&quot;MM/dd/yyyy&quot;)]&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload to JSON for Logging Framework" doc:description="This payload will complete the transaction in interface dashboard by loggin a business error for zero record extracted"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call LogTransactionSubFlow to Complete the transaction with business error"/>
+				<message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+						<delete-message-property key="Header"/>
+						<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+						<delete-message-property key="Trailer"/>
+						<delete-message-property key="TransactionID"/>
+						
+						
+						
+			</message-properties-transformer>
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+				<delete-message-property key="TID"/>
+				<delete-message-property key="TransAttachment"/>
+			</message-properties-transformer>
+            </when>
+            <otherwise>
+                <logger message="Records Extracted Succesfully " level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="inf008-child-support-application-extract-Call-Logging-Framework-2-Sub_Flow">
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set ErrorAttachmentNew,TransAttchment" doc:description="ErrorAttachmentNew:Save the ErrorAttachment variable before removing it from the memory , to restore it after logging framework has been called, otherwise logging framework will attach it
+         TransAttachment:Extracted File">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="ErrorAttachmentNew" value="#[sessionVars.ErrorAttachement]"/>
+        </message-properties-transformer>
+        <remove-session-variable variableName="ErrorAttachment" doc:name="Session Variable" doc:description="Remove ErrorAttachment before calling logging framework to avoid attaching it"/>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF008&quot;, &quot;InterfaceName&quot;: &quot;Child Support Application Extract&quot;,&quot;ErrorFilename&quot;:&quot;ErrorAttachment&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_FOSTER_CARE_NEW_APPLICAT#[server.dateTime.changeTimeZone('EST').format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;RecordSkipped&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload to JSON" doc:description="Set Payload to JSON for logging framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call LogTransactionSubFlow to attach TransAttachment"/>
+        <logger level="INFO" doc:name="Logger" message="#[payload]"/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Create ErrorAttachment" doc:description="Restore ErrorAttachment from the varable ErrorAttachmentNew">
+            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachmentNew]"/>
+        </message-properties-transformer>
+    </sub-flow>
+ <sub-flow name="Call-LOV-flow-CSA" doc:description="Call LOV framework to get LOVs to be used in interface run">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'ADDRESS_COUNTY','STATECODE','COURT_ORDER_FRQ','COURT_ORDER_IND','COURT_ORD_PYMT_TYPE','MOTHER_HEALTH_IND','MOTHER_EMP_IND','FATHER_HEALTH_IND','FATHER_EMP_IND','FATHER_ADD_IND','MOTHER_ADD_IND','GENDER','RACE','COURT_ORDER_EXIST_IND'&quot;}" doc:name="Set LOV names" doc:description="Set LOV names in JSON to extract it from SFDC"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow" doc:description="Call lovquerySub_Flow"/>
+ </sub-flow>
+ <sub-flow name="inf008-child-support-application-extract-OtoSConversion-ForFV-Sub_Flow">
+		<set-payload value="#[flowVars.Header]" doc:name="Set Payload: File with Trailer"/>
+
+				<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+		<set-variable variableName="Header" value="#[payload]" doc:name="FV: Set Header"/>
+
+	<set-payload value="#[flowVars.Trailer]" doc:name="Set Payload: File with Trailer" />
+				<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+				<set-variable variableName="Trailer" value="#[payload]" doc:name="Variable"/>
+	</sub-flow>
+	<sub-flow name="inf008-child-support-application-extract-OtoSConversion-For-SV-Sub_Flow">
+		<set-payload value="#[sessionVars.Header]" doc:name="Set Payload: File with Trailer"/>
+
+				<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+		<set-session-variable variableName="Header" value="#[payload]" doc:name="SV: Set Header"/>
+
+
+	<set-payload value="#[sessionVars.Trailer]" doc:name="Set Payload: File with Trailer" />
+				<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+		<set-session-variable variableName="Trailer" value="#[payload]" doc:name="SV: Set Trailer"/>
+
+	</sub-flow>
+    </mule>

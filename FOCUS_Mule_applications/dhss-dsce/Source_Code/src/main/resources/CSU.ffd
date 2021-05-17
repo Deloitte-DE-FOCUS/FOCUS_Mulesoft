@@ -1,0 +1,21 @@
+form: FIXEDWIDTH
+name: 'CSU'
+values: 
+- { name: 'RecordIdentifier', usage: M, type: String, length: 1 }
+- { name: 'ClientMCI', usage: M, type: String, length: 10 }
+- { name: 'ClientPID', usage: M, type: String, length: 10 }
+- { name: 'MotherCaseNumber', usage: M, type: String, length: 10 }
+- { name: 'FatherCaseNumber', usage: M, type: String, length: 10 }
+- { name: 'PlacementEndDate', usage: M, type: String, length: 8 }
+- { name: '4E_Date', usage: M, type: String, length: 8 }
+- { name: '4E_Status', usage: M, type: String, length: 1 }
+- { name: 'MotherTPR_Indicator', usage: M, type: String, length: 1 }
+- { name: 'MotherTPR_Date', usage: M, type: String, length: 8 }
+- { name: 'FatherTPR_Indicator', usage: M, type: String, length: 1 }
+- { name: 'FatherTPR_Date', usage: M, type: String, length: 8 }
+- { name: 'WorkerName', usage: M, type: String, length: 40 }
+- { name: 'WorkerPhone', usage: M, type: String, length: 10 }
+- { name: 'ParentName', usage: M, type: String, length: 40 }
+- { name: 'ParentPID', usage: M, type: String, length: 10 }
+- { name: 'ParentSSN', usage: M, type: String, length: 9 }
+- { name: 'ParentDOB', usage: M, type: String, length: 8 }

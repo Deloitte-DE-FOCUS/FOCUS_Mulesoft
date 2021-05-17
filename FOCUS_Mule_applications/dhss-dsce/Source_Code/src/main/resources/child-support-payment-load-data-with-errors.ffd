@@ -1,0 +1,19 @@
+form: FIXEDWIDTH
+name: 'ChildSupportPaymentData'
+values: 
+- { name: 'Record-Identifier', usage: M, type: String, length: 1 }
+- { name: 'Child-MCI', usage: M, type: String, length: 10 }
+- { name: 'Child-FOCUS-PID', usage: M, type: String, length: 10 }
+- { name: 'Child-SSN', usage: M, type: String, length: 9 }
+- { name: 'Child-Last-Name', usage: M, type: String, length: 24 }
+- { name: 'Mother-DSCE-Case-ID', usage: M, type: String, length: 10 }
+- { name: 'Mother-MCI', usage: M, type: String, length: 10 }
+- { name: 'Mother-FOCUS-PID', usage: M, type: String, length: 10 }
+- { name: 'Mother-Payment-Amount', usage: M, type: String, length: 12 }
+- { name: 'Mother-Payment-Date', usage: M, type: String, length: 8 }
+- { name: 'Father-DSCE-Case-ID', usage: M, type: String, length: 10 }
+- { name: 'Father-MCI', usage: M, type: String, length: 10 }
+- { name: 'Father-FOCUS-PID', usage: M, type: String, length: 10 }
+- { name: 'Father-Payment-Amount', usage: M, type: String, length: 12 }
+- { name: 'Father-Payment-Date', usage: M, type: String, length: 8 }
+- { name: 'Error-Description', usage: M, type: String, length: 300 }

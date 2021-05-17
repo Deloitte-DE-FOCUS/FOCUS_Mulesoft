@@ -1,0 +1,9 @@
+form: FIXEDWIDTH
+name: 'ChildSuppoprtCostofCare_FinalPayload'
+values: 
+- { name: 'RecordIdentifier', usage: M, type: String, length: 1 }
+- { name: 'MCI', usage: M, type: String, length: 10 }
+- { name: 'PID', usage: M, type: String, length: 10 }
+- { name: 'SSN', usage: O, type: String, length: 9 }
+- { name: 'MonthofCare', usage: M, type: String, length: 6 }
+- { name: 'CostofCare', usage: M, type: String, length: 12 }

@@ -1,0 +1,47 @@
+form: FIXEDWIDTH
+name: 'LoadPayload'
+values: 
+- { name: 'Record Identifier', usage: M, type: String, length: 1 }
+- { name: 'Reason Update', usage: M, type: String, length: 2 }
+- { name: 'Child''s MCI', usage: M, type: String, length: 10 }
+- { name: 'Child FOCUS PID', usage: M, type: String, length: 10 }
+- { name: 'Child Name', usage: M, type: String, length: 24 }
+- { name: 'Child SSN', usage: M, type: String, length: 9 }
+- { name: 'Child FOCUS DFS Case ID', usage: M, type: String, length: 10 }
+- { name: 'Child Support Application Status', usage: M, type: String, length: 1 }
+- { name: 'Child Paternity Established', usage: M, type: String, length: 1 }
+- { name: 'Date Paternity Established', usage: M, type: Date, length: 8, format: { justify: RIGHT } }
+- { name: 'Method of Paternity Establishment', usage: M, type: String, length: 2 }
+- { name: 'Date of Child Support Order', usage: M, type: String, length: 8 }
+- { name: 'Mother DCSS Case ID', usage: M, type: String, length: 10 }
+- { name: 'Mother FOCUS DFS Case ID', usage: M, type: String, length: 10 }
+- { name: 'Mother MCI', usage: M, type: String, length: 10 }
+- { name: 'Mother FOCUS PID', usage: M, type: String, length: 10 }
+- { name: 'Mother Name', usage: M, type: String, length: 24 }
+- { name: 'Mother Order Amount', usage: M, type: String, length: 12 }
+- { name: 'Mother Last Date of Payment', usage: M, type: Date, length: 8, format: { justify: RIGHT } }
+- { name: 'Mother Last Payment Amount', usage: M, type: String, length: 12 }
+- { name: 'Mother Address Indicator', usage: M, type: String, length: 1 }
+- { name: 'Mother Address Street 1', usage: M, type: String, length: 31 }
+- { name: 'Mother Address Street 2', usage: M, type: String, length: 31 }
+- { name: 'Mother Address State', usage: M, type: String, length: 2 }
+- { name: 'Mother Address City', usage: M, type: String, length: 16 }
+- { name: 'Mother Address Zip', usage: M, type: String, length: 5 }
+- { name: 'Mother Address Zip+4', usage: M, type: String, length: 4 }
+- { name: 'Mother FOCUS DFS Case Open Date', usage: M, type: Date, length: 8, format: { justify: RIGHT } }
+- { name: 'Father DCSS Case ID', usage: M, type: String, length: 10 }
+- { name: 'Father FOCUS DFS Case ID', usage: M, type: String, length: 10 }
+- { name: 'Father MCI', usage: M, type: String, length: 10 }
+- { name: 'Father FOCUS PID', usage: M, type: String, length: 10 }
+- { name: 'Father Name', usage: M, type: String, length: 24 }
+- { name: 'Father Order Amount', usage: M, type: String, length: 12 }
+- { name: 'Father Last Date of Payment', usage: M, type: Date, length: 8, format: { justify: RIGHT } }
+- { name: 'Father Last Payment Amount', usage: M, type: String, length: 12 }
+- { name: 'Father Address Indicator', usage: M, type: String, length: 1 }
+- { name: 'Father Address Street 1', usage: M, type: String, length: 31 }
+- { name: 'Father Address Street 2', usage: M, type: String, length: 31 }
+- { name: 'Father Address State', usage: M, type: String, length: 2 }
+- { name: 'Father Address City', usage: M, type: String, length: 16 }
+- { name: 'Father Address Zip', usage: M, type: String, length: 5 }
+- { name: 'Father Address Zip+4', usage: M, type: String, length: 4 }
+- { name: 'Father FOCUS DFS Case Open Date', usage: M, type: Date, length: 8, format: { justify: RIGHT } }
