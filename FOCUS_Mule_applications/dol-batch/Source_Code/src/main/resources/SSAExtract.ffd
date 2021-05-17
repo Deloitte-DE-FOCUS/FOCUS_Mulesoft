@@ -1,0 +1,49 @@
+form: FIXEDWIDTH
+name: 'SSAExtract'
+values: 
+- { name: 'RecordType', usage: M, type: String, length: 1 }
+- { name: 'FirstName', usage: M, type: String, length: 15 }
+- { name: 'MiddleName', usage: M, type: String, length: 15 }
+- { name: 'LastName', usage: M, type: String, length: 20 }
+- { name: 'SSN', usage: M, type: String, length: 9 }
+- { name: 'DOB', usage: M, type: String, length: 10 }
+- { name: 'FosterParentFirstName', usage: M, type: String, length: 15 }
+- { name: 'FosterParentLastName', usage: M, type: String, length: 20 }
+- { name: 'FosterCarePlacementInstitutionName', usage: M, type: String, length: 40 }
+- { name: 'FosterCarePlacementLocationAddressLine1', usage: M, type: String, length: 22 }
+- { name: 'FosterCarePlacementLocationAddressLine2', usage: M, type: String, length: 22 }
+- { name: 'FosterCarePlacementLocationAddressLine3', usage: M, type: String, length: 22 }
+- { name: 'FosterCarePlacementLocationAddressLine4', usage: M, type: String, length: 22 }
+- { name: 'FosterCarePlacementLocationCity', usage: M, type: String, length: 22 }
+- { name: 'FosterCarePlacementLocationState', usage: M, type: String, length: 2 }
+- { name: 'FosterCarePlacementLocationZipCode', usage: M, type: String, length: 5 }
+- { name: 'FosterCarePlacementLocationZip4', usage: M, type: String, length: 4 }
+- { name: 'FosterCarePlacementPhoneNumber', usage: M, type: String, length: 10 }
+- { name: 'FosterCarePlacementPhoneExtension', usage: M, type: String, length: 5 }
+- { name: 'NameofStateAgency', usage: M, type: String, length: 40 }
+- { name: 'StateEmployerEIN', usage: M, type: String, length: 9 }
+- { name: 'StateAgencyMailingAddressLine1', usage: M, type: String, length: 22 }
+- { name: 'StateAgencyMailingAddressLine2', usage: M, type: String, length: 22 }
+- { name: 'StateAgencyMailingAddressLine3', usage: M, type: String, length: 22 }
+- { name: 'StateAgencyMailingAddressLine4', usage: M, type: String, length: 22 }
+- { name: 'StateAgencyMailingCity', usage: M, type: String, length: 22 }
+- { name: 'StateAgencyMailingState', usage: M, type: String, length: 2 }
+- { name: 'StateAgencyMailingZipCode', usage: M, type: String, length: 5 }
+- { name: 'StateAgencyMailingZip4', usage: M, type: String, length: 4 }
+- { name: 'StateAgencyPOCFirstName', usage: M, type: String, length: 15 }
+- { name: 'StateAgencyPOCLastName', usage: M, type: String, length: 20 }
+- { name: 'StateAgencyPOCPhoneNumber', usage: M, type: String, length: 10 }
+- { name: 'StateAgencyPOCPhoneExtension', usage: M, type: String, length: 5 }
+- { name: 'ChildStatus', usage: M, type: String, length: 1 }
+- { name: 'DateOfChildStatus',  type: String, length: 10 }
+- { name: 'WastheChildAdopted', usage: M, type: String, length: 1 }
+- { name: 'DidChildageoutofFosterCare', usage: M, type: String, length: 1 }
+- { name: 'WastheStatethepayeeinthemonthbeforethisReport', usage: M, type: String, length: 1 }
+- { name: 'CurrentPayeeFirstName', usage: M, type: String, length: 15 }
+- { name: 'CurrentPayeeLastName', usage: M, type: String, length: 20 }
+- { name: 'CurrentPayeeSSN', usage: M, type: String, length: 9 }
+- { name: 'CurrentPayeeOrgName', usage: M, type: String, length: 40 }
+- { name: 'CurrentPayeeEIN', usage: M, type: String, length: 9 }
+- { name: 'CurrentPayeePhoneNumber', usage: M, type: String, length: 10 }
+- { name: 'CurrentPayeePhoneNumberExtn', usage: M, type: String, length: 5 }
+- { name: 'TypeofPayeeHandlingSSAFunds', usage: M, type: String, length: 1 }

@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:cluster="http://www.mulesoft.org/schema/mule/ee/cluster" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd">
+
+	<apikit:config name="api-config" raml="solr_pac_api.raml"
+		consoleEnabled="false" doc:name="Router" keepRamlBaseUri="false" disableValidations="true"/>
+	<http:request-config name="HTTP_Request_Solr_Configuration"
+		host="${solr.host}" port="${solr.port}" basePath="${solr.path}"
+		doc:name="HTTP Request Configuration" protocol="HTTPS">
+		<http:basic-authentication username="${solr.auth.userName}"
+			password="${solr.auth.pwd}" preemptive="true" />
+	</http:request-config>
+    <http:request-config name="HTTP_Request_dsce_Configuration"
+		host="${dsce.host}" port="${dsce.port}" basePath="${dsce.path}"
+		doc:name="HTTP Request Configuration" protocol="HTTPS">
+	</http:request-config>
+    <configuration doc:name="Configuration">
+		<expression-language>
+			<global-functions>
+			    def convertToEnglish(input) {
+			    	gov.delaware.replacer.LatinToEnglishConverter lconv = new gov.delaware.replacer.LatinToEnglishConverter();
+			    	return lconv.convertToEnglish(input);
+			    }
+		   </global-functions>
+		</expression-language>
+	</configuration>
+	<flow name="solr_api-main">
+		<http:listener config-ref="HTTP_Listener_Configuration"
+			path="/*" allowedMethods="POST" doc:name="HTTP - Request" />
+		<logger message="Input from FOCUS #[payload] " level="INFO"
+			doc:name="Logger" />
+
+		<apikit:router config-ref="api-config" doc:name="APIkit Router" />
+		<exception-strategy ref="solr_api-apiKitGlobalExceptionMapping"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+<!-- 	<flow name="solr_api-console">
+		<http:listener config-ref="HTTP_Listener_Configuration"
+			path="/console/*" doc:name="HTTP" />
+		<apikit:console config-ref="api-config" doc:name="APIkit Console" />
+	</flow> -->
+	<flow name="get:/ConnectivityTest:api-config">
+		<flow-ref name="TestFramework" doc:name="TestFramework"/>	
+	</flow>
+	<flow name="post:/addressSearch:api-config">
+		<object-to-string-transformer doc:name="Object to String" />
+		<message-properties-transformer scope="invocation"
+			doc:name="Message Properties">
+			<add-message-property key="queryText" value="#[json:q]" />
+			<add-message-property key="queryFields" value="#[json:fl]" />
+			<add-message-property key="queryFq" value="#[json:fq]" />
+		</message-properties-transformer>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-variable variableName="queryFilters"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+(flowVars.queryFq default {} map {
+	fq : $
+})
+}]]></dw:set-variable>
+		</dw:transform-message>
+		<logger
+			message="Query Text :  #[flowVars.queryText]  Query Fields :  #[flowVars.queryFields]  Query Filters :  #[flowVars.queryFilters]"
+			level="INFO" doc:name="Logger" />
+		<set-payload value="#[&quot;&quot;]" doc:name="Set Payload" />
+		<set-property propertyName="Content-Type" value="application/json" doc:name="Property : ContentType"/>
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.address.core}/select" method="GET"
+			doc:name="HTTP : Retrieve address details">
+			<http:request-builder>
+				<http:query-param paramName="q" value="#[flowVars.queryText]" />
+				<http:query-param paramName="fl"
+					value="#[flowVars.queryFields]" />
+				<http:query-param paramName="wt"
+					value="${solr.address.response}" />
+				<http:query-params expression="#[flowVars.queryFilters]" />
+			</http:request-builder>
+		</http:request>
+
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.response.docs
+]]></dw:set-payload>
+		</dw:transform-message>
+		<logger message="After Transformation : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<!-- query solr -->
+		<!-- <solr:query config-ref="focusSolr" q="*:*" doc:name="Solr" highlightField="content"/> -->
+
+		<!-- return results -->
+		<!-- <set-payload value="#[groovy: payload.getResults()]" doc:name="Set 
+			Payload"/> -->
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property" />
+	</flow>
+	<flow name="post:/addressUpsert:api-config">
+		<object-to-string-transformer mimeType="application/xml"
+			doc:name="Object to String" />
+		
+		<!-- <scripting:component doc:name="Groovy : Delay 10 Seconds">
+			<scripting:script engine="Groovy"><![CDATA[sleep(10000);
+return message.payload;]]></scripting:script>
+		</scripting:component> -->
+		<logger message="Input Address Payload : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<dw:transform-message doc:name="TM : Collect SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="TM : Combine SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+		</dw:transform-message>
+		<!-- <logger message="Address Salesforce Ids : #[payload]" level="INFO"
+			doc:name="Logger" /> -->
+		<sfdc:query config-ref="Salesforce__Basic_Authentication"
+			query="SELECT Id,Name,County__c,Street_1__c,Street_2__c,PO_Box_Number__c,ZIP__c,City__c,State__c,Country__c FROM DEL_Address__c WHERE Id in (#[payload])"
+			doc:name="Salesforce" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"ADDR_ID": $.Id,
+	"AddressLine1": $.Street_1__c,
+	"AddressLine1_S": (($.Street_1__c replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') replace /^(\d+)/ with '') when $.Street_1__c != null otherwise '',
+	"AddressLine1_NN": (($.Street_1__c replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '')  replace /\s+/ with '_') when $.Street_1__c != null otherwise '',
+	"AddressLine1_P": ((($.Street_1__c replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') replace /^(\d+)/ with '') replace /\s+/ with ' ' splitBy ' ') when $.Street_1__c != null otherwise '',
+	"AddressLine2": $.Street_2__c,
+	"POBox": $.PO_Box_Number__c,
+	"City": $.City__c,
+	"County": $.County__c,
+	"zip": $.ZIP__c,
+	"state": $.State__c,
+	"country": $.Country__c
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.address.core}/update" method="POST"
+			doc:name="HTTP : Solr Update">
+			<http:request-builder>
+                <http:query-param paramName="commit" value="true"/>
+                <http:query-param paramName="Content-Type" value="application/json"/>
+			</http:request-builder>
+		</http:request>
+
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" />
+		<!-- <logger message="After Transformation : #[payload]" level="INFO"
+			doc:name="Logger" /> -->
+		<!-- query solr -->
+		<!-- <solr:query config-ref="focusSolr" q="*:*" doc:name="Solr" highlightField="content"/> -->
+
+		<!-- return results -->
+		<!-- <set-payload value="#[groovy: payload.getResults()]" doc:name="Set 
+			Payload"/> -->
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property" />
+	</flow>
+	<flow name="post:/caseSearch:api-config">
+		<object-to-string-transformer doc:name="Object to String" />
+		<message-properties-transformer scope="invocation"
+			doc:name="Message Properties">
+			<add-message-property key="queryText" value="#[json:q]" />
+			<add-message-property key="queryFields" value="#[json:fl]" />
+			<add-message-property key="queryFq" value="#[json:fq]" />
+		</message-properties-transformer>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-variable variableName="queryFilters"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+(flowVars.queryFq default {} map {
+	fq : $
+})
+}]]></dw:set-variable>
+		</dw:transform-message>
+		<logger
+			message="Query Text :  #[flowVars.queryText]  Query Fields :  #[flowVars.queryFields]  Query Filters :  #[flowVars.queryFilters]"
+			level="INFO" doc:name="Logger" />
+		<set-payload value="#[&quot;&quot;]" doc:name="Set Payload" />
+		<set-property propertyName="Content-Type" value="application/json" doc:name="Property : ContentType"/>
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.case.core}/select" method="GET" doc:name="HTTP : Retrieve case details">
+			<http:request-builder>
+				<http:query-param paramName="q" value="#[flowVars.queryText]" />
+				<http:query-param paramName="fl"
+					value="#[flowVars.queryFields]" />
+				<http:query-param paramName="wt" value="${solr.case.response}" />
+				<http:query-params expression="#[flowVars.queryFilters]" />
+			</http:request-builder>
+		</http:request>
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.response.docs
+]]></dw:set-payload>
+		</dw:transform-message>
+		<logger message="After Transformation : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property" />
+	</flow>
+	<flow name="post:/caseUpsert:api-config">
+		<object-to-string-transformer mimeType="application/xml"
+			doc:name="Object to String" />
+		
+		<!-- <scripting:component doc:name="Groovy : Delay 10 Seconds">
+			<scripting:script engine="Groovy"><![CDATA[sleep(10000);
+return message.payload;]]></scripting:script>
+		</scripting:component> -->
+		<logger message="Input Case Payload : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<dw:transform-message doc:name="TM : Collect SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="TM : Combine SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-payload>
+		</dw:transform-message>
+		<!-- <logger message="Case Salesforce Ids : #[payload]" level="INFO"
+			doc:name="Logger" /> -->
+		<sfdc:query config-ref="Salesforce__Basic_Authentication"
+			query="SELECT Id,Name,Case_Name_Divisionwise__c,Division__c,Case_Open_Date__c,Case_Close_Date__c,Status__c FROM DEL_Case__c WHERE Id in (#[payload])"
+			doc:name="Salesforce" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"CASE_ID": $.Id,
+	"CASE_NM": $.Name,
+	"CASE_NM_S": (($.Name replace ',' with '') replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Name != null otherwise '',
+	"Case_NM_Div": $.Case_Name_Divisionwise__c,
+	"Case_NM_Div_S": ($.Case_Name_Divisionwise__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Case_Name_Divisionwise__c != null otherwise '',
+	"Division": $.Division__c,
+	"Case_Open_Date": $.Case_Open_Date__c,
+	"Case_Close_Date": $.Case_Close_Date__c,
+	"Status": $.Status__c
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.case.core}/update/json/docs" method="POST" doc:name="HTTP : Solr Update">
+			<http:request-builder>
+				<http:query-param paramName="commit" value="true" />
+				<http:query-param paramName="Content-Type" value="application/json" />
+			</http:request-builder>
+		</http:request>
+
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" />
+		<!-- <logger message="After Transformation : #[payload]" level="INFO"
+			doc:name="Logger" /> -->
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property" />
+	</flow>
+	<flow name="post:/personSearch:api-config">
+		<object-to-string-transformer doc:name="Object to String" />
+		<message-properties-transformer scope="invocation"
+			doc:name="Message Properties">
+			<add-message-property key="queryText" value="#[json:q]" />
+			<add-message-property key="queryFields" value="#[json:fl]" />
+			<add-message-property key="queryFq" value="#[json:fq]" />
+		</message-properties-transformer>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-variable variableName="queryFilters"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+(flowVars.queryFq default {} map {
+	fq : $
+})
+}]]></dw:set-variable>
+		</dw:transform-message>
+		<logger
+			message="Query Text :  #[flowVars.queryText]  Query Fields :  #[flowVars.queryFields]  Query Filters :  #[flowVars.queryFilters]"
+			level="INFO" doc:name="Logger" />
+		<set-payload value="#[&quot;&quot;]" doc:name="Set Payload" />
+		<set-property propertyName="Content-Type" value="application/json" doc:name="Property : ContentType"/>
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.person.core}/select" method="GET"
+			doc:name="HTTP : Retrieve person details">
+			<http:request-builder>
+				<http:query-param paramName="q" value="#[flowVars.queryText]" />
+				<http:query-param paramName="fl"
+					value="#[flowVars.queryFields]" />
+				<http:query-param paramName="wt"
+					value="${solr.person.response}" />
+				<http:query-params expression="#[flowVars.queryFilters]" />
+			</http:request-builder>
+		</http:request>
+		<byte-array-to-string-transformer
+			mimeType="application/json" doc:name="Byte Array to String" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.response.docs
+]]></dw:set-payload>
+		</dw:transform-message>
+		<logger message="After Transformation : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property" />
+	</flow>
+	<flow name="post:/personUpsert:api-config">
+		<object-to-string-transformer mimeType="application/xml"
+			doc:name="Object to String" />
+		
+		<!-- <scripting:component doc:name="Groovy : Delay 10 Seconds">
+			<scripting:script engine="Groovy"><![CDATA[sleep(10000);
+return message.payload;]]></scripting:script>
+		</scripting:component> -->
+		<logger message="Input Person Payload : #[payload]" level="INFO"
+			doc:name="Logger" />
+		<dw:transform-message doc:name="TM : Collect SF Ids">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.Envelope.Body.notifications.*Notification map {
+	SfId : $.sObject.Id
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="TM : Combine SF Ids">
+            <dw:set-variable variableName="sfIds"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.SfId ++ "'")) joinBy ","]]></dw:set-variable>
+
+		</dw:transform-message>
+		<!-- <logger message="Person Salesforce Ids : #[payload]" level="INFO"
+			doc:name="Logger" /> -->
+		<sfdc:query config-ref="Salesforce__Basic_Authentication"
+			query="Select Id, Name, DEL_PID__c, DEL_MCI__c, Birthdate, DEL_Gender__c, DEL_Suffix__c, FirstName, MiddleName, LastName, DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_STI__c, DEL_SSN_Text__c, DEL_SBI__c,(Select id,First_Name__c, Last_Name__c from Alias_Other_Name__r), DEL_PLC__c, DEL_JIC__c, DEL_FC1__c, DEL_FC2__c, DEL_FC3__c, DEL_EMP__c, DEL_DMV__c, DEL_DHS__c, DEL_BPN__c, DEL_No_of_DSCYF_Staffs__c FROM Contact where Id in (#[flowVars.sfIds])"
+			doc:name="SF : Person Details" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"CLNT_ID" : $.Id,
+	"DEL_PID": $.DEL_PID__c,
+	"DOB": $.Birthdate,
+	"SEX_CD": $.DEL_Gender__c,
+	"SUFFIX": $.DEL_Suffix__c default "",
+	"FIRST_NM": $.FirstName,
+	"FIRST_NM_AL": $.Alias_Other_Name__r.First_Name__c default [],
+	"FIRST_NM_AL_S": $.Alias_Other_Name__r.First_Name__c default [] map (convertToEnglish($) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with ''),
+	"FIRST_NM_AL_P": $.Alias_Other_Name__r.First_Name__c default [] map (convertToEnglish($) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with ''),
+	"MIDDLE_NM": $.MiddleName default "",
+	"LAST_NM": $.LastName,
+	"LAST_NM_AL": $.Alias_Other_Name__r.Last_Name__c default [],
+	"LAST_NM_AL_S": $.Alias_Other_Name__r.Last_Name__c default [] map (convertToEnglish($) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with ''),
+	"LAST_NM_AL_P": $.Alias_Other_Name__r.Last_Name__c default [] map (convertToEnglish($) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with ''),
+	"LAST_NM_S": (convertToEnglish($.LastName) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.LastName != null otherwise '',
+	"LAST_NM_P": (convertToEnglish($.LastName) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.LastName != null otherwise '',
+	"FIRST_NM_S": (convertToEnglish($.FirstName) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.FirstName != null otherwise '',
+	"FIRST_NM_P": (convertToEnglish($.FirstName) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.FirstName != null otherwise '',
+	"RACE": $.DEL_Race_Primary__c default "",
+	"ETHNICITY": $.DEL_Ethnicity__c	default "",
+    "DEL_STI": $.DEL_STI__c,
+	"DEL_SSN_Text": $.DEL_SSN_Text__c,
+	"DEL_SBI": $.DEL_SBI__c,
+	"DEL_PLC": $.DEL_PLC__c,
+	"DEL_MCI": $.DEL_MCI__c,
+	"DEL_JIC": $.DEL_JIC__c,
+	"DEL_FC3": $.DEL_FC3__c,
+	"DEL_FC2": $.DEL_FC2__c,
+	"DEL_EMP": $.DEL_EMP__c,
+	"DEL_DMV": $.DEL_DMV__c,
+	"DEL_DHS": $.DEL_DHS__c,
+	"DEL_BPN": $.DEL_BPN__c,
+	"DEL_FC1": $.DEL_FC1__c,
+	"NUM_STAFF": $.DEL_No_of_DSCYF_Staffs__c
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.person.core}/update" method="POST"
+			doc:name="HTTP : Solr Update">
+			<http:request-builder>
+                <http:query-param paramName="commit" value="true"/>
+                <http:query-param paramName="Content-Type" value="application/json"/>
+
+			</http:request-builder>
+		</http:request>
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" mimeType="application/json" />
+		<!-- <logger message="After Transformation : #[payload]" level="INFO"
+			doc:name="Logger" /> -->
+		<set-property propertyName="Content-Type" value="application/json"
+			doc:name="Property" />
+        <async doc:name="Async : Intake Person Update ">
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id from DEL_Intake_Person__c where Validated_Person_Name__c IN (#[flowVars.sfIds])" doc:name="SF : Intake Person Ids"/>
+            <expression-filter expression="#[payload.size() != 0]" doc:name="Expression"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	Envelope: {
+		Body: {
+			notifications : {
+				(payload map {
+					Notification : {
+						sObject : {
+							Id: $.Id
+						}
+					}
+				})
+			}
+		}
+	}
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <http:request config-ref="HTTP_Request_dsce_Configuration" path="intakePersonUpsert" method="POST" doc:name="HTTP : Intake Person Update"/>
+        </async>
+	</flow>
+	<apikit:mapping-exception-strategy
+		name="solr_api-apiKitGlobalExceptionMapping">
+		<apikit:mapping statusCode="404">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.NotFoundException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload
+				value="{ &quot;message&quot;: &quot;Resource not found&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="405">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload
+				value="{ &quot;message&quot;: &quot;Method not allowed&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="415">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload
+				value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="406">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.NotAcceptableException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="400">
+			<apikit:exception
+				value="org.mule.module.apikit.exception.BadRequestException" />
+			<set-property propertyName="Content-Type" value="application/json"
+				doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Bad request&quot; }"
+				doc:name="Set Payload" />
+		</apikit:mapping>
+	</apikit:mapping-exception-strategy>
+</mule>

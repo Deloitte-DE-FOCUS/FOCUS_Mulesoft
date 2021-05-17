@@ -1,0 +1,711 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    
+    <!-- <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" url="${sfdc.url}" doc:name="Salesforce: Basic Authentication" disableSessionInvalidation="true" >
+        <reconnect  count="5"/>
+    </sfdc:config> -->
+ <!-- <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans> 
+   	 <spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans>  -->
+   	<spring:beans>
+         <spring:import resource="classpath:/queryframework.xml" />      
+   	</spring:beans> 
+    <objectstore:config name="ObjectStore__Connector" partition="BatchInfo" doc:name="ObjectStore: Connector"/>
+   <sftp:connector name="SFTPOverride" validateConnections="true" 
+		doc:name="SFTP" >
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+    <objectstore:config name="DOL_WageLoad_Error" partition="DOL_WageLoad_Error" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="DOL_WageLoad" partition="DOL_WageLoad" doc:name="ObjectStore: Connector"/>
+   
+            
+    <flow name="inf026-dol-wage-loadFlow" processingStrategy="synchronous" initialState="started">
+        <poll doc:name="Poll-DHSS" doc:description="Poll connector is used to start the Batch schedule at a specific time">
+            <schedulers:cron-scheduler expression="0 45 16 ? * MON,TUE,WED,THU,FRI *" timeZone="US/Eastern"/>
+            <set-payload value="INF026" doc:name="Set Payload to Interface ID" doc:description="Set the iterface ID for Exception framework to log an Error in case of an Error"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV:Set Interface ID" doc:description="Set the iterface ID for Exception framework to log an Error in case of an Error becasue the scope of poll is limited to 'Source' so we are re setting the flow variable "/>
+        <mulerequester:request resource="sftp://${sftp.dolwageload.transaction.username}:${sftp.dolwageload.transaction.password}@${sftp.dolwageload.transaction.host}:${sftp.dolwageload.transaction.port}${sftp.dolwageload.transaction.path}?connector=SFTPOverride&amp;myfilename=${sftp.dolwageload.transaction.filename}" timeout="120000" doc:name="Mule Requester" doc:description="Get the DOL Wage Load file from the SFTP location"/>
+        <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check if File is Present" doc:description="Check if the load file is available or not" config-ref="Validation_Configuration1"/>
+        
+        <object-to-string-transformer mimeType="application/csv" doc:name="O to S: Change filestream to string" doc:description="Change the incoming file input stream to a readable string"/>
+   
+        <message-properties-transformer scope="session" doc:name="MP:Set TransAttachment" doc:description="Create TransAttachment for the Logging framework">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="ErrorAttachment" value="Error,Field Name in Error,Field Value in Error,Error Description"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Call the Logging framework without altering the Payload">
+            <flow-ref name="inf026-DOL-load-InProgress-Log-Transaction-Sub_Flow" doc:name="inf026-DOL-load-InProgress-Log-Transaction-Sub_Flow" doc:description="Call the In-Progress Logging framework"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher> 
+         <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-1" outputPattern="${sftp.dolwageload.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.dolwageload.archive.host}" port="${sftp.dolwageload.archive.port}" path="${sftp.dolwageload.archive.path}" user="${sftp.dolwageload.archive.username}" password="${sftp.dolwageload.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" doc:description="Put the Load file in the Archive SFTP Location"/> 
+        <dw:transform-message metadata:id="5e0c617f-86d5-4be4-a0fe-250e67a203d4" doc:name="TM:Convert CSV into a Map">
+            <dw:input-payload  mimeType="application/csv" doc:sample="C:\Users\hharshvardhan\Documents\FOCUS\Sprint 8\Sample\DOL_WAGE_Load_OUT - Copy.TXT">
+                <dw:reader-property name="header" value="false"/>
+                <dw:reader-property name="separator" value="|"/>
+            </dw:input-payload>
+            <dw:set-payload><![CDATA[//Convert the incoming payload into a map
+%dw 1.0
+%input payload application/csv
+%output application/java
+---
+payload map {
+	SSN: $[0] default '',
+	PID: $[1]  default '',
+	WageQuarter: $[2] default '',
+	WageAmount:$[3] default '',
+	Name: $[4] ,
+	Status: trim $[5] default ''
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set Record Count" doc:description="Set the Record Count ">
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="TM: Validate values in Payload">
+            <dw:input-payload doc:sample="sample_data\list_string_1.dwl"/>
+            <dw:set-payload><![CDATA[//Validate Values in payload
+%dw 1.0
+%output application/java
+---
+payload filter ( (isValidNumber($.PID))  and ( isValidNumber($.SSN)) and (  isValidNumber($.WageAmount)) and ( isValidNumber($.WageQuarter))  )  map {
+	SSN: $.SSN,
+	PID: $.PID as :number as :string,
+	WageQuarter: $.WageQuarter,
+	WageAmount:( ( ($.WageAmount/100) as :number  as :string {format:".00"} ) when ($.WageAmount as :number > 0) otherwise 0 ) default '',
+	Name: $.Name ,
+	Status: $.Status
+} ]]></dw:set-payload>
+            <dw:set-session-variable variableName="InvalidNumberError"><![CDATA[//Create Error Report for missing mandatory fields
+%dw 1.0
+%output application/csv header=false , ignoreEmptyLine=true
+---
+payload filter ( ( not isValidNumber($.PID))  or ( not isValidNumber($.SSN)) or ( not isValidNumber($.WageAmount)) or ( not isValidNumber($.WageQuarter)) )   map {
+	Error:'Data Error',
+    "Field Name in Error":( ('') when (isValidNumber($.SSN)) otherwise (' \'SSN\' ') ) ++
+						  ( ('') when (isValidNumber($.PID )) otherwise (' \'PID\' ') ) ++
+						  ( ('') when (isValidNumber($.WageAmount )) otherwise (' \'Wage Amount\' ' ) ) ++
+						  ( ('') when (isValidNumber($.WageQuarter)) otherwise (' \'Wage Quarter\' ') ),
+    "Field Value in Error":( ('') when (isValidNumber($.SSN)) otherwise ($.SSN) ) ++
+						  ( ('') when (isValidNumber($.PID )) otherwise ($.PID) ) ++
+						  ( ('') when (isValidNumber($.WageAmount )) otherwise ($.WageAmount) ) ++
+						  ( ('') when (isValidNumber($.WageQuarter)) otherwise ($.WageQuarter) ),
+	"Error Description":( ( ('') when (isValidNumber($.SSN)) otherwise (' \'SSN\' ') ) ++
+						  ( ('') when (isValidNumber($.PID )) otherwise (' \'PID\' ') ) ++
+						  ( ('') when (isValidNumber($.WageAmount )) otherwise (' \'Wage Amount\' ' ) ) ++
+						  ( ('') when (isValidNumber($.WageQuarter) and (($.WageQuarter mod 10) < 5) ) otherwise (' \'Wage Quarter\' ') ) ) ++ ' is not a valid number : ' ++ ((' PID ' ++ $.PID) when ( $.PID != '0') otherwise ('SSN ' ++ $.SSN) when ($.SSN != "") otherwise "\"No Unique Identifier available\"" ) 
+	
+} ]]></dw:set-session-variable>
+
+        </dw:transform-message>
+         <enricher doc:name="Message Enricher" doc:description="Call LOV framework without changing the Payload">
+            <flow-ref name="Call-LOV-flow" doc:name="Call-LOV-flow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[sessionVars.LOVReturned]"/>
+        </enricher>
+
+        <dw:transform-message metadata:id="97150630-b7c4-42dc-8364-7755c1243fc2" doc:name="TM:Create Error Set 1">
+            <dw:input-payload doc:sample="sample_data\list_string.dwl" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//Generate Error if field values are missing
+%dw 1.0
+%output application/java
+---
+payload  filter ((($.Status !=  "")  and ($.SSN != "") and ($.PID != '0') and ($.WageAmount != '') and ($.WageQuarter != "")) and (($.WageQuarter mod 10) < 5 )  ) map {
+	($)
+}]]></dw:set-payload>
+
+            <dw:set-session-variable variableName="ErrorMissingFields"><![CDATA[//Create Error Report for missing mandatory fields
+%dw 1.0
+%output application/csv header=false , ignoreEmptyLine=true
+---
+payload filter (($.Status ==  "")  or ($.SSN == "") or ($.PID == '0000000000') or ($.WageAmount == '') or ($.WageQuarter == "")) map {
+	Error:'Mandatory Field Missing',
+    "Field Name in Error":( (' \'Status\' ' ) when ($.Status ==  "" ) otherwise ('') ) ++
+						  ( (' \'SSN\' ') when ($.SSN == "") otherwise ('') ) ++
+						  ( (' \'PID\' ') when ($.PID == '0000000000') otherwise ('') ) ++
+						  ( (' \'Wage Amount\' ' ) when ($.WageAmount == "") otherwise ('') ) ++
+						  ( (' \'Wage Quarter\' ' ) when ($.WageQuarter == "") otherwise ('') ),
+    "Field Value in Error":'Null',
+	"Error Description":( (' \'Status\' ' ) when ($.Status ==  "" ) otherwise ('') ) ++
+						  ( (' \'SSN\' ') when ($.SSN == "") otherwise ('') ) ++
+						  ( (' \'PID\' ') when ($.PID == '0000000000') otherwise ('') ) ++
+						  ( (' \'Wage Amount\' ' ) when ($.WageAmount == "") otherwise ('') ) ++
+						  ( (' \'Wage Quarter\' ' ) when ($.WageQuarter == "") otherwise ('') ) ++ ' is missing for : ' ++ ((' PID ' ++ $.PID) when ( $.PID != 0) otherwise ('SSN ' ++ $.SSN) when ($.SSN != "" ) otherwise "\"No Unique Identifier available\"" ) 
+	
+} ]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="ErrorStatus"><![CDATA[//Create Error Report for Status = S
+%dw 1.0
+%output application/csv header=false , ignoreEmptyLine=true
+---
+payload filter ($.Status == 'S') map {
+	Error:'Business Rule Warning',
+    "Field Name in Error":'SSN',
+    "Field Value in Error":$.SSN,
+	"Error Description":'SSN for Client ' ++ $.PID ++ ' not found at DOL'
+	
+} distinctBy payload[$$].SSN]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="PID_Count"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	PID:$.PID  default null
+} distinctBy $.PID]]></dw:set-session-variable>
+            <dw:set-session-variable variableName="WageQuarterError"><![CDATA[%dw 1.0
+%output application/csv ignoreEmptyLine=true, header = false
+---
+payload filter (($.WageQuarter mod 10) > 4 )    map {
+	Error:'Data Error',
+    "Field Name in Error":'WageQuarter',
+    "Field Value in Error":$.WageQuarter,
+	"Error Description":$.WageQuarter ++ ' is not in valid format for' ++ ((' PID :' ++ $.PID) when ( $.PID != '0') otherwise ('SSN ' ++ $.SSN) when ($.SSN != "") otherwise "\"No Unique Identifier available\"" ) 
+	
+} ]]></dw:set-session-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP:Set ErrorAttachment" doc:description="Set the Error Record Count, Total Record Count and Success Record Count">
+
+            <add-message-property key="RecordSuccess" value="#[0]"/>
+
+            <add-message-property key="ErrorAttachment" value="#[ sessionVars.ErrorAttachment + '\n' + sessionVars.ErrorStatus.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + '\n'+sessionVars.ErrorMissingFields.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + '\n' + sessionVars.InvalidNumberError.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + '\n' + sessionVars.WageQuarterError.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) ]"/>
+
+            <add-message-property key="MissingValuesErrorCount" value="#[sessionVars.ErrorMissingFields != ''?(sessionVars.ErrorMissingFields.split(&quot;\n&quot;).length):0]"/>
+            <add-message-property key="StatusErrorCount" value="#[sessionVars.ErrorStatus != ''?(sessionVars.ErrorStatus.split(&quot;\n&quot;).length):0]"/>
+            <add-message-property key="PIDCount" value="#[sessionVars.PID_Count.size()]"/>
+            <add-message-property key="InvalidLengthCount" value="#[sessionVars.InvalidNumberError != ''?(sessionVars.InvalidNumberError.split(&quot;\n&quot;).length):0]"/>
+            <add-message-property key="WageQuarterErrorCount" value="#[sessionVars.WageQuarterError != ''?(sessionVars.WageQuarterError.split(&quot;\n&quot;).length):0]"/>
+
+        </message-properties-transformer>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice" doc:description="Check if payload size is equal to zero.">
+            <when expression="#[payload.size() == 0]">
+               
+             <set-payload value="{&quot;InterfaceID&quot;: &quot;INF026&quot;, &quot;InterfaceName&quot;: &quot;DOL Wage Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_DOLWageLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;RecordSkipped&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records present in File&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to JSON for Logging Framework" doc:description="Set the JSON payooad for the Loggin framework-Final call"/>
+                    <choice doc:name="Choice" doc:description="Check if ErrorAtachment has records present">
+                        <when expression="#[sessionVars.ErrorAttachment.split(&quot;\n&quot;).length &lt;= 1]">
+                            <message-properties-transformer scope="session" doc:name="MP: Remove ErrorAttachment" doc:description="Remove ErrorAttachment and TransAttachment">
+                                <delete-message-property key="ErrorAttachment"/>
+                            <delete-message-property key="TransAttachment"/>
+                            </message-properties-transformer>
+                        </when>
+                        <otherwise>
+                            <logger message="Errors/Warning Present" level="INFO" doc:name="Logger"/>
+                         <message-properties-transformer scope="session" doc:name="MP: Remove TransAttachment" doc:description="Remove  TransAttachment">
+                           
+                            <delete-message-property key="TransAttachment"/>
+                            </message-properties-transformer>
+                        </otherwise>
+                    </choice>
+            <logger message="JSON: #[payload]" level="INFO" doc:name="Logger" doc:description="Display the result of logging framework call"/>
+
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the Loggin framework"/>
+             <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Display the outcome of the logging framewok"/>
+            </when>
+            <otherwise>
+                <batch:execute name="BatchLoad" doc:name="BatchLoad" doc:description="Call the Batch step for execution "/>
+            </otherwise>
+        </choice>
+    
+
+        
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>           
+          </flow>
+    <batch:job name="BatchLoad" max-failed-records="-1" block-size="200" doc:description="Batch Step to split records into Valid chunks so as to not break Governor limit of SFDC">
+        <batch:process-records>
+            <batch:step name="Batch_Step" accept-policy="ALL" doc:description="Batch Step to split records and process into Valid chunks so as to not break Governor limit of SFDC" >
+                <batch:commit size="200" doc:name="Batch Commit" doc:description="Batch Step to split records and process into Valid chunks so as to not break Governor limit of SFDC">
+                    <message-properties-transformer scope="invocation" doc:name="MP:Save Incoming Array" doc:description="Save the Incoming Array ">
+                        <add-message-property key="BatchArray" value="#[payload]"/>
+                        <add-message-property key="QueryRequest" value="#['']"/>
+                        <add-message-property key="RunDate" value="#[server.dateTime.format(&quot;yyyy-MM-dd&quot;)]"/>
+
+
+                    </message-properties-transformer>
+
+                    <logger message="BatchArray :#[flowVars.BatchArray]" level="INFO" doc:name="Logger"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.PID ++ "'") ) joinBy "," ]]></dw:set-payload>
+                    </dw:transform-message>
+
+
+                    <logger message="#[flowVars.QueryRequest]" level="INFO" doc:name="Logger" doc:description="Display Created query"/>
+                    <enricher   doc:name="Message Enricher" doc:description="Message Enricher is Used to Query SFDC to get ID's for DOL Request records without altering the original payload">
+                        <processor-chain doc:name="Processor Chain" doc:description="Processor chain is used inside Message enricher to use both SFDC query and Dataweave step inside enricher ">
+                            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select  Id,Person__r.DEL_PID__c,Person__c,SSN_not_found_at_DOL__c,SSN__c from DEL_DOL_Request__c where Person__r.DEL_PID__c in (#[payload])" doc:name="SFDC:Query PID in DOL Request" doc:description="Query SFDC to get the SFDC-ID of the DOL Request records"/>
+                            <dw:transform-message doc:name="Transform Message">
+                                <dw:set-payload><![CDATA[//Convert query output into array 
+%dw 1.0
+%output application/java
+---
+payload map {
+	PID:$.Person__r.DEL_PID__c as :string,
+	Id:$.Id,
+	Person:$.Person__c,
+	Flag:$.SSN_not_found_at_DOL__c ,
+	SSN_DOL:$.SSN__c
+}]]></dw:set-payload>
+                            </dw:transform-message>
+                        </processor-chain>
+                        <enrich source="#[payload]" target="#[flowVars.IdManual]"/>
+                    </enricher>
+                    <enricher source="#[dw('payload map {PID:$.Person__r.DEL_PID__c as :string,Id:$.Id}')]" target="#[flowVars.Id4E]" doc:name="Message Enricher" doc:description="Message Enricher is Used to Query SFDC to get ID's for IV-E records without altering the original payload">
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select  Id,Person__r.DEL_PID__c from DEL_Eligibility_Person__c where Person__r.DEL_PID__c  in (#[payload]) and Eligibility_ID__r.Application_Status__c ='Pending'  and No_SSN_found_in_DOL__c=true" doc:name="SFDC: Query PID in IV-E" doc:description="Query SFDC to retrieve the ID's of IV-E records"/>
+
+                    </enricher>
+                    
+
+
+                   <!--  <objectstore:store config-ref="ObjectStore__Connector" key="ID_Manual" value-ref="#[flowVars.IdManual.size() ]" overwrite="true" doc:name="ObjectStore : Store ID for DOL-Manual" doc:description="Store the Id's retrieved from DOL Request so that it can be used later in Updating the SSN flag"/>
+                    <objectstore:store config-ref="ObjectStore__Connector" key="ID_4E" value-ref="#[flowVars.Id4E.size()]" doc:name="ObjectStore: Store ID for DOL-4E" doc:description="Store the Id's retrieved from IV-E records so that it can be used later in Updating the SSN flag" overwrite="true"/>
+                    --> <enricher   doc:name="Message Enricher" doc:description="Message Enricher is used to Query SFDC to retrice the RecordType Id without altering the Payload">
+                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,RecordType.Name  From RecordType Where SobjectType =  'DEL_DOL_Response__c' and RecordType.Name='DOL Wage Load'" doc:name="SFDC:Query to get DOL Wage Load Record type ID" doc:description="Query SFDC to retrieve the RecordType Id for DOL Wage Load"/>
+                        <enrich source="#[dw('payload map {ID:$.Id,Name:$.Name}')]" target="#[flowVars.RecordType]"/>
+                    </enricher>
+                    <dw:transform-message doc:name="TM: DOL Load records groupby and OrderBy">
+                        <dw:set-variable variableName="LatestLoadRecordsGroupBy"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.BatchArray orderBy $.WageQuarter)[-1..0] groupBy $.PID )]]></dw:set-variable>
+                        <dw:set-variable variableName="SSNNotFoundRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.BatchArray filter ($.Status == 'S') )]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Flatten list to take the latest">
+                        <dw:set-variable variableName="LatestLoadRecordToUpdateOnParent"><![CDATA[%dw 1.0
+%output application/java
+---
+flatten (flowVars.LatestLoadRecordsGroupBy map $[0] default [])]]></dw:set-variable>
+                    </dw:transform-message>
+
+                    <dw:transform-message metadata:id="97150630-b7c4-42dc-8364-7755c1243fc2" doc:name="TM: Create Array for Case Load">
+                        <dw:input-variable doc:sample="sample_data\list_Java-Payload_1.dwl" mimeType="application/java" variableName="BatchArray"/>
+                        <dw:input-variable doc:sample="sample_data\string.dwl" variableName="RecordTypeID"/>
+                        <dw:set-variable variableName="StatusW_O_SSNFlag_Manual"><![CDATA[////Create Array for Updating SSN flag in DOL manual request  to false for all records where status=W and O
+%dw 1.0
+%output application/java
+%var ID = {( flowVars.IdManual map {	
+	($.PID as :string):$.Id
+})}
+---
+flowVars.LatestLoadRecordToUpdateOnParent map  {
+	Id:ID[$.PID],
+	SSN_not_found_at_DOL__c: false when $.Status != 'S' otherwise true
+
+} filter ($.Id != null)]]></dw:set-variable>
+                        <dw:set-variable variableName="StatusW_O"><![CDATA[//Create Array for Upserting records in Wage Load object for status W and O
+%dw 1.0
+%input payload application/java
+%output application/java
+%var ID = {( flowVars.IdManual map {	
+	($.PID as :string):$.Id
+})}
+%var Person = {( flowVars.IdManual map {	
+	($.PID as :string):($.Person)
+})}
+%var SSN = {( flowVars.IdManual map {
+	($.PID as :string):$.SSN_DOL
+})}
+---
+flowVars.BatchArray filter ($.Status != 'S') map  {	
+	DOL_Request_ID__c:ID[$.PID] when ( (SSN[$.PID] == $.SSN) ) otherwise ('SSN Mismatch' when ((SSN[$.PID] != null) and (SSN[$.PID] != $.SSN) ) otherwise null) ,
+	Person__c:Person[$.PID],
+	External_ID__c:$.PID ++ '-' ++ $.WageQuarter ++ '-' ++ flowVars.RecordType[0].Name ++ "-" ++ ($.Name default ""),
+	RecordTypeId:flowVars.RecordType[0].ID,
+	Wage__c:$.WageAmount,
+	Employer_Name__c:$.Name,
+	Year_Quarter__c:$.WageQuarter,
+	Status__c:sessionVars.LOVReturned[('DOL_WAGE_STATUS-' ++ $.Status)][0]
+		} filter $.DOL_Request_ID__c != 'SSN Mismatch']]></dw:set-variable>
+                        <dw:set-variable variableName="Status_W_O_SSNFlag_4E"><![CDATA[//Create Array for Updating SSN flag in 4E to false for all records where status=W and O
+%dw 1.0
+%output application/java
+%var ID4E = {( flowVars.Id4E map {	
+	($.PID as :string):$.Id
+})}
+---
+flowVars.LatestLoadRecordToUpdateOnParent map  {
+	Id:ID4E[$.PID],
+	No_SSN_found_in_DOL__c: false when $.Status != 'S' otherwise true
+
+} filter ($.Id != null)]]></dw:set-variable>
+                        <dw:set-variable variableName="Change_Flag"><![CDATA[////Create Array for creating SSN flag change warning
+%dw 1.0
+%output application/java
+%var ID = {( flowVars.IdManual map {
+	($.PID as :string):$.Id
+})}
+%var Flag = {( flowVars.IdManual map {
+	($.PID as :string):$.Flag
+})}
+---
+flowVars.BatchArray filter ($.Status != 'S')  map  {	
+	Id:ID[$.PID],
+	SSN_Flag:Flag[$.PID],
+	PID:$.PID,
+	SSN:$.SSN
+} filter (($.Id != null) and ($.SSN_Flag == 'true'))
+ ]]></dw:set-variable>
+                        <dw:set-variable variableName="SSN_Mismatch"><![CDATA[//Create Array for creating SSN mismatch error
+%dw 1.0
+%input payload application/java
+%output application/java
+%var ID = {( flowVars.IdManual map {	
+	($.PID as :string):$.Id
+})}
+%var SSN = {( flowVars.IdManual map {
+	($.PID as :string):$.SSN_DOL
+})}
+---
+flowVars.BatchArray filter ($.Status != 'S') map  {	
+	DOL_Request_ID__c:ID[$.PID] when ( SSN[$.PID] == $.SSN) otherwise 'SSN Mismatch',
+	SSN_Focus:SSN[$.PID],
+	SSN_DOL:$.SSN,
+	PID:$.PID
+		} filter (($.DOL_Request_ID__c == 'SSN Mismatch') and ($.SSN_Focus != null))]]></dw:set-variable>
+
+
+
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="External_ID__c" type="DEL_DOL_Response__c" doc:name="SFDC: Upsert DOL Response records" doc:description="Upsert valid records in SFDC as per Bussiness Rule  3: If the status of a wage record is 'O' (OK) or &#8216;W&#8217; (No wages), the record on the file is compared to the existing wage records in FOCUS for the given PID, and if an existing record is found in FOCUS such that the Year/Quarter on the file = Existing Year/Quarter, then the FOCUS record is updated with the new wage details. Otherwise, a new wage record is created with the details provided in the file).  4: If the status is 'W' for a record on the file, the dollar amount is &#8216;0&#8217;. ">
+                        <sfdc:objects ref="#[flowVars.StatusW_O]"/>
+                    </sfdc:upsert>
+
+                    <dw:transform-message metadata:id="6386aa5c-9a53-4388-93e1-f6a114eddff2" doc:name="TM:Create Error log">
+                        <dw:set-variable variableName="UpserError1"><![CDATA[//Create Error Report if the Updation Call has errored out
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode when (payload[$$].errors[0].fields[0]  != 'DOL_Request_ID__c') otherwise 'Data Error',
+	Field_Name_in_Error: payload[$$].errors[0].fields[0] when (payload[$$].errors[0].fields[0]  != 'DOL_Request_ID__c') otherwise 'PID',
+	Field_Value_in_Error: payload[$$].errors[0].message when (payload[$$].errors[0].fields[0]  != 'DOL_Request_ID__c') otherwise (flowVars.StatusW_O[$$].External_ID__c splitBy "-")[0],
+	Error_Description:payload[$$].errors[0].message when (payload[$$].errors[0].fields[0]  != 'DOL_Request_ID__c') otherwise 'DOL Request record is not present in FOCUS PID: ' ++ (flowVars.StatusW_O[$$].External_ID__c splitBy "-")[0]
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+                        <dw:set-variable variableName="Count_Upsert"><![CDATA[//Count Successfull Upserts
+%dw 1.0
+%output application/java
+---
+payload filter ($.Id != null) map {
+	Id:$.Id
+} ]]></dw:set-variable>
+                        <dw:set-variable variableName="Flag_Change_CSV"><![CDATA[//Create Warning if the flag is changed
+%dw 1.0
+%output application/csv header=false
+---
+flowVars.Change_Flag map {
+	Error: 'Business Rule Warning',
+	Field_Name_in_Error: 'SSN Not-Found Flag',
+	Field_Value_in_Error: 'Value changed from true to false',
+	Error_Description:"'SSN Not-Found' Flag at DOL changed from true to false for PID :" ++ $.PID
+	
+}]]></dw:set-variable>
+                        <dw:set-variable variableName="SSN_Mismatch_CSV"><![CDATA[//Create SSN mismatch Error
+%dw 1.0
+%output application/csv header=false
+---
+flowVars.SSN_Mismatch filter ($.DOL_Request_ID__c == 'SSN Mismatch') map {
+	Error: 'Business Rule Error',
+	Field_Name_in_Error: 'SSN',
+	Field_Value_in_Error: 'Value in FOCUS :' ++ $.SSN_Focus ++ ' and  Value in DOL :' ++ $.SSN_DOL,
+	Error_Description:'SSN Value in FOCUS and DOL are different for PID :' ++ $.PID
+	
+}]]></dw:set-variable>
+                    </dw:transform-message>
+                    <message-properties-transformer scope="invocation" doc:name="MP:Set Error Count for Upsert and SSN Mismatch" doc:description="Calculate SSN-Mismatch and Upsert Error count">
+                        <add-message-property key="UpsertErrorCount" value="#[(flowVars.UpserError1 != null and flowVars.UpserError1 != &quot;&quot;)? flowVars.UpserError1.split(&quot;\n&quot;).length:0]"/>
+                        <add-message-property key="SSNErrorCount" value="#[(flowVars.SSN_Mismatch_CSV != null and flowVars.SSN_Mismatch_CSV != &quot;&quot;)? flowVars.SSN_Mismatch_CSV.split(&quot;\n&quot;).length:0]"/>
+                        <add-message-property key="Count_UpsertInt" value="#[flowVars.Count_Upsert.size()]"/>
+                        <add-message-property key="SSNNotFoundCount" value="#[ flowVars.SSNNotFoundRecords.size()]"/>
+                    </message-properties-transformer>
+                    <objectstore:store config-ref="DOL_WageLoad" key="Upsert_Error_#[server.nanoTime()]" value-ref="#[flowVars.UpsertErrorCount + flowVars.SSNErrorCount]" doc:name="ObjectStore: Store Errors in Upsert Step" overwrite="true"/>
+                    <objectstore:store config-ref="DOL_WageLoad" key="Success_Upsert_#[server.nanoTime()]" value-ref="#[flowVars.Count_UpsertInt + flowVars.SSNNotFoundCount]" doc:name="ObjectStore: Store Size of Successfull Upserts" overwrite="true"/>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_DOL_Request__c" doc:name="SFDC:Update SSN flag for Manual" doc:description="Update SSN Flag to False for all records where status=W and O as per Business rule 
+5: When the status on a record is &#8216;O&#8217; or 'W' for a record on the file, and the data is loaded under a request record on the DOL Request screen with Source = IVE, then 
+&#8226;	If &#8220;SSN not found at DOL&#8221; indicator = &#8220;Y&#8221; on the parent request record, then update &#8220;SSN not found at DOL&#8221; indicator = &#8220;N&#8221; on the Request record as well as update &#8220;SSN not found at DOL&#8221; indicator to NOT Selected for the identified client on the PENDING IVE Determination from where the request was generated.
+">
+                        <sfdc:objects ref="#[flowVars.StatusW_O_SSNFlag_Manual]"/>
+                    </sfdc:update>
+                    <dw:transform-message doc:name="TM:Create Error log">
+                        <dw:set-variable variableName="UpdateError1"><![CDATA[//Create Error Report if the Updation Call has errored out
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode,
+	Field_Name_in_Error: payload[$$].errors[0].fields[0],
+	Field_Value_in_Error: payload[$$].errors[0].message,
+	Error_Description:payload[$$].errors[0].message
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+                    </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Eligibility_Person__c" doc:name="SFDC:Update SSN flag for 4E" doc:description="Update SSN Flag to False for all records where status=W and O as per Business rule  5: When the status on a record is &#8216;O&#8217; or 'W' for a record on the file, and the data is loaded under a request record on the DOL Request screen with Source = IVE, then  &#8226; If &#8220;SSN not found at DOL&#8221; indicator = &#8220;Y&#8221; on the parent request record, then update &#8220;SSN not found at DOL&#8221; indicator = &#8220;N&#8221; on the Request record as well as update &#8220;SSN not found at DOL&#8221; indicator to NOT Selected for the identified client on the PENDING IVE Determination from where the request was generated. ">
+                        <sfdc:objects ref="#[flowVars.Status_W_O_SSNFlag_4E]"/>
+                    </sfdc:update>
+
+                    <dw:transform-message doc:name="TM:Create Error log">
+                        <dw:set-variable variableName="UpdateError2"><![CDATA[//Create Error Report if the Updation Call has errored out
+%output application/csv ignoreEmptyLine=true ,header = false 
+---
+payload map {
+	Error: payload[$$].errors[0].statusCode,
+	Field_Name_in_Error: payload[$$].errors[0].fields[0],
+	Field_Value_in_Error: payload[$$].errors[0].message,
+	Error_Description:payload[$$].errors[0].message
+} filter (payload[$$].Id == null )]]></dw:set-variable>
+                    </dw:transform-message>
+
+                    <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+                    <objectstore:store config-ref="DOL_WageLoad" key="BatchInfo_#[server.nanoTime()]" value-ref="#[flowVars.UpdateError1 + flowVars.UpserError1 + flowVars.UpdateError2 + flowVars.Flag_Change_CSV + flowVars.SSN_Mismatch_CSV]" doc:name="ObjectStore: Store Error Logs" doc:description="Store the Error Log so that it can be used later to create the Error Attachment" overwrite="true"/>
+                    <set-payload value="#[[]]" doc:name="Set Payload to Empty Array" doc:description="Set the payload to an empty list so that the Batch step wont error out as it expects and array to be the output"/>
+
+
+
+
+
+                    <!-- <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP: Save JobID">
+                        <add-message-property key="JobId" value="#[payload.jobId]"/>
+                        <add-message-property key="JobResponse" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <until-successful maxRetries="50" millisBetweenRetries="2000" failureExpression="#[payload.state== 'Queued' || payload.state == 'InProgress' ]" synchronous="true" doc:name="Until Successful">
+                        <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Upsert Result">
+                            <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
+                        </sfdc:batch-result-stream>
+                    </until-successful>
+                    <object-to-string-transformer mimeType="application/xml" doc:name="O to S: Change Filestream to XML"/> -->
+
+                </batch:commit>
+            </batch:step>
+              <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>
+                    <objectstore:store config-ref="DOL_WageLoad_Error" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="DOL_WageLoad_Error" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+
+                </batch:commit>
+            </batch:step>
+
+        </batch:process-records>
+        <batch:on-complete>
+            <json:object-to-json-transformer doc:name="Object to JSON : Convert Batch Summary" doc:description="Parse the the Batch Summary into a JSON"/>
+            <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Diplay the Batch Summary"/>
+            <message-properties-transformer scope="session" doc:name="Message Properties">
+                <add-message-property key="RecordSuccess" value="#[0]"/>
+                <add-message-property key="RecordError" value="#[sessionVars.MissingValuesErrorCount + sessionVars.InvalidLengthCount + sessionVars.WageQuarterErrorCount]"/>
+            </message-properties-transformer>
+             <objectstore:retrieve-all-keys config-ref="DOL_WageLoad_Error" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys"/>
+           <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>
+            <foreach doc:name="For Each : Iterate over Exception Keys" doc:description="For Each : Iterate over Exception Keys">
+                <choice doc:name="Choice">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="DOL_WageLoad_Error" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count"/>
+
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:description="Message Properties: Update Total SFDC Connection Error Count" doc:name="Message Properties: Update Total SFDC Connection Error Count">
+	                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+	                    </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="DOL_WageLoad_Error" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details" doc:description="Exception ObjectStore : Retrive and Remove a record having Exception Details"/>
+		                <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+		                      <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+		                </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </foreach>
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if Exceptions occured" doc:description="Choice : Route to process Further if Exceptions occured
+If Exceptions occured flow is passed to a different branch which will handle clean up">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="DOL_WageLoad_Error" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="For Each : Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="DOL_WageLoad_Error" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Removes all the enteries and Clean Object Store"/>
+
+                    </foreach>
+                    <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow"/>
+              </when>
+              <otherwise>
+                    <objectstore:retrieve-all-keys config-ref="DOL_WageLoad" doc:name="ObjectStore: Retrieve Stored Objects" doc:description="Retrieve the Error Messsage stored in the Object Store"/>
+
+            <foreach doc:name="For Each" doc:description="For Each For Parsing the Error Report from the Object store one by one">
+                <choice doc:name="Choice">
+                    <when expression="#[payload.contains('Success')]">
+                        <objectstore:remove config-ref="DOL_WageLoad" key="#[payload]" doc:name="ObjectStore:Update Success Records"/>
+                        <message-properties-transformer scope="session" doc:name="Message Properties">
+                            <add-message-property key="RecordSuccess" value="#[(payload != null)?(sessionVars.RecordSuccess + payload):sessionVars.RecordSuccess]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <when expression="#[payload.contains('Error')]">
+                                <objectstore:remove config-ref="DOL_WageLoad" key="#[payload]" doc:name="ObjectStore: Update Error Records"/>
+
+                        <message-properties-transformer scope="session" doc:name="Message Properties" overwrite="true">
+                            <add-message-property key="RecordError" value="#[(payload != null or payload != '')?(sessionVars.RecordError + payload):sessionVars.RecordError]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                                <objectstore:remove config-ref="DOL_WageLoad" key="#[payload]" doc:name="ObjectStore: Read Stored Objects" doc:description="Remove the Error Report from the object store"/>
+
+                        <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Create Error Attachment" doc:description="Append the Error report retrieved from the object store into the ErrorAttachment variable">
+                            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;) + payload]"/>
+
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+
+            </foreach>
+            <message-properties-transformer doc:name="MP: Check if error count &gt; total records" scope="session" doc:description="Check if the Error count is greater than the total count">
+                <add-message-property key="RecordError" value="#[sessionVars.RecordError&lt;sessionVars.RecordCount ? sessionVars.RecordError:sessionVars.RecordCount]"/>
+            </message-properties-transformer>
+            <message-properties-transformer overwrite="true" scope="session" metadata:id="9109bd5b-8548-49c1-9c54-aeba7188f064" doc:name="MP: Update RecordCount,RecordError,RecordSuccess" doc:description="Update the Error Count, Success Count and the Total Count">
+
+                <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment.replaceAll(&quot;(?m)^[ \t]*\r?\n&quot;, &quot;&quot;)]"/>
+                <add-message-property key="RecordSkipped" value="#[sessionVars.RecordCount - sessionVars.RecordSuccess]"/>
+                <add-message-property key="ErrorDescription" value="#[sessionVars.RecordError != 0?('Distinct PIDs in File= ' + sessionVars.PIDCount + ',  See attached file for details'):('Distinct PIDs in File= ' + sessionVars.PIDCount)]"/>
+
+                <delete-message-property key="TransAttachment"/>
+
+            </message-properties-transformer>
+
+             <set-payload value="{&quot;InterfaceID&quot;: &quot;INF026&quot;, &quot;InterfaceName&quot;: &quot;DOL Wage Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_DOLWageLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordSuccess==0?'Error':sessionVars.RecordError==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordError]&quot;,&quot;RecordSkipped&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.ErrorDescription]&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordError != 0 ?'Business':'']&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to JSON for Logging Framework" doc:description="Set the JSON payooad for the Loggin framework-Final call"/>
+                    <choice doc:name="Choice">
+                        <when expression="#[sessionVars.ErrorAttachment.split(&quot;\n&quot;).length &lt;= 1]">
+                            <message-properties-transformer scope="session" doc:name="Message Properties">
+                                <delete-message-property key="ErrorAttachment"/>
+                            </message-properties-transformer>
+                        </when>
+                        <otherwise>
+                            <logger message="Errors/Warning Present" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+            <logger message="JSON: #[payload]" level="INFO" doc:name="Logger" doc:description="Display the result of logging framework call"/>
+
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the Loggin framework"/>
+             <message-properties-transformer scope="invocation" doc:name="MP:Deleting FV">
+						<delete-message-property key="exceptionRecordCount"/>
+						<delete-message-property key="InterfaceID"/>
+				
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+						
+						<delete-message-property key="TransactionID"/>
+						
+						
+						
+			</message-properties-transformer>
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+				<delete-message-property key="TID"/>
+				<delete-message-property key="WageQuarterError"/>
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="ErrorDescription"/>
+				<delete-message-property key="ErrorMissingFields"/>
+				<delete-message-property key="ErrorStatus"/>
+				<delete-message-property key="PID_Count"/>
+				<delete-message-property key="InvalidLengthCount"/>
+				<delete-message-property key="InvalidNumberError"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="MissingValuesErrorCount"/>
+				<delete-message-property key="ErrorReasonUpdate"/>
+				<delete-message-property key="PIDCount"/>
+				<delete-message-property key="RecordCount"/>
+				<delete-message-property key="RecordError"/>
+				<delete-message-property key="RecordSkipped"/>
+				<delete-message-property key="RecordSuccess"/>
+				<delete-message-property key="StatusErrorCount"/>
+				<delete-message-property key="WageQuarterErrorCount"/>
+			</message-properties-transformer>
+             <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Display the outcome of the logging framewok"/>
+       </otherwise>
+       </choice>
+        </batch:on-complete>
+    </batch:job>
+   <!--  <sub-flow name="inf-026-dol-wage-load:CountUpdateFlow">
+    <objectstore:remove config-ref="ObjectStore__Connector" key="Success_Upsert" ignoreNotExists="true" doc:name="ObjectStore: Retrieve Successfull DOL Count"/>
+            <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Set RecordCount,RecordError,RecordSuccess" doc:description="Update the Error Count, Total Record Count, Succesfull Record Count">
+                <add-message-property key="RecordSuccess" value="#[payload != null?payload:0]"/>
+
+
+                <delete-message-property key="TransAttachment"/>
+            </message-properties-transformer>
+            <objectstore:remove config-ref="ObjectStore__Connector" key="Update_SSN_Count" doc:name="ObjectStore:Retrieve Successfull SSN Count" ignoreNotExists="true"/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP : Update Error Count and Success Count">
+            <add-message-property key="RecordSuccess" value="#[(payload != null)?(sessionVars.RecordSuccess + payload):RecordSuccess]"/>
+        </message-properties-transformer>
+            <objectstore:remove config-ref="ObjectStore__Connector" key="Upsert_Error" ignoreNotExists="true" doc:name="ObjectStore: Retrieve Error DOL Count"/>
+            <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Update Error Count">
+                <add-message-property key="RecordError" value="#[(payload != null or payload != '')?(sessionVars.RecordError + payload):sessionVars.RecordError]"/>
+            </message-properties-transformer>
+        <objectstore:remove config-ref="ObjectStore__Connector" key="Error_SSN_Count" ignoreNotExists="true" doc:name="ObjectStore: Retrive SSN Error count"/>
+        <message-properties-transformer scope="session" doc:name="MP:Update Error Count">
+            <add-message-property key="RecordError" value="#[(payload != null or payload != '')?(sessionVars.RecordError + payload):sessionVars.RecordError]"/>
+        </message-properties-transformer>
+    </sub-flow> -->
+    <sub-flow name="inf026-DOL-load-InProgress-Log-Transaction-Sub_Flow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF026&quot;, &quot;InterfaceName&quot;: &quot;DOL Wage Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_WAGEOUT&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;}" mimeType="application/json" doc:name="SP:Set JSON payload for logging Framework" doc:description="Set the JSON Payload for Logging Framework Call"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the logging framework "/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="Display the result of logging framework call"/>
+    </sub-flow>
+	 <sub-flow name="Call-LOV-flow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'DOL_WAGE_STATUS'&quot;}" doc:name="Set Payload"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+	
+
+
+
+    
+    </mule>

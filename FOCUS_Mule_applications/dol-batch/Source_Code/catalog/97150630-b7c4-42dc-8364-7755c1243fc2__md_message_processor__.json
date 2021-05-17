@@ -1,0 +1,18 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "Java"
+        }
+    },
+    "outputMessageMetadata": {
+        "flowVariables": {
+            "InvalidNumberError": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "CSV-Error"
+            }
+        }
+    },
+    "id": "97150630-b7c4-42dc-8364-7755c1243fc2",
+    "version": "5.2.0.0"
+}

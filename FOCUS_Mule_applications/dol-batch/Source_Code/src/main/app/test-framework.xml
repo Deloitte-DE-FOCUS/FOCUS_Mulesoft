@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+	xmlns:ss="http://www.springframework.org/schema/security"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd
+http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    
+        <http:listener-config name="HTTP_Listener_Configuration"  host="0.0.0.0" port="${https.port}"  doc:name="HTTP Listener Configuration" protocol="HTTPS" connectionIdleTimeout="120000">
+        <tls:context>
+            <tls:key-store path="clientkeystore.jks" keyPassword="password" password="password"/>
+        </tls:context>
+        <http:worker-threading-profile maxThreadsActive="120" maxThreadsIdle="80" poolExhaustedAction="WAIT" threadWaitTimeout="-1"/>
+        </http:listener-config>
+	
+	
+	<sftp:connector name="SFTP-testFramework" validateConnections="true" doc:name="SFTP"/>    
+    <validation:config name="Validation_Configuration-testFramework" doc:name="Validation Configuration"/>
+    <flow name="TestFramework">
+        <!-- <http:listener config-ref="HTTP_Listener_Configuration" path="/ConnectivityTest" doc:name="HTTP" /> -->
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.OnDemandRequest.attrList reduce ((val, acc = {interfaceName : payload.OnDemandRequest.interfaceName}) -> acc ++ (( { (val.attributeName) : ( val.attributeValue ) } ))) ]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="Property"><![CDATA[%dw 1.0
+%output application/java
+%var InterfaceName =  {
+"INF001":"TANF Activity Extract", 
+"INF002":"TANF Request Extract", 
+"INF003":"TANF Response Load", 
+"INF004":"Medicaid Application Submission Extract", 
+"INF005":"Medicaid Application Response Load", 
+"INF006":"DHSS CCMIS Extract", 
+"INF007":"DHSS Case Activity Extract", 
+"INF008":"Child Support Application Extract", 
+"INF009":"Child Support Update Extract", 
+"INF010":"Child Support Case Load", 
+"INF011":"Child Support Payment Load", 
+"INF012":"Child Support Cost of Care Extract", 
+"INF013":"MMIS Extract", 
+"INF014":"MMIS Eligibility Load - 450", 
+"INF014b":"MMIS Eligibility Load - 450b", 
+"INF015":"HIPPA Medicaid Claims 837 Institutional Extract", 
+"INF016":"HIPPA Medicaid Claims 837 Professional Extract", 
+"INF017":"HIPAA Medicaid Claim 835 Remittance Load", 
+"INF018":"CJIS Request Extract", 
+"INF019":"CJIS Load", 
+"INF020":"CJIS Broker Schedule Information", 
+"INF021":"CJIS Broker Charge Information", 
+"INF023":"MCI Webservice", 
+"INF024":"DOE Enrolment Extract", 
+"INF025":"DOL Wage Request Extract", 
+"INF026":"DOL Wage Load", 
+"INF027":"DOL UI Load", 
+"INF028":"FSF Chartfield Load", 
+"INF029":"FSF Vendor Extract", 
+"INF030":"FSF Vendor Load", 
+"INF031":"FSF Vendor Log Load", 
+"INF032":"FSF Purchase Order Load", 
+"INF033":"FSF Payment Voucher Extract", 
+"INF034":"FSF Payment Voucher Log Load", 
+"INF035":"FSF Payment Detail Load", 
+"INF036":"FSF Transaction Detail Load", 
+"INF048":"Abuse Registry", 
+"INF049":"DOE Stars Extract", 
+"INF050":"DOE Stars Load", 
+"INF051":"TPL Carrier Information Load", 
+"INF052":"TPL Client Information Load",
+"INF053":"DOE Information Load"
+}
+---
+ {
+	Host:p(payload.Host),
+	InterfaceID:payload.interfaceName,
+	InterfaceName:InterfaceName[payload.interfaceName],
+	InterfaceType:payload.InterfaceType,	
+	Port:p(payload.Port),
+	Path:p(payload.Path),
+	Username:p(payload.Username),
+	Password:p(payload.Password),
+	Filename:payload.Filename
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="Request Recieved #[payload]" level="INFO" doc:name="Logger"/>
+        <logger message="#[payload.InterfaceType]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.Property.InterfaceType == 'Load']">
+                <mulerequester:request resource="#[ 'sftp://' + flowVars.Property.Username + ':' + flowVars.Property.Password + '@' + flowVars.Property.Host + ':' + flowVars.Property.Port + flowVars.Property.Path + '?connector=SFTP&amp;myfilename=' + flowVars.Property.Filename]" doc:name="Mule Requester"/>
+            <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check if File is Present" doc:description="Check if the load file is available or not" config-ref="Validation_Configuration-testFramework"/>
+                <object-to-string-transformer doc:name="Object to String"/>
+            </when>
+            <otherwise>
+                <set-payload value="#[flowVars.Property.InterfaceName + ' Connectivity Testing']" doc:name="Set Payload"/>
+                <object-to-string-transformer doc:name="Object to String"/>
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-testFramework" outputPattern="#[flowVars.Property.Filename]" host="#[flowVars.Property.Host]" port="#[flowVars.Property.Port]" path="#[flowVars.Property.Path]" user="#[flowVars.Property.Username]" password="#[flowVars.Property.Password]" responseTimeout="10000" doc:name="SFTP" duplicateHandling="overwrite"/>
+            </otherwise>
+        </choice>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{  
+   "SmokeTestingResponse":{  
+      "interfaceId":flowVars.Property.InterfaceID,
+      "status":"Success", 
+      "errorDescription":""
+      }
+}
+
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="Exception" value="#[exception.message]"/>
+            </message-properties-transformer>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{  
+   "SmokeTestingResponse":{  
+      "interfaceId":flowVars.Property.InterfaceID,
+      "status":"Failure", 
+      "errorDescription":flowVars.Exception
+      }
+}
+
+
+]]></dw:set-payload>
+            </dw:transform-message>
+        </catch-exception-strategy>
+
+    </flow>
+</mule>

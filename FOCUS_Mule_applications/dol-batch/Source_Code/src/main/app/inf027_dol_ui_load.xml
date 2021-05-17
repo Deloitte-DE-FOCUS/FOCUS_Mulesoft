@@ -1,0 +1,728 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	<spring:beans>
+		<spring:bean id="DOL_UI_Load_Object_Store"
+			class="org.mule.util.store.SimpleMemoryObjectStore"></spring:bean>
+		<spring:bean id="DOL_UI_Load_Error_Object_Store"
+			class="org.mule.util.store.SimpleMemoryObjectStore"></spring:bean>
+	</spring:beans>
+	<objectstore:config name="DOL_UI_Load_Object_Store__Connector"
+		doc:name="ObjectStore: Connector" objectStore-ref="DOL_UI_Load_Object_Store" />
+	<objectstore:config name="DOL_UI_Load_Error_Object_Store__Connector"
+		doc:name="ObjectStore: Connector" objectStore-ref="DOL_UI_Load_Error_Object_Store" />
+
+	<spring:beans>
+		<spring:import resource="classpath:/loggingframework.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/errorhandling.xml" />
+	</spring:beans>
+
+	<!-- <spring:beans> <spring:import resource="classpath:/test-framework.xml" 
+		/> </spring:beans> -->
+
+	<sftp:connector name="SFTP-1" validateConnections="true"
+		doc:name="SFTP">
+		<reconnect count="5" />
+	</sftp:connector>
+	<sftp:connector name="SFTP-2" validateConnections="true"
+		doc:name="SFTP">
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+	<sftp:connector name="SFTP-No-DeleteConnector"
+		validateConnections="true" autoDelete="false" doc:name="SFTP">
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+	<validation:config name="Validation_Configuration"
+		doc:name="Validation Configuration">
+		<validation:exception-factory
+			class="gov.delaware.validation.DelawareValidationExceptionFactory" />
+	</validation:config>
+	<validation:config name="Validation_Configuration1"
+		doc:name="Validation Configuration" />
+	<configuration doc:name="Configuration">
+		<expression-language>
+			<global-functions file="GlobalUtilityFunctions.mvel">
+				def isValidNumber(textNumber) {
+				org.mule.util.StringUtils.isNumeric(textNumber) }
+			</global-functions>
+		</expression-language>
+	</configuration>
+
+	<flow name="inf027_dol_ui_loadFlow"
+		doc:description="DOL UI Load Main flow, this flow triggers at the configured schdule.
+Flow handles retrieval of the file, performs validations and passes the data to the Batch component which processes the data."
+		processingStrategy="synchronous" initialState="started">
+		<poll doc:name="Poll : DOL UI Load"
+			doc:description="Polls and triggers the flow Every Tuesday to Saturday at 5 30 AM
+Poller run's in EST timezone ">
+			<schedulers:cron-scheduler expression="0 30 5 ? * TUE,WED,THU,FRI,SAT *"
+				timeZone="US/Eastern" />
+			<set-payload value="INF027"
+				doc:name="Set Payload to Interface ID for DOL UI Batch Load"
+				doc:description="Set Interface ID in payload so that the flow is triggered. Interface ID is required in the Logging Framework" />
+		</poll>
+		<async doc:name="Async">
+			<flow-ref name="inf027_dol_ui_load_deleteOldDOLRequestRecordsFlow"
+				doc:name="inf027_dol_ui_load_deleteOldDOLRequestRecordsFlow"
+				doc:description="Triggers Flow which handles the delete of 15 days or older records . The flow triggred will process asynchronously since it is triggered by Batch Complete which is also asynchronous, flow will be executed in a different thread." />
+		</async>
+		<set-variable variableName="InterfaceID" value="#[payload]"
+			doc:name="FV: Set Interface ID"
+			doc:description="Interface is stored in flow variable InterfaceID which is used by the Logging framework " />
+		<!-- <logger message="Is Valid Date : #[isInvalidDate(&quot;20150527&quot;,&quot;yyyyMMdd&quot;)] 
+			Is Valid Number #[isValidNumber(&quot;234&quot;)] Is Valid Number #[isValidNumber(&quot;2rytrt34&quot;)]" 
+			level="INFO" doc:name="Logger"/> -->
+		<mulerequester:request
+			resource="sftp://${sftp.DOLUILoad.transaction.username}:${sftp.DOLUILoad.transaction.password}@${sftp.DOLUILoad.transaction.host}:${sftp.DOLUILoad.transaction.port}${sftp.DOLUILoad.transaction.path}?connector=SFTP-2&amp;myfilename=${sftp.DOLUILoad.transaction.filename}"
+			timeout="180000" doc:name="Mule Requester: Retrieve DOL UI Load File"
+			doc:description="Retrives the Load file if available. The Filename is passed to the Requester If the File is not found then Null is returned, The File content is used for Archive purpose only" />
+		<validation:is-not-null config-ref="Validation_Configuration1"
+			message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]"
+			doc:name="Validation : Validate Not Null Payload"
+			doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown" />
+		<object-to-string-transformer mimeType="application/csv"
+			doc:name="Object to String : Consume Payload"
+			doc:description="Consume Payload to convert Payload Input Stream to a Textual format with mime type text/plain" />
+		<set-session-variable variableName="TransAttachment"
+			value="#[payload]" doc:name="Set TransAttachment"
+			doc:description="Creating TransAttachment for the Logging framework, this is backup of the file to be Stored in Salesforce Interface Transaction record" />
+
+		<enricher doc:name="Message Enricher : Invoke Logging Framework"
+			doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+			<flow-ref name="DOL_UI_Load_LogInProgressTransaction_Sub_Flow"
+				doc:name="DOL_UI_Load_LogInProgressTransaction_Sub_Flow"
+				doc:description="Invoke Logging Framework Sub Flow to start Logging" />
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+		</enricher>
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Delete TransAttachment"
+			doc:description="Delete TransAttachment so that we do not get File backup in further Interface Transactions">
+			<delete-message-property key="TransAttachment" />
+		</message-properties-transformer>
+
+
+		<sftp:outbound-endpoint exchange-pattern="one-way"
+			connector-ref="SFTP-1"
+			outputPattern="${sftp.DOLUILoad.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt"
+			host="${sftp.DOLUILoad.archive.host}" port="${sftp.DOLUILoad.archive.port}"
+			path="${sftp.DOLUILoad.archive.path}" user="${sftp.DOLUILoad.archive.username}"
+			password="${sftp.DOLUILoad.archive.password}" responseTimeout="180000"
+			doc:name="SFTP : Archive File" duplicateHandling="overwrite"
+			doc:description="SFTP Archive in Request-Response to ensure that the next component is not invoked until the File Write is complete
+Also Timeout is set sufficiently to allow writing of the file till that time" />
+		<dw:transform-message doc:name="Transform Message : Get PSV Iterator"
+			doc:description="Getting a Iterator from CSV payload which can be loaded in a Batch Processor">
+			<dw:input-payload mimeType="application/csv">
+				<dw:reader-property name="header" value="false" />
+				<dw:reader-property name="separator" value="|" />
+			</dw:input-payload>
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+		</dw:transform-message>
+		<set-session-variable variableName="totalRecCount"
+			value="#[payload.size()]" doc:name="Session Variable : Set Total Record Count"
+			doc:description="Set Total Record Count in session Variable, the total record count is retrieved using the BatchJobResult , after completion of the Batch." />
+		<choice doc:name="Choice : Check If File is Empty"
+			doc:description="Check if any records is present in the File. If not present then route to Log Comletion and throw Buisness Exception.
+If records are present then continue processing">
+			<when expression="#[payload.size() &gt; 0]">
+				<dw:transform-message doc:name="Transform Message : Get Unique PID's">
+					<dw:set-variable variableName="PIDList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.column_1 != "" and isValidNumber($.column_1)) distinctBy ($.column_1 as :number) map ( $.column_1 as :number)]]></dw:set-variable>
+				</dw:transform-message>
+				<set-session-variable variableName="totalUniqueCount"
+					value="#[flowVars.PIDList.size()]" doc:name="Session Variable : Store Unique Count"
+					doc:description="Store Unique Count,
+Unique count is the total number of Unique records in the interface. Uniqueness is determined by FOCUS PID" />
+
+
+				<foreach collection="#[flowVars.PIDList]" batchSize="180"
+					doc:name="For Each"
+					doc:description="Considering the maximum size of PID as 20, The Batch Size is 180">
+					<remove-variable variableName="rootMessage"
+						doc:name="Variable : Remove Root variable" doc:description="Remove Root variable to avoid unnecessary Serialization" />
+					<dw:transform-message doc:name="Get payload from Mule Message">
+						<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+					</dw:transform-message>
+					<dw:transform-message doc:name="Prepare PID List Salesforce Query">
+						<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ ++ "'") ) joinBy "," ]]></dw:set-payload>
+					</dw:transform-message>
+					<enricher
+						source="#[ dw('flowVars.PersonIDValueMap default {} ++ payload')]"
+						target="#[flowVars.PersonIDValueMap]" doc:name="Message Enricher"
+						doc:description="Add enteries to the PersonIDValueMap, 200 at a time coming from the data transformed after the Salesforce Query">
+						<processor-chain doc:name="Processor Chain">
+							<!-- <logger message="select Id,DEL_PID__c from Contact where DEL_PID__c 
+								IN (#[payload])" level="INFO" doc:name="Logger"/> -->
+							<sfdc:query config-ref="Salesforce__Basic_Authentication"
+								query="select Id,DEL_PID__c from Contact where DEL_PID__c IN (#[payload])"
+								doc:name="Salesforce : Query Person (Contact) Id"
+								doc:description="Query Person (Contact) Id from the Contact Object" />
+							<dw:transform-message
+								doc:name="Get LOV Mappings With Partner Code as Key and Focus Code as Value"
+								doc:description="Get a Map From the Consumer Iterator by executing a Lambda over all the elements of the Iterator">
+								<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload reduce ((val, acc = {}) -> acc ++ (( { (val.DEL_PID__c as :string) : (val.Id) } )))]]></dw:set-payload>
+							</dw:transform-message>
+
+						</processor-chain>
+					</enricher>
+					<enricher
+						source="#[ dw('flowVars.RequestIDValueMap default {} ++ payload')]"
+						target="#[flowVars.RequestIDValueMap]" doc:name="Message Enricher"
+						doc:description="Add enteries to the RequestIDValueMap, 200 at a time coming from the data transformed after the Salesforce Query">
+						<processor-chain doc:name="Processor Chain">
+							<!-- <logger message="select id,Person__r.DEL_PID__c from DEL_DOL_Request__c 
+								where Person__r.DEL_PID__c IN (#[payload]) and ( Submission_End__c = Null 
+								or Submission_End__c &gt;= #[dw(' (now &gt;&gt; |+00:00|) as :string {format 
+								: &quot;yyyy-MM-dd&quot;} ') ])" level="INFO" doc:name="Logger"/> -->
+							<sfdc:query config-ref="Salesforce__Basic_Authentication"
+								query="select id,SSN__c,Person__r.DEL_PID__c from DEL_DOL_Request__c where Person__r.DEL_PID__c IN (#[payload]) and  ( Submission_End__c = Null or Submission_End__c &gt;= #[dw(' (now &gt;&gt; |+00:00|) as :string {format : &quot;yyyy-MM-dd&quot;} ') ])"
+								doc:name="Salesforce : Query DOL Request Parent Id"
+								doc:description="Query Person (Contact) Id from the Contact Object" />
+							<dw:transform-message
+								doc:name="Get LOV Mappings With Partner Code as Key and Focus Code as Value"
+								doc:description="Get a Map From the Consumer Iterator by executing a Lambda over all the elements of the Iterator">
+								<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload reduce ((val, acc = {}) -> acc ++ (( { (val.Person__r.DEL_PID__c as :string) : { "Id" : (val.Id),"SSN" : (val.SSN__c) } } )))]]></dw:set-payload>
+							</dw:transform-message>
+							<!-- <logger message="Payload" level="INFO" doc:name="Logger"/> -->
+						</processor-chain>
+					</enricher>
+				</foreach>
+
+				<enricher source="#[payload.Id]" target="#[flowVars.RecordID_DOLUI]"
+					doc:name="Recieve DOL UI Record Type ID"
+					doc:description="Recieve DOL UI Record Type ID from the underlying SFDC Query operation and store it in a variable so that the payload is not disturbed
+The RecordType will be used in upcoming SFDC operations in the interface">
+					<sfdc:query-single config-ref="Salesforce__Basic_Authentication"
+						query="select Id from RecordType where name = 'DOL UI Load'"
+						doc:name="Salesforce : Query DOL UI RecordType ID"
+						doc:description="Get DOL UI Record Type ID from SFDC Query operation on RecordType object, this ID will be used later in the later SFDC operations." />
+				</enricher>
+
+				<batch:execute name="inf027_dol_ui_load_Batch"
+					doc:name="inf027_dol_ui_load_Batch"
+					doc:description="Invoke the Batch component which will handle the Load, PSV Iterator is passed to the Batch process Input, which Batch will use for Loading records" />
+
+			</when>
+
+			<otherwise>
+				<message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties : Update Count" doc:description="Update Success count to be used in Logging Framework">
+					<add-message-property key="totalSuccCount" value="#[0]"/>
+					<add-message-property key="totalErrorCount" value="#[0]"/>
+					<add-message-property key="recStatus" value="#['Error']"/>
+				</message-properties-transformer>
+
+
+				<set-payload
+					value="{&quot;InterfaceID&quot;: &quot;INF027&quot;, &quot;InterfaceName&quot;: &quot;DOL UI Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_DOLUILoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;No Records present in the file&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Tuesday to Saturday Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+					mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+					doc:description="Set Payload for Logging Framework for Transaction completion" />
+				<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"
+					doc:description="Invoke Log Transaction SubFlow of the Logging Framework" />
+<message-properties-transformer scope="invocation" doc:name="Deleting FV">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="exceptionRecordCount"/>
+				<delete-message-property key="RecordError"/>
+				<delete-message-property key="PIDList"/>
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+				<delete-message-property key="totalRecCount"/>
+				<delete-message-property key="totalUniqueCount"/>
+				<delete-message-property key="totalSuccCount"/>
+				<delete-message-property key="recStatus"/>
+					<delete-message-property key="totalErrorCount"/>
+			
+			</message-properties-transformer>
+			</otherwise>
+		</choice>
+
+		<exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+
+
+	<batch:job name="inf027_dol_ui_load_Batch"
+		doc:description="Batch Job which will handle the Load of all records from DOL UI File
+The Block size for a thread is set to 100"
+		max-failed-records="-1">
+		<batch:process-records>
+			<batch:step name="Batch_Step_Process_InValid_Detail_Records"
+				accept-expression="#[ ( payload.column_0 == null || validator.isEmpty(payload.column_0) || !isValidNumber(payload.column_0)) || ( payload.column_1 == null || validator.isEmpty(payload.column_1) || !isValidNumber(payload.column_1) ) || ( flowVars.RequestIDValueMap.get(dw('payload.column_1 as :number as :string')) == null || !flowVars.RequestIDValueMap.get(dw('payload.column_1 as :number as :string')).get(&quot;SSN&quot;).equals(payload.column_0)) || ( payload.column_2 == null || validator.isEmpty(payload.column_2) || isInvalidDate(payload.column_2,&quot;yyyyMMdd&quot;) ) || ( payload.column_3 == null || validator.isEmpty(payload.column_3) || isInvalidDate( (payload.column_3),&quot;yyyyMMdd&quot;) ) || ( payload.column_4 == null || validator.isEmpty(payload.column_4.trim()) || !isValidNumber(payload.column_4.trim()) ) ]"
+				doc:description="This Batch Step recieves all the records in which one or more mandatory fields are missing or Invalid, 
+Invalid date for example having 15 in the month field etc is handled by a global function isInvalidDate in the accept expression. ">
+				<batch:commit doc:name="Batch Commit"
+					doc:description="Process All Rcords recieved from the file having one or more fields missing. At the end a CSV report is generated"
+					size="200">
+					<dw:transform-message
+						doc:name="Transform Message : Create error report for records having Missing and Invalid fields">
+						<dw:set-payload><![CDATA[%dw 1.0
+%output application/csv separator=",", header=false
+---
+payload map {
+	"SSN" : $.column_0,
+	"PID" : $.column_1,
+	"CheckDate" : $.column_2,
+	"WeekEndingDate" : $.column_3,	
+	"Amount" : $.column_4,						
+	"errorDesc" : ( "Client SSN number is Missing" when ($.column_0 == null or $.column_0 == "" )  otherwise "" )  
+	++ ( "|Client SSN number is Invalid" when (($.column_0 != null and $.column_0 != "" ) and ( not (isValidNumber($.column_0)) ) )  otherwise "" )	
+	++ ( "|FOCUS PID is Missing" when ($.column_1 == null or $.column_1 == "" )  otherwise "" )  
+	++ ( "|FOCUS PID is Invalid" when (($.column_1 != null and $.column_1 != "" ) and ( not (isValidNumber($.column_1))) )  otherwise "" )	
+	++ ( "|No DOL Wage Request record found with the given PID and SSN combination to insert UI load data" when (($.column_1 != null and $.column_1 != "" ) and ( flowVars.RequestIDValueMap[($.column_1 as :number as :string)] == null ) )  otherwise "" )	
+	++ ( "|SSN from the file does not match the SSN from FOCUS" when (($.column_1 != null and $.column_1 != "" and $.column_0 != null and $.column_0 != "" and (flowVars.RequestIDValueMap[($.column_1 as :number as :string)] != null) ) and ( flowVars.RequestIDValueMap[($.column_1 as :number as :string)]['SSN'] != $.column_0 ) )  otherwise "" )	
+	++ ( "|Check Date is Missing" when ($.column_2 == null or $.column_2 == "" )  otherwise "" )  
+	++ ( "|Check Date is Invalid" when (($.column_2 != null and $.column_2 != "" ) and isInvalidDate($.column_2,"yyyyMMdd") )  otherwise "" )
+	++ ( "|Week Ending Date is Missing" when ($.column_3 == null or $.column_3 == "" )  otherwise "" )
+	++ ( "|Week Ending Date is Invalid" when (($.column_3 != null and $.column_3 != "" ) and isInvalidDate($.column_3,"yyyyMMdd") )  otherwise "" )	
+	++ ( "|Amount is Missing" when ($.column_4 == null or (trim $.column_4) == "" )  otherwise "" )  
+	++ ( "|Amount is Invalid" when (($.column_4 != null and (trim $.column_4) != "" ) and ( not (isValidNumber(trim $.column_4))) )  otherwise "" )	
+}]]></dw:set-payload>
+					</dw:transform-message>
+					<object-to-string-transformer
+						doc:name="Object to String: Consume Payload"
+						doc:description="Consume Payload so that the Output(CSV) from Dataweave is converted into a textual format , 
+which can be entered in a Object Store " />
+					<set-variable variableName="MissingFieldErrorCount"
+						value="#[(payload:java.lang.String).toString().equals(&quot;&quot;) ? new Integer(&quot;0&quot;) : ((payload:java.lang.String).toString().split(&quot;\n&quot;).length)]"
+						doc:name="Variable : Missing Fields Error Count" doc:description="Get Missing Fields Error Count" />
+					<expression-filter expression="#[ flowVars.MissingFieldErrorCount &gt; 0 ]"
+						doc:name="Expression : Stop Processing when No Records are InValid"
+						doc:description="Expression : Stop Processing when No Records are InValid, Batch Commit is used, so even when we get no invalid records the Batch Commit components will still be invoked , so that is Filter is used." />
+					<objectstore:store config-ref="DOL_UI_Load_Object_Store__Connector"
+						key="MissingFieldErrorCount#[java.util.UUID.randomUUID().toString()]"
+						value-ref="#[flowVars.MissingFieldErrorCount]" doc:name="Store Missing Field Error Count in Object Store"
+						doc:description="Store Missing Field Error Count in Object Store, a unique ID is appended in key to make a unique entry in Object Store" />
+					<objectstore:store config-ref="DOL_UI_Load_Object_Store__Connector"
+						key="MissingFieldErrorReport#[java.util.UUID.randomUUID().toString()]"
+						value-ref="#[payload:java.lang.String]" doc:name="Store Missing Field Error Report in Object Store"
+						doc:description="Store Missing Field Error Report in Object Store, a unique ID is appended in key to make a unique entry in Object Store" />
+
+				</batch:commit>
+			</batch:step>
+
+			<batch:step name="Batch_Step_Process_Valid_Detail_Records"
+				accept-expression="#[ ( isValidNumber(payload.column_0)  &amp;&amp; (payload.column_0 != &quot;&quot;) ) &amp;&amp; ( isValidNumber(payload.column_1 ) &amp;&amp; (payload.column_1 != &quot;&quot;) ) &amp;&amp; ( flowVars.RequestIDValueMap.get(dw('payload.column_1 as :number as :string')) != null &amp;&amp; flowVars.RequestIDValueMap.get(dw('payload.column_1 as :number as :string')).get(&quot;SSN&quot;).equals(payload.column_0))  &amp;&amp; ( payload.column_2 != null &amp;&amp; validator.notEmpty(payload.column_2) &amp;&amp; !isInvalidDate(payload.column_2,&quot;yyyyMMdd&quot;) ) &amp;&amp; ( payload.column_3 != null &amp;&amp; validator.notEmpty(payload.column_3) &amp;&amp; !isInvalidDate(payload.column_3,&quot;yyyyMMdd&quot;)  ) &amp;&amp; ( isValidNumber(payload.column_4.trim()) &amp;&amp; payload.column_4 != null &amp;&amp; (payload.column_4.trim() != &quot;&quot;) ) ]"
+				doc:description="This Batch Step recieves the records which are not having any Missing fields This Batch Step recieves the records which are not having any Missing fields or Invalid Fields. 
+The Invalid date for example having 15 in the month field etc is handled by a global function isInvalidDate in the accept expression.  
+This Batch Step upserts the Eligibility information in Salesforce">
+				<batch:commit doc:name="Batch Commit" size="200"
+					doc:description="Batch Commit is set to 200, keeping in mind the Upsert operation SFDC limit
+200 records are upserted at a time">
+					<!-- <logger message="Hello" level="INFO" doc:name="Logger"/> -->
+					<dw:transform-message doc:name="Transform Message : Prepare Data for Upsert">
+						<dw:set-variable variableName="preUpsertData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	RecordTypeId : flowVars.RecordID_DOLUI,
+	//SSN__c : $.column_0,
+	Check_Date__c: (("4000" ++ $.column_2[4..7] as :string) when ($.column_2[0..3] as :number) > 4000  otherwise $.column_2 )  as :date {format: "yyyyMMdd"},		
+	Week_Ending_Date__c: (("4000" ++ $.column_3[4..7] as :string) when ($.column_3[0..3] as :number) > 4000  otherwise $.column_3 )  as :date {format: "yyyyMMdd"},	
+	Amount__c : $.column_4,
+	External_ID__c : ($.column_1 as :number) ++ "-" ++ $.column_2 ++ "-" ++ $.column_3 ++ "-" ++ flowVars.RecordID_DOLUI,
+// 	Person__c : flowVars.PersonIDValueMap[($.column_1 as :number )],
+//	DOL_Request_ID__c : flowVars.RequestIDValueMap[($.column_1 as :number)], 
+	Person__c : flowVars.PersonIDValueMap[(($.column_1 as :number) as :string)],
+	DOL_Request_ID__c : flowVars.RequestIDValueMap[(($.column_1 as :number) as :string)]['Id']
+}]]></dw:set-variable>
+					</dw:transform-message>
+
+					<enricher source="#[payload]" target="#[flowVars.SFDCResult]"
+						doc:name="Message Enricher : Invoke SFDC Insert in encricher"
+						doc:description="Message Enricher : Invoke SFDC Upsert in encricher so that orignal payload is not disturbed
+The orignal Payload will be used for Error report creation if the Upsert Operation fails for any record.">
+						<sfdc:create config-ref="Salesforce__Basic_Authentication"
+							 type="DEL_DOL_Response__c"
+							doc:name="Salesforce : Insert Records for the Child"
+							doc:description="Salesforce : Upsert Records for the Child">
+							<sfdc:objects ref="#[flowVars.preUpsertData]"/>
+
+						</sfdc:create>
+					</enricher>
+					<dw:transform-message
+						doc:name="Transform Message : Get error report of records failed in SFDC">
+						<dw:set-payload><![CDATA[%dw 1.0
+%output application/csv separator=","
+---
+flowVars.SFDCResult map {
+	"SSN" : payload[$$].column_0,
+	"PID" : payload[$$].column_1,
+	"CheckDate" : payload[$$].column_2,
+	"WeekEndingDate" : payload[$$].column_3,	
+	"Amount" : payload[$$].column_4,
+	//("errors" : ("PID (" ++ payload[$$].column_1 ++ ") is not present in FOCUS") when ($.errors[0].fields[0] == "Person__c" ) otherwise ($.errors[0].fields[0] ++ ":" ++ $.errors[0].message  ++ ":" ++ $.errors[0].statusCode ) 		
+	//) when ($.success == false)
+	("Error Description" : (("PID (" ++ payload[$$].column_1 ++ ") is not present in FOCUS or a parent DOL Request record could not be identified for the provided PID") when ($.errors[0].fields[0] == "Person__c" or $.errors[0].fields[0] == "DOL_Request_ID__c" ) otherwise ""  )	when (($.errors[0].fields[0] == "Person__c" ) or ($.errors[0].fields[0] == "DOL_Request_ID__c")) otherwise ($.errors[0].fields[0] ++ ":" ++ $.errors[0].message  ++ ":" ++ $.errors[0].statusCode ) 	
+	) when ($.success == false)
+} filter $["Error Description"] != null]]></dw:set-payload>
+					</dw:transform-message>
+					<object-to-string-transformer
+						doc:name="Object to String : Consume Payload"
+						doc:description="Object to String is used to get a textual format of the Error report generated by the dataweave" />
+					<set-variable variableName="SFDCErrorCount"
+						value="#[payload.equals(&quot;&quot;) ? new Integer(&quot;0&quot;) : ((payload.split(&quot;\n&quot;).length) - 1)  ]"
+						doc:name="Variable : SFDC Error Count" doc:description="Variable : SFDC Error Count" />
+					<objectstore:store config-ref="DOL_UI_Load_Object_Store__Connector"
+						key="SFDCErrorCount#[java.util.UUID.randomUUID().toString()]"
+						value-ref="#[flowVars.SFDCErrorCount]"
+						doc:name="ObjectStore : Store SFDC Error Count for 200 records at a time"
+						doc:description="Store SFDC Error Count  for 200 records at a time, in the Object Store for Techinal Exceptions" />
+					<expression-filter expression="#[ flowVars.SFDCErrorCount &gt; 0 ]"
+						doc:name="Expression : Stop Processing when all Records are Valid"
+						doc:description="Expression : Stop Processing when all Records are Valid" />
+					<objectstore:store config-ref="DOL_UI_Load_Object_Store__Connector"
+						key="SFDCErrorReport#[java.util.UUID.randomUUID().toString()]"
+						value-ref="#[payload:java.lang.String]"
+						doc:name="ObjectStore : Store SFDC Error Report for 200 records at a time"
+						doc:description="Store SFDC Error Report for 200 records at a time in the Object Store for Techinal Exceptions" />
+				</batch:commit>
+
+			</batch:step>
+
+			<batch:step name="Batch_Step_getBatchErrors"
+				accept-policy="ONLY_FAILURES"
+				doc:description="This Batch catches all the Exceptions which occured during the processing">
+				<set-payload value="#[getLastException()]" doc:name="Set Payload" />
+				<batch:commit size="1000" doc:name="Batch Commit"
+					doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+					<message-properties-transformer
+						scope="invocation" doc:name="Message Properties : Initialize Variables"
+						doc:description="Initialize Variables to be used later">
+						<add-message-property key="SFDCConErrorCount"
+							value="#[0]" />
+						<add-message-property key="exceptionMessage"
+							value="#[&quot;&quot;]" />
+						<add-message-property key="totalErrorCount"
+							value="#[0]" />
+						<add-message-property key="previousExceptionMessages"
+							value="#[[&quot;&quot;]]" />
+						<add-message-property key="currentExceptionMessage"
+							value="#[&quot;&quot;]" />
+					</message-properties-transformer>
+					<foreach collection="#[payload]" doc:name="For Each">
+						<expression-component
+							doc:name="Expression : Update Exception Message Details"
+							doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+					</foreach>
+					<expression-filter
+						expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]"
+						doc:name="Expression : Stop Processing when no Errors"
+						doc:description="Expression : Stop Processing when no Errors" />
+					<objectstore:store config-ref="DOL_UI_Load_Error_Object_Store__Connector"
+						key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]"
+						value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count"
+						doc:description="ObjectStore : Store SFDC Error Count with a unique key" />
+					<objectstore:store config-ref="DOL_UI_Load_Error_Object_Store__Connector" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+
+				</batch:commit>
+			</batch:step>
+		</batch:process-records>
+		<batch:on-complete>
+			<!-- <set-session-variable variableName="totalRecCount" value="#[payload.loadedRecords]" 
+				doc:name="Session Variable : Set Total Record Count" doc:description="Set 
+				Total Record Count in session Variable, the total record count is retrieved 
+				using the BatchJobResult , after completion of the Batch."/> -->
+			<objectstore:retrieve-all-keys
+				config-ref="DOL_UI_Load_Error_Object_Store__Connector" doc:name="Exception ObjectStore : Get all Exception Keys"
+				doc:description="Exception ObjectStore : Get all Exception Keys" />
+			<set-variable variableName="exceptionRecordCount" value="#[payload.size()]"
+				doc:name="Variable : Store count of Exception Records"
+				doc:description="Variable : Store count of Exception Records" />
+
+			<foreach doc:name="For Each">
+				<choice doc:name="Choice : Route Error Count and Error Report"
+					doc:description="Choice : Route Error Count and Error Report
+All the exception details enteries are routed to the default barnch and all the Connection Error count enteries are routed to the other branch.">
+					<when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+						<objectstore:remove config-ref="DOL_UI_Load_Error_Object_Store__Connector"
+							key="#[payload]"
+							doc:name="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count"
+							doc:description="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count" />
+						<message-properties-transformer
+							overwrite="true" scope="invocation"
+							doc:description="Message Properties: Update Total SFDC Connection Error Count"
+							doc:name="Message Properties: Update Total SFDC Connection Error Count">
+							<add-message-property key="total_sfdc_con_errorcount"
+								value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]" />
+						</message-properties-transformer>
+					</when>
+					<otherwise>
+						<objectstore:remove config-ref="DOL_UI_Load_Error_Object_Store__Connector"
+							key="#[payload]"
+							doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details"
+							doc:description="Exception ObjectStore : Retrive and Remove a record having Exception Details" />
+						<message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+							<add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+						</message-properties-transformer>
+
+					</otherwise>
+				</choice>
+			</foreach>
+			<!-- <logger message="Before Validation All FlowVars #[flowVars]" level="INFO" 
+				doc:name="Logger"/> -->
+			<!-- <validation:custom-validator doc:name="Validation" exceptionClass="org.mule.api.ConnectionException" 
+				class="gov.delaware.validation.DelawareValidator" config-ref="Validation_Configuration"/> -->
+
+			<!-- <logger message="Valid " level="INFO" doc:name="Logger"/> -->
+			<choice doc:name="Choice : Route when No Exception Occured"
+				doc:description="Choice : Route when No Exception Occured
+If any error has occured, then the clean branch is executed otherwise the branch dealing with calculating Logging transaction metrics is executed.">
+				<when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+					<logger message="Error(s) thrown, Log Completion will not be invoked"
+						level="INFO" doc:name="Logger" />
+					<objectstore:retrieve-all-keys
+						config-ref="DOL_UI_Load_Object_Store__Connector" doc:name="ObjectStore : Retrieve all Keys"
+						doc:description="Retrieve all Keys" />
+					<foreach doc:name="For Each : Iterate over each Entry"
+						doc:description="For Each : Iterate over each Entry">
+						<objectstore:remove config-ref="DOL_UI_Load_Object_Store__Connector"
+							key="#[payload]" doc:name="ObjectStore : Remove Each Entry"
+							doc:description="Remove Each Entry from Object Store so that that these enteries does not appear in the next Run" />
+					</foreach>
+					<flow-ref name="Interface-handle-batch-errors-Flow"
+						doc:name="Interface-handle-batch-errors-Flow" />
+				</when>
+				<otherwise>
+					<message-properties-transformer
+						overwrite="true" scope="session" doc:name="Message Properties: Initialize variables"
+						doc:description="Message Properties: Initialize variables">
+						<!-- <add-message-property key="totalRecCount" value="#[0]"/> -->
+						<add-message-property key="totalErrorCount"
+							value="#[0]" />
+						<add-message-property key="totalSuccCount"
+							value="#[0]" />
+						<add-message-property key="errorDetails"
+							value="#[new StringBuilder()]" />
+					</message-properties-transformer>
+					<objectstore:retrieve-all-keys
+						config-ref="DOL_UI_Load_Object_Store__Connector" doc:name="ObjectStore : Retrieve All Keys"
+						doc:description="ObjectStore : Retrieve All Keys" />
+					<foreach collection="#[payload]" doc:name="For Each : Iterate over each key"
+						doc:description="For Each : Iterate over each key">
+						<choice
+							doc:name="Choice : Route all Counting entries stored in Object Store "
+							doc:description="Route all Counting entries stored in Object Store
+All report enteries will be routed to default branch and the counting enteries to the other branch.">
+							<when expression="#[ payload.contains('Count') ]">
+								<objectstore:remove config-ref="DOL_UI_Load_Object_Store__Connector"
+									key="#[payload]" doc:name="ObjectStore : Remove and get" />
+								<message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update Total InValid Count">
+									<add-message-property key="totalErrorCount" value="#[ sessionVars.totalErrorCount + (new java.lang.Integer(payload))]"/>
+								</message-properties-transformer>
+
+							</when>
+							<otherwise>
+								<objectstore:remove config-ref="DOL_UI_Load_Object_Store__Connector"
+									key="#[payload]" doc:name="ObjectStore : Remove and get" />
+								<!-- <message-properties-transformer overwrite="true" scope="session" 
+									doc:name="Message Properties: Update totalErrorCount, ErrorAttachment"> -->
+								<expression-component doc:name="Expression : Add Errors to error Report"
+									doc:description="Expression : Append Errors to Error Report"><![CDATA[ sessionVars.errorDetails.append(( payload ))]]></expression-component>
+								<!-- </message-properties-transformer> -->
+							</otherwise>
+						</choice>
+					</foreach>
+					<!-- <message-properties-transformer overwrite="true" scope="session" 
+						doc:name="Message Properties : Update Success count" doc:description="Update 
+						Success count to be used in Logging Framework"> <add-message-property key="totalSuccCount" 
+						value="#[sessionVars.totalRecCount - sessionVars.totalErrorCount]" /> </message-properties-transformer> -->
+					<message-properties-transformer
+						overwrite="true" scope="session"
+						doc:name="Message Properties : Update Success count, Update Record Status, ErrorAttachment"
+						doc:description="Update Success count, Update Record Status, ErrorAttachment
+This will be used in Logging Framework">
+						<add-message-property key="totalSuccCount"
+							value="#[sessionVars.totalRecCount -  sessionVars.totalErrorCount]" />
+						<add-message-property key="recStatus"
+							value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+						<add-message-property key="ErrorAttachment"
+							value="#[sessionVars.totalErrorCount==0  ? null : sessionVars.errorDetails.toString() ]" />
+					</message-properties-transformer>
+					<choice doc:name="Choice : Errors exist, add header to error file">
+						<when expression="#[sessionVars.totalErrorCount &gt; 0]">
+							<set-variable variableName="headerData"
+								value="#[&quot;SSN,PID,CheckDate,WeekEndingDate,Amount&quot;]"
+								mimeType="application/csv" doc:name="FV Header Prepare" />
+							<set-session-variable variableName="ErrorAttachment"
+								value="#[flowVars.headerData.toString()+'\n'+sessionVars.ErrorAttachment.toString()]"
+								doc:name="SV Cobmine Header and ErrorAttachment" />
+						</when>
+						<otherwise>
+							<logger message="No error records" level="INFO" doc:name="Logger" />
+						</otherwise>
+					</choice>
+					<set-payload
+						value="{&quot;InterfaceID&quot;: &quot;INF027&quot;, &quot;InterfaceName&quot;: &quot;DOL UI Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_DOLUILoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot; Number Of Unique records #[sessionVars.totalUniqueCount] #[sessionVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Tuesday to Saturday Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+						mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+						doc:description="Set Payload for Logging Framework for Transaction completion" />
+					<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"
+						doc:description="Invoke Log Transaction SubFlow of the Logging Framework" />
+				<message-properties-transformer scope="invocation" doc:name="Message Properties">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="preUpsertData"/>
+				<delete-message-property key="exceptionRecordCount"/>
+				<delete-message-property key="RecordError"/>
+				<delete-message-property key="SFDCErrorCount"/>
+				<delete-message-property key="PIDList"/>
+				<delete-message-property key="MissingFieldErrorCount"/>
+				
+				<delete-message-property key="SFDCConErrorCount"/>
+				<delete-message-property key="exceptionMessage"/>
+				<delete-message-property key="totalErrorCount"/>
+				<delete-message-property key="previousExceptionMessages"/>
+				<delete-message-property key="currentExceptionMessage"/>
+				<delete-message-property key="AggregatedErrorDetails"/>
+				<delete-message-property key="total_sfdc_con_errorcount"/>	
+			</message-properties-transformer>
+			<message-properties-transformer scope="session" doc:name="Message Properties">
+				<delete-message-property key="totalRecCount"/>
+				<delete-message-property key="totalUniqueCount"/>
+				<delete-message-property key="totalErrorCount"/>
+				<delete-message-property key="totalSuccCount"/>
+				<delete-message-property key="errorDetails"/>
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="headerData"/>	
+			</message-properties-transformer>
+				</otherwise>
+			</choice>
+		</batch:on-complete>
+	</batch:job>
+
+	<flow name="Interface-handle-batch-errors-Flow">
+		<!-- <logger message="FlowVars From Flow #[flowVars]" level="INFO" doc:name="Logger"/> -->
+		<validation:custom-validator
+			doc:name="Validation : Validate for Batch Techincal Errors"
+			exceptionClass="org.mule.api.ConnectionException" class="gov.delaware.validation.DelawareValidator"
+			config-ref="Validation_Configuration"
+			doc:description="Validate for Batch Exceptions, if Batch Technical Errors are present a Exception is thrown depending on the nature of the Batch Exceptions" />
+		<!-- <logger message="After Validation : In flow" level="INFO" doc:name="Logger"/> -->
+		<exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+	<flow name="inf027_dol_ui_load_deleteOldDOLRequestRecordsFlow"
+		doc:description=" This Flow handles the delete of 15 days or older records .
+This flow will process asynchronously since it is triggered by Batch Complete which is also asynchronous, thus flow will not return to the main Batch Complete thread and will be processed parallely">
+		<set-variable variableName="deleteQueryCheckDate"
+			value="#[server.dateTime.plusDays(${DOLUILoad.OldDaystoDelete}).format('yyyy-MM-dd')]"
+			doc:name="Variable : Store DOL UI Load Interface Run date"
+			doc:description="Store DOL UI Load Interface Run date minus 15 days in GMT Timezone and prepares a textual date for the Salesforce Query
+MEL Dataweave function is used to caculate the current date minus 15 days" />
+		<sfdc:query config-ref="Salesforce__Basic_Authentication"
+			query="select id from DEL_DOL_Request__c where Submission_End__c &lt;= #[flowVars.deleteQueryCheckDate]"
+			doc:name="Salesforce : Get Id of all old records"
+			doc:description="Salesforce : Get Id of all old records, These Id's will be used for the subsequent Delete operation" />
+		<foreach batchSize="200" doc:name="For Each"
+			doc:description="Get 200 records at a time.
+This is done so that the delete operation limit is not exceeded.">
+			<dw:transform-message
+				doc:name="Transform Message : Obtain List of ID to be deleted">
+				<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $.Id]]></dw:set-payload>
+			</dw:transform-message>
+			<sfdc:delete config-ref="Salesforce__Basic_Authentication"
+				doc:name="Salesforce : Delete old records"
+				doc:description="Deletes the DOL Request Records which were created 15 days or less than the current date" />
+		</foreach>
+		<exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+
+	<sub-flow name="DOL_UI_Load_LogInProgressTransaction_Sub_Flow">
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF027&quot;, &quot;InterfaceName&quot;: &quot;DOL UI Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_${sftp.DOLUILoad.archive.filename}&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Tuesday to Saturday Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+			doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+	</sub-flow>
+
+</mule>

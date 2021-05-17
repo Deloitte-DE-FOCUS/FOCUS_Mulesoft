@@ -1,0 +1,1104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:spring="http://www.springframework.org/schema/beans" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+       <!-- <spring:beans> 
+         <spring:import resource="classpath:/loggingframework.xml" />   
+      </spring:beans> 
+      <spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+      </spring:beans> -->
+   
+   
+ 
+    <flow name="inf054-ssa-extract-Flow" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="This poll will trigger the mule flow 5th of every Month">
+            <schedulers:cron-scheduler expression="0 0 0 5 * ? *" timeZone="US/Eastern"/>
+           <set-payload value="INF054" doc:name="Set Payload to Interface ID" doc:description="SSA Extract contains details related to all modified placement"/>
+        </poll>
+        <message-properties-transformer scope="invocation" doc:name="MP: Set Interface ID and Run-Date">
+            <add-message-property key="InterfaceID" value="#[payload]"/>
+            <add-message-property key="RunDate" value="#[server.dateTime.format(&quot;yyyy-MM-dd&quot;)]"/>
+            <add-message-property key="isInitialReport" value="${ssa.isInitialReport}"/>
+            <add-message-property key="ReportStartDate" value="#[dw('(|2020-04-05| - |P30D|) as :date as :string {format : &quot;yyyy-MM-dd&quot;}')]"/>
+            <add-message-property key="ReportEndDate" value="#[dw('|2020-04-05| as :date as :string {format : &quot;yyyy-MM-dd&quot;}')]"/>
+            <add-message-property key="Report3Years" value="#[dw('(|2020-04-05| - |P4Y|) as :date as :string {format : &quot;yyyy-MM-dd&quot;}')]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload i.e. the query result">
+            <flow-ref name="In-Progress_SSA-Extract" doc:name="In-Progress_SSA-Extract" doc:description="This flow reference calls the sub flow In-Progress_DOL-Extract to create the In-Progress transaction in SFDC interface tab for MMIS extract"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf054-ssa-Court-Order-details-Sub_Flow" doc:name="inf054-ssa-Court-Order-details-Sub_Flow"/>
+            <enrich source="#[flowVars.CourtOrderPlacementId]" target="#[flowVars.CourtOrderPlacementId]"/>
+            <enrich source="#[flowVars.CourtOrderDetails]" target="#[flowVars.CourtOrderDetails]"/>
+        </enricher>
+
+        
+        
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.isInitialReport == 'Y']">
+                <flow-ref name="inf054-ssa-extract-basic-query-for-initial-report-Sub_Flow" doc:name="inf054-ssa-extract-basic-query-for-initial-report-Sub_Flow"/>
+            </when>
+            <otherwise>
+                <flow-ref name="inf054-ssa-extract-Basic-query-Sub_Flow" doc:name="inf054-ssa-extract-Basic-query-Sub_Flow"/>
+            </otherwise>
+        </choice>
+        <dw:transform-message doc:name="Transform Message : Set payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.AllPlacementDetails filter (flowVars.ClientIds contains $.ClientId) distinctBy $.Id]]></dw:set-payload>
+            <dw:set-variable variableName="AllPlacementHistory"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.PlacementHistory default []) ++ (flowVars.SupportHistory default []))]]></dw:set-variable>
+        </dw:transform-message>
+         <dw:transform-message doc:name="Transform Message : ExParteCustodyDetails">
+            <dw:set-variable variableName="ExParteCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map (value,index) -> (flowVars.AllCustodyDetails[value.ClientId] filter ($.OrderType contains "Ex Parte") groupBy $.Id )) ]]></dw:set-variable>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+        <when expression="#[flowVars.isInitialReport == 'N']">
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf054-ssa-extract-historical-placement-check-Sub_Flow" doc:name="inf054-ssa-extract-historical-placement-check-Sub_Flow"/>
+            <enrich source="#[flowVars.isEntryPlacement]" target="#[flowVars.isEntryPlacement]"/>
+            <enrich source="#[flowVars.ExParteCustodyDetails]" target="#[flowVars.ExParteCustodyDetails]"/>
+        </enricher>
+        </when>
+        <otherwise>
+        	<logger message="Not a Monthly file" doc:name="Logger"/>
+        </otherwise>
+        </choice>
+
+
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP:Set Record-Error,Count,Success " doc:description="This message property is used to set the total records, succesfull records and the records which errored out">
+            <add-message-property key="RecordError" value="#[0]"/>
+            <add-message-property key="RecordSuccess" value="#[payload.size()]"/>
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+        </message-properties-transformer>
+         <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the No Payload Sub flow without altering the payload">
+            <flow-ref name="inf054-SSA-request-extract-NoPayload_Flow" doc:name="inf054-SSA-request-extract-NoPayload_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression: Stop flow for 0 records" doc:description="Filter expression to stop the execution of the flow if size of payload is zero i.e. no records are extracted"/>
+
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf054-SSA-payee-details-Sub_Flow" doc:name="inf054-SSA-payee-details-Sub_Flow"/>
+            <enrich source="#[flowVars.payeeDetails]" target="#[flowVars.payeeDetails]"/>
+        </enricher>
+
+        <dw:transform-message doc:name="TM:Calculate each element">
+            <dw:input-payload doc:sample="sample_data\empty.xml" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//This dataweave code converts the SFDC query output to a array list
+%dw 1.0
+%output application/java 
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%var stateCodeMap = {
+      "Alabama" : "AL",
+      "Arizona" : "AZ",
+      "Arkansas" : "AR",
+      "California" : "CA",
+      "Colorado" : "CO",
+      "Connecticut" : "CT",
+      "Delaware" : "DE",
+      "Florida" : "FL",
+      "Georgia" : "GA",
+      "Idaho" : "ID",
+      "Illinois" : "IL",
+      "Indiana" : "IN",
+      "Iowa" : "IA",
+      "Kansas" : "KS",
+      "Kentucky" : "KY",
+      "Louisiana" : "LA",
+      "Maine" : "ME",
+      "Maryland" : "MD",
+      "Massachusetts" : "MA",
+      "Michigan" : "MI",
+      "Minnesota" : "MN",
+      "Mississippi" : "MS",
+      "Missouri" : "MO",
+      "Montana" : "MT",
+      "Nebraska" : "NE",
+      "Nevada" : "NV",
+      "New Hampshire" : "NH",
+      "New Jersey" : "NJ",
+      "New Mexico"  : "NM",
+      "New York" : "NY",
+      "North Carolina" : "NC",
+      "North Dakota" : "ND",
+      "Ohio" : "OH",
+      "Oklahoma" : "OK",
+      "Oregon" : "OR",
+      "Pennsylvania" : "PA",
+      "Rhode Island" : "RI",
+      "South Carolina" : "SC",
+      "South Dakota" : "SD",
+      "Tennessee" : "TN",
+      "Texas" : "TX",
+      "Utah"  : "UT",
+      "Vermont" : "VT",
+      "Virginia" : "VA",
+      "Washington" : "WA",
+      "West Virginia" : "WV",
+      "Wisconsin" : "WI",
+      "Wyoming" : "WY"
+      }
+---
+payload map ({
+	  Id : $.Id,
+      RecordType : "D",
+      FirstName : $.FirstName,
+      MiddleName : $.MiddleName,
+      LastName : $.LastName,
+      SSN : $.SSN,
+      DOB : $.DOB,
+      Age: abs ( ((now as :date) - $.DOB).years ) default "0",
+      FosterParentFirstName : "" when ($.FosterParentFirstName == null) otherwise $.FosterParentFirstName,
+      FosterParentLastName : "" when ($.FosterParentFirstName == null) otherwise $.FosterParentLastName,
+      FosterCarePlacementInstitutionName : $.FosterCarePlacementInstitutionName when ($.FosterParentFirstName == null) otherwise "",
+      FosterCarePlacementLocationAddressLine1 : $.FosterCarePlacementLocationAddressLine1,
+      FosterCarePlacementLocationAddressLine2 : $.FosterCarePlacementLocationAddressLine2,
+      FosterCarePlacementLocationAddressLine3 : "",
+      FosterCarePlacementLocationAddressLine4 : "",
+      FosterCarePlacementLocationCity : $.FosterCarePlacementLocationCity,
+      FosterCarePlacementLocationState : stateCodeMap[capitalize ($.FosterCarePlacementLocationState)] default "",
+      FosterCarePlacementLocationZipCode : $.FosterCarePlacementLocationZipCode[0..4],
+      FosterCarePlacementLocationZip4 : $.FosterCarePlacementLocationZip4[6..9],
+      FosterCarePlacementPhoneNumber : $.FosterCarePlacementPhoneNumber when ($.FosterCarePlacementPhoneNumber != null) otherwise $.FosterCarePlacementOtherPhoneNumber,
+      FosterCarePlacementPhoneExtension : "",
+      NameofStateAgency : "DSCYF",
+      StateEmployerEIN : "516000279",
+      StateAgencyMailingAddressLine1 : "1825 Faulkland Road",
+      StateAgencyMailingAddressLine2 : "",
+      StateAgencyMailingAddressLine3 : "",
+      StateAgencyMailingAddressLine4 : "",
+      StateAgencyMailingCity : "Wilmington",
+      StateAgencyMailingState : "DE",
+      StateAgencyMailingZipCode : "19805",
+      StateAgencyMailingZip4 : "1195",
+      StateAgencyPOCFirstName : "Kristel",
+      StateAgencyPOCLastName : "Williams",
+      StateAgencyPOCPhoneNumber : "3028924530",
+      StateAgencyPOCPhoneExtension : "",
+      ChildStatus : "I" when (flowVars.isInitialReport == "Y")
+             otherwise "C" when (((flowVars.AllPlacementHistory[$.Id][-1].OldValue != flowVars.AllPlacementHistory[$.Id][-1].NewValue) and (["Service_taxanomy__c","Last_Name_Organization_Name__c","Service__c","Provider_Staff__c","Placement_Start_Date__c","Placement_End_date__c","Placement_Discharge_Date__c","Admission_Date__c","Discharge_Date__c","Effective_Date__c"] contains (flowVars.AllPlacementHistory[$.Id][-1].Field default "")) and (flowVars.AllPlacementHistory[$.Id][-1].OldValue != null) ) or (($.ModifiedRecord == true) and (["Service_taxanomy__c","Last_Name_Organization_Name__c","Service__c","Provider_Staff__c","Placement_Start_Date__c","Placement_End_date__c","Placement_Discharge_Date__c","Admission_Date__c","Discharge_Date__c","Effective_Date__c"] contains (flowVars.AllPlacementHistory[$.Id][-1].Field default ""))) or ((flowVars.isEntryPlacement[$.ClientId][0].isEntry == true) and ($.PlacementStatus != "Discharged")) ) 
+             	otherwise "X" when (($.EndReason == "Returned Home/DFS Custody (Trial Reunification)") or (flowVars.CourtOrderDetails[$.ClientId].CustodyEndDate[0] != null))                 
+	               	otherwise "E" when ( (((flowVars.AllPlacementHistory[$.Id][-1].Field == "Placement_Status__c") and (flowVars.AllPlacementHistory[$.Id][-1].NewValue == "Admitted")) or ((flowVars.AllPlacementHistory[$.Id][-1].Field == "Admission_Status__c") and (flowVars.AllPlacementHistory[$.Id][-1].NewValue == "Completed") ) or (flowVars.AllPlacementHistory[$.Id][-1].Field == "created") or (((flowVars.DYRSPlacementDetailsGroup[$.Id] != null)) and (flowVars.DYRSPlacementDetailsGroup[$.Id][0].ModifyStatus != "Completed") and (flowVars.DYRSPlacementDetailsGroup[$.Id][0].EndStatus != "Completed") )) and ($.PlacementStatus != "Discharged")  )
+	               		otherwise "Z" when (($.PlacementStatus == "Discharged") and ($.EndReason != "Returned Home/DFS Custody (Trial Reunification)"))
+                   			otherwise "E", //otherwise "X" when (((flowVars.AllPlacementHistory[$.Id][-1].Field == "Placement_Status__c") and (flowVars.AllPlacementHistory[$.Id][-1].NewValue == "Discharged")) or ((flowVars.AllPlacementHistory[$.Id][-1].Field == "Service_Discharge_Status__c") and (flowVars.AllPlacementHistory[$.Id][-1].NewValue == "Completed") ) or (flowVars.AllPlacementHistory[$.Id][-1].Field == "Placement_Discharge_Date__c") or (flowVars.AllPlacementHistory[$.Id][-1].Field == "Placement_End_date__c") )
+      DateOfChildStatus : [ (($.PlacementEndDate) when ($.EndReason == "Returned Home/DFS Custody (Trial Reunification)") otherwise (flowVars.CourtOrderDetails[$.ClientId].CustodyEndDate[0] default "")),(flowVars.ExParteCustodyDetails[$.ClientId][0][-1].StartDate when (flowVars.ExParteCustodyDetails[$.ClientId][0][-1].StartDate != null and flowVars.ExParteCustodyDetails[$.ClientId][0][-1].StartDate >= flowVars.ReportStartDate) otherwise ("" when ($.PlacementStartDate == "2999-01-01") otherwise $.PlacementStartDate default "")), ("" when ($.EffectiveDate == "2999-01-01") otherwise $.EffectiveDate default "") ],
+      WastheChildAdopted : "Y" when (($.EndReason == "Adoption Finalized" or $.EndReason == "Guardianship") and ($.EndStatus == "Completed")) otherwise "N",
+      DidChildageoutofFosterCare : "Y" when (($.EndReason == "Majority, Married, Emancipated" or $.EndReason == "Aged Out" or $.EndReason == "Majority Age Reached") and ($.EndStatus == "Completed")) otherwise "N",
+      WastheStatethepayeeinthemonthbeforethisReport : "Y" when (flowVars.payeeDetails default [] contains $.ClientId) otherwise "N",
+      CurrentPayeeFirstName : "",
+      CurrentPayeeLastName : "",
+      CurrentPayeeSSN : "",
+      CurrentPayeeOrganizationName : "DSCYF" when (flowVars.payeeDetails default [] contains $.ClientId) otherwise "",
+      CurrentPayeeEIN : "516000279" when (flowVars.payeeDetails default [] contains $.ClientId) otherwise "",
+      CurrentPayeePhoneNumber : "3028924530" when (flowVars.payeeDetails default [] contains $.ClientId) otherwise "",
+      CurrentPayeePhoneNumberExtn : "",
+      TypeofpayeehandlingSSAfunds : "1" when (flowVars.payeeDetails default [] contains $.ClientId) otherwise "",
+      PlacementEndDate : $.PlacementEndDate,
+      PlacementStartDate : $.PlacementStartDate,
+      EffectiveDate : $.EffectiveDate,
+      PlacementModifyDate : $.PlacementModifyDate 
+}) filter ($.Age < 21) ]]></dw:set-payload>
+            
+        </dw:transform-message>
+        <dw:transform-message  doc:name="Transform Message : Generate Final File" >
+                    <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath="SSAExtract.ffd" 
+---
+payload filter ($.ChildStatus != "Z")  map {
+      RecordType : $.RecordType,
+      FirstName : $.FirstName[0..14] when ($.FirstName[0..14] != null) otherwise $.FirstName,
+      MiddleName : $.MiddleName[0..14] when ($.MiddleName[0..14] != null) otherwise $.MiddleName,
+      LastName : $.LastName[0..19] when ($.LastName[0..19] != null) otherwise $.LastName,
+      SSN : $.SSN,
+      DOB : $.DOB,
+      FosterParentFirstName : $.FosterParentFirstName[0..14] when ($.FosterParentFirstName[0..14] != null) otherwise $.FosterParentFirstName,
+      FosterParentLastName : $.FosterParentLastName[0..19] when ($.FosterParentLastName[0..19] != null) otherwise $.FosterParentLastName,
+      FosterCarePlacementInstitutionName : $.FosterCarePlacementInstitutionName[0..39] when ($.FosterCarePlacementInstitutionName[0..39] != null) otherwise $.FosterCarePlacementInstitutionName,
+      FosterCarePlacementLocationAddressLine1 : $.FosterCarePlacementLocationAddressLine1[0..21] when ($.FosterCarePlacementLocationAddressLine1[0..21] != null) otherwise $.FosterCarePlacementLocationAddressLine1,
+      FosterCarePlacementLocationAddressLine2 : $.FosterCarePlacementLocationAddressLine2[0..21] when ($.FosterCarePlacementLocationAddressLine2[0..21] != null) otherwise $.FosterCarePlacementLocationAddressLine2,
+      FosterCarePlacementLocationAddressLine3 : $.FosterCarePlacementLocationAddressLine3[0..21] when ($.FosterCarePlacementLocationAddressLine3[0..21] != null) otherwise $.FosterCarePlacementLocationAddressLine3,
+      FosterCarePlacementLocationAddressLine4 : $.FosterCarePlacementLocationAddressLine4[0..21] when ($.FosterCarePlacementLocationAddressLine4[0..21] != null) otherwise $.FosterCarePlacementLocationAddressLine4,
+      FosterCarePlacementLocationCity : $.FosterCarePlacementLocationCity[0..21] when ($.FosterCarePlacementLocationCity[0..21] != null) otherwise $.FosterCarePlacementLocationCity,
+      FosterCarePlacementLocationState : $.FosterCarePlacementLocationState,
+      FosterCarePlacementLocationZipCode : $.FosterCarePlacementLocationZipCode,
+      FosterCarePlacementLocationZip4 : $.FosterCarePlacementLocationZip4 default "",
+      FosterCarePlacementPhoneNumber : $.FosterCarePlacementPhoneNumber[0..9] when ($.FosterCarePlacementPhoneNumber[0..9] != null) otherwise $.FosterCarePlacementPhoneNumber,
+      FosterCarePlacementPhoneExtension : $.FosterCarePlacementPhoneExtension,
+      NameofStateAgency : $.NameofStateAgency[0..39] when ($.NameofStateAgency[0..39] != null) otherwise $.NameofStateAgency,
+      StateEmployerEIN : $.StateEmployerEIN,
+      StateAgencyMailingAddressLine1 : $.StateAgencyMailingAddressLine1[0..21] when ($.StateAgencyMailingAddressLine1[0..21] != null) otherwise $.StateAgencyMailingAddressLine1,
+      StateAgencyMailingAddressLine2 : $.StateAgencyMailingAddressLine2[0..21] when ($.StateAgencyMailingAddressLine2[0..21] != null) otherwise $.StateAgencyMailingAddressLine2,
+      StateAgencyMailingAddressLine3 : $.StateAgencyMailingAddressLine3[0..21] when ($.StateAgencyMailingAddressLine3[0..21] != null) otherwise $.StateAgencyMailingAddressLine3,
+      StateAgencyMailingAddressLine4 : $.StateAgencyMailingAddressLine4[0..21] when ($.StateAgencyMailingAddressLine4[0..21] != null) otherwise $.StateAgencyMailingAddressLine4,
+      StateAgencyMailingCity : $.StateAgencyMailingCity[0..21] when ($.StateAgencyMailingCity[0..21] != null) otherwise $.StateAgencyMailingCity,
+      StateAgencyMailingState : $.StateAgencyMailingState,
+      StateAgencyMailingZipCode : $.StateAgencyMailingZipCode,
+      StateAgencyMailingZip4 : $.StateAgencyMailingZip4,
+      StateAgencyPOCFirstName : $.StateAgencyPOCFirstName[0..14] when ($.StateAgencyPOCFirstName[0..14] != null) otherwise $.StateAgencyPOCFirstName,
+      StateAgencyPOCLastName : $.StateAgencyPOCLastName[0..19] when ($.StateAgencyPOCLastName[0..19] != null) otherwise $.StateAgencyPOCLastName,
+      StateAgencyPOCPhoneNumber : $.StateAgencyPOCPhoneNumber,
+      StateAgencyPOCPhoneExtension : $.StateAgencyPOCPhoneExtension,
+      ChildStatus : $.ChildStatus,
+      DateOfChildStatus : ($.DateOfChildStatus[2] when ($.DateOfChildStatus[2] != "" and $.DateOfChildStatus[2] != null and $.DateOfChildStatus[2] != "2999-01-01") otherwise $.DateOfChildStatus[1]) when ($.ChildStatus == "E" or $.ChildStatus == "C") 
+             otherwise $.DateOfChildStatus[0] when ($.ChildStatus == "X" and $.DateOfChildStatus[0] != null)  otherwise ($.DateOfChildStatus orderBy $ )[-1],
+      WastheChildAdopted : $.WastheChildAdopted,
+      DidChildageoutofFosterCare : $.DidChildageoutofFosterCare,
+   WastheStatethepayeeinthemonthbeforethisReport : $.WastheStatethepayeeinthemonthbeforethisReport,
+      CurrentPayeeFirstName : $.CurrentPayeeFirstName[0..14] when ($.CurrentPayeeFirstName[0..14] != null) otherwise $.CurrentPayeeFirstName,
+      CurrentPayeeLastName : $.CurrentPayeeLastName[0..19] when ($.CurrentPayeeLastName[0..19] != null) otherwise $.CurrentPayeeLastName,
+      CurrentPayeeSSN : $.CurrentPayeeSSN,
+      CurrentPayeeOrgName : $.CurrentPayeeOrganizationName[0..39] when ($.CurrentPayeeOrganizationName[0..39] != null) otherwise $.CurrentPayeeOrganizationName,
+      CurrentPayeeEIN : $.CurrentPayeeEIN,
+      CurrentPayeePhoneNumber : $.CurrentPayeePhoneNumber[0..9] when ($.CurrentPayeePhoneNumber[0..9] != null) otherwise $.CurrentPayeePhoneNumber,
+      CurrentPayeePhoneNumberExtn : $.CurrentPayeePhoneNumberExtn,
+      TypeofPayeeHandlingSSAFunds : $.TypeofpayeehandlingSSAfunds 
+}]]></dw:set-payload>
+                </dw:transform-message>
+
+        <set-payload value="#[message.payloadAs(java.lang.String) ]" mimeType="text/plain" doc:name="Set Payload: to Final file" doc:description="This Set Payload is used to combine the Header, Record Detail and Trailer file"/>
+        <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload : split by new line to get the blank rows"/>
+        <dw:transform-message doc:name="TM: Remove Extra new lines">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+( payload filter ((sizeOf $) > 0 ) map ($ replace "\n" with '' replace "\r" with '' replace "\r\n" with '') ) joinBy "\n"]]></dw:set-payload>
+        </dw:transform-message>
+
+
+        <flow-ref name="Write_to_SFTP-SSA" doc:name="Write_to_SFTP-SSA" doc:description="This flow reference is used to call the sub flow Write_to_SFTP-MMIS which will write the final fixed width file to the SFTP server ."/>
+
+       <set-payload value="{&quot;InterfaceID&quot;: &quot;INF054&quot;, &quot;InterfaceName&quot;: &quot;SSA Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_ssa-extract#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Monthly Extact&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework- Final Call" doc:description="This Set Payload is used to set the Payload to a JSON for the Logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This Sub flow call the Logging frmaework to create the comlete/success transaction in SFTP for the MMIS Extract interface."/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+				<delete-message-property key="AllCustodyDetails"/>
+				<delete-message-property key="AllPlacementDetails"/>
+				<delete-message-property key="AllPlacementHistory"/>
+				<delete-message-property key="ClientIds"/>
+				<delete-message-property key="CourtOrderDetails"/>
+				<delete-message-property key="CourtOrderPlacementId"/>
+				<delete-message-property key="DFSCustodyDetails"/>
+				<delete-message-property key="DYRSIds"/>
+				<delete-message-property key="DYRSPlacementDetails"/>
+				<delete-message-property key="DYRSPlacementDetailsGroup"/>
+				<delete-message-property key="EndDate"/>
+				<delete-message-property key="ExParteCustodyDetails"/>
+				<delete-message-property key="Id"/>
+				<delete-message-property key="isEntryPlacement"/>
+				<delete-message-property key="isInitialReport"/>
+				<delete-message-property key="payeeDetails"/>
+				<delete-message-property key="PBHSCustodyDetails"/>
+				<delete-message-property key="PlacementDetails"/>
+				<delete-message-property key="PlacementHistory"/>
+				<delete-message-property key="PlacementId"/>
+				<delete-message-property key="RecordError"/>
+				<delete-message-property key="RecordSuccess"/>
+				<delete-message-property key="RecordCount"/>
+				<delete-message-property key="Report3Years"/>
+				<delete-message-property key="ReportEndDate"/>
+				<delete-message-property key="ReportStartDate"/>
+				<delete-message-property key="RunDate"/>
+				<delete-message-property key="TrailerFFD"/>	
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="StartDate"/>
+				<delete-message-property key="SuupportDetails"/>
+				<delete-message-property key="SupportHistory"/>
+				<delete-message-property key="SupportId"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>	
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="Message Properties">
+				<delete-message-property key="TID"/>
+				<delete-message-property key="TransAttachment"/>
+			</message-properties-transformer>
+        <logger message="#[payload]" level="INFO" doc:name="Logger: Display Interface Transaction ID" doc:description="This logger displays the result of the Logging framework transaction"/>
+        <!-- <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/> -->
+
+        
+        </flow>
+    <sub-flow name="inf054-ssa-extract-Basic-query-Sub_Flow">
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id,OldValue, newValue, Parent.Id, Field, CreatedDate from Del_Placement__history where createddate = last_month" doc:name="Salesforce : Basic Query for exxtrct"/>
+
+        <dw:transform-message doc:name="TM : Read the value from Placement History">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+      Id : $.Parent.Id,
+      isModified : "true" when ( (($.Field == "Placement_Status__c") and (["Admitted"] contains $.NewValue)) or (($.OldValue != $.NewValue) and (["Service_taxanomy__c","Last_Name_Organization_Name__c","Service__c","Provider_Staff__c","Placement_Start_Date__c","Placement_Status__c","Admission_Status__c","Admission_Date__c","Effective_Date__c"] contains ($.Field default ""))) or ($.Field == "created") ) otherwise "false",
+      OldValue : $.OldValue,
+      NewValue : $.NewValue,
+      Field : $.Field,
+      CreatedDate : $.CreatedDate
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <dw:transform-message doc:name="TM : Variable set for Placement Id">
+            <dw:set-variable variableName="PlacementId"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter ($.isModified == "true") map $.Id distinctBy $.Id ) ++ (flowVars.CourtOrderPlacementId default [])]]></dw:set-variable>
+            <dw:set-variable variableName="PlacementHistory"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.isModified == "true") map $ orderBy $.CreatedDate groupBy $.Id]]></dw:set-variable>
+
+
+        </dw:transform-message>
+        <logger message="Modified Placement Id filtered.." level="INFO" doc:name="Logger"/>
+        <foreach doc:name="For Each : Itearate each Placement Id in the 200 size" collection="#[flowVars.PlacementId]" batchSize="200">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ default "" ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Contact__c, DEL_Placement__c.Contact__r.firstname, DEL_Placement__c.Contact__r.middlename, DEL_Placement__c.Contact__r.lastName, DEL_Placement__c.Contact__r.DEL_SSN__c, DEL_Placement__c.Contact__r.Birthdate, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_First_Name__c, DEL_Placement__c.Last_Name_Organization_Name__r.name, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_Address_Line_1__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_Address_Line_2__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_City__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_State__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_Zip_Code__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Business_Phone_formula__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Other_Phone_Formula__c, DEL_Placement__c.Placement_Start_Date_Division_Wide__c , DEL_Placement__c.Placement_End_Date_Division_Wide__c, Effective_Date__c, DEL_Placement__c.Modified_Date__c, End_Reason__c,Reason_Community__c, Placement_End_Status__c,Placement_Status__c,Placement_Event_Status__c,Modify_Status__c, Record_Version__c, Division__c from DEL_Placement__c  where Division__c in ('DYRS','DFS') and Home_Placement_Type__c = null and Service_taxanomy__r.Residential_Nonresidential__c = 'Residential' and Service_taxanomy__r.Paid_Non_Paid__c In ('Paid','Both','Non-Paid;Paid','Paid;Non-Paid','Both;Paid','Paid;Both','Both;Non-Paid;Paid','Paid;Non-Paid;Both')  and Service_taxanomy__r.Foster_Care_Setting_Type__c = 'Foster Care' AND Service_taxanomy__r.Level_Two_Services__c != 'Respite' and Home_Placement_Type__c not in ('Trial Reunification','Temporary Home Visit') and Latest_Version_Placement__c = true and Placement_Event_Status__c = 'Completed' and Id in  (#[payload]) " doc:name="Salesforce: Query to get Placement detiails" doc:description="Capture all the placement related data"/>
+            <dw:transform-message doc:name="TM : Read the message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ((($.Placement_End_Date_Division_Wide__c default "2999-01-01") >= flowVars.Report3Years) and 
+	(($.Placement_Start_Date_Division_Wide__c default "2999-01-01") >= flowVars.Report3Years)) map {
+      Id : $.Id,
+      ClientId: $.Contact__c,
+      FirstName: $.Contact__r.FirstName,
+      MiddleName: $.Contact__r.MiddleName,
+      LastName: $.Contact__r.LastName,
+      SSN: $.Contact__r.DEL_SSN__c,
+      DOB: $.Contact__r.Birthdate,
+      FosterParentFirstName : $.Last_Name_Organization_Name__r.DEL_First_Name__c ,
+      FosterParentLastName : $.Last_Name_Organization_Name__r.Name,
+      FosterCarePlacementInstitutionName : $.Last_Name_Organization_Name__r.Name,
+      FosterCarePlacementLocationAddressLine1 : $.Last_Name_Organization_Name__r.DEL_Site_Address_Line_1__c,
+      FosterCarePlacementLocationAddressLine2 : $.Last_Name_Organization_Name__r.DEL_Site_Address_Line_2__c,
+      FosterCarePlacementLocationCity : $.Last_Name_Organization_Name__r.DEL_Site_City__c,
+      FosterCarePlacementLocationState : $.Last_Name_Organization_Name__r.DEL_Site_State__c,
+      FosterCarePlacementLocationZipCode : $.Last_Name_Organization_Name__r.DEL_Site_Zip_Code__c,
+      FosterCarePlacementLocationZip4 : $.Last_Name_Organization_Name__r.DEL_Site_Zip_Code__c,
+      FosterCarePlacementPhoneNumber : $.Last_Name_Organization_Name__r.DEL_Business_Phone_formula__c ,
+      FosterCarePlacementOtherPhoneNumber : $.Last_Name_Organization_Name__r.DEL_Other_Phone_Formula__c,
+      PlacementStartDate : $.Placement_Start_Date_Division_Wide__c default "2999-01-01", 
+      PlacementEndDate : $.Placement_End_Date_Division_Wide__c default "2999-01-01",
+      PlacementModifyDate : $.Modified_Date__c default "2999-01-01",
+      EffectiveDate : $.Effective_Date__c default "2999-01-01",
+      EndStatus : $.Placement_End_Status__c,
+      StartStatus : $.Placement_Event_Status__c,
+      ModifyStatus : $.Modify_Status__c,
+      PlacementStatus : $.Placement_Status__c,
+      ModifiedRecord : true when ($.Record_Version__c == "Modified") otherwise false,
+      EndReason : $.End_Reason__c when ($.End_Reason__c != null) otherwise $.Reason_Community__c,
+      Division : $.Division__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Set Contact and Placement details">
+
+                <dw:set-variable variableName="PlacementDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.PlacementDetails default []) ++ (payload  default []))]]></dw:set-variable>
+                <dw:set-variable variableName="DYRSIds"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ( ($.Division == "DYRS")) map $.ClientId ]]></dw:set-variable>
+                <dw:set-variable variableName="DYRSPlacementDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (  ($.Division == "DYRS")) map $ ]]></dw:set-variable>
+                          <dw:set-variable variableName="DYRSPlacementDetailsGroup"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (  ($.Division == "DYRS")) map $ groupBy $.Id]]></dw:set-variable>                   
+
+            </dw:transform-message>
+        </foreach>
+        <foreach collection="#[flowVars.PlacementDetails]" doc:name="For Each : Iterate each Cient in the size of 200" batchSize="200">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.ClientId default "" ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            	<sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id, Start_Date__c, End_Date__c, Client_Name__c, Order_Type__c, Custody_Status__c, Actual_End_Date__c  from DEL_Custody__c where Client_Name__c in (#[payload]) and Custodian__c Like '%DFS%' " doc:name="Salesforce : Query for Client Custody"/>
+            <dw:transform-message doc:name="TM : Read the Custody Detials">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+      StartDate : $.Start_Date__c default "2999-01-01",
+      EndDate : $.End_Date__c default "2999-01-01",
+      OrderType : $.Order_Type__c,
+      Status : $.Custody_Status__c, 
+      ActualEndDate : $.Actual_End_Date__c,
+      Id : $.Client_Name__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Combine Custody details">
+                <dw:set-variable variableName="DFSCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.DFSCustodyDetails default []) ++ (payload default []))]]></dw:set-variable>
+
+            </dw:transform-message>
+        </foreach>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="DFSCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.DFSCustodyDetails default [] groupBy $.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <foreach collection="#[flowVars.PlacementDetails]" doc:name="For Each : PLacement">
+            <message-properties-transformer doc:name="Message Properties" scope="invocation">
+                <add-message-property key="StartDate" value="#[dw('payload.PlacementStartDate')]"/>
+                <add-message-property key="EndDate" value="#[dw('payload.PlacementEndDate')]"/>
+                <add-message-property key="Id" value="#[dw('payload.ClientId')]"/>
+            </message-properties-transformer>
+            <dw:transform-message doc:name="TM : Check Placement overlap with Custody">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java  
+---
+(flowVars.DFSCustodyDetails[flowVars.Id] default []) filter ( ($.StartDate >= flowVars.StartDate and $.StartDate <= flowVars.EndDate) or ($.EndDate >= flowVars.StartDate and $.EndDate <= flowVars.EndDate) or ($.StartDate <= flowVars.StartDate and $.EndDate >= flowVars.EndDate)  ) map $]]></dw:set-payload>
+            </dw:transform-message>
+                  <dw:transform-message doc:name="Transform Message : Add Person Id to the qualified list">
+                <dw:input-payload mimeType="application/java"/>
+                <dw:set-variable variableName="ClientIds"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.ClientIds default []) + flowVars.Id) when ((sizeOf payload) > 0 ) otherwise (flowVars.ClientIds default []) ]]></dw:set-variable>
+
+        </dw:transform-message>
+        </foreach>
+        <flow-ref name="inf054-ssa-extract-Basic-query-for-support-Sub_Flow" doc:name="inf054-ssa-extract-Basic-query-for-support-Sub_Flow"/>
+
+    </sub-flow>
+    <sub-flow name="inf054-ssa-extract-Basic-query-for-support-Sub_Flow">
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id,OldValue, newValue, Parent.Id, Field, CreatedDate from Del_Support__history where createddate = last_month" doc:name="Salesforce : Basic Query for exxtrct"/>
+
+        <dw:transform-message doc:name="TM : Read the value from Support History">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+      Id : $.Parent.Id,
+      isModified : "true" when ( (($.Field == "Admission_Status__c") and (["Completed"] contains $.NewValue)) or (($.OldValue != $.NewValue) and (["Service_taxanomy__c","Last_Name_Organization_Name__c","Service__c","Provider_Staff__c","Placement_Start_Date__c","Placement_Status__c","Admission_Status__c","Admission_Date__c","created"] contains ($.Field default "")))) otherwise "false",
+      OldValue : $.OldValue,
+      NewValue : $.NewValue,
+      Field : $.Field,
+      CreatedDate : $.CreatedDate
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <dw:transform-message doc:name="TM : Variable set for Support Id">
+            <dw:set-variable variableName="SupportId"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter ($.isModified == "true") map $.Id distinctBy $.Id) ++ (flowVars.CourtOrderPlacementId default []) ]]></dw:set-variable>
+            <dw:set-variable variableName="SupportHistory"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.isModified == "true") map $ orderBy $.CreatedDate groupBy $.Id]]></dw:set-variable>
+
+
+        </dw:transform-message>
+        <logger message="Modified Placement Id filtered.." level="INFO" doc:name="Logger"/>
+
+        <foreach doc:name="For Each : Itearate each Support Id in the 200 size" collection="#[flowVars.SupportId]" batchSize="200">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ default "" ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Client__c, Client__r.firstname, Client__r.middlename, Client__r.lastName, Client__r.DEL_SSN__c, Client__r.Birthdate, Provider__r.DEL_First_Name__c, Provider__r.name, Provider__r.DEL_Site_Address_Line_1__c, Provider__r.DEL_Site_Address_Line_2__c, Provider__r.DEL_Site_City__c, Provider__r.DEL_Site_State__c, Provider__r.DEL_Site_Zip_Code__c, Provider__r.DEL_Business_Phone_formula__c, Provider__r.DEL_Other_Phone_Formula__c, Admission_Date__c , Admission_Status__c, Discharge_Date__c, Discharge_Reason__c,Service_Discharge_Status__c from DEL_Support__c  where Service_Res_Non_Res__c = 'Residential' and  Admission_Status__c = 'Completed' and Service__r.Paid_Non_Paid__c In ('Paid','Both','Non-Paid;Paid','Paid;Non-Paid','Both;Paid','Paid;Both','Both;Non-Paid;Paid','Paid;Non-Paid;Both')  and Service__r.Foster_Care_Setting_Type__c = 'Foster Care' and Id in (#[payload])" doc:name="Salesforce: Query to get Support detiails" doc:description="Capture all the placement related data"/>
+            <dw:transform-message doc:name="TM : Read the message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ((($.Admission_Date__c default "2999-01-01") >= flowVars.Report3Years) and 
+	(($.Discharge_Date__c default "2999-01-01") >= flowVars.Report3Years)) map {
+      Id : $.Id,
+      ClientId: $.Client__c,
+      FirstName: $.Client__r.FirstName,
+      MiddleName: $.Client__r.MiddleName,
+      LastName: $.Client__r.LastName,
+      SSN: $.Client__r.DEL_SSN__c,
+      DOB: $.Client__r.Birthdate,
+      FosterParentFirstName : $.Provider__r.DEL_First_Name__c ,
+      FosterParentLastName : $.Provider__r.Name,
+      FosterCarePlacementInstitutionName : $.Provider__r.Name,
+      FosterCarePlacementLocationAddressLine1 : $.Provider__r.DEL_Site_Address_Line_1__c,
+      FosterCarePlacementLocationAddressLine2 : $.Provider__r.DEL_Site_Address_Line_2__c,
+      FosterCarePlacementLocationCity : $.Provider__r.DEL_Site_City__c,
+      FosterCarePlacementLocationState : $.Provider__r.DEL_Site_State__c,
+      FosterCarePlacementLocationZipCode : $.Provider__r.DEL_Site_Zip_Code__c,
+      FosterCarePlacementLocationZip4 : $.Provider__r.DEL_Site_Zip_Code__c,
+      FosterCarePlacementPhoneNumber : $.Provider__r.DEL_Business_Phone_formula__c ,
+      FosterCarePlacementOtherPhoneNumber : $.Provider__r.DEL_Other_Phone_Formula__c,
+      PlacementStartDate : $.Admission_Date__c default "2999-01-01", 
+      PlacementEndDate : $.Discharge_Date__c default "2999-01-01",
+      PlacementModifyDate : $.Modified_Date__c default "2999-01-01",
+      EndStatus : $.Service_Discharge_Status__c,
+      StartStatus : $.Admission_Status__c,
+      EndReason : $.Discharge_Reason__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Set Contact and Support details">
+
+
+                <dw:set-variable variableName="SupportDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.SupportDetails default []) ++ (payload default []))]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+        <foreach collection="#[flowVars.SupportDetails]" batchSize="200" doc:name="For Each : Iterate each Cient in the size of 200">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.ClientId default "" ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id, Start_Date__c, End_Date__c, Client_Name__c,Order_Type__c,Custody_Status__c, Actual_End_Date__c from DEL_Custody__c where Client_Name__c in (#[payload]) and Custodian__c Like '%DFS%' " doc:name="Salesforce : Query for Client Custody"/>
+            <dw:transform-message doc:name="TM : Read the Custody Detials">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+      StartDate : $.Start_Date__c default "2999-01-01",
+      EndDate : $.End_Date__c default "2999-01-01",
+      OrderType : $.Order_Type__c,
+      Status : $.Custody_Status__c, 
+      ActualEndDate :$.Actual_End_Date__c,
+      Id : $.Client_Name__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Combine Custody details">
+                <dw:set-variable variableName="PBHSCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.PBHSCustodyDetails default []) ++ (payload default []))]]></dw:set-variable>
+
+            </dw:transform-message>
+        </foreach>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="PBHSCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.PBHSCustodyDetails default [] groupBy $.Id   ]]></dw:set-variable>
+
+        </dw:transform-message>
+        <foreach collection="#[flowVars.SupportDetails]" doc:name="For Each : Support">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="StartDate" value="#[dw('payload.PlacementStartDate')]"/>
+                <add-message-property key="EndDate" value="#[dw('payload.PlacementEndDate')]"/>
+                <add-message-property key="Id" value="#[dw('payload.ClientId')]"/>
+            </message-properties-transformer>
+            <dw:transform-message doc:name="TM : Check Placement overlap with Custody">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java  
+---
+(flowVars.PBHSCustodyDetails[flowVars.Id] default []) filter ( ($.StartDate >= flowVars.StartDate and $.StartDate <= flowVars.EndDate) or ($.EndDate >= flowVars.StartDate and $.EndDate <= flowVars.EndDate) or ($.StartDate <= flowVars.StartDate and $.EndDate >= flowVars.EndDate)  ) map $]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message : Add Person Id to the qualified list">
+                <dw:input-payload mimeType="application/java"/>
+                <dw:set-variable variableName="ClientIds"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.ClientIds default []) + flowVars.Id) when ((sizeOf payload) > 0 ) otherwise (flowVars.ClientIds default []) ]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+        <dw:transform-message doc:name="TM : Combine Placement &amp; Support Details">
+            <dw:set-variable variableName="AllPlacementDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.SupportDetails default []) ++ 
+	(flowVars.PlacementDetails default [])
+)]]></dw:set-variable>
+            <dw:set-variable variableName="AllCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.DFSCustodyDetails default []) ++
+	(flowVars.PBHSCustodyDetails default [])
+)]]></dw:set-variable>
+        </dw:transform-message>
+
+    </sub-flow>
+    <sub-flow name="inf054-ssa-extract-basic-query-for-initial-report-Sub_Flow">
+     <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Contact__c, DEL_Placement__c.Contact__r.firstname, DEL_Placement__c.Contact__r.middlename, DEL_Placement__c.Contact__r.lastName, DEL_Placement__c.Contact__r.DEL_SSN__c, DEL_Placement__c.Contact__r.Birthdate, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_First_Name__c, DEL_Placement__c.Last_Name_Organization_Name__r.name, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_Address_Line_1__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_Address_Line_2__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_City__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_State__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Site_Zip_Code__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Business_Phone_formula__c, DEL_Placement__c.Last_Name_Organization_Name__r.DEL_Other_Phone_Formula__c, DEL_Placement__c.Placement_Start_Date_Division_Wide__c , DEL_Placement__c.Placement_End_Date_Division_Wide__c, DEL_Placement__c.Modified_Date__c, Effective_Date__c, End_Reason__c,Reason_Community__c, Placement_Status__c,Placement_End_Status__c,Placement_Event_Status__c,Modify_Status__c,Record_Version__c, Division__c from DEL_Placement__c  where Division__c in ('DYRS','DFS') and Home_Placement_Type__c = null and Service_taxanomy__r.Residential_Nonresidential__c = 'Residential' and Service_taxanomy__r.Paid_Non_Paid__c In ('Paid','Both','Non-Paid;Paid','Paid;Non-Paid','Both;Paid','Paid;Both','Both;Non-Paid;Paid','Paid;Non-Paid;Both')  and Service_taxanomy__r.Foster_Care_Setting_Type__c = 'Foster Care' and Service_taxanomy__r.Level_Two_Services__c != 'Respite' and Home_Placement_Type__c not in ('Trial Reunification','Temporary Home Visit') and Latest_Version_Placement__c = true and Placement_Event_Status__c = 'Completed' and Placement_Status__c = 'Admitted' " doc:name="Salesforce: Query to get Placement detiails" doc:description="Capture all the placement related data"/>
+            <dw:transform-message doc:name="TM : Read the message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+      Id : $.Id,
+      ClientId: $.Contact__c,
+      FirstName: $.Contact__r.FirstName,
+      MiddleName: $.Contact__r.MiddleName,
+      LastName: $.Contact__r.LastName,
+      SSN: $.Contact__r.DEL_SSN__c,
+      DOB: $.Contact__r.Birthdate,
+      FosterParentFirstName : $.Last_Name_Organization_Name__r.DEL_First_Name__c ,
+      FosterParentLastName : $.Last_Name_Organization_Name__r.Name,
+      FosterCarePlacementInstitutionName : $.Last_Name_Organization_Name__r.Name,
+      FosterCarePlacementLocationAddressLine1 : $.Last_Name_Organization_Name__r.DEL_Site_Address_Line_1__c,
+      FosterCarePlacementLocationAddressLine2 : $.Last_Name_Organization_Name__r.DEL_Site_Address_Line_2__c,
+      FosterCarePlacementLocationCity : $.Last_Name_Organization_Name__r.DEL_Site_City__c,
+      FosterCarePlacementLocationState : $.Last_Name_Organization_Name__r.DEL_Site_State__c,
+      FosterCarePlacementLocationZipCode : $.Last_Name_Organization_Name__r.DEL_Site_Zip_Code__c,
+      FosterCarePlacementLocationZip4 : $.Last_Name_Organization_Name__r.DEL_Site_Zip_Code__c,
+      FosterCarePlacementPhoneNumber : $.Last_Name_Organization_Name__r.DEL_Business_Phone_formula__c ,
+      FosterCarePlacementOtherPhoneNumber : $.Last_Name_Organization_Name__r.DEL_Other_Phone_Formula__c,
+      PlacementStartDate : $.Placement_Start_Date_Division_Wide__c default "2999-01-01", 
+      PlacementEndDate : $.Placement_End_Date_Division_Wide__c default "2999-01-01",
+      EffectiveDate : $.Effective_Date__c default "2999-01-01",
+      PlacementModifyDate : $.Modified_Date__c default "2999-01-01",
+      EndStatus : $.Placement_End_Status__c,
+      StartStatus : $.Placement_Event_Status__c,
+      ModifyStatus : $.Modify_Status__c,
+	  PlacementStatus : $.Placement_Status__c,
+      ModifiedRecord : true when ($.Record_Version__c == "Modified") otherwise false,
+      EndReason : $.End_Reason__c when ($.End_Reason__c != null) otherwise $.Reason_Community__c,
+      Division : $.Division__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Set Contact and Placement details">
+
+                <dw:set-variable variableName="PlacementDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.PlacementDetails default []) ++ (payload  default []))]]></dw:set-variable>
+      <dw:set-variable variableName="DYRSIds"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (($.Division == "DYRS")) map $.ClientId ]]></dw:set-variable>
+                      <dw:set-variable variableName="DYRSPlacementDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (($.Division == "DYRS")) map $ ]]></dw:set-variable>
+                   <dw:set-variable variableName="DYRSPlacementDetailsGroup"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (($.Division == "DYRS")) map $ groupBy $.Id]]></dw:set-variable>
+
+            </dw:transform-message>
+        
+        <foreach collection="#[flowVars.PlacementDetails]" doc:name="For Each : Iterate each Cient in the size of 200" batchSize="200">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.ClientId default "" ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id, Start_Date__c, End_Date__c, Client_Name__c, Order_Type__c, Custody_Status__c, Actual_End_Date__c  from DEL_Custody__c where Client_Name__c in (#[payload]) and Custodian__c Like '%DFS%' " doc:name="Salesforce : Query for Client Custody"/>
+            <dw:transform-message doc:name="TM : Read the Custody Detials">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+      StartDate : $.Start_Date__c default "2999-01-01",
+      EndDate : $.End_Date__c default "2999-01-01",
+      Id : $.Client_Name__c,
+      OrderType : $.Order_Type__c,
+      Status : $.Custody_Status__c, 
+      ActualEndDate : $.Actual_End_Date__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Combine Custody details">
+                <dw:set-variable variableName="DFSCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.DFSCustodyDetails default []) ++ (payload default []))]]></dw:set-variable>
+
+            </dw:transform-message>
+        </foreach>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="DFSCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.DFSCustodyDetails default [] groupBy $.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <foreach collection="#[flowVars.PlacementDetails]" doc:name="For Each : PLacement">
+            <message-properties-transformer doc:name="Message Properties" scope="invocation">
+                <add-message-property key="StartDate" value="#[dw('payload.PlacementStartDate')]"/>
+                <add-message-property key="EndDate" value="#[dw('payload.PlacementEndDate')]"/>
+                <add-message-property key="Id" value="#[dw('payload.ClientId')]"/>
+            </message-properties-transformer>
+            <dw:transform-message doc:name="TM : Check Placement overlap with Custody">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java  
+---
+(flowVars.DFSCustodyDetails[flowVars.Id] default []) filter ( ($.StartDate >= flowVars.StartDate and $.StartDate <= flowVars.EndDate) or ($.EndDate >= flowVars.StartDate and $.EndDate <= flowVars.EndDate) or ($.StartDate <= flowVars.StartDate and $.EndDate >= flowVars.EndDate)  ) map $]]></dw:set-payload>
+            </dw:transform-message>
+                  <dw:transform-message doc:name="Transform Message : Add Person Id to the qualified list">
+                <dw:input-payload mimeType="application/java"/>
+                <dw:set-variable variableName="ClientIds"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.ClientIds default []) + flowVars.Id) when ((sizeOf payload) > 0 ) otherwise (flowVars.ClientIds default []) ]]></dw:set-variable>
+
+        </dw:transform-message>
+        </foreach>
+        <flow-ref name="inf054-ssa-extract-Basic-query-for-support-Initial-report-Sub_Flow" doc:name="inf054-ssa-extract-Basic-query-for-support-Initial-report-Sub_Flow"/>
+
+    
+    </sub-flow>
+    <sub-flow name="inf054-ssa-extract-Basic-query-for-support-Initial-report-Sub_Flow">
+           <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Client__c, Client__r.firstname, Client__r.middlename, Client__r.lastName, Client__r.DEL_SSN__c, Client__r.Birthdate, Provider__r.DEL_First_Name__c, Provider__r.name, Provider__r.DEL_Site_Address_Line_1__c, Provider__r.DEL_Site_Address_Line_2__c, Provider__r.DEL_Site_City__c, Provider__r.DEL_Site_State__c, Provider__r.DEL_Site_Zip_Code__c, Provider__r.DEL_Business_Phone_formula__c, Provider__r.DEL_Other_Phone_Formula__c, Admission_Date__c , Admission_Status__c, Discharge_Date__c, Discharge_Reason__c,Service_Discharge_Status__c from DEL_Support__c  where Service_Res_Non_Res__c = 'Residential'  and  Admission_Status__c = 'Completed' and Service_Discharge_Status__c != 'Completed' and Service__r.Residential_Nonresidential__c = 'Residential' and Service__r.Paid_Non_Paid__c In ('Paid','Both','Non-Paid;Paid','Paid;Non-Paid','Both;Paid','Paid;Both','Both;Non-Paid;Paid','Paid;Non-Paid;Both')  and Service__r.Foster_Care_Setting_Type__c = 'Foster Care'" doc:name="Salesforce: Query to get Support detiails" doc:description="Capture all the placement related data"/>
+            <dw:transform-message doc:name="TM : Read the message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+      Id : $.Id,
+      ClientId: $.Client__c,
+      FirstName: $.Client__r.FirstName,
+      MiddleName: $.Client__r.MiddleName,
+      LastName: $.Client__r.LastName,
+      SSN: $.Client__r.DEL_SSN__c,
+      DOB: $.Client__r.Birthdate,
+      FosterParentFirstName : $.Provider__r.DEL_First_Name__c ,
+      FosterParentLastName : $.Provider__r.Name,
+      FosterCarePlacementInstitutionName : $.Provider__r.Name,
+      FosterCarePlacementLocationAddressLine1 : $.Provider__r.DEL_Site_Address_Line_1__c,
+      FosterCarePlacementLocationAddressLine2 : $.Provider__r.DEL_Site_Address_Line_2__c,
+      FosterCarePlacementLocationCity : $.Provider__r.DEL_Site_City__c,
+      FosterCarePlacementLocationState : $.Provider__r.DEL_Site_State__c,
+      FosterCarePlacementLocationZipCode : $.Provider__r.DEL_Site_Zip_Code__c,
+      FosterCarePlacementLocationZip4 : $.Provider__r.DEL_Site_Zip_Code__c,
+      FosterCarePlacementPhoneNumber : $.Provider__r.DEL_Business_Phone_formula__c ,
+      FosterCarePlacementOtherPhoneNumber : $.Provider__r.DEL_Other_Phone_Formula__c,
+      PlacementStartDate : $.Admission_Date__c default "2999-01-01", 
+      PlacementEndDate : $.Discharge_Date__c default "2999-01-01",
+      PlacementModifyDate : $.Modified_Date__c default "2999-01-01",
+      EndStatus : $.Service_Discharge_Status__c,
+      StartStatus : $.Admission_Status__c,
+      EndReason : $.Discharge_Reason__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Set Contact and Support details">
+
+
+                <dw:set-variable variableName="SupportDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.SupportDetails default []) ++ (payload default []))]]></dw:set-variable>
+            </dw:transform-message>
+
+        <foreach collection="#[flowVars.SupportDetails]" batchSize="200" doc:name="For Each : Iterate each Cient in the size of 200">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.ClientId default "" ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id, Start_Date__c, End_Date__c, Client_Name__c, Order_Type__c, Custody_Status__c, Actual_End_Date__c  from DEL_Custody__c where Client_Name__c in (#[payload]) and Custodian__c Like '%DFS%' " doc:name="Salesforce : Query for Client Custody"/>
+            <dw:transform-message doc:name="TM : Read the Custody Detials">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+      StartDate : $.Start_Date__c default "2999-01-01",
+      EndDate : $.End_Date__c default "2999-01-01",
+      Id : $.Client_Name__c,
+      OrderType : $.Order_Type__c,
+      Status : $.Custody_Status__c, 
+      ActualEndDate : $.Actual_End_Date__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Combine Custody details">
+                <dw:set-variable variableName="PBHSCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.PBHSCustodyDetails default []) ++ (payload default []))]]></dw:set-variable>
+
+            </dw:transform-message>
+        </foreach>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="PBHSCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.PBHSCustodyDetails default [] groupBy $.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <foreach collection="#[flowVars.SupportDetails]" doc:name="For Each : Support">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="StartDate" value="#[dw('payload.PlacementStartDate')]"/>
+                <add-message-property key="EndDate" value="#[dw('payload.PlacementEndDate')]"/>
+                <add-message-property key="Id" value="#[dw('payload.ClientId')]"/>
+            </message-properties-transformer>
+            <dw:transform-message doc:name="TM : Check Placement overlap with Custody">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java  
+---
+(flowVars.PBHSCustodyDetails[flowVars.Id] default []) filter ( ($.StartDate >= flowVars.StartDate and $.StartDate <= flowVars.EndDate) or ($.EndDate >= flowVars.StartDate and $.EndDate <= flowVars.EndDate) or ($.StartDate <= flowVars.StartDate and $.EndDate >= flowVars.EndDate)  ) map $]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message : Add Person Id to the qualified list">
+                <dw:input-payload mimeType="application/java"/>
+                <dw:set-variable variableName="ClientIds"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.ClientIds default []) + flowVars.Id) when ((sizeOf payload) > 0 ) otherwise (flowVars.ClientIds default []) ]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+        
+        <dw:transform-message doc:name="TM : Combine Placement &amp; Support Details">
+            <dw:set-variable variableName="AllPlacementDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.SupportDetails default [])  ++ (flowVars.PlacementDetails default []))]]></dw:set-variable>
+            <dw:set-variable variableName="AllCustodyDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((flowVars.DFSCustodyDetails default []) ++
+	(flowVars.PBHSCustodyDetails default [])
+)]]></dw:set-variable>
+        </dw:transform-message>
+
+    </sub-flow>
+    <sub-flow name="inf054-ssa-Court-Order-details-Sub_Flow">
+        <logger message="Retrieving Court Order Details.." level="INFO" doc:name="Logger"/>
+        <expression-component doc:name="flowVars.query"><![CDATA[flowVars.query= if (flowVars.isInitialReport == "N")
+("Select id,OldValue, newValue, Parent.Id, Field, CreatedDate from DEL_Court_Order__History where createddate = last_month")
+else ("Select id,OldValue, newValue, Parent.Id, Field, CreatedDate from DEL_Court_Order__History limit 1")]]></expression-component>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="#[flowVars.query]" doc:name="Salesforce"/>
+        <dw:transform-message doc:name="TM : Read the value from Court Order History">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+      Id : $.Parent.Id,
+      isModified : "true" when ( (($.Field == "Court_Order_Status__c") and (["Completed"] contains $.NewValue)) ) otherwise "false",
+      OldValue : $.OldValue,
+      NewValue : $.NewValue,
+      Field : $.Field,
+      CreatedDate : $.CreatedDate
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <dw:transform-message doc:name="TM : Variable set for Court Order Id">
+            <dw:set-variable variableName="CourtOrderId"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.isModified == "true") map $.Id distinctBy $.Id]]></dw:set-variable>
+            <dw:set-variable variableName="CourtOrderHistory"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.isModified == "true") map $ orderBy $.CreatedDate groupBy $.Id]]></dw:set-variable>
+
+
+        </dw:transform-message>
+        <logger message="Modified Placement Id filtered.." level="INFO" doc:name="Logger"/>
+        
+        <foreach collection="#[flowVars.CourtOrderId]" batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="Transform Message : Get Comma Separated CourtOrder Id List">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ default "'" ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Name__c, Children_Court_Order__r.Id, Children_Court_Order__r.Court_Order_Hearing_Date_formula__c,Children_Court_Order__r.Custodian__c, Children_Court_Order__r.Court_Decision__c,Children_Court_Order__r.RecordType.DeveloperName, Children_Court_Order__r.Order_Type__c, Children_Court_Order__r.No_Hearing_End_Custody_Date__c,Children_Court_Order__r.Date_of_Decision__c,Children_Court_Order__r.Date_of_Hearing__c, Children_Court_Order__r.Court_Order_Status__c from DEL_Person_Involved__c where  Children_Court_Order__r.Court_Order_Status__c='Completed'  and Children_Court_Order__r.Order_Type__c != 'Ex Parte' and Children_Court_Order__r.Id in (#[payload])  " doc:name="Salesforce query for Court Order details"/>
+            <dw:transform-message doc:name="Transform Message to read the payload">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message for Business rule">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	ClinetId : $.Name__c,
+	CustodyEndDate : (($.Children_Court_Order__r.Date_of_Decision__c) when (($.Children_Court_Order__r.Order_Type__c == "Final Order of Adoption") and ($.Children_Court_Order__r.Court_Decision__c == "Decree Signed") and ($.Children_Court_Order__r.Court_Order_Status__c == "Completed"))
+		otherwise ($.Children_Court_Order__r.Date_of_Decision__c) when ((($.Children_Court_Order__r.Order_Type__c == "Permanent Guardianship") or ($.Children_Court_Order__r.Order_Type__c == "Guardianship")) and ($.Children_Court_Order__r.Court_Decision__c == "Guardianship Approved") and ($.Children_Court_Order__r.Court_Order_Status__c == "Completed"))
+		otherwise ($.Children_Court_Order__r.Court_Order_Hearing_Date_formula__c) when (($.Children_Court_Order__r.Order_Type__c == "Guardianship") and ($.Children_Court_Order__r.Court_Order_Status__c == "Completed"))
+		otherwise ($.Children_Court_Order__r.No_Hearing_End_Custody_Date__c) when ((($.Children_Court_Order__r.Order_Type__c == "Age of Majority - No Hearing (No Further Hearings)") or ($.Children_Court_Order__r.Order_Type__c == "Child Deceased") or ($.Children_Court_Order__r.Order_Type__c == "Custody Rescission Order- No Hearing")) and ($.Children_Court_Order__r.Court_Order_Status__c == "Completed"))
+		otherwise ($.Children_Court_Order__r.No_Hearing_End_Custody_Date__c) when ($.Children_Court_Order__r.Court_Order_Status__c == "Completed") otherwise "1900-01-01") default "1900-01-01"
+} filter (($.CustodyEndDate != "1900-01-01") and ($.CustodyEndDate >= flowVars.Report3Years)) ]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message Aggregate">
+                <dw:set-variable variableName="CourtOrderDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+((payload ) ++ (flowVars.CourtOrderDetails default []))]]></dw:set-variable>
+
+			<dw:set-variable variableName="CourtOrderClientId"><![CDATA[%dw 1.0
+%output application/java
+---
+((payload map $.ClinetId) ++ (flowVars.CourtOrderClientId default []))]]></dw:set-variable>
+            </dw:transform-message>
+
+        </foreach>
+        <dw:transform-message doc:name="Transform Message GroupBy">
+            <dw:set-variable variableName="CourtOrderDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.CourtOrderDetails default [] groupBy $.ClinetId]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="Retrieve latest dischaged placement" level="INFO" doc:name="Logger"/>
+        <foreach collection="#[flowVars.CourtOrderClientId]" doc:name="For Each" batchSize="150">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ default "'" ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id,Contact__c,Placement_Status__c from del_Placement__c where Contact__c in (#[payload])  and Placement_Status__c = 'Discharged'  order By Placement_End_Date_Division_Wide__c desc" doc:name="Query for Dicharged placement"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-variable variableName="CourtOrderPlacementId"><![CDATA[%dw 1.0
+%output application/java
+---
+payload groupBy $.Contact__c map $[0].Id]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+        
+    </sub-flow>
+    <sub-flow name="inf054-ssa-extract-historical-placement-check-Sub_Flow">
+        <logger message="Check the Previous Placement " level="INFO" doc:name="Logger"/>
+   
+        <dw:transform-message doc:name="Transform Message : Filtering out">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (($.PlacementStartDate > flowVars.ExParteCustodyDetails[$.ClientId][0][-1].StartDate) and ((($.PlacementStatus default "") != "Discharged"))) map {
+	ClientId : $.ClientId,
+	StartDate : flowVars.ExParteCustodyDetails[$.ClientId][0][-1].StartDate
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <foreach collection="payload"  doc:name="For Each">
+
+            <logger message="Select Id from DEL_Placement__c where Contact__c = '#[payload.ClientId]' and Placement_Start_Date_Division_Wide__c &gt;= #[payload.StartDate] order By Placement_Start_Date_Division_Wide__c" level="INFO" doc:name="Logger"/>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Contact__c,Placement_Start_Date_Division_Wide__c from DEL_Placement__c where Contact__c = '#[payload.ClientId]' and Placement_Start_Date_Division_Wide__c &gt;= #[payload.StartDate] order By Placement_Start_Date_Division_Wide__c" doc:name="Salesforce Query to retrive Older Placement "/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Id : $.Id,
+	ClientId : $.Contact__c,
+	PlacementStartDate : $.Placement_Start_Date_Division_Wide__c
+} ]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Id : $.Id,
+	ClientId : $.ClientId,
+	PlacementStartDate : $.PlacementStartDate,
+	isEntry : true when ((sizeOf (payload)) > 1  ) otherwise false
+}
+]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-variable variableName="isEntryPlacement"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.isEntryPlacement default []) ++ (payload default [])]]></dw:set-variable>
+            </dw:transform-message>
+
+        </foreach>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="isEntryPlacement"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.isEntryPlacement default []) groupBy $.ClientId]]></dw:set-variable>
+        </dw:transform-message>
+
+    </sub-flow>
+    <sub-flow name="inf054-SSA-payee-details-Sub_Flow">
+        <logger message="Check SSA payent for last month..." level="INFO" doc:name="Logger"/>
+        <foreach doc:name="For Each" batchSize="150" collection="#[flowVars.ClientIds]">
+        <dw:transform-message doc:name="Transform Message : Get Comma Separated Client Id List">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ default "'" ++ "'")) joinBy ","]]></dw:set-payload>
+
+            </dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select ID,Transaction_Type__c,Transaction_Amount__c,Client_Name__c,Trust_Account_Type__c, Transaction_Date__c from DEL_Transaction__c where Client_Name__c in (#[payload]) and Trust_Account_Type__c != Null AND  (Trust_Account_Type__c in ('SSA', 'SSI')) AND (((Transaction_Type__c = 'Income' OR Transaction_Type__c = 'Trust Inc (Adj)') AND Transaction_Status__c = 'Complete') OR ((Transaction_Type__c = 'Trust Dec (Adj)' OR Transaction_Type__c = 'Payment' OR Transaction_Type__c = 'Payment Super Card' OR Transaction_Type__c = 'EX Dec (Adj)' OR Transaction_Type__c = 'EX Inc (Adj)' OR Transaction_Type__c = 'Recoup' OR Transaction_Type__c = 'Voucher Adj') AND Transaction_Status__c != 'Abridged')) " doc:name="Salesforce query for SSA payee details"/>
+        <dw:transform-message doc:name="Transform Message map transactions">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+      ClientID : $.Client_Name__c,
+      TransactionDate : $.Transaction_Date__c as :date as :string {format : "MM"}
+}]]></dw:set-payload>
+        </dw:transform-message>
+         <dw:transform-message doc:name="Transform Message : Filter Out last month transaction only">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (($.TransactionDate as :number) == (now.month - 1)) map $.ClientID default [])]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message : Aggreate all">
+                <dw:set-variable variableName="payeeDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.payeeDetails default [] ++ payload)]]></dw:set-variable>
+        </dw:transform-message>
+        </foreach>
+    </sub-flow>
+    <sub-flow name="In-Progress_SSA-Extract">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF054&quot;, &quot;InterfaceName&quot;: &quot;SSA Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Monthly SSA Extract&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework-Initial Call" doc:description="This Set Payload is used to set the payload for the Logging Framework to a JSON to create the In-Progress Transaction."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
+    </sub-flow>
+    <sub-flow name="Write_to_SFTP-SSA">
+
+        <sftp:outbound-endpoint connector-ref="SFTP-1" exchange-pattern="one-way" outputPattern="${sftp.ssaextract.transaction.filename}" host="${sftp.ssaextract.transaction.host}" port="${sftp.ssaextract.transaction.port}" path="${sftp.ssaextract.transaction.path}" user="${sftp.ssaextract.transaction.username}" password="${sftp.ssaextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder" doc:description="This SFTP connector writes the final file to the SFTP location "/>
+
+        <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment ErrorAttachment" overwrite="true" doc:description="This message property will set the TransAttachment and ErrorAttachment for the Logging Framework">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment]"/>
+        </message-properties-transformer>
+        <sftp:outbound-endpoint connector-ref="SFTP-1" exchange-pattern="one-way" outputPattern="${sftp.ssaextract.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.ssaextract.archive.host}" port="${sftp.ssaextract.archive.port}" path="${sftp.ssaextract.archive.path}" user="${sftp.ssaextract.archive.username}" password="${sftp.ssaextract.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" doc:description="This SFTP connector writes the final file to the SFTP location "/>
+
+      
+    </sub-flow>
+
+<sub-flow name="inf054-SSA-request-extract-NoPayload_Flow">
+        <choice doc:name="Choice" doc:description="Choice router will check the size of the payload and depending on the size, will direct the payload ">
+                   <when expression="#[payload.size()==0]">
+                <flow-ref name="Write_to_SFTP-SSA" doc:name="Write_to_SFTP-SSA"/>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF054&quot;, &quot;InterfaceName&quot;: &quot;SSA Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;Backup_ssa_extract#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;, &quot;ExceptionType&quot;:&quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Operation&quot;:&quot;Monthly SSA Extract&quot;}" doc:name="Set Payload to No Payload for Logging Framework" doc:description="Set the Payload for Logging framework, this will log a bussiness error in logging framework that no records were extracted"/>
+                <!-- <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Flow reference to call the logging framework"/> -->
+            </when>
+            <otherwise>
+                <logger message="Records Extracted Succesfully " level="INFO" doc:name="Logger" doc:description="Logger to diplay that records were extracted"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+
+    
+    </mule>

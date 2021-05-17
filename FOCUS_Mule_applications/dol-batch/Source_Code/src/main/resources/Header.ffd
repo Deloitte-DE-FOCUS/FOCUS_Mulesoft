@@ -1,0 +1,5 @@
+form: FIXEDWIDTH
+name: 'Header'
+values: 
+- { name: 'RecordIdentifier', usage: M, type: String, length: 1 }
+- { name: 'RunDate', usage: M, type: String, length: 8 }

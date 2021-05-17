@@ -1,0 +1,5 @@
+form: FIXEDWIDTH
+name: 'Trailer'
+values: 
+- { name: 'RecordIdentifier', usage: M, type: String, length: 1 }
+- { name: 'Count', usage: M, type: String, length: 9 }

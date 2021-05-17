@@ -1,0 +1,102 @@
+#%RAML 1.0
+title : Solar Interface API
+version: v1
+baseUri: http://api.samplehost.com/solarservices
+securitySchemes:
+  basic:
+    description: |
+      This API supports Basic Authentication.
+    type: Basic Authentication
+securedBy: basic
+traits: 
+  hasNotFound:
+    responses:
+      404:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string
+  isNotAcceptable:
+    responses:
+      406:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string   
+#/personSearch:
+#  post:
+#    displayName: Search for person
+#    description: Search for person  
+#    is: [hasNotFound,isNotAcceptable]
+#    body:
+#      application/json:  
+#    responses:
+#      200:
+#        body:
+#          application/json:          
+
+/ConnectivityTest:
+  get:
+    displayName: Test Connectivity for Interfaces
+    description: Test Connectivity for Interfaces 
+#    is: [hasNotFound,isNotAcceptable]
+    responses:
+      200:
+        body:
+          application/json:
+
+/personUpsert:
+  post:
+    displayName: Upsert person
+    description: Upsert person   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          text/xml:
+
+#/addressSearch:
+#  post:
+#    displayName: Address search
+#    description: Address search   
+#    is: [hasNotFound,isNotAcceptable]
+#    body:
+#      application/json:  
+#    responses:
+#      200:
+#        body:
+#          application/json:
+/addressUpsert:
+  post:
+    displayName: Address Upsert
+    description: Address Upsert   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:
+#/caseSearch:
+#  post:
+#    displayName: Case Search
+#    description: Case Search  
+#    is: [hasNotFound,isNotAcceptable]
+#    body:
+#      application/json:  
+#    responses:
+#      200:
+#        body:
+#          application/json:
+/caseUpsert:
+  post:
+    displayName: Case Upsert
+    description: Case Upsert   
+#    is: [hasNotFound,isNotAcceptable]
+    body:  
+    responses:
+      200:
+        body:
+          application/json:  

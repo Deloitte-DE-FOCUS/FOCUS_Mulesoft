@@ -1,0 +1,6 @@
+form: FIXEDWIDTH
+name: 'FinalPayload'
+values: 
+- { name: 'RecordIdentifier', usage: M, type: String, length: 1 }
+- { name: 'SSN', usage: M, type: String, length: 9 }
+- { name: 'PID', usage: M, type: String, length: 20 }

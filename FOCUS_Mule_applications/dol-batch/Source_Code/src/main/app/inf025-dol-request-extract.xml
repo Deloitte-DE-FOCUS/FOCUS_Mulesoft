@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd">
+   	 <!-- <spring:beans> 
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans> 
+   	<spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans> -->
+   
+   
+ 
+    <flow name="inf025-dol-request-extract-Flow" processingStrategy="synchronous" >
+        <poll doc:name="Poll" doc:description="This poll will trigger the mule flow every Thursday at 5 PM">
+            <schedulers:cron-scheduler expression="0 45 16 ? * MON,TUE,WED,THU,FRI *" timeZone="US/Eastern"/>
+            <set-payload value="INF025" doc:name="Set Payload to Interface ID" doc:description="Set the iterface ID for Exception framework to log an Error in case of an Error becasue the scope of Source is limited to poll so we are re setting
+Set the Run date to be use in the logic for getting valid records as per Business rule 1: 
+&#8226;	The client is picked up by the daily Extract Run if the Run Date falls in the Request Date Range i.e. (Request Start Date &lt;= Run Date &lt;= Request End Date for Manual Requests) OR (Request Start Date &lt;= Run Date AND Request End Date is blank for IVE Requests)."/>
+        </poll>
+		<message-properties-transformer scope="invocation" doc:name="MP: Set Interface ID and Run-Date">
+			<add-message-property key="InterfaceID" value="#[payload]"/>
+			<add-message-property key="RunDate" value="#[server.dateTime.format(&quot;yyyy-MM-dd&quot;)]"/>
+		</message-properties-transformer>
+
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select  Submission_Start__c,SSN__c,Person__r.DEL_PID__c,Submission_End__c from DEL_DOL_Request__c where ( (Submission_Start__c &lt;= #[flowVars.RunDate] and Submission_End__c &gt;= #[flowVars.RunDate] ) or (Submission_Start__c &lt;= #[flowVars.RunDate] and Submission_End__c = null ) )" doc:name="Salesforce: Query DOL Request object to get valid records" doc:description="This Query extracts all clients who have an end-date for wage request greater than the run-date and start-date less than the run-date."/>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload i.e. the query result">
+            <flow-ref name="In-Progress_DOL-Extract" doc:name="In-Progress_DOL-Extract" doc:description="This flow reference calls the sub flow In-Progress_DOL-Extract to create the In-Progress transaction in SFDC interface tab for MMIS extract"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+         <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the No Payload Sub flow without altering the payload">
+            <flow-ref name="inf025-dol-request-extract-NoPayload_Flow" doc:name="inf025-dol-request-extract-NoPayload_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression: Stop flow for 0 records" doc:description="Filter expression to stop the execution of the flow if size of payload is zero i.e. no records are extracted"/>
+       
+        <message-properties-transformer overwrite="true" scope="invocation" metadata:id="32690d77-a9e8-4d27-a862-66e925480bfc" doc:name="MP:Set Record-Error,Count,Success " doc:description="This message property is used to set the total records, succesfull records and the records which errored out">
+            <add-message-property key="RecordError" value="#[0]"/>
+            <add-message-property key="RecordSuccess" value="#[payload.size()]"/>
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+        </message-properties-transformer>
+
+        <dw:transform-message metadata:id="d42f62a7-56bf-4254-9425-ac3902c88a00" doc:name="TM:Convert Query to map">
+            <dw:input-payload doc:sample="sample_data\empty.xml" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//This dataweave code converts the SFDC query output to a array list
+%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	PID:$.Person__r.DEL_PID__c as :string {format:"00000000000000000000"} default '00000000000000000000' ,
+	SSN:$.SSN__c default ' ',
+	StartDate:$.Submission_Start__c,
+	EndDate:$.Submission_End__c 
+} ]]></dw:set-payload>
+            <dw:set-variable variableName="Trailer"><![CDATA[//This dataweave code creates the array for creating trailer for the final fixed width file
+%dw 1.0
+%output application/java
+---
+{
+	RecordIdentifier:'T',
+	Count: flowVars.RecordCount 
+}]]></dw:set-variable>
+            <dw:set-variable variableName="Header"><![CDATA[//This dataweave code creates the array for creating header for the final fixed width file
+%dw 1.0
+%output application/java
+---
+{
+	RecordIdentifier:'H',
+	RunDate:now as :date {format:"MMddyyyy"} as :string {format:"MMddyyyy"}
+}]]></dw:set-variable>
+
+        </dw:transform-message>
+ 
+ 
+
+        <dw:transform-message metadata:id="0ce64bed-014e-4438-bb61-6b5f3a956507" doc:name="TM:Create Header,Trailer,Detail Record">
+            <dw:input-payload doc:sample="sample_data\list_string_1.dwl"/>
+            <dw:input-variable doc:sample="sample_data\map.dwl" variableName="Trailer"/>
+
+            <dw:set-payload><![CDATA[//This dataweave code will create the Record detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "FinalPayload.ffd"
+---
+payload map  {
+	RecordIdentifier:' ',
+	SSN: $.SSN ,
+	PID: $.PID as :number as :string {format:"00000000000000000000"}
+}]]></dw:set-payload>
+            <dw:set-variable variableName="TrailerFFD"><![CDATA[////This dataweave code will create the Trailer detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "Trailer.ffd"
+---
+[{
+	RecordIdentifier:flowVars.Trailer.RecordIdentifier,
+	Count:flowVars.Trailer.Count as :string {format: "000000000"}
+}]]]></dw:set-variable>
+
+            <dw:set-variable variableName="HeaderFFD"><![CDATA[//////This dataweave code will create the Trailer detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "Header.ffd"
+---
+[{
+	RecordIdentifier:flowVars.Header.RecordIdentifier,
+	RunDate:flowVars.Header.RunDate
+}]]]></dw:set-variable>
+
+
+        </dw:transform-message>
+<enricher doc:name="Message Enricher">
+					<flow-ref name="inf025-dol-request-extract-OtoSConversion-Sub_Flow" doc:name="inf025-dol-request-extract-OtoSConversion-Sub_Flow"/>
+					<enrich source="#[flowVars.HeaderFFD]" target="#[flowVars.HeaderFFD]"/>
+					<enrich source="#[flowVars.TrailerFFD]" target="#[flowVars.TrailerFFD]"/>
+				</enricher>
+        <set-payload value="#[flowVars.HeaderFFD + '\n'+ message.payloadAs(java.lang.String) +'\n'+ flowVars.TrailerFFD + '\n']" mimeType="text/plain" doc:name="Set Payload: to Final file" doc:description="This Set Payload is used to combine the Header, Record Detail and Trailer file"/>
+        <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Set Payload : split by new line to get the blank rows"/>
+        <dw:transform-message doc:name="TM: Remove Extra new lines">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+( payload filter ((sizeOf $) > 0 ) map ($ replace "\n" with '' replace "\r" with '' replace "\r\n" with '') ) joinBy "\n"]]></dw:set-payload>
+        </dw:transform-message>
+
+
+        <flow-ref name="Write_to_SFTP-DOL" doc:name="Write_to_SFTP-DOL" doc:description="This flow reference is used to call the sub flow Write_to_SFTP-MMIS which will write the final fixed width file to the SFTP server ."/>
+
+       <set-payload value="{&quot;InterfaceID&quot;: &quot;INF025&quot;, &quot;InterfaceName&quot;: &quot;DOL Request Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_DFCYFIN#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Weekly Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework- Final Call" doc:description="This Set Payload is used to set the Payload to a JSON for the Logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This Sub flow call the Logging frmaework to create the comlete/success transaction in SFTP for the MMIS Extract interface."/>
+        <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+				<delete-message-property key="Header"/>
+				<delete-message-property key="HeaderFFD"/>
+				<delete-message-property key="RecordCount"/>
+				<delete-message-property key="RecordError"/>
+				<delete-message-property key="RecordSuccess"/>
+				<delete-message-property key="RunDate"/>
+				<delete-message-property key="Trailer"/>
+				<delete-message-property key="TrailerFFD"/>	
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>	
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP: Deleting FV">	
+				<delete-message-property key="TID"/>
+				<delete-message-property key="TransAttachment"/>
+			</message-properties-transformer>
+        <logger message="#[payload]" level="INFO" doc:name="Logger: Display Interface Transaction ID" doc:description="This logger displays the result of the Logging framework transaction"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+        
+        </flow>
+    <sub-flow name="In-Progress_DOL-Extract">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF025&quot;, &quot;InterfaceName&quot;: &quot;DOL Request Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework-Initial Call" doc:description="This Set Payload is used to set the payload for the Logging Framework to a JSON to create the In-Progress Transaction."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
+    </sub-flow>
+    <sub-flow name="Write_to_SFTP-DOL">
+
+        <sftp:outbound-endpoint connector-ref="SFTP-1" exchange-pattern="one-way" outputPattern="${sftp.dolextract.transaction.filename}" host="${sftp.dolextract.transaction.host}" port="${sftp.dolextract.transaction.port}" path="${sftp.dolextract.transaction.path}" user="${sftp.dolextract.transaction.username}" password="${sftp.dolextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder" doc:description="This SFTP connector writes the final file to the SFTP location "/>
+
+        <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment ErrorAttachment" overwrite="true" doc:description="This message property will set the TransAttachment and ErrorAttachment for the Logging Framework">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment]"/>
+        </message-properties-transformer>
+        <sftp:outbound-endpoint connector-ref="SFTP-1" exchange-pattern="one-way" outputPattern="${sftp.dolextract.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.dolextract.archive.host}" port="${sftp.dolextract.archive.port}" path="${sftp.dolextract.archive.path}" user="${sftp.dolextract.archive.username}" password="${sftp.dolextract.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" doc:description="This SFTP connector writes the final file to the SFTP location "/>
+
+      
+    </sub-flow>
+
+<sub-flow name="inf025-dol-request-extract-NoPayload_Flow">
+        <choice doc:name="Choice" doc:description="Choice router will check the size of the payload and depending on the size, will direct the payload ">
+			<when expression="#[payload.size()==0]">
+
+				<dw:transform-message doc:name="TM:Create Header,Trailer for empty data file">
+					<dw:set-variable variableName="HeaderFFD"><![CDATA[//////This dataweave code will create the Trailer detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "Header.ffd"
+---
+[{
+	RecordIdentifier:'H',
+	RunDate:now as :date {format:"MMddyyyy"} as :string {format:"MMddyyyy"}
+}]]]>
+					</dw:set-variable>
+					<dw:set-variable variableName="TrailerFFD"><![CDATA[//This dataweave code creates the array for creating trailer for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "Trailer.ffd"
+---
+[{
+	RecordIdentifier:'T',
+	Count: 0 as :string {format: "000000000"}
+}]]]></dw:set-variable>
+
+                </dw:transform-message>
+				<enricher doc:name="Message Enricher">
+					<flow-ref name="inf025-dol-request-extract-OtoSConversion-Sub_Flow" doc:name="inf025-dol-request-extract-OtoSConversion-Sub_Flow"/>
+					<enrich source="#[flowVars.HeaderFFD]" target="#[flowVars.HeaderFFD]"/>
+					<enrich source="#[flowVars.TrailerFFD]" target="#[flowVars.TrailerFFD]"/>
+				</enricher>
+
+<set-payload value="#[flowVars.HeaderFFD + flowVars.TrailerFFD]" doc:name="Set Payload: File with Header  and footer only" />
+				
+
+
+                <flow-ref name="Write_to_SFTP-DOL" doc:name="Write_to_SFTP-DOL"/>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF025&quot;, &quot;InterfaceName&quot;: &quot;DOL Request Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;Backup_DFCYFIN#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload to No Payload for Logging Framework" doc:description="Set the Payload for Logging framework, this will log a bussiness error in logging framework that no records were extracted"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Flow reference to call the logging framework"/>
+				<message-properties-transformer scope="invocation" doc:name="Message Properties">
+				<delete-message-property key="HeaderFFD"/>
+				<delete-message-property key="RunDate"/>
+				<delete-message-property key="TrailerFFD"/>	
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>	
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="Message Properties">
+				
+				<delete-message-property key="TID"/>
+				<delete-message-property key="TransAttachment"/>
+			</message-properties-transformer>
+            </when>
+            <otherwise>
+                <logger message="Records Extracted Succesfully " level="INFO" doc:name="Logger" doc:description="Logger to diplay that records were extracted"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+	<sub-flow name="inf025-dol-request-extract-OtoSConversion-Sub_Flow">
+	<set-payload value="#[flowVars.HeaderFFD]" doc:name="Set Payload: File with Header only" />
+				<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+				<set-variable variableName="HeaderFFD" value="#[payload]" doc:name="Variable"/>
+	<set-payload value="#[flowVars.TrailerFFD]" doc:name="Set Payload: File with Header  and footer only" />
+				<object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+				<set-variable variableName="TrailerFFD" value="#[payload]" doc:name="Variable"/>
+	</sub-flow>
+
+    
+    </mule>

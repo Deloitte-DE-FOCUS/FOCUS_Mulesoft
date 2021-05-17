@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+	<flow name="inf101-solr-person-loadFlow" processingStrategy="synchronous">
+		<poll doc:name="Poll : Solr Person Load"
+			doc:description="Polls and triggers the flow Every Sunday at 8 AM
+Poller run's in EST timezone ">
+			<schedulers:cron-scheduler expression="0 0 8 ? * 1 *"
+				timeZone="US/Eastern" />
+			<set-payload value="INF101" doc:name="Set Payload to Interface ID"
+				doc:description="Set Interface ID in payload so that the flow is triggered
+Interface ID is required in the Logging Framework" />
+		</poll>
+		<message-properties-transformer scope="invocation"
+			doc:name="MP : Set Interface ID, isFullLoad">
+			<add-message-property key="InterfaceID" value="#[payload]" />
+			<add-message-property key="isFullLoad" value="${solr.isFullLoad}" />
+		</message-properties-transformer>
+		<logger message="Enter Person Data load to solr" level="INFO"
+			doc:name="Logger : Person Data Load" />
+		<choice doc:name="Choice">
+			<when expression="#[flowVars.isFullLoad == &quot;Y&quot;]">
+				<sfdc:query config-ref="Salesforce__Basic_Authentication"
+					query="Select Id, Name, DEL_PID__c, DEL_MCI__c, Birthdate, DEL_Gender__c, DEL_Suffix__c, FirstName, MiddleName, LastName, DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_STI__c, DEL_SSN_Text__c, DEL_SBI__c,(Select id,First_Name__c, Last_Name__c from Alias_Other_Name__r), DEL_PLC__c, DEL_JIC__c, DEL_FC1__c, DEL_FC2__c, DEL_FC3__c, DEL_EMP__c, DEL_DMV__c, DEL_DHS__c, DEL_BPN__c, DEL_No_of_DSCYF_Staffs__c FROM Contact"
+					doc:name="SF : Retreive all Person (contacts) data" />
+			</when>
+			<otherwise>
+				<sfdc:query config-ref="Salesforce__Basic_Authentication"
+					query="Select Id, Name, DEL_PID__c, DEL_MCI__c, Birthdate, DEL_Gender__c, DEL_Suffix__c, FirstName, MiddleName, LastName, DEL_Race_Primary__c, DEL_Ethnicity__c, DEL_STI__c, DEL_SSN_Text__c, DEL_SBI__c,(Select id,First_Name__c, Last_Name__c from Alias_Other_Name__r), DEL_PLC__c, DEL_JIC__c, DEL_FC1__c, DEL_FC2__c, DEL_FC3__c, DEL_EMP__c, DEL_DMV__c, DEL_DHS__c, DEL_BPN__c, DEL_No_of_DSCYF_Staffs__c FROM Contact  WHERE LastModifiedDate &gt;= LAST_N_DAYS:1"
+					doc:name="SF : Retreive last 1 day Person (contacts) data" />
+			</otherwise>
+		</choice>
+		<validation:is-not-null message="There are no Person records to process"
+			exceptionClass="java.lang.Exception" value="#[payload]"
+			doc:name="Validation : Validate Not Null Payload"
+			doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown"
+			config-ref="Validation_Configuration1" />
+		<enricher doc:name="Message Enricher : Invoke Logging Framework"
+			doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+			<processor-chain doc:name="Processor Chain">
+				<set-payload
+					value="{&quot;InterfaceID&quot;: &quot;INF101&quot;, &quot;InterfaceName&quot;: &quot;Solr Person Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+					mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+					doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
+				<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+			</processor-chain>
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+		</enricher>
+		<message-properties-transformer scope="invocation"
+			doc:name="MP : Calculate Number of Batches Required"
+			doc:description="Set Total Batch size and number of iterations required
+And Initialize an atomic integer to keep track of the parallel processes">
+			<add-message-property key="solrBatchSize"
+				value="#[ (payload.size() == 0) ? new Integer(&quot;0&quot;) : new Integer((int) Math.ceil((double) payload.size() / new Integer(1000)))]" />
+			<add-message-property key="personAtomicCount"
+				value="#[new java.util.concurrent.atomic.AtomicInteger()]" />
+			<add-message-property key="personAtomicErrorCount"
+				value="#[new java.util.concurrent.atomic.AtomicInteger()]" />
+			<add-message-property key="personTotalRecordCount"
+				value="#[payload.size()]" />
+		</message-properties-transformer>
+		<foreach batchSize="1000" doc:name="For Each">
+			<async doc:name="Async">
+				<flow-ref name="inf101-solr-person-load-batch" doc:name="inf101-solr-person-load-batch" />
+			</async>
+		</foreach>
+		<until-successful maxRetries="1000"
+			millisBetweenRetries="30000" failureExpression="#[payload != flowVars.solrBatchSize]"
+			synchronous="true" doc:name="Until Successful : Wait for upsert"
+			doc:description="Wait until all the parallel upsert operations are complete">
+			<set-payload value="#[new Integer(flowVars.personAtomicCount.get())]"
+				doc:name="Set payload to latest Count "
+				doc:description="Set payload to latest Count of parallel upsert process completed" />
+		</until-successful>
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF101&quot;, &quot;InterfaceName&quot;: &quot;Solr Person Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.personAtomicErrorCount.get() == 0 ? 'Success' : (flowVars.personTotalRecordCount - flowVars.personAtomicErrorCount.get() == 0 ? 'Error' : 'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.personTotalRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.personTotalRecordCount - flowVars.personAtomicErrorCount.get()]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.personAtomicErrorCount.get()]&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.personAtomicErrorCount.get() != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+			doc:description="Set JSON Payload for Logging Framework for Transaction completion" />
+		<logger message="End Person load to solr - Log : #[payload]"
+			level="INFO" doc:name="Logger : End Person load" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"
+			doc:description="Invoke Logging framework for Transaction completion" />
+		
+		<message-properties-transformer scope="invocation" doc:name="Message Properties">
+						<delete-message-property key="isFullLoad"/>
+						<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="personAtomicCount"/>
+				<delete-message-property key="personAtomicErrorCount"/>
+				<delete-message-property key="personTotalRecordCount"/>
+				<delete-message-property key="solrBatchSize"/>
+				<delete-message-property key="PID_Count"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+						
+						<delete-message-property key="TransactionID"/>	
+						
+			</message-properties-transformer>
+			<message-properties-transformer scope="session" doc:name="Message Properties">
+				<delete-message-property key="TID"/>
+			</message-properties-transformer>
+		<exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+
+	<flow name="inf101-solr-person-load-batch">
+		<logger message="Before SF Person data to Solr support data Transformation"
+			level="INFO" doc:name="Logger" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"CLNT_ID" : $.Id,
+	"DEL_PID": $.DEL_PID__c,
+	"DOB": $.Birthdate,
+	"SEX_CD": $.DEL_Gender__c,
+	"SUFFIX": $.DEL_Suffix__c default "",
+	"FIRST_NM": $.FirstName,
+	"FIRST_NM_AL": $.Alias_Other_Name__r.First_Name__c default [],
+	"FIRST_NM_AL_S": $.Alias_Other_Name__r.First_Name__c default [] map (convertToEnglish($) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with ''),
+	"FIRST_NM_AL_P": $.Alias_Other_Name__r.First_Name__c default [] map (convertToEnglish($) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with ''),
+	"MIDDLE_NM": $.MiddleName default "",
+	"LAST_NM": $.LastName,
+	"LAST_NM_AL": $.Alias_Other_Name__r.Last_Name__c default [],
+	"LAST_NM_AL_S": $.Alias_Other_Name__r.Last_Name__c default [] map (convertToEnglish($) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with ''),
+	"LAST_NM_AL_P": $.Alias_Other_Name__r.Last_Name__c default [] map (convertToEnglish($) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with ''),
+	"LAST_NM_S": (convertToEnglish($.LastName) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.LastName != null otherwise '',
+	"LAST_NM_P": (convertToEnglish($.LastName) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.LastName != null otherwise '',
+	"FIRST_NM_S": (convertToEnglish($.FirstName) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.FirstName != null otherwise '',
+	"FIRST_NM_P": (convertToEnglish($.FirstName) replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.FirstName != null otherwise '',
+	"RACE": $.DEL_Race_Primary__c default "",
+	"ETHNICITY": $.DEL_Ethnicity__c	default "",
+    "DEL_STI": $.DEL_STI__c,
+	"DEL_SSN_Text": $.DEL_SSN_Text__c,
+	"DEL_SBI": $.DEL_SBI__c,
+	"DEL_PLC": $.DEL_PLC__c,
+	"DEL_MCI": $.DEL_MCI__c,
+	"DEL_JIC": $.DEL_JIC__c,
+	"DEL_FC3": $.DEL_FC3__c,
+	"DEL_FC2": $.DEL_FC2__c,
+	"DEL_EMP": $.DEL_EMP__c,
+	"DEL_DMV": $.DEL_DMV__c,
+	"DEL_DHS": $.DEL_DHS__c,
+	"DEL_BPN": $.DEL_BPN__c,
+	"DEL_FC1": $.DEL_FC1__c,
+	"NUM_STAFF": $.DEL_No_of_DSCYF_Staffs__c
+}]]></dw:set-payload>
+			<dw:set-variable variableName="processIdList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $.Id joinBy ","]]></dw:set-variable>
+			<dw:set-variable variableName="batchProcessCount"><![CDATA[%dw 1.0
+%output application/java
+---
+sizeOf payload]]></dw:set-variable>
+		</dw:transform-message>
+		<byte-array-to-string-transformer
+			mimeType="application/json" doc:name="Byte Array to String" />
+		<logger message="After SF Person data to Solr support data Transformation"
+			level="INFO" doc:name="Logger" />
+		<!-- <validation:is-false config-ref="Validation_Configuration" message="Error 
+			occurred on validation" exceptionClass="java.lang.Exception" expression="#[true]" 
+			doc:name="Validation" /> -->
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.person.core}/update" method="POST" doc:name="HTTP : Solr Upsert">
+			<http:request-builder>
+				<http:query-param paramName="commit" value="true" />
+				<http:query-param paramName="Content-Type" value="application/json" />
+			</http:request-builder>
+		</http:request>
+		<logger message="After Person Solr Upsert Process" level="INFO"
+			doc:name="Logger" />
+		<expression-component doc:name="Expression : Increment Atomic counter by 1"
+			doc:description="Increment Atomic count by 1 to mark completion of this Solr Batch"><![CDATA[flowVars.personAtomicCount.addAndGet(1)]]></expression-component>
+		<catch-exception-strategy doc:name="Catch Exception Strategy">
+			<logger
+				message="Exception  #[message.exception] occured while loading Person data into Solr for Input \n #[flowVars.processIdList]"
+				level="INFO" doc:name="Logger" />
+			<expression-component doc:name="Expression : Increment Atomic counter by 1"
+				doc:description="Increment Atomic count by 1 to mark completion of this solr Batch"><![CDATA[flowVars.personAtomicCount.addAndGet(1);
+flowVars.personAtomicErrorCount.addAndGet(flowVars.batchProcessCount);
+]]></expression-component>
+			<set-payload value="{&quot;InterfaceID&quot;: &quot;INF101&quot;, &quot;InterfaceName&quot;: &quot;Solr Person Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;ErrorDescription&quot;:&quot; #[flowVars.personAtomicErrorCount.get() != 0?exception:'']&quot;}" doc:name="Set Payload"/>
+            <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+		</catch-exception-strategy>
+	</flow>
+
+	<flow name="inf102-solr-address-loadFlow" processingStrategy="synchronous">
+		<poll doc:name="Poll : Solr Address Load"
+			doc:description="Polls and triggers the flow Sunday at 12 PM
+Poller run's in EST timezone ">
+			<schedulers:cron-scheduler expression="0 0 12 ? * 1 *"
+				timeZone="US/Eastern" />
+			<set-payload value="INF102" doc:name="Set Payload to Interface ID"
+				doc:description="Set Interface ID in payload so that the flow is triggered
+Interface ID is required in the Logging Framework" />
+		</poll>
+		<message-properties-transformer scope="invocation"
+			doc:name="MP : Set Interface ID, isFullLoad">
+			<add-message-property key="InterfaceID" value="#[payload]" />
+			<add-message-property key="isFullLoad" value="${solr.isFullLoad}" />
+		</message-properties-transformer>
+		<logger message="Enter Address Data Load to solr" level="INFO"
+			doc:name="Logger : Address Data Load" />
+		<choice doc:name="Choice">
+			<when expression="#[flowVars.isFullLoad == &quot;Y&quot;]">
+				<sfdc:query config-ref="Salesforce__Basic_Authentication"
+					query="SELECT Id,Name,County__c,Street_1__c,Street_2__c,PO_Box_Number__c,ZIP__c,City__c,State__c,Country__c FROM DEL_Address__c"
+					doc:name="SF : Retreive all Address data" />
+			</when>
+			<otherwise>
+				<sfdc:query config-ref="Salesforce__Basic_Authentication"
+					query="SELECT Id,Name,County__c,Street_1__c,Street_2__c,PO_Box_Number__c,ZIP__c,City__c,State__c,Country__c FROM DEL_Address__c  WHERE LastModifiedDate &gt;= LAST_N_DAYS:1"
+					doc:name="SF : Retreive last 1 day Address data" />
+			</otherwise>
+		</choice>
+		<validation:is-not-null message="There are no Address records to process"
+			exceptionClass="java.lang.Exception" value="#[payload]"
+			doc:name="Validation : Validate Not Null Payload"
+			doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown"
+			config-ref="Validation_Configuration1" />
+		<enricher doc:name="Message Enricher : Invoke Logging Framework"
+			doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+			<processor-chain doc:name="Processor Chain">
+				<set-payload
+					value="{&quot;InterfaceID&quot;: &quot;INF102&quot;, &quot;InterfaceName&quot;: &quot;Solr Address Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+					mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+					doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
+				<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+			</processor-chain>
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+		</enricher>
+		<message-properties-transformer scope="invocation"
+			doc:name="MP : Calculate Number of Batches Required"
+			doc:description="Set Total Batch size and number of iterations required
+And Initialize an atomic integer to keep track of the parallel processes">
+			<add-message-property key="addrBatchSize"
+				value="#[ (payload.size() == 0) ? new Integer(&quot;0&quot;) : new Integer((int) Math.ceil((double) payload.size() / new Integer(1000)))]" />
+			<add-message-property key="addrAtomicCount"
+				value="#[new java.util.concurrent.atomic.AtomicInteger()]" />
+			<add-message-property key="addrAtomicErrorCount"
+				value="#[new java.util.concurrent.atomic.AtomicInteger()]" />
+			<add-message-property key="addrTotalRecordCount"
+				value="#[payload.size()]" />
+		</message-properties-transformer>
+		<foreach batchSize="1000" doc:name="For Each">
+			<async doc:name="Async">
+				<flow-ref name="inf102-solr-addr-load-batch" doc:name="inf102-solr-addr-load-batch" />
+			</async>
+		</foreach>
+		<until-successful maxRetries="1000"
+			millisBetweenRetries="30000" failureExpression="#[payload != flowVars.addrBatchSize]"
+			synchronous="true" doc:name="Until Successful : Wait for upsert"
+			doc:description="Wait until all the parallel upsert operations are complete">
+			<set-payload value="#[new Integer(flowVars.addrAtomicCount.get())]"
+				doc:name="Set payload to latest Address records count "
+				doc:description="Set payload to latest Address records count of parallel upsert process completed" />
+		</until-successful>
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF102&quot;, &quot;InterfaceName&quot;: &quot;Solr Address Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.addrAtomicErrorCount.get() == 0 ? 'Success' : (flowVars.addrTotalRecordCount - flowVars.addrAtomicErrorCount.get() == 0 ? 'Error' : 'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.addrTotalRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.addrTotalRecordCount - flowVars.addrAtomicErrorCount.get()]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.addrAtomicErrorCount.get()]&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.addrAtomicErrorCount.get() != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+			doc:description="Set JSON Payload for Logging Framework for Transaction completion" />
+		<logger message="End Address load to solr Log : #[payload]"
+			level="INFO" doc:name="Logger : End Address Load" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"
+			doc:description="Invoke Logging framework for Transaction completion" />
+		<message-properties-transformer scope="invocation" doc:name="Message Properties">
+				<delete-message-property key="addrAtomicCount"/>
+				<delete-message-property key="addrAtomicErrorCount"/>
+				<delete-message-property key="addrBatchSize"/>
+				<delete-message-property key="addrTotalRecordCount"/>
+				<delete-message-property key="isFullLoad"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+						
+			<delete-message-property key="TransactionID"/>	
+						
+			</message-properties-transformer>
+			<message-properties-transformer scope="session" doc:name="Message Properties">
+				<delete-message-property key="TID"/>
+			</message-properties-transformer>
+		<exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+
+	<flow name="inf102-solr-addr-load-batch">
+		<logger message="Before SF Address data to Solr support data Transformation"
+			level="INFO" doc:name="Logger" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"ADDR_ID": $.Id,
+	"AddressLine1": $.Street_1__c,
+	"AddressLine1_S": (($.Street_1__c replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') replace /^(\d+)/ with '') when $.Street_1__c != null otherwise '',
+	"AddressLine1_NN": (($.Street_1__c replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '')  replace /\s+/ with '_') when $.Street_1__c != null otherwise '',
+	"AddressLine1_P": ((($.Street_1__c replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') replace /^(\d+)/ with '') replace /\s+/ with ' ' splitBy ' ') when $.Street_1__c != null otherwise '',
+	"AddressLine2": $.Street_2__c,
+	"POBox": $.PO_Box_Number__c,
+	"City": $.City__c,
+	"County": $.County__c,
+	"zip": $.ZIP__c,
+	"state": $.State__c,
+	"country": $.Country__c
+}]]></dw:set-payload>
+			<dw:set-variable variableName="processIdList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $.Id joinBy ","]]></dw:set-variable>
+			<dw:set-variable variableName="batchProcessCount"><![CDATA[%dw 1.0
+%output application/java
+---
+sizeOf payload]]></dw:set-variable>
+		</dw:transform-message>
+		<byte-array-to-string-transformer
+			mimeType="application/json" doc:name="Byte Array to String" />
+		<logger message="After SF Address data to Solr support data Transformation"
+			level="INFO" doc:name="Logger" />
+		<!-- <validation:is-false config-ref="Validation_Configuration" message="Error 
+			occurred on validation" exceptionClass="java.lang.Exception" expression="#[true]" 
+			doc:name="Validation" /> -->
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.address.core}/update" method="POST" doc:name="HTTP : Solr Upsert">
+			<http:request-builder>
+				<http:query-param paramName="commit" value="true" />
+				<http:query-param paramName="Content-Type" value="application/json" />
+			</http:request-builder>
+		</http:request>
+		<logger message="After Address Solr Upsert process" level="INFO"
+			doc:name="Logger" />
+		<expression-component doc:name="Expression : Increment Atomic counter by 1"
+			doc:description="Increment Atomic count by 1 to mark completion of this Solr Batch"><![CDATA[flowVars.addrAtomicCount.addAndGet(1)]]></expression-component>
+		<catch-exception-strategy doc:name="Catch Exception Strategy">
+			<logger
+				message="Exception  #[message.exception] occured while loading Address data into Solr for Input \n #[flowVars.processIdList]"
+				level="INFO" doc:name="Logger" />
+			<expression-component doc:name="Expression : Increment Atomic counter by 1"
+				doc:description="Increment Atomic count by 1 to mark completion of this solr Batch"><![CDATA[flowVars.addrAtomicCount.addAndGet(1);
+flowVars.addrAtomicErrorCount.addAndGet(flowVars.batchProcessCount);
+
+]]></expression-component>
+<set-payload value="{&quot;InterfaceID&quot;: &quot;INF102&quot;, &quot;InterfaceName&quot;: &quot;Solr Person Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;ErrorDescription&quot;:&quot; #[flowVars.personAtomicErrorCount.get() != 0?exception:'']&quot;}" doc:name="Set Payload"/>
+            		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+		</catch-exception-strategy>
+	</flow>
+
+	<flow name="inf103-solr-case-loadFlow" processingStrategy="synchronous">
+		<poll doc:name="Poll : Solr Case data Load"
+			doc:description="Polls and triggers the flow Sunday at 4 PM
+Poller run's in EST timezone ">
+			<schedulers:cron-scheduler expression="0 0 16 ? * 1 *"
+				timeZone="US/Eastern" />
+			<set-payload value="INF103" doc:name="Set Payload to Interface ID"
+				doc:description="Set Interface ID in payload so that the flow is triggered
+Interface ID is required in the Logging Framework" />
+		</poll>
+		<message-properties-transformer scope="invocation"
+			doc:name="MP : Set Interface ID, isFullLoad">
+			<add-message-property key="InterfaceID" value="#[payload]" />
+			<add-message-property key="isFullLoad" value="${solr.isFullLoad}" />
+		</message-properties-transformer>
+		<logger message="Enter Case data load to solr" level="INFO"
+			doc:name="Logger : Enter Case Load" />
+		<choice doc:name="Choice">
+			<when expression="#[flowVars.isFullLoad == &quot;Y&quot;]">
+				<sfdc:query config-ref="Salesforce__Basic_Authentication"
+					query="SELECT Id, Name, Case_Name_Divisionwise__c, Division__c, Case_Open_Date__c, Case_Close_Date__c, Status__c FROM DEL_Case__c"
+					doc:name="SF : Retreive all Case data" />
+			</when>
+			<otherwise>
+				<sfdc:query config-ref="Salesforce__Basic_Authentication"
+					query="SELECT Id, Name, Case_Name_Divisionwise__c, Division__c, Case_Open_Date__c, Case_Close_Date__c, Status__c FROM DEL_Case__c  WHERE LastModifiedDate &gt;= LAST_N_DAYS:1"
+					doc:name="SF : Retreive all Case data" />
+			</otherwise>
+		</choice>
+		<validation:is-not-null message="There are no Case records to process"
+			exceptionClass="java.lang.Exception" value="#[payload]"
+			doc:name="Validation : Validate Not Null Payload"
+			doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown"
+			config-ref="Validation_Configuration1" />
+		<enricher doc:name="Message Enricher : Invoke Logging Framework"
+			doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+			<processor-chain doc:name="Processor Chain">
+				<set-payload
+					value="{&quot;InterfaceID&quot;: &quot;INF103&quot;, &quot;InterfaceName&quot;: &quot;Solr Case Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+					mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+					doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
+				<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+			</processor-chain>
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+		</enricher>
+		<message-properties-transformer scope="invocation"
+			doc:name="MP : Calculate Number of Batches Required"
+			doc:description="Set Total Batch size and number of iterations required
+And Initialize an atomic integer to keep track of the parallel processes">
+			<add-message-property key="caseBatchSize"
+				value="#[ (payload.size() == 0) ? new Integer(&quot;0&quot;) : new Integer((int) Math.ceil((double) payload.size() / new Integer(1000)))]" />
+			<add-message-property key="caseAtomicCount"
+				value="#[new java.util.concurrent.atomic.AtomicInteger()]" />
+			<add-message-property key="caseAtomicErrorCount"
+				value="#[new java.util.concurrent.atomic.AtomicInteger()]" />
+			<add-message-property key="caseTotalRecordCount"
+				value="#[payload.size()]" />
+		</message-properties-transformer>
+		<foreach batchSize="1000" doc:name="For Each">
+			<async doc:name="Async">
+				<flow-ref name="inf103-solr-case-load-batch" doc:name="inf103-solr-case-load-batch" />
+			</async>
+		</foreach>
+		<until-successful maxRetries="1000"
+			millisBetweenRetries="30000" failureExpression="#[payload != flowVars.caseBatchSize]"
+			synchronous="true" doc:name="Until Successful : Wait for upsert"
+			doc:description="Wait until all the parallel upsert operations are complete">
+			<set-payload value="#[new Integer(flowVars.caseAtomicCount.get())]"
+				doc:name="Set payload to latest case records count "
+				doc:description="Set payload to latest case records count of parallel upsert process completed" />
+		</until-successful>
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF103&quot;, &quot;InterfaceName&quot;: &quot;Solr Case Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.caseAtomicErrorCount.get() == 0 ? 'Success' : (flowVars.caseTotalRecordCount - flowVars.caseAtomicErrorCount.get() == 0 ? 'Error' : 'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.caseTotalRecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.caseTotalRecordCount - flowVars.caseAtomicErrorCount.get()]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.caseAtomicErrorCount.get()]&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.caseAtomicErrorCount.get() != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework"
+			doc:description="Set JSON Payload for Logging Framework for Transaction completion" />
+		<logger message="End Case load to solr - Log : #[payload]"
+			level="INFO" doc:name="Logger : End Case Load" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"
+			doc:description="Invoke Logging framework for Transaction completion" />
+		<message-properties-transformer scope="invocation" doc:name="MP:Deleting FV">
+				<delete-message-property key="caseAtomicCount"/>
+				<delete-message-property key="caseAtomicErrorCount"/>
+				<delete-message-property key="caseBatchSize"/>
+				<delete-message-property key="caseTotalRecordCount"/>
+				<delete-message-property key="isFullLoad"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+						
+			<delete-message-property key="TransactionID"/>	
+						
+			</message-properties-transformer>
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+				<delete-message-property key="TID"/>
+			</message-properties-transformer>
+		<exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+
+	<flow name="inf103-solr-case-load-batch">
+		<logger message="Before SF Case data to Solr support data Transformation"
+			level="INFO" doc:name="Logger" />
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"CASE_ID": $.Id,
+	"CASE_NM": $.Name,
+	"CASE_NM_S": (($.Name replace ',' with '') replace /([.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Name != null otherwise '',
+	"Case_NM_Div": $.Case_Name_Divisionwise__c,
+	"Case_NM_Div_S": ($.Case_Name_Divisionwise__c replace /([\s,.,!,@,#,$,%,^,\&,*,(,),_,\+,\-,=,>,<,~,\?,\\,\/,\',\"])/ with '') when $.Case_Name_Divisionwise__c != null otherwise '',
+	"Division": $.Division__c,
+	"Case_Open_Date": $.Case_Open_Date__c,
+	"Case_Close_Date": $.Case_Close_Date__c,
+	"Status": $.Status__c
+}]]></dw:set-payload>
+			<dw:set-variable variableName="processIdList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $.Id joinBy ","]]></dw:set-variable>
+			<dw:set-variable variableName="batchProcessCount"><![CDATA[%dw 1.0
+%output application/java
+---
+sizeOf payload]]></dw:set-variable>
+		</dw:transform-message>
+		<byte-array-to-string-transformer
+			mimeType="application/json" doc:name="Byte Array to String" />
+		<logger message="After SF Case data to Solr support data Transformation"
+			level="INFO" doc:name="Logger" />
+		<!-- <validation:is-false config-ref="Validation_Configuration" message="Error 
+			occurred on validation" exceptionClass="java.lang.Exception" expression="#[true]" 
+			doc:name="Validation" /> -->
+		<http:request config-ref="HTTP_Request_Solr_Configuration"
+			path="${solr.case.core}/update" method="POST" doc:name="HTTP : Solr Upsert">
+			<http:request-builder>
+				<http:query-param paramName="commit" value="true" />
+				<http:query-param paramName="Content-Type" value="application/json" />
+			</http:request-builder>
+		</http:request>
+		<logger message="After Case Solr Upsert process" level="INFO"
+			doc:name="Logger" />
+		<expression-component doc:name="Expression : Increment Atomic counter by 1"
+			doc:description="Increment Atomic count by 1 to mark completion of this Solr Batch"><![CDATA[flowVars.caseAtomicCount.addAndGet(1)]]></expression-component>
+		<catch-exception-strategy doc:name="Catch Exception Strategy">
+			<logger
+				message="Exception  #[message.exception] occured while loading case data into Solr for Input \n #[flowVars.processIdList]"
+				level="INFO" doc:name="Logger" />
+			<expression-component doc:name="Expression : Increment Atomic counter by 1"
+				doc:description="Increment Atomic count by 1 to mark completion of this solr Batch"><![CDATA[flowVars.caseAtomicCount.addAndGet(1);
+flowVars.caseAtomicErrorCount.addAndGet(flowVars.batchProcessCount);
+]]></expression-component>
+<set-payload value="{&quot;InterfaceID&quot;: &quot;INF103&quot;, &quot;InterfaceName&quot;: &quot;Solr Person Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;ErrorDescription&quot;: &quot;#[flowVars.caseAtomicErrorCount!=0?exception:'']&quot;}" doc:name="Set Payload"/>
+            		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+		</catch-exception-strategy>
+	</flow>
+
+</mule>
