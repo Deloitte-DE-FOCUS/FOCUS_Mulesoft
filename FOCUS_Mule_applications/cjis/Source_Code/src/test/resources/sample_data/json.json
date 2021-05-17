@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<ScheduleResponse>
+  <ScheduleInformations>
+    <ScheduleInformation>
+      <SbiNumber>00771573</SbiNumber>
+      <ScheduleDate/>
+      <ScheduleTime/>
+      <Court/>
+      <Event/>
+      <Type/>
+      <Disposition/>
+      <JudgeName/>
+      <UniformCaseNumber/>
+      <NoteIndicator/>
+      <PersonSurName/>
+      <PersonMiddleName/>
+      <PersonGivenName/>
+      <ErrorCode>5001</ErrorCode>
+      <ErrorDescription>ERROR - RECORD NOT FOUND</ErrorDescription>
+    </ScheduleInformation>
+  </ScheduleInformations>
+</ScheduleResponse>

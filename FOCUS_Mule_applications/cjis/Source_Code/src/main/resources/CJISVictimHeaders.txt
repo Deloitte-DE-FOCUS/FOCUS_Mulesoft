@@ -1,0 +1,1 @@
+recordIdentifier,PID,SBI,chargeSeq,DUC,currentCase,firstName,lastName,birthDate,victimType,residencePhone,age,notification,businessPhone,address1,address2,city,state,county,countyName,zipCode,parentName,parentAddress1,parentAddress2,parentCity,parentState,parentZip,victimSeq,businessPhone

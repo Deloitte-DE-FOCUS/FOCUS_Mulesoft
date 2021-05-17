@@ -1,0 +1,1 @@
+recordIdentifier,PID,SBI,SBIOther,seq,lastName,firstName,middleName,suffix,birthdate,street1,street2,city,state,county,countyName,offZip,offRace,raceDescription,offSex,height,weight,employerName,sexOffRegFlag,sexOffRegAgency,sexOffRegAgencyName,sexOffRegDate,currentlyWanted,ErrorCode,ErrorDescription

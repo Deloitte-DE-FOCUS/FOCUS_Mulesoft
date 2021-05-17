@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "RunawayDetails"
+        }
+    },
+    "id": "b2822b4e-6fa9-48f2-99c6-354c52f574a6",
+    "version": "5.2.0.0"
+}

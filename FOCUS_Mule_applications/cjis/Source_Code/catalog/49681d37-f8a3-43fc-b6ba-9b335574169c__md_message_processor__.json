@@ -1,0 +1,18 @@
+{
+    "inputMessageMetadata": {
+        "flowVariables": {
+            "OverallSuccessCount": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "Count"
+            }
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "Header"
+        }
+    },
+    "id": "49681d37-f8a3-43fc-b6ba-9b335574169c",
+    "version": "5.2.0.0"
+}

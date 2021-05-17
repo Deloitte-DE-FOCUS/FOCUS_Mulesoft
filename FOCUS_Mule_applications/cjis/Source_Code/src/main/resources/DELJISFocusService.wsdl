@@ -1,0 +1,694 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions name="DELJISFocusService" targetNamespace="http://namespace.softwareag.com/entirex/xml/mapping" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:sn0="urn:com-softwareag-entirex-rpc:DELJIS" xmlns:tns="http://namespace.softwareag.com/entirex/xml/mapping" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
+  <wsdl:types>
+    <xsd:schema targetNamespace="urn:com-softwareag-entirex-rpc:DELJIS">
+      <xsd:element name="CheckConnectivity">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="TestingString">
+              <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                  <xsd:maxLength value="20"/>
+                </xsd:restriction>
+              </xsd:simpleType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getNotesInformationResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="ScheduleNotesResponse">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element minOccurs="0" name="ResponseResult">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="ResponseStatus" type="xsd:int"/>
+                        <xsd:element name="ResponseMessage">
+                          <xsd:simpleType>
+                            <xsd:restriction base="xsd:string">
+                              <xsd:maxLength value="40"/>
+                            </xsd:restriction>
+                          </xsd:simpleType>
+                        </xsd:element>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                  <xsd:element minOccurs="0" name="SbiNumber">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="8"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element minOccurs="0" name="UniformCaseNumber">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="10"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element minOccurs="0" name="ScheduleEvent">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="6"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element minOccurs="0" name="NotesCount">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:decimal">
+                        <xsd:totalDigits value="3"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element minOccurs="0" name="EventNotes">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element maxOccurs="191" minOccurs="0" name="string">
+                          <xsd:simpleType>
+                            <xsd:restriction base="xsd:string">
+                              <xsd:maxLength value="60"/>
+                            </xsd:restriction>
+                          </xsd:simpleType>
+                        </xsd:element>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getNotesInformation">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="ScheduleNotesRequest">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="UserID">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="8"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element name="CaseNumber">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="10"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element name="Event">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="6"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element name="EventDate">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="8"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getChargeInformationResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="ChargeResponse">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="ResponseResult">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="ResponseStatus" type="xsd:int"/>
+                        <xsd:element name="ResponseMessage">
+                          <xsd:simpleType>
+                            <xsd:restriction base="xsd:string">
+                              <xsd:maxLength value="40"/>
+                            </xsd:restriction>
+                          </xsd:simpleType>
+                        </xsd:element>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                  <xsd:element name="ChargeCount">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:decimal">
+                        <xsd:totalDigits value="3"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element minOccurs="0" name="ChargeInformations">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element maxOccurs="999" minOccurs="0" name="ChargeInformation">
+                          <xsd:complexType>
+                            <xsd:sequence>
+                              <xsd:element minOccurs="0" name="SbiNumber">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="8"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="SbiSequence">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="2"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="Person">
+                                <xsd:complexType>
+                                  <xsd:sequence>
+                                    <xsd:element minOccurs="0" name="PersonName">
+                                      <xsd:complexType>
+                                        <xsd:sequence>
+                                          <xsd:element minOccurs="0" name="PersonSurName">
+                                            <xsd:simpleType>
+                                              <xsd:restriction base="xsd:string">
+                                                <xsd:maxLength value="40"/>
+                                              </xsd:restriction>
+                                            </xsd:simpleType>
+                                          </xsd:element>
+                                          <xsd:element minOccurs="0" name="PersonMiddleName">
+                                            <xsd:simpleType>
+                                              <xsd:restriction base="xsd:string">
+                                                <xsd:maxLength value="40"/>
+                                              </xsd:restriction>
+                                            </xsd:simpleType>
+                                          </xsd:element>
+                                          <xsd:element minOccurs="0" name="PersonGivenName">
+                                            <xsd:simpleType>
+                                              <xsd:restriction base="xsd:string">
+                                                <xsd:maxLength value="40"/>
+                                              </xsd:restriction>
+                                            </xsd:simpleType>
+                                          </xsd:element>
+                                        </xsd:sequence>
+                                      </xsd:complexType>
+                                    </xsd:element>
+                                  </xsd:sequence>
+                                </xsd:complexType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="UniformCaseNumber">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="10"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="ChargeSequenceID">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="3"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="StatuteRank">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="6"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="ArrestDate">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="8"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="Statute">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="14"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="StatuteDescription">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="78"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="CourtAction">
+                                <xsd:complexType>
+                                  <xsd:sequence>
+                                    <xsd:element minOccurs="0" name="DispositionDate">
+                                      <xsd:simpleType>
+                                        <xsd:restriction base="xsd:string">
+                                          <xsd:maxLength value="8"/>
+                                        </xsd:restriction>
+                                      </xsd:simpleType>
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" name="CourtDisposition">
+                                      <xsd:simpleType>
+                                        <xsd:restriction base="xsd:string">
+                                          <xsd:maxLength value="4"/>
+                                        </xsd:restriction>
+                                      </xsd:simpleType>
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" name="DispositionLiteral">
+                                      <xsd:simpleType>
+                                        <xsd:restriction base="xsd:string">
+                                          <xsd:maxLength value="40"/>
+                                        </xsd:restriction>
+                                      </xsd:simpleType>
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" name="FinalDispositionStatus">
+                                      <xsd:simpleType>
+                                        <xsd:restriction base="xsd:string">
+                                          <xsd:maxLength value="1"/>
+                                        </xsd:restriction>
+                                      </xsd:simpleType>
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" name="FinalDispositionStatusLiteral">
+                                      <xsd:simpleType>
+                                        <xsd:restriction base="xsd:string">
+                                          <xsd:maxLength value="10"/>
+                                        </xsd:restriction>
+                                      </xsd:simpleType>
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" name="DispositionAgency">
+                                      <xsd:simpleType>
+                                        <xsd:restriction base="xsd:string">
+                                          <xsd:maxLength value="2"/>
+                                        </xsd:restriction>
+                                      </xsd:simpleType>
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" name="DispositionAgencyName">
+                                      <xsd:simpleType>
+                                        <xsd:restriction base="xsd:string">
+                                          <xsd:maxLength value="40"/>
+                                        </xsd:restriction>
+                                      </xsd:simpleType>
+                                    </xsd:element>
+                                  </xsd:sequence>
+                                </xsd:complexType>
+                              </xsd:element>
+                            </xsd:sequence>
+                          </xsd:complexType>
+                        </xsd:element>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="CheckConnectivityResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="ResponseStatus" type="xsd:int"/>
+            <xsd:element name="ResponseMessage">
+              <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                  <xsd:maxLength value="80"/>
+                </xsd:restriction>
+              </xsd:simpleType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getScheduleInformation">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="ScheduleRequest">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="UserID">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="8"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element name="SbiNumber">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="8"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element name="StartDate">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="8"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element name="EndDate">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="8"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getChargeInformation">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="ChargeRequest">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="UserID">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="8"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element name="CaseNumber">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:string">
+                        <xsd:maxLength value="10"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getScheduleInformationResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="ScheduleResponse">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element minOccurs="0" name="ResponseResult">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="ResponseStatus" type="xsd:int"/>
+                        <xsd:element name="ResponseMessage">
+                          <xsd:simpleType>
+                            <xsd:restriction base="xsd:string">
+                              <xsd:maxLength value="40"/>
+                            </xsd:restriction>
+                          </xsd:simpleType>
+                        </xsd:element>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                  <xsd:element minOccurs="0" name="ScheduleCount">
+                    <xsd:simpleType>
+                      <xsd:restriction base="xsd:decimal">
+                        <xsd:totalDigits value="3"/>
+                      </xsd:restriction>
+                    </xsd:simpleType>
+                  </xsd:element>
+                  <xsd:element minOccurs="0" name="ScheduleInformations">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element maxOccurs="999" minOccurs="0" name="ScheduleInformation">
+                          <xsd:complexType>
+                            <xsd:sequence>
+                              <xsd:element minOccurs="0" name="SbiNumber">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="8"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="ScheduleDate">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="8"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="ScheduleTime">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="4"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="Court">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="40"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="Event">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="6"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="Type">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="6"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="Disposition">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="6"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="JudgeName">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="35"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="UniformCaseNumber">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="10"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="NoteIndicator">
+                                <xsd:simpleType>
+                                  <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="1"/>
+                                  </xsd:restriction>
+                                </xsd:simpleType>
+                              </xsd:element>
+                              <xsd:element minOccurs="0" name="Person">
+                                <xsd:complexType>
+                                  <xsd:sequence>
+                                    <xsd:element minOccurs="0" name="PersonName">
+                                      <xsd:complexType>
+                                        <xsd:sequence>
+                                          <xsd:element minOccurs="0" name="PersonSurName">
+                                            <xsd:simpleType>
+                                              <xsd:restriction base="xsd:string">
+                                                <xsd:maxLength value="40"/>
+                                              </xsd:restriction>
+                                            </xsd:simpleType>
+                                          </xsd:element>
+                                          <xsd:element minOccurs="0" name="PersonMiddleName">
+                                            <xsd:simpleType>
+                                              <xsd:restriction base="xsd:string">
+                                                <xsd:maxLength value="40"/>
+                                              </xsd:restriction>
+                                            </xsd:simpleType>
+                                          </xsd:element>
+                                          <xsd:element minOccurs="0" name="PersonGivenName">
+                                            <xsd:simpleType>
+                                              <xsd:restriction base="xsd:string">
+                                                <xsd:maxLength value="40"/>
+                                              </xsd:restriction>
+                                            </xsd:simpleType>
+                                          </xsd:element>
+                                        </xsd:sequence>
+                                      </xsd:complexType>
+                                    </xsd:element>
+                                  </xsd:sequence>
+                                </xsd:complexType>
+                              </xsd:element>
+                            </xsd:sequence>
+                          </xsd:complexType>
+                        </xsd:element>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </wsdl:types>
+  <wsdl:message name="CheckConnectivitySoapIn">
+    <wsdl:part name="parameters" element="sn0:CheckConnectivity">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getScheduleInformationSoapOut">
+    <wsdl:part name="parameters" element="sn0:getScheduleInformationResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getChargeInformationSoapIn">
+    <wsdl:part name="parameters" element="sn0:getChargeInformation">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="CheckConnectivitySoapOut">
+    <wsdl:part name="parameters" element="sn0:CheckConnectivityResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getScheduleInformationSoapIn">
+    <wsdl:part name="parameters" element="sn0:getScheduleInformation">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getNotesInformationSoapOut">
+    <wsdl:part name="parameters" element="sn0:getNotesInformationResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getNotesInformationSoapIn">
+    <wsdl:part name="parameters" element="sn0:getNotesInformation">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getChargeInformationSoapOut">
+    <wsdl:part name="parameters" element="sn0:getChargeInformationResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:portType name="DELJISPort">
+    <wsdl:operation name="CheckConnectivity">
+      <wsdl:input message="tns:CheckConnectivitySoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:CheckConnectivitySoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getChargeInformation">
+      <wsdl:input message="tns:getChargeInformationSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:getChargeInformationSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getScheduleInformation">
+      <wsdl:input message="tns:getScheduleInformationSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:getScheduleInformationSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getNotesInformation">
+      <wsdl:input message="tns:getNotesInformationSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:getNotesInformationSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="DELJISSOAP12Binding" type="tns:DELJISPort">
+    <soap12:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="CheckConnectivity">
+      <soap12:operation soapAction="CheckConnectivity"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getChargeInformation">
+      <soap12:operation soapAction="getChargeInformation"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getScheduleInformation">
+      <soap12:operation soapAction="getScheduleInformation"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getNotesInformation">
+      <soap12:operation soapAction="getNotesInformation"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="DELJISSOAP11Binding" type="tns:DELJISPort">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="CheckConnectivity">
+      <soap:operation soapAction="CheckConnectivity"/>
+      <wsdl:input>
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getChargeInformation">
+      <soap:operation soapAction="getChargeInformation"/>
+      <wsdl:input>
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getScheduleInformation">
+      <soap:operation soapAction="getScheduleInformation"/>
+      <wsdl:input>
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getNotesInformation">
+      <soap:operation soapAction="getNotesInformation"/>
+      <wsdl:input>
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="DELJISFocusService">
+    <wsdl:port name="DELJISFocusServiceHttpsSoap12Endpoint" binding="tns:DELJISSOAP12Binding">
+      <soap12:address location="https://xmlwstst.dti.state.de.us/wsstackdel912/services/DELJISFocusService.DELJISFocusServiceHttpsSoap12Endpoint/"/>
+    </wsdl:port>
+    <wsdl:port name="DELJISFocusServiceHttpsSoap11Endpoint" binding="tns:DELJISSOAP11Binding">
+      <soap:address location="https://xmlwstst.dti.state.de.us/wsstackdel912/services/DELJISFocusService.DELJISFocusServiceHttpsSoap11Endpoint/"/>
+    </wsdl:port>
+    <wsdl:port name="DELJISSOAP11Port" binding="tns:DELJISSOAP11Binding">
+      <soap:address location="http://xmlwstst.dti.state.de.us/wsstackdel912/services/DELJISFocusService.DELJISSOAP11Port/"/>
+    </wsdl:port>
+    <wsdl:port name="DELJISSOAP12Port" binding="tns:DELJISSOAP12Binding">
+      <soap12:address location="http://xmlwstst.dti.state.de.us/wsstackdel912/services/DELJISFocusService.DELJISSOAP12Port/"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>

@@ -1,0 +1,203 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<ChargeResponse>
+  <ChargeInformations>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1607015724</UniformCaseNumber>
+      <ChargeSequenceID>001</ChargeSequenceID>
+      <StatuteRank>041</StatuteRank>
+      <ArrestDate>20160731</ArrestDate>
+      <Statute>DE11083100A1FE</Statute>
+      <StatuteDescription>Robbery Second Degree Prevent or Overcome Resistance to the Taking of Property</StatuteDescription>
+      <DispositionDate>20160912</DispositionDate>
+      <CourtDisposition>JDEL</CourtDisposition>
+      <DispositionLiteral>JUVENILE FOUND DELINQUENT</DispositionLiteral>
+      <FinalDispositionStatus>G</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1607015724</UniformCaseNumber>
+      <ChargeSequenceID>002</ChargeSequenceID>
+      <StatuteRank>051</StatuteRank>
+      <ArrestDate>20160731</ArrestDate>
+      <Statute>DE111447A00AFB</Statute>
+      <StatuteDescription>Possession of a Firearm During the Commission of a Felony</StatuteDescription>
+      <DispositionDate>20160912</DispositionDate>
+      <CourtDisposition>NOLP</CourtDisposition>
+      <DispositionLiteral>NOLLE PROSEQUI</DispositionLiteral>
+      <FinalDispositionStatus>N</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Not Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1607015724</UniformCaseNumber>
+      <ChargeSequenceID>003</ChargeSequenceID>
+      <StatuteRank>306</StatuteRank>
+      <ArrestDate>20160731</ArrestDate>
+      <Statute>DE1105120001FG</Statute>
+      <StatuteDescription>CONSPIRACY SECOND DEGREE-AGREEMENT TO ENGAGE IN FELONY CRIMINAL CONDUCT</StatuteDescription>
+      <DispositionDate>20160912</DispositionDate>
+      <CourtDisposition>NOLP</CourtDisposition>
+      <DispositionLiteral>NOLLE PROSEQUI</DispositionLiteral>
+      <FinalDispositionStatus>N</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Not Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1607015724</UniformCaseNumber>
+      <ChargeSequenceID>004</ChargeSequenceID>
+      <StatuteRank>727</StatuteRank>
+      <ArrestDate>20160731</ArrestDate>
+      <Statute>DE1143340000M </Statute>
+      <StatuteDescription>VIOLATION OF PROBATION-</StatuteDescription>
+      <DispositionDate>20170616</DispositionDate>
+      <CourtDisposition>VF</CourtDisposition>
+      <DispositionLiteral>FOUND IN VIOLATION</DispositionLiteral>
+      <FinalDispositionStatus>G</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1607015724</UniformCaseNumber>
+      <ChargeSequenceID>005</ChargeSequenceID>
+      <StatuteRank>734</StatuteRank>
+      <ArrestDate>20160731</ArrestDate>
+      <Statute>DE1143340000M </Statute>
+      <StatuteDescription>VIOLATION OF PROBATION-</StatuteDescription>
+      <DispositionDate>20180130</DispositionDate>
+      <CourtDisposition>VF</CourtDisposition>
+      <DispositionLiteral>FOUND IN VIOLATION</DispositionLiteral>
+      <FinalDispositionStatus>G</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1608000019</UniformCaseNumber>
+      <ChargeSequenceID>001</ChargeSequenceID>
+      <StatuteRank>327</StatuteRank>
+      <ArrestDate>20160801</ArrestDate>
+      <Statute>DE1105110001MA</Statute>
+      <StatuteDescription>Conspiracy Third Degree</StatuteDescription>
+      <DispositionDate>20160912</DispositionDate>
+      <CourtDisposition>JDEL</CourtDisposition>
+      <DispositionLiteral>JUVENILE FOUND DELINQUENT</DispositionLiteral>
+      <FinalDispositionStatus>G</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1608000019</UniformCaseNumber>
+      <ChargeSequenceID>002</ChargeSequenceID>
+      <StatuteRank>349</StatuteRank>
+      <ArrestDate>20160801</ArrestDate>
+      <Statute>DE110841000AMA</Statute>
+      <StatuteDescription>Theft Under $1500 (Deprive Person)</StatuteDescription>
+      <DispositionDate>20160912</DispositionDate>
+      <CourtDisposition>NOLP</CourtDisposition>
+      <DispositionLiteral>NOLLE PROSEQUI</DispositionLiteral>
+      <FinalDispositionStatus>N</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Not Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1608000019</UniformCaseNumber>
+      <ChargeSequenceID>003</ChargeSequenceID>
+      <StatuteRank>727</StatuteRank>
+      <ArrestDate>20160801</ArrestDate>
+      <Statute>DE1143340000M </Statute>
+      <StatuteDescription>VIOLATION OF PROBATION-</StatuteDescription>
+      <DispositionDate>20170616</DispositionDate>
+      <CourtDisposition>VF</CourtDisposition>
+      <DispositionLiteral>FOUND IN VIOLATION</DispositionLiteral>
+      <FinalDispositionStatus>G</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+    <ChargeInformation>
+      <SbiNumber>00692202</SbiNumber>
+      <SbiSequence>01</SbiSequence>
+      <PersonSurName>WRIGHT</PersonSurName>
+      <PersonMiddleName/>
+      <PersonGivenName>TRAMEL</PersonGivenName>
+      <UniformCaseNumber>1608000019</UniformCaseNumber>
+      <ChargeSequenceID>004</ChargeSequenceID>
+      <StatuteRank>734</StatuteRank>
+      <ArrestDate>20160801</ArrestDate>
+      <Statute>DE1143340000M </Statute>
+      <StatuteDescription>VIOLATION OF PROBATION-</StatuteDescription>
+      <DispositionDate>20180130</DispositionDate>
+      <CourtDisposition>VF</CourtDisposition>
+      <DispositionLiteral>FOUND IN VIOLATION</DispositionLiteral>
+      <FinalDispositionStatus>G</FinalDispositionStatus>
+      <FinalDispositionStatusLiteral>Guilty</FinalDispositionStatusLiteral>
+      <DispositionAgency>U2</DispositionAgency>
+      <DispositionAgencyName>KENT COUNTY FAMILY COURT</DispositionAgencyName>
+      <ErrorCode/>
+      <ErrorDescription/>
+    </ChargeInformation>
+  </ChargeInformations>
+</ChargeResponse>

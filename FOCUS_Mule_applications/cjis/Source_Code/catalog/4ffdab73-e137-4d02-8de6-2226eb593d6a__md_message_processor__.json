@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "FacilityWorkerxml"
+        }
+    },
+    "id": "4ffdab73-e137-4d02-8de6-2226eb593d6a",
+    "version": "5.2.0.0"
+}

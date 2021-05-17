@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+  <record>
+    <caseId>1234</caseId>
+    <DucNumbers>
+      <Duc>1</Duc>
+      <Duc>2</Duc>
+    </DucNumbers>
+  </record>
+</root>

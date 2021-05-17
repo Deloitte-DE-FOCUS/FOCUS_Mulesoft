@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+    <ws:consumer-config name="Login_Webservice_Consumer" service="mainMethods" port="mainMethodsSoap12" serviceAddress="https://testws.delaware.gov:1203/deljis/mainMethods" wsdlLocation="MainMethods.wsdl" doc:name="Web Service Consumer"/>
+    <ws:consumer-config name="Web_Service_Consumer_Login" service="mainMethods" port="mainMethodsSoap12" serviceAddress="${cjis.loginwsdlurl}" wsdlLocation="mainMethods.wsdl" doc:name="Web Service Consumer"/>
+    <flow name="cjis_loginFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration_testFramework" path="/CJISLogin" doc:name="HTTP" allowedMethods="POST"/>
+        <http:basic-security-filter realm="mule-realm"/>
+        <json:json-to-xml-transformer mimeType="application/xml" doc:name="JSON to XML"/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties">
+            <add-message-property key="loginRequest" value="#[payload]"/>
+            <add-message-property key="TransactionID" value="#[xpath3('/loginRequest/interfaceTransId')]"/>
+        </message-properties-transformer>
+        <logger message="#[flowVars.loginRequest]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="b4887a61-9464-4309-8de9-16b977727af3" doc:name="Transform Message">
+            <dw:input-payload doc:sample="C:\Users\hechada\Desktop\LoginExampleSFDC.xml" mimeType="application/xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 https://appsprod.deljis.state.de.us/WebServices/DELJISServices
+---
+{
+	ns0#checkLogin: {
+		ns0#cjisid: payload.loginRequest.username,
+		ns0#cjispw: ""
+	}
+}]]></dw:set-payload>
+            <dw:set-variable variableName="LoginReqToCJIS"><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 https://appsprod.deljis.state.de.us/WebServices/DELJISServices
+---
+{
+	ns0#checkLogin: {
+		ns0#cjisid: payload.loginRequest.username,
+		ns0#cjispw: payload.loginRequest.password
+	}
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set File Name">
+            <add-message-property key="filename" value="LoginRequest.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <set-payload value="#[flowVars.LoginReqToCJIS]" mimeType="application/xml" doc:name="Set Payload : Set Login Request XML "/>
+        <logger message="request payload --&gt; #[payload]" level="INFO" doc:name="Logger"/>
+        <ws:consumer config-ref="Web_Service_Consumer_Login" operation="checkLogin" doc:name="Web Service Consumer"/>
+
+        <mulexml:dom-to-xml-transformer mimeType="application/xml" doc:name="DOM to XML"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="filename" value="LoginResponse.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+
+        <dw:transform-message metadata:id="b9103402-68da-40ee-80aa-483e9ea26b09" doc:name="Transform Message">
+            <dw:input-payload doc:sample="sample_data\checkLoginResponse.xml" mimeType="application/xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%namespace ns0 https://appsprod.deljis.state.de.us/WebServices/DELJISServices
+---
+{
+	loginResponse: {
+		ErrorCode: payload.ns0#checkLoginResponse.ns0#checkLoginResult.ns0#ErrorCode default "",
+		ErrorDescription: payload.ns0#checkLoginResponse.ns0#checkLoginResult.ns0#ErrorDesc default ""
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+        <json:xml-to-json-transformer mimeType="application/json" doc:name="XML to JSON"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="CreateTransactionAttachment">
+    	<string-to-byte-array-transformer doc:name="String to Byte Array"/>
+                <set-variable variableName="AttachmentBody" value="#[payload]" doc:name="Variable : Store the Fixed width file"/>
+                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+	ParentId: flowVars.TransactionID, //Need to Check
+	Name: flowVars.filename,
+	//Description: '',
+	Body: flowVars.AttachmentBody
+	}
+] ]]></dw:set-payload>
+                </dw:transform-message>
+         <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce : Create Attachment">
+              <sfdc:objects ref="#[payload]"/>
+         </sfdc:create>-->
+		 <logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.filename,
+             Title : flowVars.filename,
+             VersionData : flowVars.AttachmentBody
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.TransactionID
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+        <logger message="After Create Attachment : #[payload]" level="INFO" doc:name="Logger"/>
+        
+    </sub-flow>
+</mule>

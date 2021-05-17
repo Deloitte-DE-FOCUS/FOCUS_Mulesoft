@@ -1,0 +1,874 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:context="http://www.springframework.org/schema/context" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd">
+  
+    
+   <!--  <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans> -->
+  
+    
+    <sftp:connector name="SFTPOverrideNoDelete" validateConnections="true" 
+		doc:name="SFTP" autoDelete="false">
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="3" />
+	</sftp:connector>
+	<custom-transformer name="CJISLoadCustomTransformer" class="org.delaware.util.CJISLoadTransformer" doc:name="Java"/>
+    <validation:config name="Validation_Configuration" doc:name="Validation Configuration"/>
+    <objectstore:config name="ObjectStore__Connector_OffenderErrors" partition="OffenderErrors" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="ObjectStore__Connector_VictimErrors" partition="VictimErrors" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="ObjectStore__Connector_CJISEErrors" partition="CJISEErrors" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="ObjectStore__Connector_RecordCount" partition="RecordCount" doc:name="ObjectStore: Connector"/>
+    <sftp:connector name="SFTPOverrideDelete" validateConnections="true" doc:name="SFTP" duplicateHandling="overwrite">
+        <reconnect count="5"/>
+    </sftp:connector>
+    <objectstore:config name="ObjectStore__Connector_InvalidRows" partition="InvalidRows" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="ObjectStore__Connector_CJISBatchTechnicalErrors" partition="CJISBatchTechnicalErrors" doc:name="ObjectStore: Connector"/>
+    <objectstore:config name="ObjectStore__Connector_TotalOffenderCount" partition="TotalOffenderCount" doc:name="ObjectStore: Connector"/>
+    
+    <flow name="inf019-cjis-load" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <schedulers:cron-scheduler expression="0 5 7 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF019" doc:name="Set Payload"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="Variable"/>
+        <mulerequester:request resource="sftp://${sftp.cjisload.transaction.username}:${sftp.cjisload.transaction.password}@${sftp.cjisload.transaction.host}:${sftp.cjisload.transaction.port}${sftp.cjisload.transaction.path}?connector=SFTPOverrideNoDelete&amp;myfilename=${sftp.cjisload.transaction.filename}" doc:name="Mule Requester : Get file from CJIS SFTP"/>
+        <validation:is-not-null config-ref="Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check Payload"/>
+        <flow-ref name="LogTransactionAndArchiveFile_Subflow" doc:name="LogTransactionAndArchiveFile_Subflow"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id FROM DEL_CJIS_Offender_Information__c" doc:name="Salesforce :  Query Offender and Victim Records"/>
+        <dw:transform-message doc:name="Transform Message : Get Offender IDs">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	Id: payload01.Id
+})]]></dw:set-payload>
+            <!--  <dw:input-payload doc:sample="sample_data\list_DEL_Offender_Information__c.dwl" doc:sample="sample_data\list_DEL_Offender_Information__c.dwl"/>  -->
+        </dw:transform-message>
+        <batch:execute name="inf019-delete-offender-records-Batch" doc:name="inf019-delete-offender-records-Batch"/>
+
+        
+
+
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="LogTransactionAndArchiveFile_Subflow">
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP" outputPattern="${sftp.cjisload.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.cjisload.archive.host}" port="${sftp.cjisload.archive.port}" path="${sftp.cjisload.archive.path}" user="${sftp.cjisload.archive.username}" password="${sftp.cjisload.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP"/>
+
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF019&quot;, &quot;InterfaceName&quot;: &quot;CJIS Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_kids.input&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Extension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload : In Progress Transaction"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+
+    </sub-flow>
+    <sub-flow name="inf019-LogCompletedTransactionWithDetails">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Total and Error Count">
+            <add-message-property key="totalRecCount" value="#[sessionVars.TotalRecCount]"/>
+            <add-message-property key="totalErrorCount" value="#[(sessionVars.AllOffenderErrors != null &amp;&amp; sessionVars.AllOffenderErrors != &quot;&quot; ? sessionVars.AllOffenderErrors.split('\n').size() : 0 ) + (sessionVars.AllVictimErrors != null &amp;&amp; sessionVars.AllVictimErrors != &quot;&quot; ? sessionVars.AllVictimErrors.split('\n').size() : 0 ) + (sessionVars.InvalidRows != null &amp;&amp; sessionVars.InvalidRows != &quot;&quot; ? sessionVars.InvalidRows.split('\n').size() : 0 )]"/>
+            <add-message-property key="totalERecordCount" value="#[(sessionVars.AllCJISEErrors != null &amp;&amp; sessionVars.AllCJISEErrors != &quot;&quot; ? sessionVars.AllCJISEErrors.split('\n').size() : 0 ) ]"/>
+        </message-properties-transformer>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Success Count and Status">
+            <add-message-property key="totalSuccCount" value="#[totalRecCount - totalErrorCount]"/>
+            <add-message-property key="recStatus" value="#[totalErrorCount == 0 ? 'Success' : (totalRecCount == totalErrorCount ? 'Error' : 'Completed with Error(s)')]"/>
+        </message-properties-transformer>
+        <logger message="'Total Count #[flowVars.totalRecCount];Total Success Count--&gt; #[flowVars.totalSuccCount] Total Error Count--&gt; #[flowVars.totalErrorCount]'" level="INFO" doc:name="Logger : Display Count of Records"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.recStatus != 'Success']">
+                <set-session-variable variableName="ErrorAttachment" value="#['PID,SBI,SBIOther,seq,lastName,firstName,middleName,suffix,birthdate,street1,street2,city,state,country,countryName,offZip,offRace,raceDescription,offSex,height,weiht,employerName,sexOffRegFlag,sexOffRegAgency,sexOffRegAgencyName,sexOffRegDate,currentlyWanted,Error' + '\n' + sessionVars.AllOffenderErrors + '\n' +'PID,SBI,chargeSeq,DUC,currentCase,firstName,lastName,birthDate,victimType,residencePhone,age,notification,businessPhone,address1,address2,city,state,county,countyName,zipCode,parentName,parentAddress1,parentAddress2,parentCity,parentState,parentZip,victimSeq,businessName,Error' + '\n' + sessionVars.AllVictimErrors + '\n' +'Invalid Rows' + '\n' + sessionVars.InvalidRows]" doc:name="Session Variable : Set Error Attachment"/>
+            </when>
+            <otherwise>
+                <logger message="' No Error file '" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF019&quot;, &quot;InterfaceName&quot;: &quot;CJIS Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_CJISLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_kids.input&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;Offenders Record Count:#[sessionVars.TotalOffenderCount]; CJIS E Records Count: #[flowVars.totalERecordCount]&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload :  Transaction Completed Record" mimeType="application/json"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="'Completed Transaction Details'#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <batch:job name="inf019-cjis-load-VictimLoad-Batch" block-size="200" max-failed-records="-1">
+        <batch:process-records>
+            <batch:step name="Batch_Step1">
+                <batch:commit size="200" doc:name="Batch Commit">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload joinBy "\n"]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Prepare Valid Invalid Records" metadata:id="4083f0e6-ede7-43f1-98a8-eb6835a2525b">
+                    	<dw:input-payload mimeType="application/csv">
+			                <dw:reader-property name="header" value="false"/>
+			               <!--  <dw:reader-property name="quote" value="^"/>  -->
+			            </dw:input-payload>
+                        <dw:set-variable variableName="OffenderDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($[0] == '1') and ($[1] != "" and $[1] != null) 
+		and ($[4] != "" and $[4] != null) and ($[1] == null or ( sizeOf trim $[1]) <= 10)
+		and ($[2] == null or ( sizeOf trim $[2]) <= 8) and ($[3] == null or ( sizeOf trim $[3]) <= 8) 
+		and ($[4] == null or ( sizeOf trim $[4]) <= 2) and ($[5] == null or ( sizeOf trim $[5]) <= 17) 
+		and ($[6] == null or ( sizeOf trim $[6]) <= 11) and ($[7] == null or ( sizeOf trim $[7]) <= 1) 
+		and ($[8] == null or ( sizeOf trim $[8]) <= 2) and ($[9] == null or $[9] == "" or $[9] == "        " or  ( sizeOf trim $[9]) == 8) 
+		and ($[10] == null or ( sizeOf trim $[10]) <= 30) and ($[11] == null or ( sizeOf trim $[11]) <= 30) 
+		and ($[12] == null or ( sizeOf trim $[12]) <= 18) and ($[13] == null or ( sizeOf trim $[13]) <= 2) 
+		and ($[14] == null or ( sizeOf trim $[14]) <= 1) and ($[15] == null or ( sizeOf trim $[15]) <= 15) 
+		and ($[16] == null or ( sizeOf trim $[16]) <= 9) and ($[17] == null or ( sizeOf trim $[17]) <= 1) 
+		and ($[18] == null or ( sizeOf trim $[18]) <= 30) and ($[19] == null or ( sizeOf trim $[19]) <= 1) 
+		and ($[20] == null or ( sizeOf trim $[20]) <= 3) and ($[21] == null or ( sizeOf trim $[21]) <= 3) 
+		and ($[22] == null or ( sizeOf trim $[22]) <= 30) and ($[23] == null or ( sizeOf trim $[23]) <= 1) 
+		and ($[24] == null or ( sizeOf trim $[24]) <= 2) and ($[25] == null or ( sizeOf trim $[25]) <= 40) 
+		and ($[26] == null or $[26] == "" or $[26] == "        " or   ( sizeOf trim $[26]) == 8) and ($[27] == null or ( sizeOf trim $[27]) <= 1) map {
+	PID : $[1],
+	SBINumber : $[2],
+	SBIOther : $[3],
+	SequenceNumber : $[4],
+	LastName : $[5],
+	FirstName: $[6],
+	MiddleName: $[7],
+	Suffix: $[8],
+	DateofBirth: $[9],
+	(DateofBirth_Valid : $[9] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false )  when $[9] != null and $[9] != '' and ( sizeOf trim $[9]) == 8 ,
+	Street1: $[10],
+	Street2: $[11],
+	City: $[12],
+	State: $[13],
+	County:  $[14],
+	CountyName: $[15],
+	OffZip: $[16],
+	OffRace: $[17],
+	RaceDescription: $[18],
+	Sex : $[19],
+	Height: $[20],
+	Weight : $[21],
+	EmployerName: $[22],
+	SexOffRegFlag: $[23],
+	SexOffRegAgency: $[24],
+	SexOffRegAgencyName: $[25],
+	SexOffRegDate: $[26],
+	(SexOffRegDate_Valid : $[26] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false ) when $[26] != null and $[26] != '' and ( sizeOf trim $[26]) == 8 ,
+	CurrentlyWanted :  $[27]	
+} filter ( $.DateofBirth_Valid != false and $.SexOffRegDate_Valid != false)]]></dw:set-variable>
+                        <dw:set-variable variableName="VictimDetails"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($[0] == '7') and ($[1] != "" and $[1] != null) 
+		and ($[2] != "" and $[2] != null) and ($[3] != "" and $[3] != null)
+		and ($[4] != "" and $[4] != null) and ($[5] != "" and $[5] != null)
+		and ($[1] == null or ( sizeOf trim $[1]) <= 10)
+		and ($[2] == null or ( sizeOf trim $[2]) <= 8) and ($[3] == null or ( sizeOf trim $[3]) <= 3) 
+		and ($[4] == null or ( sizeOf trim $[4]) <= 10) and ($[5] == null or ( sizeOf trim $[5]) <= 10) 
+		and ($[6] == null or ( sizeOf trim $[6]) <= 11) and ($[7] == null or ( sizeOf trim $[7]) <= 17) 
+		and ($[8] == null or $[8] == "" or $[8] == "        " or   ( sizeOf trim $[8]) == 8) and ($[9] == null or ( sizeOf trim $[9]) <= 2) 
+		and ($[10] == null or ( sizeOf trim $[10]) <= 10) and ($[11] == null or ( sizeOf trim $[11]) <= 3) 
+		and ($[12] == null or ( sizeOf trim $[12]) <= 1) and ($[13] == null or ( sizeOf trim $[13]) <= 10) 
+		and ($[14] == null or ( sizeOf trim $[14]) <= 30) and ($[15] == null or ( sizeOf trim $[15]) <= 30) 
+		and ($[16] == null or ( sizeOf trim $[16]) <= 18) and ($[17] == null or ( sizeOf trim $[17]) <= 2) 
+		and ($[18] == null or ( sizeOf trim $[18]) <= 1) and ($[19] == null or ( sizeOf trim $[19]) <= 15) 
+		and ($[20] == null or ( sizeOf trim $[20]) <= 9) and ($[21] == null or ( sizeOf trim $[21]) <= 30) 
+		and ($[22] == null or ( sizeOf trim $[22]) <= 30) and ($[23] == null or ( sizeOf trim $[23]) <= 30) 
+		and ($[24] == null or ( sizeOf trim $[24]) <= 18) and ($[25] == null or ( sizeOf trim $[25]) <= 2) 
+		and ($[26] == null or ( sizeOf trim $[26]) <= 9) and ($[27] == null or ( sizeOf trim $[27]) <= 3) 
+		and ($[28] == null or ( sizeOf trim $[28]) <= 30) map {
+	PID : $[1],
+	SBINumber : $[2],
+	ChargeSequence : $[3],
+	DUCNumber : $[4],
+	CurrentCase : $[5],
+	FirstName: $[6],
+	LastName: $[7],
+	BirthDate: $[8],
+	(BirthDate_Valid : $[8] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false ) when $[8] != null and $[8] != '' and ( sizeOf trim $[8]) == 8 ,
+	VictimType : $[9],
+	ResidencePhone: $[10],
+	Age: $[11],
+	Notification: $[12],
+	BusinessPhone: $[13],
+	Address1:  $[14],
+	Address2: $[15],
+	City: $[16],
+	State: $[17],
+	County: $[18],
+	CountyName : $[19],
+	ZipCode : $[20],
+	ParentName : $[21],
+	ParentAddress1: $[22],
+	ParentAddress2: $[23],
+	ParentCity: $[24],
+	ParentState : $[25],
+	ParentZip: $[26],
+	VictimSequence :  $[27],
+	BusinessName :  $[28]
+} filter ($.BirthDate_Valid != false)]]></dw:set-variable>
+                        <dw:set-variable variableName="CJISEErrorsFile"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = "," 
+---
+payload  filter $[0] == 'E' map {
+	PID: $[1],
+	SBI: $[2],
+	CJISmessage: $[3]
+}
+]]></dw:set-variable>
+                        <dw:set-variable variableName="InvalidRowErrors"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = "," 
+---
+(payload  filter $[0] != '1' and $[0] != '7' and $[0] != 'E' )]]></dw:set-variable>
+
+                        <dw:set-session-variable variableName="OffenderFieldErrors"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = ","
+---
+payload filter ($[0] == '1') and (($[1] == "" or $[1] == null) 
+		or ($[4] == "" or $[4] == null) or ($[1] != null and ( sizeOf trim $[1]) > 10)
+		or ($[2] != null and ( sizeOf trim $[2]) > 8) or ($[3] != null and ( sizeOf trim $[3]) > 8) 
+		or ($[4] != null and ( sizeOf trim $[4]) > 2) or ($[5] != null and ( sizeOf trim $[5]) > 17) 
+		or ($[6] != null and ( sizeOf trim $[6]) > 11) or ($[7] != null and ( sizeOf trim $[7]) > 1) 
+		or ($[8] != null and ( sizeOf trim $[8]) > 2) or ($[9] != null and $[9] != "" and $[9] != "        " and  (( sizeOf trim $[9]) != 8 or (( sizeOf trim $[9]) == 8 and 
+		($[9] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false) == false ))) 
+		or ($[10] != null and ( sizeOf trim $[10]) > 30) or ($[11] != null and ( sizeOf trim $[11]) > 30) 
+		or ($[12] != null and ( sizeOf trim $[12]) > 18) or ($[13] != null and ( sizeOf trim $[13]) > 2) 
+		or ($[14] != null and ( sizeOf trim $[14]) > 1) or ($[15] != null and ( sizeOf trim $[15]) > 15) 
+		or ($[16] != null and ( sizeOf trim $[16]) > 9) or ($[17] != null and ( sizeOf trim $[17]) > 1) 
+		or ($[18] != null and ( sizeOf trim $[18]) > 30) or ($[19] != null and ( sizeOf trim $[19]) > 1) 
+		or ($[20] != null and ( sizeOf trim $[20]) > 3) or ($[21] != null and ( sizeOf trim $[21]) > 3) 
+		or ($[22] != null and ( sizeOf trim $[22]) > 30) or ($[23] != null and ( sizeOf trim $[23]) > 1) 
+		or ($[24] != null and ( sizeOf trim $[24]) > 2) or ($[25] != null and ( sizeOf trim $[25]) > 40) 
+		or ($[26] != null and $[26] != "" and $[26] != "        " and  (( sizeOf trim $[26]) != 8 or ( ( sizeOf trim $[26]) == 8 and
+		($[26] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false) == false )))  or ($[27] != null and ( sizeOf trim $[27]) > 1)) map {
+	PID : $[1],
+	SBINumber : $[2],
+	SBIOther : $[3],
+	SequenceNumber : $[4],
+	LastName : $[5],
+	FirstName: $[6],
+	MiddleName: $[7],
+	Suffix: $[8],
+	DateofBirth: $[9],
+	Street1: $[10],
+	Street2: $[11],
+	City: $[12],
+	State: $[13],
+	County:  $[14],
+	CountyName: $[15],
+	OffZip: $[16],
+	OffRace: $[17],
+	RaceDescription: $[18],
+	Sex : $[19],
+	Height: $[20],
+	Weight : $[21],
+	EmployerName: $[22],
+	SexOffRegFlag: $[23],
+	SexOffRegAgency: $[24],
+	SexOffRegAgencyName: $[25],
+	SexOffRegDate: $[26],
+	CurrentlyWanted :  $[27],
+	Error : ( (( 'PID is Missing ' )  when  ($[1]=='' or $[1]==null)  otherwise '' ) ++ 
+	(('Sequence Number is Missing ' ) when  ($[4]=='' or $[4]==null) otherwise '' ) ++ 
+	(('PID Length is too large (Maximum Length = 10) ')  when ($[1] != null and (sizeOf trim $[1]) > 10) otherwise ''  ) ++
+	(('SBI Number length is too large (Maximum Length = 8) ')  when ($[2] != null and (sizeOf trim $[2]) > 8) otherwise ''  ) ++
+	(('SBI Other length is too large (Maximum Length = 8) ')  when ($[3] != null and (sizeOf trim $[3]) > 8) otherwise ''  ) ++
+	(('Sequence Number length is too large (Maximum Length = 2) ')  when ($[4] != null and (sizeOf trim $[4]) > 2) otherwise ''  ) ++
+	(('Last Name Length is too large (Maximum Length = 17) ')  when ($[5] != null and (sizeOf trim $[5]) > 17) otherwise ''  ) ++
+	(('First Name length is too large (Maximum Length = 11) ')  when ($[6] != null and (sizeOf trim $[6]) > 11) otherwise ''  ) ++
+	(('Middle Name length is too large (Maximum Length = 1) ')  when ($[7] != null and (sizeOf trim $[7]) > 1) otherwise ''  ) ++
+	(('Suffix Length is too large (Maximum Length = 2) ')  when ($[8] != null and (sizeOf trim $[8]) > 2) otherwise ''  ) ++
+	(('Date of Birth is invalid (Expected Length = 8) ')  when ($[9] != null and $[9] !='' and  $[9] != null and  $[9] != '        ' and ($[9] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false) == false) otherwise ''  )  ++
+	(('Street1 Length is too large (Maximum Length = 30) ')  when ($[10] != null and (sizeOf trim $[10]) > 30) otherwise ''  ) ++
+	(('Street2 Length is too large (Maximum Length = 30) ')  when ($[11] != null and (sizeOf trim $[11]) > 30) otherwise ''  ) ++
+	(('City Length is too large (Maximum Length = 18) ')  when ($[12] != null and (sizeOf trim $[12]) > 18) otherwise ''  ) ++
+	(('State Length is too large (Maximum Length = 2) ')  when ($[13] != null and (sizeOf trim $[13]) > 2) otherwise ''  ) ++
+	(('County Length is too large (Maximum Length = 1) ')  when ($[14] != null and (sizeOf trim $[14]) > 1) otherwise ''  ) ++
+	(('County Name Length is too large (Maximum Length = 15) ')  when ($[15] != null and (sizeOf trim $[15]) > 15) otherwise ''  ) ++
+	(('OffZip Length is too large (Maximum Length = 9) ')  when ($[16] != null and (sizeOf trim $[16]) > 9) otherwise ''  ) ++
+	(('OffRace Length is too large (Maximum Length = 1) ')  when ($[17] != null and (sizeOf trim $[17]) > 1) otherwise ''  ) ++
+	(('Race Description Length is too large (Maximum Length = 30) ')  when ($[18] != null and (sizeOf trim $[18]) > 30) otherwise '') ++
+	(('Sex Length is too large (Maximum Length = 1) ')  when ($[19] != null and (sizeOf trim $[19]) > 1) otherwise '') ++
+	(('Height Length is too large (Maximum Length = 3) ')  when ($[20] != null and (sizeOf trim $[20]) > 3) otherwise '') ++
+	(('Weight Length is too large (Maximum Length = 3) ')  when ($[21] != null and (sizeOf trim $[21]) > 3) otherwise ''  ) ++
+	(('Employer Name Length is too large (Maximum Length = 30) ')  when ($[22] != null and (sizeOf trim $[22]) > 30) otherwise ''  ) ++
+	(('Sex Off Reg Flag Length is too large (Maximum Length = 1) ')  when ($[23] != null and (sizeOf trim $[23]) > 1) otherwise ''  ) ++
+	(('Sex Off Reg Agency Length is too large (Maximum Length = 2) ')  when ($[24] != null and (sizeOf trim $[24]) > 2) otherwise '') ++
+	(('Sex Off Reg Agency Name Length is too large (Maximum Length = 40) ')  when ($[25] != null and (sizeOf trim $[25]) > 40) otherwise ''  ) ++
+	(('Sex Off Reg Agency Date Length is invalid (Expected Length = 8) ')  when ($[26] != null and $[26] != "" and $[26] != "        " and (sizeOf trim $[26]) != 8) otherwise '' ) ++
+	(('Sex Off Reg Agency Date is invalid ')  when ($[26] != null and $[26] != "" and $[26] != "        " and (sizeOf trim $[26]) == 8 and ($[26] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false) == false) otherwise ''  )  ++
+	(('Currently Wanted Length is too large (Maximum Length = 1) ')  when ($[27] != null and (sizeOf trim $[27]) > 1) otherwise ''  )) default ''
+}]]></dw:set-session-variable>
+                        <dw:set-session-variable variableName="VictimFieldErrors"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = ","
+---
+payload filter ($[0] == '7') and (($[1] == "" or $[1] == null) 
+		or ($[2] == "" or $[2] == null) or ($[3] == "" or $[3] == null)
+		or ($[4] == "" or $[4] == null) or ($[5] == "" or $[5] == null)
+		or ($[1] != null and ( sizeOf trim $[1]) > 10)
+		or ($[2] != null and ( sizeOf trim $[2]) > 8) or ($[3] != null and ( sizeOf trim $[3]) > 3) 
+		or ($[4] != null and ( sizeOf trim $[4]) > 10) or ($[5] != null and ( sizeOf trim $[5]) > 10) 
+		or ($[6] != null and ( sizeOf trim $[6]) > 11) or ($[7] != null and ( sizeOf trim $[7]) > 17) 
+		or ($[8] != null and $[8] != "" and $[8] != "        " and (( sizeOf trim $[8]) != 8 or ( (sizeOf trim $[8]) == 8 and ($[8] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false) == false )))
+		or ($[9] != null and ( sizeOf trim $[9]) > 2) 
+		or ($[10] != null and ( sizeOf trim $[10]) > 10) or ($[11] != null and ( sizeOf trim $[11]) > 3) 
+		or ($[12] != null and ( sizeOf trim $[12]) > 1) or ($[13] != null and ( sizeOf trim $[13]) > 10) 
+		or ($[14] != null and ( sizeOf trim $[14]) > 30) or ($[15] != null and ( sizeOf trim $[15]) > 30) 
+		or ($[16] != null and ( sizeOf trim $[16]) > 18) or ($[17] != null and ( sizeOf trim $[17]) > 2) 
+		or ($[18] != null and ( sizeOf trim $[18]) > 1) or ($[19] != null and ( sizeOf trim $[19]) > 15) 
+		or ($[20] != null and ( sizeOf trim $[20]) > 9) or ($[21] != null and ( sizeOf trim $[21]) > 30) 
+		or ($[22] != null and ( sizeOf trim $[22]) > 30) or ($[23] != null and ( sizeOf trim $[23]) > 30) 
+		or ($[24] != null and ( sizeOf trim $[24]) > 18) or ($[25] != null and ( sizeOf trim $[25]) > 2) 
+		or ($[26] != null and ( sizeOf trim $[26]) > 9) or ($[27] != null and ( sizeOf trim $[27]) > 3) 
+		or ($[28] != null and ( sizeOf trim $[28]) > 30)) map {
+	PID : $[1],
+	SBINumber : $[2],
+	ChargeSequence : $[3],
+	DUCNumber : $[4],
+	CurrentCase : $[5],
+	FirstName: $[6],
+	LastName: $[7],
+	BirthDate: $[8],
+	VictimType : $[9],
+	ResidencePhone: $[10],
+	Age: $[11],
+	Notification: $[12],
+	BusinessPhone: $[13],
+	Address1:  $[14],
+	Address2: $[15],
+	City: $[16],
+	State: $[17],
+	County: $[18],
+	CountyName : $[19],
+	ZipCode : $[20],
+	ParentName : $[21],
+	ParentAddress1: $[22],
+	ParentAddress2: $[23],
+	ParentCity: $[24],
+	ParentState : $[25],
+	ParentZip: $[26],
+	VictimSequence : $[27],
+	BusinessName : $[28],
+	Error : ( (( 'PID is Missing ' )  when  ($[1] =='' or $[1]==null)  otherwise '' ) ++ 
+		(( 'SBI Number is Missing ' )  when  ($[2]=='' or $[2]==null)  otherwise '' ) ++ 
+		(( 'Charge Sequence Number is Missing ' )  when  ($[3]=='' or $[3]==null)  otherwise '' ) ++ 
+		(( 'DUC Number is Missing ' )  when  ($[4]=='' or $[4]==null)  otherwise '' ) ++ 
+		(( 'Current Case is Missing ' )  when  ($[5]=='' or $[5]==null)  otherwise '' ) ++  
+		(('PID Length is too large (Maximum Length = 10 ) ')  when ($[1] != null and (sizeOf trim $[1]) > 10 ) otherwise ''  ) ++
+		(('SBI Number Length is too large (Maximum Length = 8) ')  when ($[2] != null and (sizeOf trim $[2]) > 8 ) otherwise ''  ) ++
+		(('Charge Sequence Length is too large (Maximum Length = 3) ')  when ($[3] != null and (sizeOf trim $[3]) > 3) otherwise ''  ) ++
+		(('DUC Number Length is too large (Maximum Length = 10) ')  when ($[4] != null and (sizeOf trim $[4]) > 10) otherwise ''  ) ++
+		(('Current Case Length is too large (Maximum Length = 10) ')  when ($[5] != null and (sizeOf trim $[5]) > 10) otherwise ''  ) ++
+		(('First Name Length is too large (Maximum Length = 11) ')  when ($[6] != null and (sizeOf trim $[6]) > 11) otherwise ''  ) ++
+		(('Last Name Length is too large (Maximum Length = 17) ')  when ($[7] != null and (sizeOf trim $[7]) > 17) otherwise ''  ) ++
+		(('Birth Date is invalid (Expected Length = 8)')  when ($[8] !='' and  $[8] != null and $[8] != "        " and (($[8] as :date {format: "yyyyMMdd"}  as :string {format: "yyyy-MM-dd"} default false) == false)) otherwise '' )  ++
+		(('Victim Type Length is too large (Maximum Length = 2) ')  when ($[9] != null and (sizeOf trim $[9]) > 2) otherwise ''  ) ++
+		(('Residence Phone Length is too large (Maximum Length = 10) ')  when ($[10] != null and (sizeOf trim $[10]) > 10) otherwise ''  ) ++
+		(('Age Length is too large (Maximum Length = 3) ')  when ($[11] != null and (sizeOf trim $[11]) > 3) otherwise ''  ) ++
+		(('Notification Length is too large (Maximum Length = 1) ')  when ($[12] != null and (sizeOf trim $[12]) > 1) otherwise ''  ) ++
+		(('Business Phone Length is too large (Maximum Length = 10) ')  when ($[13] != null and (sizeOf trim $[13]) > 10) otherwise ''  ) ++
+		(('Address1 Length is too large (Maximum Length = 30) ')  when ($[14] != null and (sizeOf trim $[14]) > 30) otherwise ''  ) ++
+		(('Address2 Length is too large (Maximum Length = 30) ')  when ($[15] != null and (sizeOf trim $[15]) > 30) otherwise ''  ) ++
+		(('City Length is too large (Maximum Length = 18) ')  when ($[16] != null and (sizeOf trim $[16]) > 18) otherwise ''  ) ++
+		(('State Length is too large (Maximum Length = 2) ')  when ($[17] != null and (sizeOf trim $[17]) > 2) otherwise ''  ) ++
+		(('County Length is too large (Maximum Length = 1) ')  when ($[18] != null and (sizeOf trim $[18]) > 1) otherwise ''  ) ++
+		(('County Name Length is too large (Maximum Length = 15) ')  when ($[19] != null and (sizeOf trim $[19]) > 15) otherwise ''  ) ++
+		(('Zip Code Length is too large (Maximum Length = 9) ')  when ($[20] != null and (sizeOf trim $[20]) > 9) otherwise ''  ) ++
+		(('Parent Name Length is too large (Maximum Length = 30) ')  when ($[21] != null and (sizeOf trim $[21]) > 30) otherwise ''  ) ++
+		(('Parent Address1 Length is too large (Maximum Length = 30) ')  when ($[22] != null and (sizeOf trim $[22]) > 30) otherwise ''  ) ++
+		(('Parent Address2 Length is too large (Maximum Length = 30) ')  when ($[23] != null and (sizeOf trim $[23]) > 30) otherwise ''  ) ++
+		(('Parent City Length is too large (Maximum Length = 18) ')  when ($[24] != null and (sizeOf trim $[24]) > 18) otherwise ''  ) ++
+		(('Parent State Length is too large (Maximum Length = 2) ')  when ($[25] != null and (sizeOf trim $[25]) > 2) otherwise ''  ) ++
+		(('Parent Zip Length is too large (Maximum Length = 9) ')  when ($[26] != null and (sizeOf trim $[26]) > 9) otherwise ''  ) ++
+		(('Victim Sequence Length is too large (Maximum Length = 3) ')  when ($[27] != null and (sizeOf trim $[27]) > 3) otherwise ''  ) ++
+		(('Business Name Length is too large (Maximum Length = 30) ')  when ($[28] != null and (sizeOf trim $[28]) > 30) otherwise ''  ))
+}]]></dw:set-session-variable>
+                    </dw:transform-message>
+                    <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set Offender Count and Total Records count in a batch">
+                        <add-message-property key="CurrentBatchTotalCount" value="#[flowVars.OffenderDetails.size() + flowVars.VictimDetails.size() + (sessionVars.OffenderFieldErrors != null &amp;&amp; sessionVars.OffenderFieldErrors != &quot;&quot; ? sessionVars.OffenderFieldErrors.split('\n').size() : 0 ) + (sessionVars.VictimFieldErrors != null &amp;&amp; sessionVars.VictimFieldErrors != &quot;&quot; ? sessionVars.VictimFieldErrors.split('\n').size() : 0 )+ (flowVars.InvalidRowErrors != null &amp;&amp; flowVars.InvalidRowErrors != &quot;&quot; ? flowVars.InvalidRowErrors.split('\n').size() : 0 )]"/>
+                        <add-message-property key="OffenderBatchCount" value="#[flowVars.OffenderDetails.size() + (sessionVars.OffenderFieldErrors != null &amp;&amp; sessionVars.OffenderFieldErrors != &quot;&quot; ? sessionVars.OffenderFieldErrors.split('\n').size() : 0 )]"/>
+                    </message-properties-transformer>
+                    <set-variable variableName="CurrentBatchTotalCount" value="#[flowVars.OffenderDetails.size() + flowVars.VictimDetails.size() + (sessionVars.OffenderFieldErrors != null &amp;&amp; sessionVars.OffenderFieldErrors != &quot;&quot; ? sessionVars.OffenderFieldErrors.split('\n').size() : 0 ) + (sessionVars.VictimFieldErrors != null &amp;&amp; sessionVars.VictimFieldErrors != &quot;&quot; ? sessionVars.VictimFieldErrors.split('\n').size() : 0 )+ (flowVars.InvalidRowErrors != null &amp;&amp; flowVars.InvalidRowErrors != &quot;&quot; ? flowVars.InvalidRowErrors.split('\n').size() : 0 )]" doc:name="Variable: Set Total Record Count"/>
+                    <objectstore:store config-ref="ObjectStore__Connector_TotalOffenderCount" key="BatchInfo_#[server.nanoTime()]" value-ref="#[flowVars.OffenderBatchCount]" doc:name="ObjectStore"/>
+                    <objectstore:store config-ref="ObjectStore__Connector_InvalidRows" key="BatchInfo_#[server.nanoTime()]" value-ref="#[flowVars.InvalidRowErrors]" doc:name="ObjectStore : Store Invalid Rows"/>
+
+                    <objectstore:store config-ref="ObjectStore__Connector_RecordCount" key="BatchInfo_#[server.nanoTime()]" value-ref="#[flowVars.CurrentBatchTotalCount]" doc:name="ObjectStore : Record Count"/>
+
+                    <objectstore:store config-ref="ObjectStore__Connector_OffenderErrors" key="BatchInfo_#[server.nanoTime()]" value-ref="#[sessionVars.OffenderFieldErrors]" doc:name="ObjectStore : Store Offender Field Errors"/>
+
+                    <objectstore:store config-ref="ObjectStore__Connector_VictimErrors" key="BatchInfo_#[server.nanoTime()]" value-ref="#[sessionVars.VictimFieldErrors]" doc:name="ObjectStore : Store Victim Field Errors"/>
+                    <objectstore:store config-ref="ObjectStore__Connector_CJISEErrors" key="BatchInfo_#[server.nanoTime()]" value-ref="#[flowVars.CJISEErrorsFile]" doc:name="ObjectStore : Store CJIS E Error Records"/>
+                    <dw:transform-message doc:name="TM : Prepare , separated PIDs">
+                        <dw:set-payload><![CDATA[//generate comma separated list of External Ids so that it can be queried against FOCUS to get the claim records
+%dw 1.0
+%output application/java
+---
+(flowVars.OffenderDetails map ("'" ++ ($.PID as :number as :string) ++ "'" )) joinBy ","]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id, DEL_PID__c, (Select Id, Street_1__c, City__c, State__c, Country__c, ZIP__c from Person_Address__r WHERE Address_Type__c = 'Home' AND status__c = 'Active') from Contact where DEL_PID__c IN (#[payload])" doc:name="Salesforce : Query for Person Ids"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-variable variableName="VariableSFIdMap"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	PID : $.DEL_PID__c,
+	SFID : $.Id,
+	PersonAddressId : $.Person_Address__r[0].Id when $.Person_Address__r != null and $.Person_Address__r[0] != null otherwise ""
+	//HomeAddress : $.Street_1__c default "" ++ $.City__c default "" ++ $.State__c default "" ++ $.Country__c default "" ++ $.ZIP__c default ""
+}]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: preapre offender recors in saesforce format">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/csv
+%output application/java
+%var PIDSFId = {( flowVars.VariableSFIdMap map (record, index) -> {
+            (record.PID as :string) : record.SFID default ""
+})}
+%var PIDAddID = {( flowVars.VariableSFIdMap map (record, index) -> {
+            (record.PID as :string) : record.PersonAddressId default ""
+})}
+---
+flowVars.OffenderDetails map ((payload01 , indexOfPayload01) -> {
+	PID__c: payload01.PID as :number as :string,
+	SBI_Number__c: payload01.SBINumber,
+	SBI_Other__c: payload01.SBIOther,
+	Sequence_Number__c: payload01.SequenceNumber,
+	Last_Name__c: payload01.LastName,
+	First_Name__c: payload01.FirstName,
+	Middle_Name__c: payload01.MiddleName,
+	Suffix__c: payload01.Suffix,
+	(Date_of_Birth__c: payload01.DateofBirth  as :date {format: "yyyyMMdd"} ) when payload01.DateofBirth != null and payload01.DateofBirth != '' and ( sizeOf trim payload01.DateofBirth) == 8 ,
+	Street_1__c: payload01.Street1,
+	Street_2__c: payload01.Street2,
+	City__c: payload01.City,
+	State__c: payload01.State,
+	County__c: payload01.County,
+	County_Name__c: payload01.CountyName,
+	Off_Zip__c: payload01.OffZip,
+	Off_Race__c: payload01.OffRace,
+	Race_Description__c: payload01.RaceDescription,
+	Sex__c: payload01.Sex,
+	Height__c: payload01.Height,
+	Weight__c: payload01.Weight,
+	Employer_Name__c: payload01.EmployerName,
+	Sex_Off_Reg_Flag__c: payload01.SexOffRegFlag,
+	Sex_Off_Reg_Agency__c: payload01.SexOffRegAgency,
+	Sex_Off_Reg_Agency_Name__c: payload01.SexOffRegAgencyName,
+	(Sex_Off_Reg_Date__c: payload01.SexOffRegDate  as :date {format: "yyyyMMdd"} ) when payload01.SexOffRegDate != null and payload01.SexOffRegDate != '' and ( sizeOf trim payload01.SexOffRegDate) == 8 ,
+	Currently_Wanted__c: payload01.CurrentlyWanted,
+	Interface_External_Id__c : payload01.PID  as :number as :string,
+	Client__c : PIDSFId[payload01.PID  as :number as :string],
+	Person_Address__c : PIDAddID[payload01.PID  as :number as :string]
+})]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:create config-ref="Salesforce__Basic_Authentication" type="DEL_CJIS_Offender_Information__c" doc:name="Salesforce : Create Offender Records">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:create>
+                    <dw:transform-message doc:name="TM: Offender Error Details">
+                        <dw:set-payload><![CDATA[%output application/csv header = false , separator = ","
+%function change(string3) ("PID") when string3 == 'PID__c'  otherwise (("Vendor Address") when string3 == 'Vendor_Address__c' otherwise (("Vendor ID") when string3 =="External_Interface_Id__c " otherwise (("Effective Date") when string3=='FSF_Effective_Date__c' otherwise ('Effective Status' when string3=='FSF_Active__c' otherwise ('Record Name' when string3=='Chart_Types__c' otherwise ('External ID' when string3=='External_Chart_Id__c' otherwise string3 )) ))))
+---
+payload map {
+	PID: flowVars.OffenderDetails[$$].PID,
+	SBINumber: flowVars.OffenderDetails[$$].SBINumber,
+	SBIOther: flowVars.OffenderDetails[$$].SBIOther,
+	SequenceNumber: flowVars.OffenderDetails[$$].SequenceNumber,
+	LastName: flowVars.OffenderDetails[$$].LastName,
+	FirstName: flowVars.OffenderDetails[$$].FirstName,
+	MiddleName: flowVars.OffenderDetails[$$].MiddleName,
+	Suffix: flowVars.OffenderDetails[$$].Suffix,
+	DateofBirth: flowVars.OffenderDetails[$$].DateofBirth,
+	Street1: flowVars.OffenderDetails[$$].Street1,
+	Street2: flowVars.OffenderDetails[$$].Street2,
+	City: flowVars.OffenderDetails[$$].City,
+	State: flowVars.OffenderDetails[$$].State,
+	County: flowVars.OffenderDetails[$$].County,
+	CountyName: flowVars.OffenderDetails[$$].CountyName,
+	OffZip: flowVars.OffenderDetails[$$].OffZip,
+	OffRace: flowVars.OffenderDetails[$$].OffRace,
+	RaceDescription: flowVars.OffenderDetails[$$].RaceDescription,
+	Sex: flowVars.OffenderDetails[$$].Sex,
+	Height: flowVars.OffenderDetails[$$].Height,
+	Weight: flowVars.OffenderDetails[$$].Weight,
+	EmployerName: flowVars.OffenderDetails[$$].EmployerName,
+	SexOffRegFlag: flowVars.OffenderDetails[$$].SexOffRegFlag,
+	SexOffRegAgency: flowVars.OffenderDetails[$$].SexOffRegAgency,
+	SexOffRegAgencyName: flowVars.OffenderDetails[$$].SexOffRegAgencyName,
+	SexOffRegDate: flowVars.OffenderDetails[$$].SexOffRegDate,
+	CurrentlyWanted: flowVars.OffenderDetails[$$].CurrentlyWanted,
+	Error: $.errors[0].message
+} filter $.Error != null and $.Error !='']]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Convert to CSV format"/>
+
+                    <objectstore:store config-ref="ObjectStore__Connector_OffenderErrors" key="BatchInfo_#[server.nanoTime()]" value-ref="#[payload]" doc:name="ObjectStore : Store Offender Errors"/>
+                    <dw:transform-message doc:name="TM : Prepare Victim records in salesforce format">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.VictimDetails map ((payload01 , indexOfPayload01) -> {
+	PID__c: payload01.PID as :number as :string,
+	SBI_Number__c: payload01.SBINumber,
+	Charge_Sequence__c: payload01.ChargeSequence,
+	DUC_CJIS_Case_Number__c: payload01.DUCNumber,
+	Current_Case__c: payload01.CurrentCase,
+	First_Name__c: payload01.FirstName,
+	Last_Name__c: payload01.LastName,
+	(Birth_Date__c: payload01.BirthDate as :date {format: "yyyyMMdd"}) when payload01.BirthDate != null and payload01.BirthDate != '' and ( sizeOf trim payload01.BirthDate) == 8 ,
+	Victim_Type__c: payload01.VictimType,
+	Residence_Phone__c: payload01.ResidencePhone,
+	(Age__c: (trim payload01.Age ) as :number ) when payload01.Age != null and payload01.Age != "" and ((trim payload01.Age) matches /(\d+)/) and ( sizeOf trim payload01.Age) >= 1, 
+	Notification__c: payload01.Notification,
+	Business_Phone__c: payload01.BusinessPhone,
+	Address_1__c: payload01.Address1,
+	Address_2__c: payload01.Address2,
+	City__c: payload01.City,
+	State__c: payload01.State,
+	County__c: payload01.County,
+	County_Name__c: payload01.CountyName,
+	Zip_Code__c: payload01.ZipCode,
+	Parent_Name__c: payload01.ParentName,
+	Parent_Address_1__c: payload01.ParentAddress1,
+	Parent_Address_2__c: payload01.ParentAddress2,
+	Parent_City__c: payload01.ParentCity,
+	Parent_State__c: payload01.ParentState,
+	Parent_Zip__c: payload01.ParentZip,
+	Victim_Sequence__c: payload01.VictimSequence,
+	Business_Name__c: payload01.BusinessName,
+	CJIS_Offender_Information__r:
+	{		
+		Interface_External_Id__c: (payload01.PID as :number ) as :string
+	}
+})]]></dw:set-payload>
+                    </dw:transform-message>
+                    <choice doc:name="Choice">
+                        <when expression="#[payload.size() !=0]">
+                            <sfdc:create-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_CJIS_Victim__c" doc:name="Salesforce : Bulk Create Victim Records">
+                                <sfdc:objects ref="#[payload]"/>
+                            </sfdc:create-bulk>
+                            <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP: Save JobID">
+                                <add-message-property key="JobId" value="#[payload.jobId]"/>
+                                <add-message-property key="JobResponse" value="#[payload]"/>
+                            </message-properties-transformer>
+                            <until-successful maxRetries="50" millisBetweenRetries="5000" synchronous="true" doc:name="Until Successful">
+                                <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Upsert Result">
+                                    <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
+                                </sfdc:batch-result-stream>
+                            </until-successful>
+                            <object-to-string-transformer mimeType="application/xml" doc:name="O to S: Change Filestream to XML"/>
+                            <dw:transform-message doc:name="TM: Victim Error Details">
+                                <dw:set-payload><![CDATA[%input payload application/xml 
+%output application/csv header = false , separator = ",", quoteValues=true, escape="\""
+%function change(string3) ("PID") when string3 == 'PID__c'  otherwise (("Vendor Address") when string3 == 'Vendor_Address__c' otherwise (("Vendor ID") when string3 =="External_Interface_Id__c " otherwise (("Effective Date") when string3=='FSF_Effective_Date__c' otherwise ('Effective Status' when string3=='FSF_Active__c' otherwise ('Record Name' when string3=='Chart_Types__c' otherwise ('External ID' when string3=='External_Chart_Id__c' otherwise string3 )) ))))
+---
+payload.results.*result map {
+	PID: flowVars.VictimDetails[$$].PID,
+	SBINumber: flowVars.VictimDetails[$$].SBINumber,
+	ChargeSequence: flowVars.VictimDetails[$$].ChargeSequence,
+	DUCNumber: flowVars.VictimDetails[$$].DUCNumber,
+	CurrentCase: flowVars.VictimDetails[$$].CurrentCase,
+	FirstName: flowVars.VictimDetails[$$].FirstName,
+	LastName: flowVars.VictimDetails[$$].LastName,
+	BirthDate: flowVars.VictimDetails[$$].BirthDate,
+	VictimType: flowVars.VictimDetails[$$].VictimType,
+	ResidencePhone: flowVars.VictimDetails[$$].ResidencePhone,
+	Age: flowVars.VictimDetails[$$].Age,
+	Notification: flowVars.VictimDetails[$$].Notification,
+	BusinessPhone: flowVars.VictimDetails[$$].BusinessPhone,
+	Address1: flowVars.VictimDetails[$$].Address1,
+	Address2: flowVars.VictimDetails[$$].Address2,
+	City: flowVars.VictimDetails[$$].City,
+	State: flowVars.VictimDetails[$$].State,
+	County: flowVars.VictimDetails[$$].County,
+	CountyName: flowVars.VictimDetails[$$].CountyName,
+	ZipCode: flowVars.VictimDetails[$$].ZipCode,
+	ParentName: flowVars.VictimDetails[$$].ParentName,
+	ParentAddress1: flowVars.VictimDetails[$$].ParentAddress1,
+	ParentAddress2: flowVars.VictimDetails[$$].ParentAddress2,
+	ParentCity: flowVars.VictimDetails[$$].ParentCity,
+	ParentState: flowVars.VictimDetails[$$].ParentState,
+	ParentZip: flowVars.VictimDetails[$$].ParentZip,
+	VictimSequence: flowVars.VictimDetails[$$].VictimSequence,
+	BusinessName: flowVars.VictimDetails[$$].BusinessName,
+	'SFDC Error': ((change($.errors.fields) ) ++    ( ' ' ++ 'is Missing' ) when $.errors.statusCode == 'REQUIRED_FIELD_MISSING' otherwise ( (change($.errors.fields) ) ++ 'is of Invalid Format')) when $.errors.fields != null otherwise   
+	(('Offender Record (SBI: ' ++ flowVars.VictimDetails[$$].SBINumber ++ ' ) is not loaded into FOCUS due to validation issues. Hence, Victim record is discarded from further processing' ) when $.errors.statusCode == 'INVALID_FIELD' or $.errors.statusCode == 'DUPLICATE_VALUE' otherwise null )
+} filter $.'SFDC Error' != null and $.'SFDC Error' !='']]></dw:set-payload>
+                            </dw:transform-message>
+                            <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Convert to CSV format"/>
+                            <objectstore:store config-ref="ObjectStore__Connector_VictimErrors" key="BatchInfo_#[server.nanoTime()]" value-ref="#[payload]" doc:name="ObjectStore : Store Victim Errors"/>
+                            <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.JobId]" doc:name="SFDC: Close Job"/>
+                        </when>
+                        <otherwise>
+                            <logger message="There are no Victim records to load" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+                    <set-payload value="#[[]]" doc:name="Set Payload : Nullify Payload"/>
+
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>
+                    <objectstore:store config-ref="ObjectStore__Connector_CJISBatchTechnicalErrors" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="ObjectStore__Connector_CJISBatchTechnicalErrors" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+
+
+                </batch:commit>
+            </batch:step>
+            
+            
+        </batch:process-records>
+        <batch:on-complete>
+            <message-properties-transformer scope="session" doc:name="Message Properties">
+                <add-message-property key="TotalRecCount" value="#[0]"/>
+                <add-message-property key="AllCJISEErrors" value="#[&quot;&quot;]"/>
+                <add-message-property key="AllOffenderErrors" value="#[&quot;&quot;]"/>
+                <add-message-property key="AllVictimErrors" value="#[&quot;&quot;]"/>
+                <add-message-property key="InvalidRows" value="#[&quot;&quot;]"/>
+                <add-message-property key="TotalOffenderCount" value="#[0]"/>
+            </message-properties-transformer>
+            <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_TotalOffenderCount" doc:name="ObjectStore: Retrieve all Offender count"/>
+            <foreach doc:name="For Each Batch">
+                <set-variable variableName="Key" value="#[payload]" doc:name="FV: Store Key."/>
+
+
+                <objectstore:retrieve config-ref="ObjectStore__Connector_TotalOffenderCount" key="#[payload]" doc:name="ObjectStore Retrieve"/>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="TotalOffenderCount" value="#[(payload != null ? sessionVars.TotalOffenderCount + payload : sessionVars.TotalOffenderCount)]"/>
+                </message-properties-transformer>
+
+
+
+                <objectstore:remove config-ref="ObjectStore__Connector_TotalOffenderCount" key="#[Key]" ignoreNotExists="true" doc:name="ObjectStore : Remove Key" doc:description="Remove Key value pair once retrieved so that it will be empty for the next job."/>
+            </foreach>
+            
+            <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_InvalidRows" doc:name="ObjectStore: Retrieve all Invlaid Rows"/>
+            <foreach doc:name="For Each Batch">
+                <set-variable variableName="Key" value="#[payload]" doc:name="FV: Store Key."/>
+
+
+                <objectstore:retrieve config-ref="ObjectStore__Connector_InvalidRows" key="#[payload]" doc:name="ObjectStore Retrieve"/>
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="InvalidRows" value="#[((payload != null &amp;&amp; payload != &quot;&quot; &amp;&amp; (!payload.equals(&quot;&quot;))) ? sessionVars.InvalidRows + payload : sessionVars.InvalidRows)]"/>
+                </message-properties-transformer>
+
+
+                <objectstore:remove config-ref="ObjectStore__Connector_InvalidRows" key="#[Key]" ignoreNotExists="true" doc:name="ObjectStore : Remove Key" doc:description="Remove Key value pair once retrieved so that it will be empty for the next job."/>
+            </foreach>
+            
+        	<objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_RecordCount" doc:name="ObjectStore: Retrieve all count Keys"/>
+            <foreach doc:name="For Each Batch">
+                <set-variable variableName="Key" value="#[payload]" doc:name="FV: Store Key."/>
+
+                <objectstore:retrieve config-ref="ObjectStore__Connector_RecordCount" key="#[payload]" doc:name="ObjectStore Retrieve"/>
+
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="TotalRecCount" value="#[(payload != null ? sessionVars.TotalRecCount + payload : sessionVars.TotalRecCount)]"/>
+
+
+                </message-properties-transformer>
+
+                <objectstore:remove config-ref="ObjectStore__Connector_RecordCount" key="#[Key]" ignoreNotExists="true" doc:name="ObjectStore : Remove Key" doc:description="Remove Key value pair once retrieved so that it will be empty for the next job."/>
+            </foreach>
+        	<objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_CJISEErrors" doc:name="ObjectStore: Retrieve all CJIS E Error Keys"/>
+            <foreach doc:name="For Each Batch">
+                <set-variable variableName="Key" value="#[payload]" doc:name="FV: Store Key."/>
+                <objectstore:retrieve config-ref="ObjectStore__Connector_CJISEErrors" key="#[payload]" doc:name="ObjectStore Retrieve"/>
+
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="AllCJISEErrors" value="#[ (payload != null &amp;&amp; (!payload.equals(&quot;&quot;)) ? sessionVars.AllCJISEErrors + payload :  sessionVars.AllCJISEErrors)]"/>
+
+                </message-properties-transformer>
+
+                <objectstore:remove config-ref="ObjectStore__Connector_CJISEErrors" key="#[Key]" ignoreNotExists="true" doc:name="ObjectStore : Remove Key" doc:description="Remove Key value pair once retrieved so that it will be empty for the next job."/>
+            </foreach>
+
+            <choice doc:name="Choice : If there are any CJIS E Error records">
+                <when expression="#[sessionVars.AllCJISEErrors != &quot;&quot; &amp;&amp; sessionVars.AllCJISEErrors != null]">
+                    <set-payload value="#['PID,SBI,CJIS Message' + '\n' + sessionVars.AllCJISEErrors]" mimeType="application/csv" doc:name="Set Payload : Set CJIS E Error file"/>
+                    <flow-ref name="inf019-LogInboundErrorRecord_Subflow" doc:name="inf019-LogInboundErrorRecord_Subflow"/>
+                </when>
+                <otherwise>
+                    <logger message="'There are no CJIS E Error records'" level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+            <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_OffenderErrors" doc:name="ObjectStore: Retrieve all Offender Keys"/>
+            <foreach doc:name="For Each Batch">
+                <set-variable variableName="Key" value="#[payload]" doc:name="FV: Store Key."/>
+                <objectstore:retrieve config-ref="ObjectStore__Connector_OffenderErrors" key="#[payload]" doc:name="ObjectStore Retrieve"/>
+
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="AllOffenderErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot; &amp;&amp; (!payload.equals(&quot;&quot;)) ? sessionVars.AllOffenderErrors + payload : sessionVars.AllOffenderErrors)]"/>
+
+                </message-properties-transformer>
+
+
+                <objectstore:remove config-ref="ObjectStore__Connector_OffenderErrors" key="#[Key]" ignoreNotExists="true" doc:name="ObjectStore : Remove Key" doc:description="Remove Key value pair once retrieved so that it will be empty for the next job."/>
+            </foreach>
+            <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_VictimErrors" doc:name="ObjectStore: Retrieve all Victim Keys"/>
+            <foreach doc:name="For Each Batch">
+                <set-variable variableName="Key" value="#[payload]" doc:name="FV: Store Key."/>
+                <objectstore:retrieve config-ref="ObjectStore__Connector_VictimErrors" key="#[payload]" doc:name="ObjectStore Retrieve"/>
+
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties">
+                    <add-message-property key="AllVictimErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot; &amp;&amp; (!payload.equals(&quot;&quot;)) ? sessionVars.AllVictimErrors + payload : sessionVars.AllVictimErrors)]"/>
+
+                </message-properties-transformer>
+
+                <objectstore:remove config-ref="ObjectStore__Connector_VictimErrors" key="#[Key]" ignoreNotExists="true" doc:name="ObjectStore : Remove Key" doc:description="Remove Key value pair once retrieved so that it will be empty for the next job."/>
+            </foreach>
+            <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_CJISBatchTechnicalErrors" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys"/>
+            <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>
+
+            <foreach doc:name="For Each : Iterate over Exception Keys" doc:description="For Each : Iterate over Exception Keys">
+                <choice doc:name="Choice">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="ObjectStore__Connector_CJISBatchTechnicalErrors" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count"/>
+
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:description="Message Properties: Update Total SFDC Connection Error Count" doc:name="Message Properties: Update Total SFDC Connection Error Count">
+	                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+	                    </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="ObjectStore__Connector_CJISBatchTechnicalErrors" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details" doc:description="Exception ObjectStore : Retrive and Remove a record having Exception Details"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+                            <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+                        </message-properties-transformer>
+
+                    </otherwise>
+                </choice>
+            </foreach>
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if Exceptions occured" doc:description="Choice : Route to process Further if Exceptions occured
+If Exceptions occured flow is passed to a different branch which will handle clean up">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_CJISBatchTechnicalErrors" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="For Each : Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="ObjectStore__Connector_CJISBatchTechnicalErrors" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Removes all the enteries and Clean Object Store"/>
+
+
+                    </foreach>
+                    <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow"/>
+              </when>
+              <otherwise>
+                    <flow-ref name="inf019-LogCompletedTransactionWithDetails" doc:name="inf019-LogCompletedTransactionWithDetails"/>
+
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+            </choice>
+
+        </batch:on-complete>
+    </batch:job>
+
+
+
+    <sub-flow name="inf019-LogInboundErrorRecord_Subflow">
+        <set-session-variable variableName="ErrorAttachment" value="#[payload]" doc:name="Session Variable :  Set Error Attachment"/>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF019&quot;, &quot;InterfaceName&quot;: &quot;CJIS Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_CJISEErrors_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" doc:name="Set Payload :  Load Inbound Errors"/>
+        <logger message="'Before CJIS E Errors Load Insert'#[payload]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <remove-session-variable variableName="ErrorAttachment" doc:name="Session Variable : Remove ErrorAttachment variable"/>
+
+
+
+    </sub-flow>
+    <batch:job name="inf019-delete-offender-records-Batch" block-size="5000">
+        <batch:process-records>
+            <batch:step name="Batch_Step">
+                <batch:commit size="5000" doc:name="Batch Commit">
+                    <choice doc:name="Choice">
+                        <when expression="#[payload.size() !=0]">
+                            <sfdc:hard-delete-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_CJIS_Offender_Information__c" doc:name="Salesforce : Bulk Delete Offender Records">
+                                <sfdc:objects ref="#[payload]"/>
+                            </sfdc:hard-delete-bulk>
+                            <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP: Save JobID">
+                                <add-message-property key="JobId" value="#[payload.jobId]"/>
+                                <add-message-property key="JobResponse" value="#[payload]"/>
+                            </message-properties-transformer>
+                            <until-successful maxRetries="50" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful">
+                                <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Upsert Result">
+                                    <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
+                                </sfdc:batch-result-stream>
+                            </until-successful>
+                            <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.JobId]" doc:name="SFDC: Close Job"/>
+                        </when>
+                        <otherwise>
+                            <logger message="No CJIS Offenders/Victims to delete" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+
+
+                    <set-payload value="#[[]]" doc:name="Set Payload : nullify the payload"/>
+                </batch:commit>
+            </batch:step>
+        </batch:process-records>
+        <batch:on-complete>
+            <logger message="'Offender Records are deleted successfully'" level="INFO" doc:name="Logger"/>
+            <mulerequester:request resource="sftp://${sftp.cjisload.transaction.username}:${sftp.cjisload.transaction.password}@${sftp.cjisload.transaction.host}:${sftp.cjisload.transaction.port}${sftp.cjisload.transaction.path}?connector=SFTPOverrideDelete&amp;myfilename=${sftp.cjisload.transaction.filename}" doc:name="Mule Requester : Get file from SFTP and delete it"/>
+        <transformer ref="CJISLoadCustomTransformer" doc:name="Transformer Reference"/>
+        <choice doc:name="Choice : If there are any valid records">
+            <when expression="#[payload.hasNext() == true]">
+
+                <batch:execute name="inf019-cjis-load-VictimLoad-Batch" doc:name="inf019-cjis-load-VictimLoad-Batch"/>
+            </when>
+            <otherwise>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF019&quot;, &quot;InterfaceName&quot;: &quot;CJIS Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_CJISLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;CJI Load File Backup&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;No valid records found in the file&quot;,&quot;ExceptionType&quot;:&quot;System&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+                <logger message="'Completed Transaction Payload'#[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        </batch:on-complete>
+    </batch:job>
+	<flow name="Interface-handle-batch-errors-Flow">
+        <!-- <logger message="FlowVars From Flow #[flowVars]" level="INFO" doc:name="Logger"/> -->
+   		<validation:custom-validator doc:name="Validation" exceptionClass="org.mule.api.ConnectionException" class="gov.delaware.validation.DelawareValidator" config-ref="Validation_Configuration"/>
+        <!-- <logger message="After Validation : In flow" level="INFO" doc:name="Logger"/> -->
+         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/> 
+    </flow>
+
+</mule>

@@ -1,0 +1,37 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {},
+        "flowVariables": {
+            "RunawayDetails": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "RunawayDetails"
+            },
+            "FacilityWorkerDetails": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "FacilityWorkerxml"
+            },
+            "CWDetails": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "FacilityWorkerxml"
+            }
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "FinalCSV"
+        },
+        "flowVariables": {
+            "DataSet2SBIMissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "ErrorCSV"
+            },
+            "DataSet2PIDMissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "ErrorCSV"
+            }
+        }
+    },
+    "id": "db9cf365-5d66-4401-bfe8-0422d659e862",
+    "version": "5.2.0.0"
+}

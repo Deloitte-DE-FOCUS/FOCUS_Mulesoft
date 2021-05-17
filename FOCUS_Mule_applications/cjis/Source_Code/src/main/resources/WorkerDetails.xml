@@ -1,0 +1,13 @@
+<root>
+  <record>
+    <OwnerId>1234567890</OwnerId>
+    <WorkerPersonalDetails>
+    	<FirstName>bala</FirstName>
+    	<LastName>Konakalla</LastName>
+    	<MiddleName>K</MiddleName>
+    	<PhoneNumber>1231231234</PhoneNumber>
+    	<PersonalEmailAddress>bbc@abc.com</PersonalEmailAddress>
+    	<EmailAddress>abc@bbc.com</EmailAddress>
+    </WorkerPersonalDetails>    
+  </record>
+ </root>

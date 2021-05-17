@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions targetNamespace="https://appsprod.deljis.state.de.us/WebServices/DELJISServices" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:s="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:tns="https://appsprod.deljis.state.de.us/WebServices/DELJISServices" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:types>
+    <s:schema elementFormDefault="qualified" targetNamespace="https://appsprod.deljis.state.de.us/WebServices/DELJISServices" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:s="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:tns="https://appsprod.deljis.state.de.us/WebServices/DELJISServices" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+      <s:element name="checkLogin">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="cjisid" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="cjispw" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="checkLoginResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="checkLoginResult" type="tns:checkLoginData"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="checkLoginData">
+        <s:sequence>
+          <s:element maxOccurs="1" minOccurs="0" name="AccessDMV" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="ChureDELJIS" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="ChureAG" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="ChureSBICertified" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="SupervisorStatus" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="CognosKey1" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="CognosKey2" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="ComplaintFlag" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="AgIntakeLevel" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="SorFlag" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="EticketFlag" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="FullName" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="ErrorDesc" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="AgencyID" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="BadgeNumber" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="ReferralUnit" type="s:string"/>
+          <s:element maxOccurs="1" minOccurs="0" name="ErrorCode" type="s:string"/>
+        </s:sequence>
+      </s:complexType>
+      <s:element name="changePassword">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="cjisid" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="cjispw" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="newcjispw" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="changePasswordResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="changePasswordResult" type="tns:checkLoginData"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendDQX">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="acf2UID" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="acf2Pwd" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="licNo" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="licState" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendDQXResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="sendDQXResult" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendRQX">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="UID" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="Pwd" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="tag" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="tagtype" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="tagyear" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="vin" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="vehmake" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="vehyear" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="state" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendRQXResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="sendRQXResult" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendFQX">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="acf2UID" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="acf2Pwd" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="destinationState" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="purposeCode" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="attention" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="SBINo" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendFQXResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="sendFQXResult" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendFQ">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="acf2UID" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="acf2Pwd" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="destinationState" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="purposeCode" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="attention" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="SBINo" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendFQResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="sendFQResult" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendDQ">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="acf2UID" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="acf2Pwd" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="licNo" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="licState" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendDQResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="sendDQResult" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendRQ">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="UID" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="Pwd" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="tag" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="tagtype" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="tagyear" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="vin" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="vehmake" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="vehyear" type="s:string"/>
+            <s:element maxOccurs="1" minOccurs="0" name="state" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="sendRQResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element maxOccurs="1" minOccurs="0" name="sendRQResult" type="s:string"/>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+    </s:schema>
+  </wsdl:types>
+  <wsdl:message name="checkLoginSoapIn">
+    <wsdl:part name="parameters" element="tns:checkLogin">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="checkLoginSoapOut">
+    <wsdl:part name="parameters" element="tns:checkLoginResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="changePasswordSoapIn">
+    <wsdl:part name="parameters" element="tns:changePassword">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="changePasswordSoapOut">
+    <wsdl:part name="parameters" element="tns:changePasswordResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendDQXSoapIn">
+    <wsdl:part name="parameters" element="tns:sendDQX">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendDQXSoapOut">
+    <wsdl:part name="parameters" element="tns:sendDQXResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendRQXSoapIn">
+    <wsdl:part name="parameters" element="tns:sendRQX">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendRQXSoapOut">
+    <wsdl:part name="parameters" element="tns:sendRQXResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendFQXSoapIn">
+    <wsdl:part name="parameters" element="tns:sendFQX">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendFQXSoapOut">
+    <wsdl:part name="parameters" element="tns:sendFQXResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendFQSoapIn">
+    <wsdl:part name="parameters" element="tns:sendFQ">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendFQSoapOut">
+    <wsdl:part name="parameters" element="tns:sendFQResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendDQSoapIn">
+    <wsdl:part name="parameters" element="tns:sendDQ">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendDQSoapOut">
+    <wsdl:part name="parameters" element="tns:sendDQResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendRQSoapIn">
+    <wsdl:part name="parameters" element="tns:sendRQ">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="sendRQSoapOut">
+    <wsdl:part name="parameters" element="tns:sendRQResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:portType name="mainMethodsSoap">
+    <wsdl:operation name="checkLogin">
+<wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Web method for retrieving acf2 login validation</wsdl:documentation>
+      <wsdl:input message="tns:checkLoginSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:checkLoginSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="changePassword">
+<wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Web method for changing acf2 password</wsdl:documentation>
+      <wsdl:input message="tns:changePasswordSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:changePasswordSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendDQX">
+<wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Send DQX (XML) transaction to the middleware/switch</wsdl:documentation>
+      <wsdl:input message="tns:sendDQXSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:sendDQXSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendRQX">
+<wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Send RQX (XML) transaction to the middleware/switch</wsdl:documentation>
+      <wsdl:input message="tns:sendRQXSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:sendRQXSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendFQX">
+<wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Send FQX transaction to the middleware/switch</wsdl:documentation>
+      <wsdl:input message="tns:sendFQXSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:sendFQXSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendFQ">
+<wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Send FQ transaction to the middleware/switch</wsdl:documentation>
+      <wsdl:input message="tns:sendFQSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:sendFQSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendDQ">
+<wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Send DQ transaction to the middleware/switch</wsdl:documentation>
+      <wsdl:input message="tns:sendDQSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:sendDQSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendRQ">
+<wsdl:documentation xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">Send RQ transaction to the middleware/switch</wsdl:documentation>
+      <wsdl:input message="tns:sendRQSoapIn">
+    </wsdl:input>
+      <wsdl:output message="tns:sendRQSoapOut">
+    </wsdl:output>
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="mainMethodsSoap12" type="tns:mainMethodsSoap">
+    <soap12:binding transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="checkLogin">
+      <soap12:operation soapAction="https://appsprod.deljis.state.de.us/WebServices/DELJISServices/checkLogin" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="changePassword">
+      <soap12:operation soapAction="https://appsprod.deljis.state.de.us/WebServices/DELJISServices/changePassword" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendDQX">
+      <soap12:operation soapAction="https://appsprod.deljis.state.de.us/WebServices/DELJISServices/sendDQX" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendRQX">
+      <soap12:operation soapAction="https://appsprod.deljis.state.de.us/WebServices/DELJISServices/sendRQX" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendFQX">
+      <soap12:operation soapAction="https://appsprod.deljis.state.de.us/WebServices/DELJISServices/sendFQX" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendFQ">
+      <soap12:operation soapAction="https://appsprod.deljis.state.de.us/WebServices/DELJISServices/sendFQ" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendDQ">
+      <soap12:operation soapAction="https://appsprod.deljis.state.de.us/WebServices/DELJISServices/sendDQ" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="sendRQ">
+      <soap12:operation soapAction="https://appsprod.deljis.state.de.us/WebServices/DELJISServices/sendRQ" style="document"/>
+      <wsdl:input>
+        <soap12:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="mainMethods">
+    <wsdl:port name="mainMethodsSoap12" binding="tns:mainMethodsSoap12">
+      <soap12:address location="https://ws.delaware.gov:1203/deljis/mainMethods"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>

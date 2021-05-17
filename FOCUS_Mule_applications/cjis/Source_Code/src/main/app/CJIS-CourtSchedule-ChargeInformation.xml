@@ -1,0 +1,746 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:context="http://www.springframework.org/schema/context" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ss="http://www.springframework.org/schema/security" 
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd">
+   <!--  <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   	 <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans>  -->  
+    <spring:beans>      
+        <ss:authentication-manager alias="authenticationManager">
+          <ss:authentication-provider>
+            <ss:user-service id="userService">
+              <ss:user name="${focus.cjis.username}" password="${focus.cjis.password}" authorities="ROLE_ADMIN" />
+            </ss:user-service>
+          </ss:authentication-provider>
+        </ss:authentication-manager>
+    </spring:beans>
+    <mule-ss:security-manager name="federal_batch_security_manager" doc:name="Spring Security Provider">
+      <mule-ss:delegate-security-provider name="memory-provider" delegate-ref="authenticationManager" />
+    </mule-ss:security-manager>    
+    <ws:consumer-config name="Web_Service_Consumer" service="DELJISFocusService" port="DELJISSOAP12Port" serviceAddress="${cjis.schedulechargeswsdl}" wsdlLocation="DELJISFocusService.wsdl" doc:name="Web Service Consumer"/>
+    <http:listener-config name="HTTP_Listener_Configuration" host="${http.host}" port="${https.cjis.port}" doc:name="HTTP Listener Configuration" protocol="HTTPS">
+        <tls:context>
+            <tls:key-store type="jks" path="focus_interface.jks" alias="focus_interfaces" keyPassword="password" password="password"/>
+        </tls:context>
+    </http:listener-config>
+    
+     
+    <flow name="courtscheuduleFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration_testFramework" path="/" allowedMethods="POST" doc:name="HTTP"/>
+        <http:basic-security-filter realm="mule-realm"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <json:json-to-xml-transformer mimeType="application/xml" doc:name="JSON to XML"/>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="TransactionID" value="#[xpath3('/ScheduleRequest/interfaceTransId')]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+            <when expression="xpath3('/ScheduleRequest/interfaceName')=='Charge'">
+            	<message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Name">
+		            <add-message-property key="filename" value="ChargeRequest.xml"/>
+		        </message-properties-transformer>
+		        <enricher doc:name="Message Enricher">
+		            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+		            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+		        </enricher>
+                <flow-ref name="ChargeInfo" doc:name="ChargeInfo"/>
+            </when>
+            <when expression="xpath3('/ScheduleRequest/interfaceName')=='Schedule'">
+            	<message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Name">
+		            <add-message-property key="filename" value="ScheduleRequest.xml"/>
+		        </message-properties-transformer>
+		        <enricher doc:name="Message Enricher">
+		            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+		            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+		        </enricher>
+                <flow-ref name="ScheduleInfo" doc:name="ScheduleInfo"/>
+            </when>
+            <otherwise>
+                <logger message="An Error has occured" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="ScheduleInfo">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="SbiNumber" value="#[xpath3('//ducOrsbiNumbers')]"/>
+            <add-message-property key="UserName" value="#[xpath3('//UserID')]"/>
+            <add-message-property key="StartDate" value="#[xpath3('//StartDate')]"/>
+            <add-message-property key="EndDate" value="#[xpath3('//EndDate')]"/>
+        </message-properties-transformer>
+        <set-variable variableName="FinalXMLOutput" value="" doc:name="Variable"/>
+        <logger message="#[flowVars.SbiNumber]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="dec867fb-5396-488c-bd9f-56278da9eb67" doc:name="Transform Message : Split by ,">
+            <dw:input-variable doc:sample="sample_data\string.dwl" variableName="SbiNumber"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	SBIList : flowVars.SbiNumber splitBy ","
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <foreach doc:name="For Each" collection="#[payload.SBIList]">
+            <logger message="'In Schedule Request SBI:'#[payload]" level="INFO" doc:name="Logger"/>
+            <set-variable variableName="currentSBINumber" value="#[payload]" doc:name="Variable : Store Current SBI Number"/>
+            <dw:transform-message metadata:id="1f809ccd-806e-4e89-b7eb-362bed7b2ad9" doc:name="Transform Message :  Prepare xml before sending to CJIS">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 urn:com-softwareag-entirex-rpc:DELJIS
+---
+{
+	ns0#getScheduleInformation: {
+		ScheduleRequest: {
+			UserID: flowVars.UserName,
+			SbiNumber: trim payload,
+			StartDate: flowVars.StartDate,
+			EndDate: flowVars.EndDate
+		}
+	}
+}]]></dw:set-payload>
+            </dw:transform-message>
+
+
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            <ws:consumer config-ref="Web_Service_Consumer" operation="getScheduleInformation" doc:name="Web Service Consumer"/>
+            <mulexml:dom-to-xml-transformer mimeType="application/xml" doc:name="DOM to XML"/>
+
+            <logger level="INFO" doc:name="Logger : Response from CJIS" message="#[payload]"/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.FinalXMLOutput!=&quot;&quot;]">
+                    <set-variable variableName="FinalXMLOutput" value="#[flowVars.FinalXMLOutput]" mimeType="application/xml" doc:name="Variable"/>
+                    <choice doc:name="Choice">
+                        <when expression="#[dw(&quot;payload.getScheduleInformationResponse.ScheduleResponse.ResponseResult.ResponseMessage&quot;)=='OK']">
+                            <dw:transform-message metadata:id="4c7dc0c1-fab2-42d1-8cfa-8e80cbcca41e" doc:name="payload_FinalXML : Append Previous Details">
+                                <dw:input-payload mimeType="application/xml"/>
+                                <dw:input-variable mimeType="application/xml" variableName="FinalXMLOutput"/>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%input FinalXMLOutput application/xml
+%output application/xml inlineCloseOn = "empty"
+
+---
+      ScheduleResponse: 
+      {
+            ScheduleInformations:
+            {
+                  (flowVars.FinalXMLOutput.ScheduleResponse.ScheduleInformations.*ScheduleInformation map ((plrecord, indexOfplrecord) -> 
+                        {
+                              ScheduleInformation: 
+                              {
+                                    SbiNumber: plrecord.SbiNumber default "",
+                                    ScheduleDate: plrecord.ScheduleDate default "",
+                                    ScheduleTime: plrecord.ScheduleTime default "",
+                                    Court: plrecord.Court default "",
+                                    Event: plrecord.Event default "",
+                                    Type: plrecord.Type default "",
+                                    Disposition: plrecord.Disposition default "",
+                                    JudgeName: plrecord.JudgeName default "",
+                                    UniformCaseNumber: plrecord.UniformCaseNumber default "",
+                                    NoteIndicator: plrecord.NoteIndicator default "",
+                                    PersonSurName: plrecord.PersonSurName default "",
+							        PersonMiddleName: plrecord.PersonMiddleName default "",
+							        PersonGivenName: plrecord.PersonGivenName default "",
+                                    ErrorCode: plrecord.ErrorCode,
+	        						ErrorDescription: plrecord.ErrorDescription,
+                                    Notes: plrecord.Notes default ""
+                              }
+                        }
+                        )
+                  ),    
+                  (payload.getScheduleInformationResponse.ScheduleResponse.ScheduleInformations.*ScheduleInformation map {             
+                        ScheduleInformation: 
+                        {
+                              SbiNumber: $.SbiNumber default "",
+                              ScheduleDate: $.ScheduleDate default "",
+                              ScheduleTime: $.ScheduleTime default "",
+                              Court:$.Court default "",
+                              Event: $.Event default "",
+                              Type: $.Type default "",
+                              Disposition: $.Disposition default "",
+                              JudgeName: $.JudgeName default "",
+                              UniformCaseNumber: $.UniformCaseNumber default "",
+                              NoteIndicator: $.NoteIndicator default "",
+                              PersonSurName: $.Person.PersonName.PersonSurName default "",
+						      PersonMiddleName: $.Person.PersonName.PersonMiddleName default "",
+						      PersonGivenName: $.Person.PersonName.PersonGivenName default "",
+                              ErrorCode: "",
+    						  ErrorDescription: "",
+                              (Notes: lookup("CJISNotesFlow", $)) when $.NoteIndicator == 'Y' 
+                        }                 
+                  })                                              
+            }
+      }]]></dw:set-payload>
+                            </dw:transform-message>
+                        </when>
+                        <otherwise>
+                            <dw:transform-message doc:name="Transform Message :  Error File">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%input FinalXMLOutput application/xml
+%output application/xml inlineCloseOn = "empty"
+
+---
+      ScheduleResponse: 
+      {
+            ScheduleInformations:
+            {
+                  (flowVars.FinalXMLOutput.ScheduleResponse.ScheduleInformations.*ScheduleInformation map ((plrecord, indexOfplrecord) -> 
+                        {
+                              ScheduleInformation: 
+                              {
+                                    SbiNumber: plrecord.SbiNumber default "",
+                                    ScheduleDate: plrecord.ScheduleDate default "",
+                                    ScheduleTime: plrecord.ScheduleTime default "",
+                                    Court: plrecord.Court default "",
+                                    Event: plrecord.Event default "",
+                                    Type: plrecord.Type default "",
+                                    Disposition: plrecord.Disposition default "",
+                                    JudgeName: plrecord.JudgeName default "",
+                                    UniformCaseNumber: plrecord.UniformCaseNumber default "",
+                                    NoteIndicator: plrecord.NoteIndicator default "",
+                                    PersonSurName: plrecord.PersonSurName default "",
+							        PersonMiddleName: plrecord.PersonMiddleName default "",
+							        PersonGivenName: plrecord.PersonGivenName default "",
+                                    ErrorCode: plrecord.ErrorCode,
+	        						ErrorDescription: plrecord.ErrorDescription,
+                                    Notes: plrecord.Notes default ""
+                              }
+                        }
+                        )
+                  ),    
+                               
+	                ScheduleInformation: 
+	                {
+	                      SbiNumber: flowVars.currentSBINumber default "",
+	                      ScheduleDate: "",
+	                      ScheduleTime: "",
+	                      Court: "",
+	                      Event: "",
+	                      Type: "",
+	                      Disposition: "",
+	                      JudgeName:"",
+	                      UniformCaseNumber: "",
+	                      NoteIndicator: "",
+	                      PersonSurName: "",
+					      PersonMiddleName: "",
+					      PersonGivenName: "",
+	                      ErrorCode: payload.getScheduleInformationResponse.ScheduleResponse.ResponseResult.ResponseStatus,
+	        			  ErrorDescription: payload.getScheduleInformationResponse.ScheduleResponse.ResponseResult.ResponseMessage
+	                }                                         
+            }
+      }]]></dw:set-payload>
+                            </dw:transform-message>
+                        </otherwise>
+                    </choice>
+
+                </when>
+                <otherwise>
+                    <choice doc:name="Choice">
+                        <when expression="#[dw(&quot;payload.getScheduleInformationResponse.ScheduleResponse.ResponseResult.ResponseMessage&quot;)=='OK']">
+                            <dw:transform-message metadata:id="a81bb3a7-e4ad-4c73-9ada-eca77f89add2" doc:name="Transform Message : First Record">
+                                <dw:input-payload doc:sample="C:\Users\hechada\Desktop\Mulesoft\Data Load\CJISCourtSchedule.xml" mimeType="application/xml"/>
+                                <dw:input-variable variableName="FinalXMLOutput"/>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml inlineCloseOn = "empty"
+---
+ScheduleResponse:
+{
+	ScheduleInformations:
+    {
+    	(payload.getScheduleInformationResponse.ScheduleResponse.ScheduleInformations.*ScheduleInformation map {             
+         ScheduleInformation: 
+         {
+         	SbiNumber: $.SbiNumber default "",
+            ScheduleDate: $.ScheduleDate default "",
+            ScheduleTime: $.ScheduleTime default "",
+            Court:$.Court default "",
+            Event: $.Event default "",
+            Type: $.Type default "",
+            Disposition: $.Disposition default "",
+            JudgeName: $.JudgeName default "",
+            UniformCaseNumber: $.UniformCaseNumber default "",
+            NoteIndicator: $.NoteIndicator default "",
+            PersonSurName: $.Person.PersonName.PersonSurName default "",
+	        PersonMiddleName: $.Person.PersonName.PersonMiddleName default "",
+	        PersonGivenName: $.Person.PersonName.PersonGivenName default "",
+            ErrorCode: "",
+            ErrorDescription: "",
+            (Notes: lookup("CJISNotesFlow", $)) when $.NoteIndicator == 'Y'           
+          }                 
+          })                                  
+    }
+}]]></dw:set-payload>
+                            </dw:transform-message>
+                        </when>
+                        <otherwise>
+                            <dw:transform-message doc:name="Transform Message : Error File">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml inlineCloseOn = "empty"
+---
+ScheduleResponse:
+{
+	ScheduleInformations:
+    {
+         ScheduleInformation: 
+         {
+         	SbiNumber: flowVars.currentSBINumber,
+         	ScheduleDate: "",
+	        ScheduleTime: "",
+	        Court: "",
+	        Event: "",
+	        Type: "",
+	        Disposition: "",
+	        JudgeName: "",
+	        UniformCaseNumber: "",
+	        NoteIndicator: "",
+	        PersonSurName: "" ,
+	        PersonMiddleName: "",
+	        PersonGivenName: "", 
+	        ErrorCode: payload.getScheduleInformationResponse.ScheduleResponse.ResponseResult.ResponseStatus,
+	        ErrorDescription: payload.getScheduleInformationResponse.ScheduleResponse.ResponseResult.ResponseMessage
+     	}                                  
+    }
+}
+
+]]></dw:set-payload>
+                            </dw:transform-message>
+                        </otherwise>
+                    </choice>
+
+                </otherwise>
+            </choice>
+            <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+            <set-variable variableName="FinalXMLOutput" value="#[payload]" doc:name="Variable" mimeType="application/xml"/>
+        </foreach>
+
+        <set-payload value="#[flowVars.FinalXMLOutput]" mimeType="application/json" doc:name="Set Payload"/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties">
+            <add-message-property key="filename" value="ScheduleResponse.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <dw:transform-message doc:name="TM : Prepare JSON Format Data">
+            <dw:input-payload mimeType="application/xml" doc:sample="sample_data\empty_1.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/json
+---
+ {
+	"ScheduleResponse" : {
+		 "ScheduleInformations" : {
+		   "ScheduleInformation" : payload.ScheduleResponse.ScheduleInformations.*ScheduleInformation map {
+				($ mapObject {
+					  ($$ as :string) : (($) when (($$ as :string) != "Notes") otherwise (
+							( (
+								{
+								"Notes" : {
+									  "Note" : {
+											"Details" : $.Note.*Details 
+									  }
+								}
+								
+								}
+							  ) when ((($ != null) and ($ is :object)) ) otherwise null)
+							)
+							)
+					  }
+				)
+		   } 
+		 }		   
+	 }                                           
+}
+
+         ]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="Final Payload value end: #[payload]" level="INFO" doc:name="Logger"/>
+
+    </sub-flow>
+    <sub-flow name="ChargeInfo">
+        <message-properties-transformer doc:name="Message Properties" scope="invocation">
+            <add-message-property key="DUCNumbers" value="#[xpath3('//ducOrsbiNumbers')]"/>
+            <add-message-property key="UserId" value="#[xpath3('//UserID')]"/>
+
+        </message-properties-transformer>
+        <set-variable variableName="FinalXMLOutput" value="" doc:name="Variable"/>
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	ducNumberList : flowVars.DUCNumbers splitBy ','
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <foreach doc:name="For Each" collection="#[payload.ducNumberList]">
+            <logger message="'In Charge request DUC'#[payload]" level="INFO" doc:name="Logger"/>
+            <set-variable variableName="currentDUCNumber" value="#[payload]" doc:name="Variable : Set Current DUC Number"/>
+            <dw:transform-message metadata:id="4da86f11-2aac-42a0-8fb3-f62234f78ee1" doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 urn:com-softwareag-entirex-rpc:DELJIS
+---
+{
+	ns0#getChargeInformation: {
+		ChargeRequest: {
+			UserID: flowVars.UserId,
+			CaseNumber: trim payload
+		}
+	}
+}]]></dw:set-payload>
+            
+            </dw:transform-message>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            <ws:consumer config-ref="Web_Service_Consumer" operation="getChargeInformation" doc:name="ScheduleInfo_Web Service Consumer"/>
+
+            <mulexml:dom-to-xml-transformer mimeType="application/xml" doc:name="DOM to XML"/>
+
+
+            <logger message="'After Charge Response'#[payload]" level="INFO" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.FinalXMLOutput!=&quot;&quot;]">
+                    <set-variable variableName="FinalXMLOutput" value="#[flowVars.FinalXMLOutput]" mimeType="application/xml" doc:name="Variable"/>
+                    <choice doc:name="Choice">
+                        <when expression="#[dw(&quot;payload.getChargeInformationResponse.ChargeResponse.ResponseResult.ResponseMessage&quot;)=='OK']">
+                            <dw:transform-message metadata:id="202bca58-94bf-4512-86a7-e6dabf0dd9ea" doc:name="Transform Message : Charge Response Multiple records">
+                                <dw:input-payload mimeType="application/xml"/>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%input FinalXMLOutput application/xml
+%output application/xml inlineCloseOn = "empty"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+
+---
+      ChargeResponse: 
+      {
+            ChargeInformations:
+            {
+                  (flowVars.FinalXMLOutput.ChargeResponse.ChargeInformations.*ChargeInformation map ((plrecord, indexOfplrecord) -> 
+                        {
+                              ChargeInformation: 
+                              {
+                                    SbiNumber: plrecord.SbiNumber default "",
+                                    SbiSequence: plrecord.SbiSequence default "",
+                                    PersonSurName: plrecord.PersonSurName default "",
+									PersonMiddleName: plrecord.PersonMiddleName default "",
+									PersonGivenName: plrecord.PersonGivenName default "",
+									UniformCaseNumber: plrecord.UniformCaseNumber default "",
+									ChargeSequenceID: plrecord.ChargeSequenceID default "",
+									StatuteRank: plrecord.StatuteRank default "",
+									ArrestDate: plrecord.ArrestDate default "",
+									Statute: plrecord.Statute default "",
+									StatuteDescription: plrecord.StatuteDescription default "",
+									DispositionDate: plrecord.DispositionDate default "",
+									CourtDisposition: plrecord.CourtDisposition default "",
+									DispositionLiteral: plrecord.DispositionLiteral default "",
+									FinalDispositionStatus: plrecord.FinalDispositionStatus default "",
+									FinalDispositionStatusLiteral: plrecord.FinalDispositionStatusLiteral default "",
+									DispositionAgency: plrecord.DispositionAgency default "",
+									DispositionAgencyName: plrecord.DispositionAgencyName default "",
+									ErrorCode: plrecord.ErrorCode default "",
+									ErrorDescription: plrecord.ErrorDescription default ""
+			        
+                              }
+                        }
+                        )
+                  ),    
+
+				(payload.getChargeInformationResponse.ChargeResponse.ChargeInformations.*ChargeInformation map {             
+				 ChargeInformation: 
+				 {
+					SbiNumber: $.SbiNumber default "",
+					SbiSequence: $.SbiSequence default "",
+					PersonSurName: $.Person.PersonName.PersonSurName default "",
+					PersonMiddleName: $.Person.PersonName.PersonMiddleName[0..0] when $.Person.PersonName.PersonMiddleName != null and (sizeOf $.Person.PersonName.PersonMiddleName) > 1 otherwise $.Person.PersonName.PersonMiddleName default "",
+					PersonGivenName: $.Person.PersonName.PersonGivenName default "",
+					UniformCaseNumber: $.UniformCaseNumber default "",
+					ChargeSequenceID: $.ChargeSequenceID default "",
+					StatuteRank: $.StatuteRank default "",
+					ArrestDate: $.ArrestDate default "",
+					Statute: ($.Statute ++ pad(" ",(14 - sizeOf $.Statute ))) when $.Statute != null and $.Statute != "" otherwise "",
+					StatuteDescription: $.StatuteDescription default "",
+					DispositionDate: $.CourtAction.DispositionDate default "",
+					CourtDisposition: $.CourtAction.CourtDisposition default "",
+					DispositionLiteral: $.CourtAction.DispositionLiteral default "",
+					FinalDispositionStatus: $.CourtAction.FinalDispositionStatus default "",
+					FinalDispositionStatusLiteral: $.CourtAction.FinalDispositionStatusLiteral default "",
+					DispositionAgency: $.CourtAction.DispositionAgency default "",
+					DispositionAgencyName: $.CourtAction.DispositionAgencyName default "",
+					ErrorCode: "",
+					ErrorDescription: ""
+			        
+				  }                 
+				} filter payload.getChargeInformationResponse.ChargeResponse.ChargeInformations.*ChargeInformation[$$].UniformCaseNumber != "" )                                   
+            }
+      }]]></dw:set-payload>
+                            </dw:transform-message>
+                        </when>
+                        <otherwise>
+                            <dw:transform-message doc:name="Transform Message : Charge Response Multiple Errors">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%input FinalXMLOutput application/xml
+%output application/xml inlineCloseOn = "empty"
+
+---
+      ChargeResponse: 
+      {
+            ChargeInformations:
+            {
+                  (flowVars.FinalXMLOutput.ChargeResponse.ChargeInformations.*ChargeInformation map ((plrecord, indexOfplrecord) -> 
+                        {
+                              ChargeInformation: 
+                              {
+                                    SbiNumber: plrecord.SbiNumber default "",
+                                    SbiSequence: plrecord.SbiSequence default "",
+                                    PersonSurName: plrecord.PersonSurName default "",
+									PersonMiddleName: plrecord.PersonMiddleName default "",
+									PersonGivenName: plrecord.PersonGivenName default "",
+									UniformCaseNumber: plrecord.UniformCaseNumber default "",
+									ChargeSequenceID: plrecord.ChargeSequenceID default "",
+									StatuteRank: plrecord.StatuteRank default "",
+									ArrestDate: plrecord.ArrestDate default "",
+									Statute: plrecord.Statute default "",
+									StatuteDescription: plrecord.StatuteDescription default "",
+									DispositionDate: plrecord.DispositionDate default "",
+									CourtDisposition: plrecord.CourtDisposition default "",
+									DispositionLiteral: plrecord.DispositionLiteral default "",
+									FinalDispositionStatus: plrecord.FinalDispositionStatus default "",
+									FinalDispositionStatusLiteral: plrecord.FinalDispositionStatusLiteral default "",
+									DispositionAgency: plrecord.DispositionAgency default "",
+									DispositionAgencyName: plrecord.DispositionAgencyName default "",
+									ErrorCode: plrecord.ErrorCode default "",
+									ErrorDescription: plrecord.ErrorDescription default ""
+			        
+                              }
+                        }
+                        )
+                  ),    
+            
+				 ChargeInformation: 
+				 {
+					SbiNumber: "",
+					SbiSequence: "",
+					PersonSurName: "",
+					PersonMiddleName: "",
+					PersonGivenName: "",
+					UniformCaseNumber: flowVars.currentDUCNumber default "",
+					ChargeSequenceID: "",
+					StatuteRank: "",
+					ArrestDate: "",
+					Statute: "",
+					StatuteDescription: "",
+					DispositionDate: "",
+					CourtDisposition: "",
+					DispositionLiteral: "",
+					FinalDispositionStatus: "",
+					FinalDispositionStatusLiteral: "",
+					DispositionAgency: "",
+					DispositionAgencyName: "",
+					ErrorCode: payload.getChargeInformationResponse.ChargeResponse.ResponseResult.ResponseStatus,
+					ErrorDescription: payload.getChargeInformationResponse.ChargeResponse.ResponseResult.ResponseMessage
+					
+				  }                                                  
+            }
+      }]]></dw:set-payload>
+                            </dw:transform-message>
+                        </otherwise>
+                    </choice>
+
+                </when>
+                <otherwise>
+                    <choice doc:name="Choice">
+                        <when expression="#[dw(&quot;payload.getChargeInformationResponse.ChargeResponse.ResponseResult.ResponseMessage&quot;)=='OK']">
+                            <dw:transform-message metadata:id="f1393cd5-ee4a-4417-bebf-eda1d16e46ac" doc:name="TM: Charge Response First record : Success File">
+                                <dw:input-payload doc:sample="sample_data\getChargeInformationResponse.xml" mimeType="application/xml"/>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml inlineCloseOn = "empty"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+ChargeResponse: {
+	ChargeInformations: {
+		(payload.getChargeInformationResponse.ChargeResponse.ChargeInformations.*ChargeInformation map {
+			ChargeInformation: {
+				SbiNumber: $.SbiNumber default "",
+				SbiSequence: $.SbiSequence default "",
+				PersonSurName: $.Person.PersonName.PersonSurName default "",
+				PersonMiddleName: $.Person.PersonName.PersonMiddleName[0..0] when $.Person.PersonName.PersonMiddleName != null and (sizeOf $.Person.PersonName.PersonMiddleName) > 1 otherwise $.Person.PersonName.PersonMiddleName default "",
+				PersonGivenName: $.Person.PersonName.PersonGivenName default "",
+				UniformCaseNumber: $.UniformCaseNumber default "",
+				ChargeSequenceID: $.ChargeSequenceID default "",
+				StatuteRank: $.StatuteRank default "",
+				ArrestDate: $.ArrestDate default "",
+				Statute: ($.Statute ++ pad(" ",(14 - sizeOf $.Statute ))) when $.Statute != null and $.Statute != "" otherwise "",	
+				StatuteDescription: $.StatuteDescription default "",
+				DispositionDate: $.CourtAction.DispositionDate default "",
+				CourtDisposition: $.CourtAction.CourtDisposition default "",
+				DispositionLiteral: $.CourtAction.DispositionLiteral default "",
+				FinalDispositionStatus: $.CourtAction.FinalDispositionStatus default "",
+				FinalDispositionStatusLiteral: $.CourtAction.FinalDispositionStatusLiteral default "",
+				DispositionAgency: $.CourtAction.DispositionAgency default "",
+				DispositionAgencyName: $.CourtAction.DispositionAgencyName default ""
+			} 
+		} filter payload.getChargeInformationResponse.ChargeResponse.ChargeInformations.*ChargeInformation[$$].UniformCaseNumber != "" )
+ 	}
+}]]></dw:set-payload>
+                            </dw:transform-message>
+                        </when>
+                        <otherwise>
+                            <dw:transform-message doc:name="Transform Message : Charge Response First Error File">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+inlineCloseOn = "empty"
+---
+ChargeResponse: {
+	ChargeInformations: {
+			ChargeInformation: {
+				SbiNumber: "",
+				SbiSequence: "",
+				PersonSurName: "",
+				PersonMiddleName: "",
+				PersonGivenName: "",
+				UniformCaseNumber: flowVars.currentDUCNumber default "",
+				ChargeSequenceID: "",
+				StatuteRank: "",
+				ArrestDate: "",
+				Statute: "",
+				StatuteDescription: "",
+				DispositionDate: "",
+				CourtDisposition: "",
+				DispositionLiteral: "",
+				FinalDispositionStatus: "",
+				FinalDispositionStatusLiteral: "",
+				DispositionAgency: "",
+				DispositionAgencyName: "",
+				ErrorCode: payload.getChargeInformationResponse.ChargeResponse.ResponseResult.ResponseStatus,
+				ErrorDescription: payload.getChargeInformationResponse.ChargeResponse.ResponseResult.ResponseMessage
+			} 
+	} 
+		
+}]]></dw:set-payload>
+                            </dw:transform-message>
+                        </otherwise>
+                    </choice>
+
+                </otherwise>
+            </choice>
+            <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+            <set-variable variableName="FinalXMLOutput" value="#[payload]" mimeType="application/xml" doc:name="Variable"/>
+
+        </foreach>
+
+        <set-payload value="#[flowVars.FinalXMLOutput]" mimeType="application/xml" doc:name="Set Payload"/>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Name">
+            <add-message-property key="filename" value="ChargeResponse.xml"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CreateTransactionAttachment" doc:name="CreateTransactionAttachment"/>
+            <enrich source="#[flowVars.TransactionID]" target="#[flowVars.TransactionID]"/>
+        </enricher>
+        <dw:transform-message doc:name="TM : Prepare JSON Format Data">
+            <dw:input-payload mimeType="application/xml" doc:sample="sample_data\empty_2.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/json
+---
+ChargeResponse: {
+	ChargeInformations: {
+		ChargeInformation: payload.ChargeResponse.ChargeInformations.*ChargeInformation map  {
+			($ mapObject {
+				  ($$ as :string) : ($)
+				  }
+			)
+		} 
+ 	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+    </sub-flow>
+	<flow name="CJISNotesFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 urn:com-softwareag-entirex-rpc:DELJIS
+---
+{
+	ns0#getNotesInformation: {
+		ScheduleNotesRequest: {
+			UserID: flowVars.UserName default "",
+			CaseNumber: payload.UniformCaseNumber default "",
+			Event:payload.Event default "",
+			EventDate: payload.ScheduleDate default ""
+		}
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <ws:consumer config-ref="Web_Service_Consumer" operation="getNotesInformation" doc:name="ScheduleInfo_Web Service Consumer"/>
+        <mulexml:dom-to-xml-transformer mimeType="application/xml" doc:name="DOM to XML"/>
+        <logger message="'Notes Response'+#[payload]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="#[dw(&quot;payload.getNotesInformationResponse.ScheduleNotesResponse.ResponseResult.ResponseStatus&quot;)=='0']">
+                <dw:transform-message metadata:id="6cbe9279-da7f-40e4-ae50-10a3a5293a41" doc:name="Transform Message : transform Notes Details">
+                    <dw:input-payload doc:sample="sample_data\string_2.dwl" mimeType="application/xml"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	Note: {
+		(payload.getNotesInformationResponse.ScheduleNotesResponse.EventNotes.*string map ((string , indexOfString) -> {
+			Details: string
+		}))
+	}
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	Note: {
+		(payload.getNotesInformationResponse.ScheduleNotesResponse.EventNotes.*string map ((string , indexOfString) -> {
+			Details: ''
+		}))
+	}
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger : Display Notes Details"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+
+</mule>

@@ -1,0 +1,43 @@
+<root>
+  <record>
+    <OwnerId>w23456</OwnerId>
+  	<CaseNumber>w23456</CaseNumber>
+  	<caseId>a12345</caseId>
+    <SBI>a123456</SBI>
+    <PID>987654321</PID>
+    <Client_LastName>Test Owner</Client_LastName>
+    <Client_FirstName>bala</Client_FirstName>
+    <Client_MiddleInitial>k</Client_MiddleInitial>
+    <Client_Suffix>abc</Client_Suffix>
+    <Client_DOB>12-12-1983</Client_DOB>
+    <YRS_FacilityCode>1234</YRS_FacilityCode>
+    <AdmitDate>12-12-1983</AdmitDate>
+    <FW_FirstName>bala</FW_FirstName>
+    <FW_LastName>k</FW_LastName>
+    <FW_Phone>1231231234</FW_Phone>    
+    <CW_LastName>h</CW_LastName>
+    <CW_FirstName>h</CW_FirstName>
+    <CW_Phone>1231231234</CW_Phone>
+    <Auth_LeaveTo>Home Pass</Auth_LeaveTo>
+    <Auth_Leave_StartDt>12-12-1983</Auth_Leave_StartDt>
+    <Auth_Leave_StartTime>2016-10-19T13:05:19.000Z</Auth_Leave_StartTime>
+    <Auth_Leave_EndDt>12-12-1983</Auth_Leave_EndDt>
+    <Auth_Leave_EndTime>2016-10-19T13:05:19.000Z</Auth_Leave_EndTime>
+    <Auth_Leave_Days>12</Auth_Leave_Days>
+    <Runaway_LocationFrom>asdf</Runaway_LocationFrom>
+    <Runaway_StartDt>12-12-1983</Runaway_StartDt>
+    <Runaway_StartTime>2016-10-19T13:05:19.000Z</Runaway_StartTime>
+    <Runaway_EndDate>12-12-1983</Runaway_EndDate>
+    <Runaway_EndTime>2016-10-19T13:05:19.000Z</Runaway_EndTime>
+    <Runaway_Days>12</Runaway_Days>
+    <Notification_Email1>abc@bbc.com</Notification_Email1>
+    <Notification_Email2>abc@bbc.com</Notification_Email2>
+    <Notification_Email3>abc@bbc.com</Notification_Email3>
+    <Notification_Email4>abc@bbc.com</Notification_Email4>
+    <Notification_Email5>abc@bbc.com</Notification_Email5>
+    <DucNumbers>
+    	<Duc>1234</Duc>
+    	<Duc>3456</Duc>
+    </DucNumbers>    
+  </record>
+ </root>

@@ -1,0 +1,652 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:smtp="http://www.mulesoft.org/schema/mule/smtp" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/smtp http://www.mulesoft.org/schema/mule/smtp/current/mule-smtp.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <sftp:connector name="SFTP" validateConnections="true" doc:name="SFTP" autoDelete="false" duplicateHandling="addSeqNo">
+        <reconnect count="5"/>
+    </sftp:connector>
+    <sftp:connector name="SFTPRealtime" validateConnections="true" doc:name="SFTP"/>
+    <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   	<spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans>
+   	<spring:beans>
+         <spring:import resource="classpath:/queryframework.xml" /> 
+   	</spring:beans>
+   	<spring:beans>
+         <spring:import resource="classpath:/test-framework.xml" /> 
+   	</spring:beans>
+   	<configuration doc:name="Configuration">
+  <expression-language autoResolveVariables="true">
+    <global-functions file = "GlobalUtilityFunctions.mvel">
+      def NoofDays(DateFrom, DateTo) 
+      { 
+      	org.delaware.util.DateUtil.getNumberofDays(DateFrom, DateTo); 
+      }
+    </global-functions>
+  </expression-language>
+</configuration>   
+    <flow name="inf018_cjisrequestextractFlow" processingStrategy="synchronous">
+    
+        <poll doc:name="Poll" doc:description="The Poll connector will trigger the job/flow as per the business requirement. The CJIS Request Extract will run every day from Sunday to Saturday at 05:05 PM EST.">
+            <schedulers:cron-scheduler expression="0 5 17 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF018" doc:name="Set Payload to Interface ID" doc:description="Set payload with Interface Id i.e. INF018. The reason why we set with Interface Id, in case job fails just after the first step, this payload will help creating an Error Transaction in FOCUS interface dashboard."/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Save the Interface Id payload in an variable because Payload variable will be overwritten by the other details in the later steps."/>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF018&quot;, &quot;InterfaceName&quot;: &quot;CJIS Request Extract&quot;, &quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Extract&quot;}" doc:name="SP: Log Inprogress Transaction" doc:description="As per the technical requirement we need to log &quot;In Progress&quot; transaction in FOCUS interface dashboard when interface is triggered. In this step, we are setting payload with all the attributes required to create &quot;In Progress&quot; transaction." mimeType="application/json"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This connector will call framwork to create In Progress transaction in FOCUS interface dashboard."/>
+        <flow-ref name="DataSet1SubFlow" doc:name="DataSet1SubFlow" doc:description="This interface has two Data Sets. This connector will call Sub Flow to prepare Data Set 1. "/>
+        <flow-ref name="DataSet2_SubFlow" doc:name="DataSet2_SubFlow"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="CheckIfBoththeDataSetExists" doc:name="CheckIfBoththeDataSetExists"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[flowVars.DataSet1Exists == &quot;Yes&quot; || flowVars.DataSet2Exists == &quot;Yes&quot;]" doc:name="Expression" doc:description="This expression will end the flow here if Both the data set2 does not exists."/>
+        <message-properties-transformer scope="invocation" doc:name="Combine DataSet1 and DataSet2 Counts" doc:description="Combining Data Set1 and Data Set2 Counts (Overall Count, Success and Error Count) in this step.">
+            <add-message-property key="OverallSuccessCount" value="#[(flowVars.DataSet1SuccessCount != &quot;&quot; &amp;&amp; flowVars.DataSet1SuccessCount != null) &amp;&amp; (flowVars.DataSet2SuccessCount != &quot;&quot; &amp;&amp; flowVars.DataSet2SuccessCount != null) ? (flowVars.DataSet1SuccessCount + flowVars.DataSet2SuccessCount) : (flowVars.DataSet1SuccessCount != &quot;&quot; &amp;&amp; flowVars.DataSet1SuccessCount != null ? flowVars.DataSet1SuccessCount : flowVars.DataSet2SuccessCount)]"/>
+            <add-message-property key="OverallErrorCount" value="#[(flowVars.DataSet1ErrorCount != &quot;&quot; &amp;&amp; flowVars.DataSet1ErrorCount != null) &amp;&amp; (flowVars.DataSet2ErrorCount != &quot;&quot; &amp;&amp; flowVars.DataSet2ErrorCount != null) ? (flowVars.DataSet1ErrorCount + flowVars.DataSet2ErrorCount) : (flowVars.DataSet1ErrorCount != &quot;&quot; &amp;&amp; flowVars.DataSet1SuccessCount != null ? flowVars.DataSet1ErrorCount : flowVars.DataSet2ErrorCount)]"/>
+            <add-message-property key="OverallCount" value="#[(flowVars.DataSet1TotalCount != &quot;&quot; &amp;&amp; flowVars.DataSet1TotalCount != null) &amp;&amp; (flowVars.DataSet2TotalCount != &quot;&quot; &amp;&amp; flowVars.DataSet2TotalCount != null) ? (flowVars.DataSet1TotalCount + flowVars.DataSet2TotalCount) : (flowVars.DataSet1TotalCount != &quot;&quot; &amp;&amp; flowVars.DataSet1TotalCount != null ? flowVars.DataSet1TotalCount : flowVars.DataSet2TotalCount)]"/>
+            <add-message-property key="RecStatus" value="#[OverallCount == OverallSuccessCount ? 'Success' : (OverallCount == OverallErrorCount ? 'Error' : 'Completed with Error(s)')]"/>
+        </message-properties-transformer>
+
+        <dw:transform-message metadata:id="49681d37-f8a3-43fc-b6ba-9b335574169c" doc:name="TM: Prepare Header Record">
+            <dw:input-variable doc:sample="sample_data\integer.dwl" mimeType="application/java" variableName="OverallSuccessCount"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function getDSTAdjustedDatetime(standarddatetime) (standarddatetime - |PT4H| )  when  (isDateInDST(((standarddatetime - |PT4H|) ) as :date,"US/Eastern") == true) otherwise (standarddatetime - |PT5H|)
+---
+(getDSTAdjustedDatetime(now) as :string {format: "MM/dd/yy,HH:mm:ss"}) ++ "," ++ flowVars.OverallSuccessCount as :string {format: "00000000"}]]></dw:set-payload>
+        </dw:transform-message>
+        <set-payload value="#[payload + &quot;\n&quot; + ((flowVars.FinalDataSet1 != &quot;&quot; &amp;&amp; flowVars.FinalDataSet1 != null) &amp;&amp; (flowVars.FinalDataSet2 != &quot;&quot; &amp;&amp; flowVars.FinalDataSet2 != null) ? (flowVars.FinalDataSet1 + flowVars.FinalDataSet2) : (flowVars.FinalDataSet1 != &quot;&quot; &amp;&amp; flowVars.FinalDataSet1 != null ? flowVars.FinalDataSet1 : flowVars.FinalDataSet2))]" mimeType="application/csv" doc:name="SP: Add Header DS1 and DS2" doc:description="In this step we are combining File Header, Data Set1 Payload and Data Set2 Payload."/>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPRealtime" outputPattern="${sftp.cjisreqextract.transaction.filename}" host="${sftp.cjisreqextract.transaction.host}" port="${sftp.cjisreqextract.transaction.port}" path="${sftp.cjisreqextract.transaction.path}" user="${sftp.cjisreqextract.transaction.username}" password="${sftp.cjisreqextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP: Transaction" doc:description="Write Final File into SFTP folder. Credentials, Folder path will be taken from Mule Properties."/>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPRealtime" outputPattern="${sftp.cjisreqextract.archive.filename}#[server.dateTime.format(&quot;yyyyMMddHHmm&quot;)].txt" host="${sftp.cjisreqextract.archive.host}" port="${sftp.cjisreqextract.archive.port}" path="${sftp.cjisreqextract.archive.path}" user="${sftp.cjisreqextract.archive.username}" password="${sftp.cjisreqextract.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP: Archive" doc:description="As per the state requirement, we need to write Final file into Archive folder as well which will kept as backup purpose."/>
+        <set-variable variableName="FinalFile" value="#[payload]" mimeType="application/csv" doc:name="FV: Store Final Payload" doc:description="Store Final File (payload) in a flow variable."/>
+        <choice doc:name="Choice" doc:description="Based on the Final Transaction Status, This choice router will call appropriate next steps.">
+            <when expression="#[RecStatus == 'Completed with Error(s)']">
+                <message-properties-transformer scope="session" mimeType="application/csv" doc:name="MP: Completed with Errors">
+                    <add-message-property key="ErrorAttachment" value="#[&quot;FieldName, FieldValue, ErrorDescription, PID, CaseNumber&quot; + &quot;\n&quot; + (flowVars.DataSet1SBIMissing != null ? flowVars.DataSet1SBIMissing : &quot;&quot;) + (flowVars.DataSet1PIDMissing != null ? flowVars.DataSet1PIDMissing : &quot;&quot;) + (flowVars.DataSet2SBIMissing != null ? flowVars.DataSet2SBIMissing : &quot;&quot;) + (flowVars.DataSet2PIDMissing != null ? flowVars.DataSet2PIDMissing : &quot;&quot;)]"/>
+                    <add-message-property key="TransAttachment" value="#[payload]"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF018&quot;, &quot;InterfaceName&quot;: &quot;CJIS Request Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;#[RecStatus]&quot;,&quot;RecordCount&quot;:&quot;#[OverallCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[OverallSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[OverallErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;Check attached file for Error details&quot;, &quot;ErrorFilename&quot;: &quot;Error/Warning_CJISRequestExtract_&quot;, &quot;CompletedFilename&quot;: &quot;Backup_kids.output&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;ErrorExtension&quot;:&quot;csv&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}" doc:name="SP with Transaction Complete info" mimeType="application/json"/>
+            </when>
+            <when expression="#[RecStatus == 'Success']">
+                <message-properties-transformer scope="session" mimeType="application/csv" doc:name="MP: Success">
+                    <add-message-property key="TransAttachment" value="#[payload]"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF018&quot;, &quot;InterfaceName&quot;: &quot;CJIS Request Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;#[RecStatus]&quot;,&quot;RecordCount&quot;:&quot;#[OverallCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[OverallSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[OverallErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;Backup_kids.output&quot;, &quot;ExceptionType&quot;:&quot;&quot;, &quot;ErrorExtension&quot;:&quot;&quot;, &quot;CompletedExtension&quot;:&quot;txt&quot;}" doc:name="SP with Transaction Success info" mimeType="application/json"/>
+            </when>
+            <otherwise>
+                <message-properties-transformer scope="session" mimeType="application/csv" doc:name="MP: Error">
+                    <add-message-property key="ErrorAttachment" value="#[&quot;FieldName, FieldValue, ErrorDescription, PID, CaseNumber&quot; + &quot;\n&quot; + (flowVars.DataSet1SBIMissing != null ? flowVars.DataSet1SBIMissing : &quot;&quot;) + (flowVars.DataSet1PIDMissing != null ? flowVars.DataSet1PIDMissing : &quot;&quot;) + (flowVars.DataSet2SBIMissing != null ? flowVars.DataSet2SBIMissing : &quot;&quot;) + (flowVars.DataSet2PIDMissing != null ? flowVars.DataSet2PIDMissing : &quot;&quot;)]"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF018&quot;, &quot;InterfaceName&quot;: &quot;CJIS Request Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;#[RecStatus]&quot;,&quot;RecordCount&quot;:&quot;#[OverallCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[OverallSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[OverallErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;Check attached file for Error details&quot;, &quot;ErrorFilename&quot;: &quot;Error/Warning_CJISRequestExtract_&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;ErrorExtension&quot;:&quot;csv&quot;, &quot;CompletedExtension&quot;:&quot;&quot;}" doc:name="SP with Transaction Complete info" mimeType="application/json"/>
+            </otherwise>
+        </choice>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call framework to update the transaction with appropriate details like total record count, success count, error count, overall status."/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+
+
+    </flow>
+    <sub-flow name="CheckIfBoththeDataSetExists" doc:description="Check if both the Data set exists or not. If both does not exists then we will log business exception in the next steps.">
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.DataSet1Exists == &quot;No&quot; &amp;&amp; flowVars.DataSet2Exists == &quot;No&quot;]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF018&quot;, &quot;InterfaceName&quot;: &quot;CJIS Request Extract&quot;, &quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records qualifed for Extract&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;, &quot;ErrorExtension&quot;:&quot;&quot;, &quot;CompletedExtension&quot;:&quot;&quot;}" doc:name="Set Payload" doc:description="Set Payload with all the attributes required to raise Business exception if both the data sets does not exists." mimeType="application/json"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call Framework to update the transaction in the FOCUS Interface dashboard with &quot;Business Exception&quot;."/>
+            </when>
+            <otherwise>
+                <logger message="----CJIS Request Extract: Records Found for Extract---" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="DataSet1SubFlow">
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Case_Legal_Status__r.Case__r.Name, Case_Legal_Status__r.Case__r.Client_Name_Lk__c, Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_PID__c, Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_SBI__c, DUC__c from DEL_CJIS_Charges__c where Duc__c != null and Duc__c != '' and Case_Legal_Status__r.Case__c != null and Case_Legal_Status__r.Case__r.Case_Close_Date__c = null and Case_Legal_Status__r.Case__r.Status__c = 'Open' and Case_Legal_Status__r.Case__r.Division__c = 'DYRS' and Case_Legal_Status__r.Case__r.Client_Name_Lk__c != null and (not(Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_SBI__c like 'E%' or  Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_SBI__c like 'N%' or  Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_SBI__c like 'D%' or  Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_SBI__c like 'P%' or  Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_SBI__c like 'I%'))" doc:name="query for Dataset1" doc:description="This Query step will satisfy the below Business rule.
+
+BR#: SELECT Criteria: Data Set 1 - The CJIS Extract file includes a record for every DSCYF client who is active in a YRS case and has an associated SBI number. On these records, only SBI #, PID and up to 10 DUC #s are sent on the file."/>
+        <choice doc:name="Check if there is atleast one record" doc:description="This step will check if there are any records returned as part of the query. In case, no record returns then it will set flow variable (DataSet1Exists) with &quot;No&quot;">
+            <when expression="#[payload.size() !=0]">
+                <dw:transform-message doc:name="TW: Convert FOCUS Output to Java format">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	CaseNumber: $.Case_Legal_Status__r.Case__r.Name,
+	ClientId: $.Case_Legal_Status__r.Case__r.Client_Name_Lk__c,
+	PID: $.Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_PID__c,
+	SBI: $.Case_Legal_Status__r.Case__r.Client_Name_Lk__r.DEL_SBI__c,
+	DUC: $.DUC__c	
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <dw:transform-message doc:name="TW: GroupBy ClientId to Get the DucNumbers" metadata:id="7add3e80-b2eb-431f-b67f-440bc2684425">
+                    <dw:input-payload doc:sample="sample_data\DataSet1QueryOutput.dwl" mimeType="application/java"/>
+                    <dw:input-variable doc:sample="sample_data\xml_1.xml" variableName="DucsOutput"/>
+                    <dw:input-variable variableName="DataSet1WODucs"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload groupBy $.ClientId pluck
+{
+      record:
+      {
+            ($.PID default [] distinctBy $.PID default [] ),
+            ($.SBI distinctBy $.SBI default []),                                                
+            DucNumbers: $.DUC distinctBy $ default [],            
+            CaseNumbers: $.CaseNumber distinctBy $ default []
+      }
+}     ]]></dw:set-payload>
+
+                </dw:transform-message>
+                <dw:transform-message doc:name="TM: Prepare Final Data Set1" metadata:id="7add3e80-b2eb-431f-b67f-440bc2684425">
+                    <dw:input-payload doc:sample="sample_data\root_2.xml"/>
+                    <dw:input-variable doc:sample="sample_data\xml_1.xml" variableName="DucsOutput"/>
+                    <dw:input-variable variableName="DataSet1WODucs"/>
+                    <dw:input-variable doc:sample="sample_data\list_string.dwl" variableName="GroupByPID"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload.*record filter ($.SBI != null and $.SBI != "" and $.PID != null and $.PID != "") map
+{
+	SBI: (pad(0,(8 - sizeOf $.SBI )) ++ $.SBI) when $.SBI != null and $.SBI != "" otherwise "",	
+	PID: $.PID as :number {format: "0000000000"} when ($.PID != "" and $.PID != null) otherwise "" as :string,
+	Client_LastName: "",
+	Client_FirstName: "",
+	Client_MiddleInitial: "",
+	Client_Suffix: "",
+	Client_DOB: "",
+	YRS_FacilityCode: "",
+	Admit_Date: "",
+	FW_LastName: "",
+	FW_FirstName: "",
+	FW_Phone: "",
+	CW_LastName: "",
+	CW_FirstName: "",
+	CW_Phone: "",
+	Auth_LeaveTo: "",
+	Auth_Leave_StartDt: "",
+	Auth_Leave_StartTime: "",
+	Auth_Leave_EndDt: "",
+	Auth_Leave_EndTime: "",
+	Auth_Leave_Days: "",
+	Runaway_LocationFrom: "",
+	Runaway_StartDt: "",
+	Runaway_StartTime: "",
+	Runaway_EndDate: "",
+	Runaway_EndTime: "",
+	Runaway_Days: "",
+	Notification_Email1: "",
+	Notification_Email2: "",
+	Notification_Email3: "",
+	Notification_Email4: "",
+	Notification_Email5: "",
+	DUC1: $.DucNumbers[0] default "",
+	DUC2: $.DucNumbers[1] default "",
+	DUC3: $.DucNumbers[2] default "",
+	DUC4: $.DucNumbers[3] default "",
+	DUC5: $.DucNumbers[4] default "",
+	DUC6: $.DucNumbers[5] default "",
+	DUC7: $.DucNumbers[6] default "",
+	DUC8: $.DucNumbers[7] default "",
+	DUC9: $.DucNumbers[8] default "",
+	DUC10: $.DucNumbers[9] default ""
+}]]></dw:set-payload>
+                    <dw:set-variable variableName="DataSet1SBIMissing"><![CDATA[%dw 1.0
+%output application/csv header = false
+---
+payload.*record filter ($.SBI == null or $.SBI == "") map
+{
+	FieldName: "SBI",
+	FieldValue: $.SBI,
+	ErrorDescription: "SBI is missing for the Client" when ($.PID != null and $.PID != "") otherwise "SBI is missing for the Client of Case#",
+	PID: $.PID default "",
+	CaseNumber: $.CaseNumbers[0] when ($.PID == null or $.PID == "") otherwise ""
+}]]></dw:set-variable>
+                    <dw:set-variable variableName="DataSet1PIDMissing"><![CDATA[%dw 1.0
+%output application/csv header = false
+---
+payload.*record filter ($.PID == null or $.PID == "") map
+{
+	FieldName: "PID",
+	FieldValue: $.PID default "",
+	ErrorDescription: "PID is missing for the Client of Case#",
+	PID: "",
+	CaseNumber: $.CaseNumbers[0]
+}]]></dw:set-variable>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/csv" doc:name="Object to String" doc:description="Converts Object Stream to Text format."/>
+                <message-properties-transformer scope="invocation" doc:name="MP: DataSet1 Record Counts" doc:description="Read Data Set1 Success and Error Count.">
+                    <add-message-property key="DataSet1SuccessCount" value="#[payload != null and payload != &quot;&quot; ? payload.split(&quot;\n&quot;).length : 0]"/>
+                    <add-message-property key="DataSet1ErrorCount" value="#[(flowVars.DataSet1SBIMissing != null and flowVars.DataSet1SBIMissing != &quot;&quot; ? flowVars.DataSet1SBIMissing.split(&quot;\n&quot;).length : 0) + (flowVars.DataSet1PIDMissing != null and flowVars.DataSet1PIDMissing != &quot;&quot; ? flowVars.DataSet1PIDMissing.split(&quot;\n&quot;).length : 0)]"/>
+                    <add-message-property key="DataSet1TotalCount" value="#[flowVars.DataSet1SuccessCount + flowVars.DataSet1ErrorCount]"/>
+                </message-properties-transformer>
+                <set-variable variableName="DataSet1TotalCount" value="#[flowVars.DataSet1SuccessCount + flowVars.DataSet1ErrorCount]" doc:name="FV: DataSet1 Total Record Count" doc:description="Set Total Count of Data Set1"/>
+                <set-variable variableName="FinalDataSet1" value="#[payload]" mimeType="application/csv" doc:name="FV: Store Final Data Set1" doc:description="Store Final Data Set1 (CSV) in a Variable. It will be used in the later steps to prepare the final file."/>
+                <set-variable variableName="DataSet1Exists" value="Yes" doc:name="FV: Set DataSet1Exists" doc:description="Set DataSet1Exists flow Variable with &quot;Yes&quot; value"/>
+            </when>
+            <otherwise>
+                <logger message="&quot;No Record exists for DataSet1&quot;" level="INFO" doc:name="Logger"/>
+                <set-variable variableName="DataSet1Exists" value="No" doc:name="Set Data Set1 Exists variable"/>
+            </otherwise>
+        </choice>
+
+    </sub-flow>
+    <sub-flow name="LOVQuery">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'FACILITY_CODE', 'AUTH_LEAVE_TO', 'RUNAWAY_LOC_FROM'&quot;} " mimeType="text/xml" doc:name="Set Payload" doc:description="In this payload step we will be setting all the attributes required for calling LOVQuery framework. In case there is more than one field required to transform source to Target values, you need to give comma separated LOV type in the payload."/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow" doc:description="This step calls LOVQuery framework to get the source to target mapping values."/>
+    </sub-flow>
+    <sub-flow name="DataSet2_SubFlow">
+
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Case_Number__r.ownerid, Case_Number__r.Id, Case_Number__r.Name, Case_Number__r.Client_Name_Lk__r.DEL_PID__c, Case_Number__r.Client_Name_Lk__r.DEL_SBI__c, Case_Number__r.Client_Name_Lk__r.FIRSTNAME, Case_Number__r.Client_Name_Lk__r.LASTNAME, Case_Number__r.Client_Name_Lk__r.MIDDLENAME, Case_Number__r.Client_Name_Lk__r.DEL_Suffix__c, Case_Number__r.Client_Name_Lk__r.Birthdate, Provider_ID__c, Last_Name_Organization_Name__r.Name, Placement_Start_Date__c, (select Id, Leave_Reason__c, Leave_Start_DateOnly__c,  Leave_Start_Date_Time__c, Leave_Start_Status__c, Leave_End_DateOnly__c,  Leave_End_Date_Time__c, Leave_End_Status__c  from  Temporary_Leaves__r order by createddate desc)  FROM DEL_Placement__c where Latest_Version_Placement__c = true and Placement_Status__c = ${placement.status} and Case_Number__r.Client_Name_Lk__r.DEL_PID__c != null and Last_Name_Organization_Name__r.Del_Provider_Id__c in ${cjis.extract.dataset2.locations} and (not (Case_Number__r.Client_Name_Lk__r.DEL_SBI__c like 'E%' or  Case_Number__r.Client_Name_Lk__r.DEL_SBI__c like 'N%' or  Case_Number__r.Client_Name_Lk__r.DEL_SBI__c like 'D%' or  Case_Number__r.Client_Name_Lk__r.DEL_SBI__c like 'P%' or  Case_Number__r.Client_Name_Lk__r.DEL_SBI__c like 'I%'))" doc:name="Query for DataSet 2" doc:description="Using this query step, we will extracting all the Placement records for Data Set2. Below is the business requirement.
+
+BR#1 SELECT Criteria: Dataset 2 &#8211;  This dataset contains all clients who are currently placed in YRS Detention placement with one of the providers New Castle County Detention Center, Ferris School, Stevenson House, Mowlds Cottage, Grace Cottage, and Snowden Cottage.
+
+BR#2: SBIs that start with &#8216;E&#8217;, &#8216;N&#8217;, &#8216;D&#8217;, &#8216;I&#8217;, &#8216;P&#8217; will NOT be sent on the file
+"/>
+        <choice doc:name="Check if there is atleast one record" doc:description="check if there is atleast one record returned for data set 2. In case no records returned, it will set a variable (DataSet2Exists) with &quot;No&quot; value.">
+            <when expression="#[payload.size() !=0]">
+                <enricher doc:name="Message Enricher" doc:description="Call LOV Query subflow.">
+                    <flow-ref name="LOVQuery" doc:name="LOVQuery"/>
+                    <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+                </enricher>
+                <dw:transform-message doc:name="TM: convert Java to xml format" metadata:id="318efed6-7924-419c-8828-8d0bd2e21500">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var currentdate = now as :date {format: "YYYY-MM-dd"}
+%function getDSTAdjustedDatetime(standarddatetime) (standarddatetime - |PT4H| )  when  (isDateInDST(((standarddatetime - |PT4H|) ) as :date,"US/Eastern") == true) otherwise (standarddatetime - |PT5H|)
+
+//%function getDLSStartWeek(dttime1) ((dttime1 >> "America/New_York").year ++ "-03-08 02:00:00.000") as :localdatetime {format: "yyyy-MM-dd HH:mm:ss.SSS"} ++ |-05:00|
+//%function modify(dttime) ((dttime + |PT1H|)  >> "America/New_York") when (((( getDLSStartWeek(dttime) + |P238D| ) +  (("P" ++ (7 - ( getDLSStartWeek(dttime) + |P238D| ).dayOfWeek) ++ "D") as :period)) ) > (dttime)) and ((dttime) > ((getDLSStartWeek(dttime)  + (("P" ++ (7 - getDLSStartWeek(dttime).dayOfWeek) ++ "D") as :period)) )) otherwise dttime >> "America/New_York"
+//https://en.wikipedia.org/wiki/Daylight_saving_time_in_the_United_States
+//2nd Sunday of March to 1st Sunday of November
+
+---
+payload map 
+{
+	OwnerId: $.Case_Number__r.OwnerId default "",
+	caseId: $.Case_Number__r.Id default "",
+	CaseNumber: $.Case_Number__r.Name default "",
+	SBI: $.Case_Number__r.Client_Name_Lk__r.DEL_SBI__c default "",
+	PID: $.Case_Number__r.Client_Name_Lk__r.DEL_PID__c default "",
+	Client_LastName: $.Case_Number__r.Client_Name_Lk__r.LastName default "",
+	Client_FirstName: $.Case_Number__r.Client_Name_Lk__r.FirstName default "",
+	Client_MiddleInitial: $.Case_Number__r.Client_Name_Lk__r.MiddleName default "",
+	Client_Suffix: $.Case_Number__r.Client_Name_Lk__r.DEL_Suffix__c default "",
+	Client_DOB: $.Case_Number__r.Client_Name_Lk__r.Birthdate default "",
+	YRS_FacilityCode: $.Provider_ID__c default "",
+	AdmitDate: $.Placement_Start_Date__c default "",
+	Auth_LeaveTo: $.Temporary_Leaves__r[0].Leave_Reason__c when ($.Temporary_Leaves__r[0].Id?) == true and $.Temporary_Leaves__r[0].Leave_Start_Status__c == "Completed" otherwise "",
+	Auth_Leave_StartDt: $.Temporary_Leaves__r[0].Leave_Start_DateOnly__c when ($.Temporary_Leaves__r[0].Id?) == true and $.Temporary_Leaves__r[0].Leave_Start_Status__c == "Completed" otherwise "" ,
+	Auth_Leave_StartTime: getDSTAdjustedDatetime($.Temporary_Leaves__r[0].Leave_Start_Date_Time__c as :datetime) when ($.Temporary_Leaves__r[0].Id?) == true and $.Temporary_Leaves__r[0].Leave_Start_Date_Time__c != null and $.Temporary_Leaves__r[0].Leave_Start_Status__c == "Completed" otherwise "" ,
+	Auth_Leave_EndDt: $.Temporary_Leaves__r[0].Leave_End_DateOnly__c when ($.Temporary_Leaves__r[0].Id?) == true and $.Temporary_Leaves__r[0].Leave_End_Status__c == "Completed" otherwise "" ,
+	Auth_Leave_EndTime: getDSTAdjustedDatetime($.Temporary_Leaves__r[0].Leave_End_Date_Time__c as :datetime) when ($.Temporary_Leaves__r[0].Id?) == true and $.Temporary_Leaves__r[0].Leave_End_Date_Time__c != null and $.Temporary_Leaves__r[0].Leave_End_Status__c == "Completed"  otherwise "" ,
+	Auth_Leave_Days: NoofDays($.Temporary_Leaves__r[0].Leave_Start_DateOnly__c as :date, $.Temporary_Leaves__r[0].Leave_End_DateOnly__c as :date) + 1 as :number when ($.Temporary_Leaves__r[0].Leave_Start_DateOnly__c != null and 
+					$.Temporary_Leaves__r[0].Leave_End_DateOnly__c != null and $.Temporary_Leaves__r[0].Leave_End_Status__c == "Completed" and $.Temporary_Leaves__r[0].Leave_Start_Status__c == "Completed" ) otherwise (NoofDays($.Temporary_Leaves__r[0].Leave_Start_DateOnly__c as :date, currentdate) + 1 as :number when $.Temporary_Leaves__r[0].Leave_Start_DateOnly__c != null and $.Temporary_Leaves__r[0].Leave_Start_Status__c == "Completed"  otherwise ""),
+	Runaway_LocationFrom: "",
+	Runaway_StartDt: "",
+	Runaway_StartTime: "",
+	Runaway_EndDate: "",
+	Runaway_EndTime: "",
+	Runaway_Days: 0,
+	Notification_Email1:"",
+	Notification_Email2:"",
+	Notification_Email3:"",
+	Notification_Email4:"",
+	Notification_Email5:"",
+	DUC1: "",
+	DUC2: "",
+	DUC3: "",
+	DUC4: "",
+	DUC5: "",
+	DUC6: "",
+	DUC7: "",
+	DUC8: "",
+	DUC9: "",
+	DUC10: ""
+}		]]></dw:set-payload>
+                </dw:transform-message>
+
+                <set-variable variableName="DataSet2" value="#[payload]" mimeType="application/java" doc:name="FV: Store DataSet2" doc:description="Store Initial payload into a flow Variable. It will be used in the later steps."/>
+                <enricher doc:name="Message Enricher - Get Facility Worker details" doc:description="As per the File requirement, we need to add Facility worker details. Hence, calling Subflow to get the Facility Worker details.">
+                    <flow-ref name="Get_Facility_Worker_Details" doc:name="Get_Facility_Worker_Details"/>
+                    <enrich source="FacilityWorkerDetails" target="#[flowVars.FacilityWorkerDetails]"/>
+                </enricher>
+                <enricher doc:name="Message Enricher - Get Community Worker Details" doc:description="As per the File requirement, we need to add Community worker details. Hence, calling Subflow to get the Community Worker details.">
+                    <flow-ref name="Get_Community_Worker_Details" doc:name="Get_Community_Worker_Details"/>
+                    <enrich source="CWDetails" target="#[flowVars.CWDetails]"/>
+                </enricher>
+                <enricher doc:name="Message Enricher  - Get Runaway Details" doc:description="As per the File requirement, we need to add Runaway details. Hence, calling Subflow to get the Runaway details.">
+                    <flow-ref name="Get_Runaway_Details" doc:name="Get_Runaway_Details"/>
+                    <enrich source="RunawayDetails" target="#[flowVars.RunawayDetails]"/>
+                </enricher>
+                <dw:transform-message doc:name="TM: Prepare Final DataSet2 and SBI Missing" metadata:id="98b22d21-c645-44d9-8713-91f54cec5542">
+                    <dw:set-payload><![CDATA[%output application/csv header = false
+%var FWdata ={(flowVars.FacilityWorkerDetails.*record map {
+              ($.OwnerId): $.WorkerPersonalDetails
+})}
+%var CWdata ={(flowVars.CWDetails.*record map {
+              ($.PID): $.WorkerPersonalDetails
+})}
+%var RWdata ={(flowVars.RunawayDetails.*record map {
+             ($.PID): $.RunawayDetails
+})}
+
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+
+---
+payload map using (FWdetails = FWdata[$.OwnerId]) using (CWDetails = CWdata[$.PID])  using (RADetails = RWdata[$.PID])
+{
+			  SBI: (pad(0,(8 - sizeOf $.SBI )) ++ $.SBI) when $.SBI != null and $.SBI != "" otherwise "",	              
+              PID: $.PID as :number {format: "0000000000"} when ($.PID != "" and $.PID != null) otherwise "" as :string,
+              Client_LastName: $.Client_LastName,
+              Client_FirstName: $.Client_FirstName,
+              Client_MiddleInitial: $.Client_MiddleInitial,
+              Client_Suffix: $.Client_Suffix,
+              Client_DOB: ($.Client_DOB as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"}) when ($.Client_DOB != null and $.Client_DOB != "") otherwise "",
+              YRS_FacilityCode: flowVars.LOVReturned[("FACILITY_CODE-" ++ $.YRS_FacilityCode)][0],
+              Admit_Date: ($.AdmitDate as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"}) when ($.AdmitDate != null and $.AdmitDate != "") otherwise "",
+              FW_LastName: FWdetails[1],
+              FW_FirstName: FWdetails[0],
+              FW_Phone: FWdetails[2],
+              CW_LastName: CWDetails[1],
+              CW_FirstName: CWDetails[0],
+              CW_Phone: CWDetails[2],
+              Auth_LeaveTo: flowVars.LOVReturned[("AUTH_LEAVE_TO-" ++ $.Auth_LeaveTo)][0] default "",
+              Auth_Leave_StartDt: ($.Auth_Leave_StartDt as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"}) when ($.Auth_Leave_StartDt != null and $.Auth_Leave_StartDt != "") otherwise "",
+              Auth_Leave_StartTime: (($.Auth_Leave_StartTime.hour as :string {format: "00"}) ++ ($.Auth_Leave_StartTime.minutes as :string {format: "00"}) ++ ($.Auth_Leave_StartTime.seconds as :string {format: "00"})) when ($.Auth_Leave_StartTime != null and $.Auth_Leave_StartTime != "") otherwise "",
+              Auth_Leave_EndDt: ($.Auth_Leave_EndDt as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"}) when ($.Auth_Leave_EndDt != null and $.Auth_Leave_EndDt != "") otherwise "",
+              Auth_Leave_EndTime: (($.Auth_Leave_EndTime.hour as :string {format: "00"}) ++ ($.Auth_Leave_EndTime.minutes as :string {format: "00"}) ++ ($.Auth_Leave_EndTime.seconds as :string {format: "00"})) when ($.Auth_Leave_EndTime != null and $.Auth_Leave_EndTime != "") otherwise "",
+              Auth_Leave_Days: $.Auth_Leave_Days,
+              Runaway_LocationFrom: RADetails[0],
+              Runaway_StartDt: RADetails[1],
+              Runaway_StartTime: (RADetails[2].hour as :string {format: "00"} ++  RADetails[2].minutes as :string {format: "00"} ++ RADetails[2].seconds as :string {format: "00"}) when (RADetails[2] != null and RADetails[2] != "") otherwise "",
+              Runaway_EndDate: RADetails[3] default "" as :string,
+			  Runaway_EndTime: (RADetails[4].hour as :string {format: "00"} ++  RADetails[4].minutes as :string {format: "00"} ++ RADetails[4].seconds as :string {format: "00"}) when (RADetails[4] != null and RADetails[4] != "") otherwise "",
+			  Runaway_Days: RADetails[5] default "" as :string,
+              Notification_Email1: FWdetails[3],
+              Notification_Email2: FWdetails[4],
+              Notification_Email3: CWDetails[3],
+              Notification_Email4: CWDetails[4],
+              Notification_Email5: "",
+              DUC1: "",
+              DUC2: "",
+              DUC3: "",
+              DUC4: "",
+              DUC5: "",
+              DUC6: "",
+              DUC7: "",
+              DUC8: "",
+              DUC9: "",
+              DUC10: ""
+} filter ($.SBI != "" and $.SBI != null and $.PID != null and $.PID != "")]]></dw:set-payload>
+                    <dw:set-variable variableName="DataSet2SBIMissing"><![CDATA[%dw 1.0
+%output application/csv header = false
+---
+payload filter ($.SBI == null or $.SBI == "") map
+{	
+	FieldName: "SBI",
+	FieldValue: $.SBI,
+	ErrorDescription: "SBI is missing for the Client" when ($.PID != null and $.PID != "") otherwise ("SBI is missing for the Client of Case#"),
+	PID: $.PID default "",
+	CaseNumber: $.CaseNumber when ($.PID == null or $.PID == "") otherwise ""
+}]]></dw:set-variable>
+                    <dw:set-variable variableName="DataSet2PIDMissing"><![CDATA[%dw 1.0
+%output application/csv header = false
+---
+payload filter ($.PID == null or $.PID == "") map
+{
+	FieldName: "PID",
+	FieldValue: $.PID default "",
+	ErrorDescription: "PID is missing for the Client of Case#",
+	PID: "",
+	CaseNumber: $.CaseNumber
+}]]></dw:set-variable>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/csv" doc:name="Object to String" doc:description="Convert Final Data Set2 Object reader format to text format."/>
+
+                <message-properties-transformer scope="invocation" doc:name="MP: Data Set 2 Record Counts" doc:description="Read DataSet2 Success and Error Counts">
+                    <add-message-property key="DataSet2SuccessCount" value="#[payload != &quot;&quot; and payload != null ? payload.split(&quot;\n&quot;).length : 0]"/>
+                    <add-message-property key="DataSet2ErrorCount" value="#[(flowVars.DataSet2SBIMissing != null and flowVars.DataSet2SBIMissing != &quot;&quot; ? flowVars.DataSet2SBIMissing.split(&quot;\n&quot;).length : 0) + (flowVars.DataSet2PIDMissing != null and flowVars.DataSet2PIDMissing != &quot;&quot; ? flowVars.DataSet2PIDMissing.split(&quot;\n&quot;).length : 0)]"/>
+                    <add-message-property key="DataSet2TotalCount" value="#[DataSet2SuccessCount + DataSet2ErrorCount]"/>
+                </message-properties-transformer>
+                <set-variable variableName="FinalDataSet2" value="#[payload]" mimeType="application/csv" doc:name="FV: Store Final Data Set 2 Payload" doc:description="Set Total Count (Success + Error Count) for DataSet2."/>
+                <set-variable variableName="DataSet2Exists" value="Yes" doc:name="FV: Set DataSet2 Exists" doc:description="Set FlowVariable (DataSet2Exists) with &quot;Yes&quot; Value. It will be used in the next connector."/>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger" message="&quot;No Record exists for DataSet2&quot;"/>
+                <set-variable variableName="DataSet2Exists" value="No" doc:name="Set DataSet2 Exists" doc:description="Set FlowVariable (DataSet2Exists) with &quot;No&quot; Value. It will be used in the next connector."/>
+            </otherwise>
+        </choice>
+
+    </sub-flow>
+    <sub-flow name="Get_Facility_Worker_Details">
+        <foreach batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="TW: Get List Of OwnerIds" metadata:id="b7ff1836-f7ce-4e50-9d79-f2b87a512f16">
+                <dw:input-payload/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.OwnerId ++ "'")) joinBy "," ]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Person__r.DEL_Connected_User__c, Person__r.FirstName, Person__r.LastName, Person__r.MiddleName, Person__r.DEL_Suffix__c, Person__r.DEL_Personal_email__c, Phone_Number__c, Business_Email__c from DEL_Person_Type__c where recordtype.name = 'DSCYF Staff' and Person__r.DEL_Connected_User__c in (#[payload])" doc:name="Query for Facility Worker Details"/>
+            <dw:transform-message doc:name="FW Details" metadata:id="a4b86317-83b7-482e-9d46-83fdb23172d3">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	record:
+	{
+		OwnerId: $.Person__r.DEL_Connected_User__c default "",
+		WorkerPersonalDetails:
+		{
+			FirstName: $.Person__r.FirstName[0..14] when (($.Person__r.FirstName?) == true) and (sizeOf $.Person__r.FirstName) > 15 otherwise ($.Person__r.FirstName when $.Person__r.FirstName != null otherwise ""),
+			LastName: $.Person__r.LastName[0..24] when (($.Person__r.LastName?) == true) and (sizeOf $.Person__r.LastName) > 25 otherwise ($.Person__r.LastName when $.Person__r.LastName != null otherwise ""),
+			PhoneNumber: (((($.Phone_Number__c replace "(" with "") replace ")" with "") replace "-" with "") replace " " with "") default "",
+			EmailAddress: $.Business_Email__c default "",
+			PersonalEmailAddress: $.Person__r.DEL_Personal_email__c default ""									
+		}	
+	}			
+}]]></dw:set-payload>
+            </dw:transform-message>
+
+            <set-variable variableName="FacilityWorkerDetails" value="#[(flowVars.FacilityWorkerDetails != null and flowVars.FacilityWorkerDetails != &quot;&quot; ? flowVars.FacilityWorkerDetails + payload : payload)]" mimeType="application/java" doc:name="FV: store Facility Worker Details"/>
+        </foreach>
+    </sub-flow>
+    <sub-flow name="Get_Community_Worker_Details">
+        <foreach batchSize="150" doc:name="For Each" doc:description="There is a limitation in FOCUS that FOCUS queries where clause cannot have more than 4000 characters. Hence, we are getting the community worker details using for each with Counter 150. We have made sure that 150 records cannot cross 4000 characters.">
+            <dw:transform-message doc:name="TW: Get List Of PIDs" metadata:id="b7ff1836-f7ce-4e50-9d79-f2b87a512f16">
+                <dw:input-payload/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.PID ++ "'")) joinBy "," ]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT OwnerId, Client_PID__c FROM DEL_Case__c WHERE recordtype.Name = ${community.case.type} and Case_Close_Date__c = null and Client_PID__c in (#[payload])" doc:name="Query for List of Community Cases" doc:description="In this step we are getting Community Case details associated to the kids who are in 6 YRS placements."/>
+
+            <dw:transform-message doc:name="TM: convert Java to Java format" metadata:id="9b2f14d0-9799-43d8-bfbb-fd7471c76038">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{	
+	OwnerId: $.OwnerId default "",
+	PID: $.Client_PID__c default ""			
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <set-variable variableName="CommunityCaseDetails" value="#[(flowVars.CommunityCaseDetails != null and flowVars.CommunityCaseDetails != &quot;&quot; ? flowVars.CommunityCaseDetails + payload : payload)]" mimeType="application/java" doc:name="FV: Save Community Case Owner Details" doc:description="Store Community Case owner details in FlowVariable.  At the end of for each loop all community case owner details in this flow variable."/>
+        </foreach>
+        <set-payload value="#[flowVars.CommunityCaseDetails]" doc:name="Set Payload" doc:description="Set Payload with community case owner details."/>
+        <choice doc:name="Choice" doc:description="Check atleast if there one community case associated to the kids who are 6 YRS placements. in case no community cases found, then set with Dummy payload in the next step. It is required to set with dummy payload so that not to get technical error while creating final data set2. ">
+            <when expression="#[payload.size()!=0]">
+                <foreach batchSize="150" doc:name="For Each">
+                    <dw:transform-message doc:name="TW: Get List Of OwnerIds" metadata:id="b7ff1836-f7ce-4e50-9d79-f2b87a512f16">
+                        <dw:input-payload/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.OwnerId ++ "'")) joinBy "," ]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Person__r.DEL_Connected_User__c, Person__r.FirstName, Person__r.LastName, Person__r.DEL_Personal_email__c, Phone_Number__c, Business_Email__c, Person__r.DEL_PID__c from DEL_Person_Type__c where recordtype.name = 'DSCYF Staff' and Person__r.DEL_Connected_User__c in (#[payload])" doc:name="Query for Community Worker Details" doc:description="In the previous query we have idenified list of community case owner details. Now in this step we are finding the personal details including contact details of owner."/>
+
+                    <dw:transform-message doc:name="TM: CW Details Convert Java to Java format" metadata:id="4ffdab73-e137-4d02-8de6-2226eb593d6a">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+//%var GetClientPID = {(flowVars.CommunityCaseDetails.root.*record map {
+ //             ($.OwnerId) : $.PID
+//})}
+---
+payload map
+{
+	record:
+	{
+		OwnerId: $.Person__r.DEL_Connected_User__c default "",
+		WorkerPersonalDetails:
+		{
+			FirstName: $.Person__r.FirstName[0..14] when (($.Person__r.FirstName?) == true) and (sizeOf $.Person__r.FirstName) > 15 otherwise ($.Person__r.FirstName when $.Person__r.FirstName != null otherwise ""),
+			LastName: $.Person__r.LastName[0..24] when (($.Person__r.LastName?) == true) and (sizeOf $.Person__r.LastName) > 25 otherwise ($.Person__r.LastName when $.Person__r.LastName != null otherwise ""),					
+			PhoneNumber: (((($.Phone_Number__c replace "(" with "") replace ")" with "") replace "-" with "") replace " " with "") default "",
+			EmailAddress: $.Business_Email__c default "",
+			PersonalEmailAddress: $.Person__r.DEL_Personal_email__c default ""					
+		}	
+	}			
+}]]></dw:set-payload>
+                    </dw:transform-message>
+
+                    <dw:transform-message doc:name="TW:Link PID with OwnerDetails">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var GetClientPID = {(payload.*record map {
+              ($.OwnerId) : $.WorkerPersonalDetails
+})}
+---
+flowVars.CommunityCaseDetails map using (ClientPID = GetClientPID[$.OwnerId] )
+{
+	record:
+	{
+		PID: $.PID default "",
+		WorkerPersonalDetails:
+		{
+			FirstName: ClientPID[0],
+			LastName: ClientPID[1],					
+			PhoneNumber: ClientPID[2],
+			EmailAddress: ClientPID[3],
+			PersonalEmailAddress: ClientPID[4]					
+		}	
+	}			
+}]]></dw:set-payload>
+                    </dw:transform-message>
+
+                    <set-variable variableName="CWDetails" value="#[(flowVars.CWDetails != null and flowVars.CWDetails != &quot;&quot; ? flowVars.CWDetails + payload : payload)]" mimeType="application/java" doc:name="FV: store Community Worker Details" doc:description="Store final Payload of Community worker details in this flow variable. It will be used in preparing final data set 2."/>
+                </foreach>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="TW: Set CWDetails Dummy Payload">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	record:
+	{
+		PID: "1-DUMMY",
+		WorkerPersonalDetails:
+		{
+			FirstName: "1-DUMMY",
+			LastName: "1-DUMMY",					
+			PhoneNumber: "1-DUMMY",
+			EmailAddress: "1-DUMMY",
+			PersonalEmailAddress: "1-DUMMY"					
+		}	
+	}
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <set-variable variableName="CWDetails" value="#[payload]" mimeType="application/java" doc:name="Variable" doc:description="Store Dummy payload in a flow variable."/>
+
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="Get_Runaway_Details">
+        <foreach batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="TW: Get List Of PIDs" metadata:id="b7ff1836-f7ce-4e50-9d79-f2b87a512f16">
+                <dw:input-payload/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.PID ++ "'")) joinBy "," ]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Person_PID__c, (select Id, Runaway_From_Location__c, Runaway_Start_Date__c, Runaway_Start_Date_Time__c, Runaway_Start_Event_Status__c, Runaway_End_Date__c, Runaway_End_Date_Time__c, Runaway_End_Event_Status__c, Days_Missing__c from RunawayPersonType__r order by createddate desc limit 1) from DEL_Person_Type__c where Person_PID__c in (#[payload])" doc:name="Query for Runaway Details" doc:description="In this step we are finding Runaway details associated to the kids who are in 6 YRS placements."/>
+
+            <choice doc:name="Choice" doc:description="Check atleast if there is one runaway event associated to the kids who are 6 YRS placements. in case no runaway events found, then set with Dummy payload in the next step. It is required to set with dummy payload so that we don't get technical errors while creating final data set2. ">
+                <when expression="#[payload.size() !=0]">
+                    <dw:transform-message doc:name="TM: Runaway Details Convert Java to Java" metadata:id="b2822b4e-6fa9-48f2-99c6-354c52f574a6">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var currentdate = now as :date {format: "YYYY-MM-dd"}
+%function getDSTAdjustedDatetime(standarddatetime) (standarddatetime - |PT4H| )  when  (isDateInDST(((standarddatetime - |PT4H|) ) as :date,"US/Eastern") == true) otherwise (standarddatetime - |PT5H|)
+//%function getDLSStartWeek(dttime1) ((dttime1 >> "America/New_York").year ++ "-03-08 02:00:00.000") as :localdatetime {format: "yyyy-MM-dd HH:mm:ss.SSS"} ++ |-05:00|
+//%function modify(dttime) ((dttime + |PT1H|)  >> "America/New_York") when (((( getDLSStartWeek(dttime) + |P238D| ) +  (("P" ++ (7 - ( getDLSStartWeek(dttime) + |P238D| ).dayOfWeek) ++ "D") as :period)) ) > (dttime)) and ((dttime) > ((getDLSStartWeek(dttime)  + (("P" ++ (7 - getDLSStartWeek(dttime).dayOfWeek) ++ "D") as :period)) )) otherwise dttime >> "America/New_York"
+//https://en.wikipedia.org/wiki/Daylight_saving_time_in_the_United_States
+//2nd Sunday of March to 1st Sunday of November
+---
+payload map 
+{
+	record:
+	{
+		PID: $.Person_PID__c,
+		RunawayDetails:
+		{					
+			Runaway_LocationFrom: flowVars.LOVReturned[("RUNAWAY_LOC_FROM-" ++ $.RunawayPersonType__r[0].Runaway_From_Location__c)][0] when ($.RunawayPersonType__r[0].Id?) == true and $.RunawayPersonType__r[0].Runaway_Start_Event_Status__c == "Completed"  otherwise "",
+			Runaway_StartDt: $.RunawayPersonType__r[0].Runaway_Start_Date__c  as :string {format: "yyyy-MM-dd"} as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"} when ($.RunawayPersonType__r[0].Id?) == true and $.RunawayPersonType__r[0].Runaway_Start_Date__c != null and $.RunawayPersonType__r[0].Runaway_Start_Event_Status__c == "Completed" otherwise "",
+			Runaway_StartTime: getDSTAdjustedDatetime($.RunawayPersonType__r[0].Runaway_Start_Date_Time__c as :datetime) when ($.RunawayPersonType__r[0].Id?) == true and $.RunawayPersonType__r[0].Runaway_Start_Date_Time__c != null and $.RunawayPersonType__r[0].Runaway_Start_Event_Status__c == "Completed" otherwise "",
+			Runaway_EndDate: $.RunawayPersonType__r[0].Runaway_End_Date__c as :string {format: "yyyy-MM-dd"} as :date {format: "yyyy-MM-dd"} as :string {format: "yyyyMMdd"} when ($.RunawayPersonType__r[0].Id?) == true and $.RunawayPersonType__r[0].Runaway_End_Date__c != null and $.RunawayPersonType__r[0].Runaway_End_Event_Status__c == "Completed" otherwise "",
+			Runaway_EndTime: getDSTAdjustedDatetime($.RunawayPersonType__r[0].Runaway_End_Date_Time__c as :datetime) when ($.RunawayPersonType__r[0].Id?) == true and $.RunawayPersonType__r[0].Runaway_End_Date_Time__c != null and $.RunawayPersonType__r[0].Runaway_End_Event_Status__c == "Completed" otherwise "",
+			Runaway_Days: ($.RunawayPersonType__r[0].Days_Missing__c as :number + p('runaway.additionalday') as :number) as :number {format: "##"} when ($.RunawayPersonType__r[0].Id?) == true and $.RunawayPersonType__r[0].Days_Missing__c != null and $.RunawayPersonType__r[0].Runaway_Start_Event_Status__c == "Completed" otherwise ""
+		}
+	}
+}]]></dw:set-payload>
+                    </dw:transform-message>
+
+                </when>
+                <otherwise>
+                    <dw:transform-message doc:name="TW: Set Runaway Dummy Payload">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	record:
+	{
+		PID: "1-DUMMY",
+		RunawayDetails:
+		{					
+			Runaway_LocationFrom: "1-DUMMY",
+			Runaway_StartDt: "1-DUMMY",
+			Runaway_StartTime: "1-DUMMY",
+			Runaway_EndDate: "1-DUMMY",
+			Runaway_EndTime: "1-DUMMY",
+			Runaway_Days: "1-DUMMY"
+		}
+	}
+}]]></dw:set-payload>
+                    </dw:transform-message>
+
+                </otherwise>
+            </choice>
+            <set-variable variableName="RunawayDetails" value="#[(flowVars.RunawayDetails != null and flowVars.RunawayDetails != &quot;&quot; ? flowVars.RunawayDetails + payload : payload)]" mimeType="application/java" doc:name="FV: store Runaway Details" doc:description="Store run away details in a flow variable. It will be used in preparing final data set 2. "/>
+        </foreach>
+    </sub-flow>
+
+
+</mule>

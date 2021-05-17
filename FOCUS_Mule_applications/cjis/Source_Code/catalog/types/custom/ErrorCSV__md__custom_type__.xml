@@ -1,0 +1,117 @@
+<custom__type__definition>
+  <version>5.2.0.0</version>
+  <typeName class="org.mule.common.metadata.DefaultMetaDataKey">
+    <id>ErrorCSV</id>
+    <displayName>ErrorCSV</displayName>
+    <category>DEFAULT</category>
+    <metaDataKeyPropertiesManager>
+      <properties>
+        <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+      </properties>
+    </metaDataKeyPropertiesManager>
+  </typeName>
+  <metadataModel class="org.mule.common.metadata.DefaultListMetaDataModel">
+    <dataType>LIST</dataType>
+    <metaDataModelPropertiesManager>
+      <properties/>
+    </metaDataModelPropertiesManager>
+    <model class="org.mule.common.metadata.DefaultStructuredMetadataModel">
+      <dataType>CSV</dataType>
+      <metaDataModelPropertiesManager>
+        <properties>
+          <org.mule.common.metadata.property.CSVHasHeadersMetaDataProperty>
+            <hasHeaders>true</hasHeaders>
+          </org.mule.common.metadata.property.CSVHasHeadersMetaDataProperty>
+        </properties>
+      </metaDataModelPropertiesManager>
+      <fields>
+        <org.mule.common.metadata.DefaultMetaDataField>
+          <name>FieldName</name>
+          <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+            <dataType>STRING</dataType>
+            <metaDataModelPropertiesManager>
+              <properties/>
+            </metaDataModelPropertiesManager>
+          </model>
+          <accessType>READ</accessType>
+          <metaDataFieldPropertyManager>
+            <properties>
+              <org.mule.common.metadata.property.LabelMetaDataProperty>
+                <label>FieldName</label>
+              </org.mule.common.metadata.property.LabelMetaDataProperty>
+            </properties>
+          </metaDataFieldPropertyManager>
+        </org.mule.common.metadata.DefaultMetaDataField>
+        <org.mule.common.metadata.DefaultMetaDataField>
+          <name>FieldValue</name>
+          <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+            <dataType>STRING</dataType>
+            <metaDataModelPropertiesManager>
+              <properties/>
+            </metaDataModelPropertiesManager>
+          </model>
+          <accessType>READ</accessType>
+          <metaDataFieldPropertyManager>
+            <properties>
+              <org.mule.common.metadata.property.LabelMetaDataProperty>
+                <label>FieldValue</label>
+              </org.mule.common.metadata.property.LabelMetaDataProperty>
+            </properties>
+          </metaDataFieldPropertyManager>
+        </org.mule.common.metadata.DefaultMetaDataField>
+        <org.mule.common.metadata.DefaultMetaDataField>
+          <name>ErrorDescription</name>
+          <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+            <dataType>STRING</dataType>
+            <metaDataModelPropertiesManager>
+              <properties/>
+            </metaDataModelPropertiesManager>
+          </model>
+          <accessType>READ</accessType>
+          <metaDataFieldPropertyManager>
+            <properties>
+              <org.mule.common.metadata.property.LabelMetaDataProperty>
+                <label>ErrorDescription</label>
+              </org.mule.common.metadata.property.LabelMetaDataProperty>
+            </properties>
+          </metaDataFieldPropertyManager>
+        </org.mule.common.metadata.DefaultMetaDataField>
+        <org.mule.common.metadata.DefaultMetaDataField>
+          <name>PID</name>
+          <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+            <dataType>STRING</dataType>
+            <metaDataModelPropertiesManager>
+              <properties/>
+            </metaDataModelPropertiesManager>
+          </model>
+          <accessType>READ</accessType>
+          <metaDataFieldPropertyManager>
+            <properties>
+              <org.mule.common.metadata.property.LabelMetaDataProperty>
+                <label>PID</label>
+              </org.mule.common.metadata.property.LabelMetaDataProperty>
+            </properties>
+          </metaDataFieldPropertyManager>
+        </org.mule.common.metadata.DefaultMetaDataField>
+        <org.mule.common.metadata.DefaultMetaDataField>
+          <name>CaseNumber</name>
+          <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+            <dataType>STRING</dataType>
+            <metaDataModelPropertiesManager>
+              <properties/>
+            </metaDataModelPropertiesManager>
+          </model>
+          <accessType>READ</accessType>
+          <metaDataFieldPropertyManager>
+            <properties>
+              <org.mule.common.metadata.property.LabelMetaDataProperty>
+                <label>CaseNumber</label>
+              </org.mule.common.metadata.property.LabelMetaDataProperty>
+            </properties>
+          </metaDataFieldPropertyManager>
+        </org.mule.common.metadata.DefaultMetaDataField>
+      </fields>
+    </model>
+    <isArray>false</isArray>
+  </metadataModel>
+</custom__type__definition>

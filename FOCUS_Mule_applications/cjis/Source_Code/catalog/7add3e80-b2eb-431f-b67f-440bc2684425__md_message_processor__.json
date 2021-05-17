@@ -1,0 +1,26 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "DataSet1QueryOutput"
+        }
+    },
+    "outputMessageMetadata": {
+        "flowVariables": {
+            "DataSet1PIDMissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "ErrorCSV"
+            },
+            "PIDMissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "PIDMissing"
+            },
+            "DataSet1SBIMissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "ErrorCSV"
+            }
+        }
+    },
+    "id": "7add3e80-b2eb-431f-b67f-440bc2684425",
+    "version": "5.2.0.0"
+}

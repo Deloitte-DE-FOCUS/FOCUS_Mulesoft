@@ -1,0 +1,21 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "FinalCSV"
+        },
+        "flowVariables": {
+            "DataSet2SBIMissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "ErrorCSV"
+            },
+            "DataSet2PIDMissing": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "ErrorCSV"
+            }
+        }
+    },
+    "id": "98b22d21-c645-44d9-8713-91f54cec5542",
+    "version": "5.2.0.0"
+}
