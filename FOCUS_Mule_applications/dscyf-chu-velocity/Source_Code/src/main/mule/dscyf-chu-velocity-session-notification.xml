@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+       xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+       <flow name="post:\chuportal\velovity-notification:dscyf-chu-velocity-config">
+             <logger level="INFO" doc:name="Logger check payload" doc:id="045ecaa7-c544-4c55-a868-2a91ac1a79cf" message='#["Incoming Request" : payload]'/>
+             <ee:transform doc:name="Transform Message" doc:id="5aaafe94-f11b-4bbb-9da6-21684f9311f4" >
+                    <ee:message >
+                          <ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+response: payload mapObject(value,key) -> (key):value]]></ee:set-payload>
+                    </ee:message>
+             </ee:transform>
+             <ee:transform doc:name="Transform Message" doc:id="be175b7e-9ffe-45a4-be9d-0a919c7ac8e7" >
+                    <ee:message >
+                          <ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+       "remittance_id": payload.response["remittance_id"] default "",
+       "client_account_number": payload.response["client_account_number"] default "",
+       "transaction_status": payload.response["transaction_status"] default "",
+       "payment_type": payload.response["payment_type"] default "",
+       "amount": payload.response["amount"] default "",
+       "payment_date": payload.response["payment_date"] default "",
+       "transaction_id": payload.response["transaction_id"] default "",
+       "company_name": payload.response["company_name"] default "",
+       "parcel": payload.response["company_name"] default "",
+       "avs_response": payload.response["avs_response"] default "",
+       "fail_code": payload.response["fail_code"] default "",
+       "billing_name": payload.response["billing_name"] default ""
+}
+    
+]]></ee:set-payload>
+                    </ee:message>
+             </ee:transform>
+             <set-variable value='#["remittance_id" : payload.remittance_id]' doc:name="Set remittance ID Variable" doc:id="5973ff2e-5705-41f8-84a9-23ca35330633" variableName="remittanceid"/>
+             <choice doc:name="Choice" doc:id="caa6d990-d91e-4157-a373-080b26633cad" >
+                    <when expression='#[payload.transaction_status == "0"]'>
+                          <logger level="INFO" doc:name="Logger" doc:id="4d2c2925-26db-4e8b-814f-36cb4cc2bf36" message="Success Pay"/>
+                          <salesforce:query doc:name="Query" doc:id="6a61bd8c-5ab9-484c-915e-e1204795a944" config-ref="Salesforce_Config" target="QueryResponse">
+                                 <salesforce:salesforce-query><![CDATA[Select ID,Name,Remittance_ID__c,Payment_Status__c,Amount__c,Payment_Submission_Date__c,Client_Account_Number__c,Parcel__c,Time_Calculation__c,Received_Date__c,Billing_Name__c,Fail_Code__c,AVS_Response__c,Transaction_Id__c,Payment_type__c,Transaction_Status__c from DEL_CHU_Payment_Transaction__c where Remittance_ID__c = :rem_ID and (Payment_Status__c = 'Payment Pending' or Payment_Status__c = 'Authentication Passed') and Time_Calculation__c <= 50]]></salesforce:salesforce-query>
+                                 <salesforce:parameters><![CDATA[#[output application/java
+---
+{
+       rem_ID : "'"++ payload.remittance_id ++"'"
+}]]]></salesforce:parameters>
+                          </salesforce:query>
+                          <choice doc:name="Choice" doc:id="c915a524-43dc-417a-bd8e-be079e00be94">
+                                 <when expression="#[sizeOf (vars.QueryResponse) &gt; 0]">
+                                       <ee:transform doc:name="Transform Message" doc:id="f522f210-963e-4f8c-9da0-52c4c11bda9f">
+                                              <ee:message>
+                                                    <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+
+var dt = payload.payment_date
+---
+[{
+    Id: vars.QueryResponse[0].Id,
+    Transaction_Status__c: payload.transaction_status,
+    Transaction_Id__c: payload.transaction_id,
+    Payment_Status__c: "Payment Success",
+    AVS_Response__c: payload.avs_response,
+    Fail_Code__c: payload.fail_code,
+       Billing_Name__c: payload.billing_name replace "+" with(" "),
+       Received_Date__c: dt as Date {format: 'MMddyyyy'} as Date {format: 'yyyy-MM-dd'},
+       Payment_type__c: if(payload.payment_type == "1") "Credit/Debit Card" else if(payload.payment_type == "2") "Personal Check" else if(payload.payment_type == "3") "Business Check" else "",
+       Payment_Submission_Date__c: now() as Date {format: 'yyyy-MM-dd'}
+}]]]></ee:set-payload>
+                                              </ee:message>
+                                       </ee:transform>
+                                       <salesforce:update doc:name="Update" doc:id="3f7b8938-30a7-4ee1-9e3a-85656c023a13" config-ref="Salesforce_Config" type="DEL_CHU_Payment_Transaction__c" target="CHUPaymentResponse"/>
+                                       <salesforce:query doc:name="Query" doc:id="1cf25516-2632-4bed-aedb-b1b0486c3402" config-ref="Salesforce_Config" target="CPRResponseCheck">
+							<salesforce:salesforce-query ><![CDATA[Select ID,Name,(select id,Request_Staus__c from Child_Protection_Registries__r where Request_Staus__c = 'Pending Payment' limit 1) from DEL_CHU_Payment_Transaction__c where Remittance_ID__c = :rem_ID ]]></salesforce:salesforce-query>
+							<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+       rem_ID : ("'"++ (vars.remittanceid[0] default "" )++ "'")
+}]]]></salesforce:parameters>
+						</salesforce:query>
+						<choice doc:name="Choice" doc:id="e26a262e-6738-4d0d-be21-57aabf1fa118" >
+							<when expression="#[vars.CPRResponseCheck[0].Child_Protection_Registries__r == null]">
+								<set-payload value="success=true" doc:name="Set Payload" doc:id="9e4ca1ab-101f-4bd8-8001-f698cfb5dc9c" />
+							</when>
+							<otherwise >
+								<try doc:name="Try" doc:id="955c7127-597e-404a-9087-335d1bc0ef30" >
+									<ee:transform doc:name="Transform Message" doc:id="2920f016-2c0f-4968-9dd6-96287fa94437">
+									<ee:message>
+										<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var dt = payload.payment_date
+---
+[{
+    Id: vars.CPRResponseCheck[0].Id,
+    Payment_Status__c: "Payment Failed",
+    Payment_Submission_Date__c: now() as Date {format: 'yyyy-MM-dd'}
+}]]]></ee:set-payload>
+									</ee:message>
+								</ee:transform>
+									<salesforce:update doc:name="Update" doc:id="4f4fde0c-7f73-4f4b-9ff6-e980ac447797" config-ref="Salesforce_Config" type="DEL_CHU_Payment_Transaction__c" />
+									<error-handler >
+										<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="015921ae-b06f-4216-8585-a6ce05c71808" >
+											<logger level="INFO" doc:name="Logger" doc:id="933aaf33-e9a8-412a-955a-fa8a1755b360" message='#["On Error Continue"]'/>
+										</on-error-continue>
+									</error-handler>
+								</try>
+								<set-payload value="success=false" doc:name="Set Payload" doc:id="da070f35-0e8f-4b22-834e-ec63bbdd68b2" />
+							</otherwise>
+						</choice>
+                                 
+</when>
+                                 <otherwise>
+                                       <set-payload value="success=false" doc:name="Set Payload" doc:id="5b3fb283-9d4f-48f4-b0f0-fda00ba5cfe3" />
+                                 </otherwise>
+                          </choice>
+                    
+</when>
+                    <when expression='#[payload.transaction_status == "1"]'>
+                          <logger level="INFO" doc:name="Logger" doc:id="7bbbc045-8782-4682-968a-f9430d4e828b" message="False - Failed"/>
+                          <salesforce:query doc:name="Query" doc:id="22e94347-46ec-4b42-b2b9-71001b80d2b6" config-ref="Salesforce_Config" target="QueryResponse">
+                                 <salesforce:salesforce-query><![CDATA[Select ID,Name,Remittance_ID__c,Payment_Status__c,Amount__c,Payment_Submission_Date__c,Client_Account_Number__c,Parcel__c,Time_Calculation__c,Received_Date__c,Billing_Name__c,Fail_Code__c,AVS_Response__c,Transaction_Id__c,Payment_type__c,Transaction_Status__c from DEL_CHU_Payment_Transaction__c where Remittance_ID__c = :rem_ID and (Payment_Status__c = 'Payment Pending' or Payment_Status__c = 'Authentication Passed') and Time_Calculation__c <= 50]]></salesforce:salesforce-query>
+                                 <salesforce:parameters><![CDATA[#[output application/java
+---
+{
+       rem_ID : ("'"++ (vars.remittanceid[0] default "" )++ "'")
+}]]]></salesforce:parameters>
+                          </salesforce:query>
+                          <choice doc:name="Choice" doc:id="20fefa7a-1496-4b91-8201-69e9608010c6">
+                                 <when expression="#[sizeOf (vars.QueryResponse) &gt; 0]">
+                                       <ee:transform doc:name="Transform Message" doc:id="435f8ca3-ff23-45e7-ae1a-7c39fa4ee0ff">
+                                              <ee:message>
+                                                    <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var dt = payload.payment_date
+---
+[{
+    Id: vars.QueryResponse[0].Id,
+    Transaction_Status__c: payload.transaction_status,
+    Transaction_Id__c: payload.transaction_id,
+    Payment_Status__c: "Payment Failed",
+    AVS_Response__c: payload.avs_response,
+    Fail_Code__c: payload.fail_code,
+       Billing_Name__c: payload.billing_name replace "+" with(" "),
+       Received_Date__c: dt as Date {format: 'MMddyyyy'} as Date {format: 'yyyy-MM-dd'},
+       Payment_type__c: if(payload.payment_type == 1) "Credit/Debit Card" else if(payload.payment_type == 2) "Personal Check" else if(payload.payment_type == 3) "Business Check" else "",
+    Payment_Submission_Date__c: now() as Date {format: 'yyyy-MM-dd'}
+}]]]></ee:set-payload>
+                                              </ee:message>
+                                        </ee:transform>
+                                       <salesforce:update doc:name="Update" doc:id="6c0088bb-986a-41d0-bd9f-967cac8feac0" config-ref="Salesforce_Config" type="DEL_CHU_Payment_Transaction__c" target="CHUPaymentResponse"/>
+                                       <set-payload value='success=false' doc:name="Set Payload" doc:id="6ccbf865-2443-4c10-80ad-49df866099d4" />
+                                 </when>
+                                 <otherwise>
+                                       <set-payload value="success=false" doc:name="Set Payload" doc:id="141c64fe-67e8-4be0-97d8-ecea7d776d13" />
+                                 </otherwise>
+                          </choice>
+                    </when>
+                    <otherwise >
+                          <logger level="INFO" doc:name="Logger Default" doc:id="57e2cebb-8a3a-42ad-8cb4-20eb74aad234" message="False"/>
+                          <set-payload value="success=false" doc:name="Set Payload" doc:id="373ddf6d-2c2c-483b-8834-8a1c92af7180" />
+                    </otherwise>
+             </choice>
+             <set-payload value="#[payload]" doc:name="Set Payload" doc:id="9c4eda37-048d-4761-8a64-16e41001fed8" />
+             <logger level="INFO" doc:name="Logger Final" doc:id="f8f92700-9845-45f3-9440-8e2331881af1" message='#["result: success=" ++ payload]'/>
+             <error-handler >
+                    <on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c057b87a-5588-4f93-a768-656b42d934de" type="ANY">
+                          <logger level="INFO" doc:name="Logger" doc:id="f08834d8-9af4-4baf-bbc8-cf52420afd21" message='#["Reason for failure" : error.description]'/>
+                          <set-payload value="#[error.description]" doc:name="Set Payload" doc:id="e5eeeeac-7833-46a9-b0d4-9dc8a4e84adc" />
+                    
+</on-error-propagate>
+             </error-handler>
+
+
+    </flow>
+       </mule>

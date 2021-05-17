@@ -1,0 +1,75 @@
+#%RAML 1.0
+title : Govultion Interface API
+version: v1
+protocols: [ HTTP,HTTPS ]
+baseUri: http://api.samplehost.com/solrproviderservices
+#mediaType: [ application/x-www-form-urlencoded, text/plain, application/java ]
+#mediaType: application/json
+securitySchemes:
+  basicAuth:
+    description: Each request must contain the headers necessary for basic authentication
+    type: Basic Authentication
+    describedBy:
+      headers:
+        Authorization:
+          description: |
+            Used to send the Base64 encoded "username:password" credentials
+            type: string
+      responses:
+        401:
+          description: |
+            Unauthorized. Either the provided username and password combination is invalid, or the user is not allowed to access the content provided by the requested URL.
+traits:
+  client-id-required:
+    queryParameters:
+      client_id:
+        type: string
+      client_secret:
+        type: string
+  hasNotFound:
+    responses:
+      404:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string
+  isNotAcceptable:
+    responses:
+      406:
+        body:
+          application/json:
+            properties:
+              statusCode : string
+              message : string   
+
+/chuportal:          
+  /velovity-notification:
+    post:
+      displayName: Velocity Notication
+      description: Notification to Velocity
+  #    is: [hasNotFound,isNotAcceptable]
+      body: 
+        application/x-www-form-urlencoded:
+          type: object
+              
+      responses:
+        200:
+          body:
+            application/json:
+            
+  /velovity-verification:
+    post:
+      displayName: Velocity Verification
+      description: Verification of Velocity request   
+  #    is: [hasNotFound,isNotAcceptable]
+      body: 
+        application/x-www-form-urlencoded:
+          type: object
+                   
+      responses:
+        200:
+          body:
+            application/json:
+            
+ 

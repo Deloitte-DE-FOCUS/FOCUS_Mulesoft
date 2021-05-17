@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="post:\chuportal\velovity-verification:dscyf-chu-velocity-config">
+		<logger level="INFO" doc:name="Payload Recieved by Govolution" doc:id="6fe03e70-5be7-401f-8300-1562b53609db" message='#["Incoming request" : payload]'/>
+		<ee:transform doc:name="Transform Message" doc:id="2f47ad2c-8267-4c16-a818-ce49911f5dbd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+response: payload mapObject(value,key) -> (key):value
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+             <ee:transform doc:name="Transform Message" doc:id="3674d39d-dcca-4ffc-90b7-1811c115677e" >
+                    <ee:message >
+                          <ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "application_id": payload.response["application_id"] default "",
+    "message_version": payload.response["message_version"] default "",
+    "remittance_id": payload.response["remittance_id"] default "",
+    "security_id": payload.response["security_id"] default ""   
+}
+    
+]]></ee:set-payload>
+                    </ee:message>
+             </ee:transform>
+             <logger level="INFO" doc:name="Logger to check key value pair" doc:id="2b8e9a18-70d8-4735-ac12-ff8c6a30bab0" message='#["Transformed message" : payload]'/>
+             <set-variable value="#[payload.remittance_id]" doc:name="Set remittance ID Variable" doc:id="360741b4-b344-4fb5-9c72-f692b29c9c62" variableName="remittanceid"/>
+             <logger level="INFO" doc:name="Logger to print remittance ID" doc:id="caed98c4-43db-4d67-98ff-eba566330c41" message='#["remittanceid" : vars.remittanceid]'/>
+		<until-successful maxRetries="3" doc:name="Until Successful" doc:id="7deccae5-75a9-4770-86f0-a4e73befa594" millisBetweenRetries="6000">
+			<salesforce:query doc:name="QueryRemittance" doc:id="af99fd92-c44d-4754-8a9b-0a7102dd76dd" config-ref="Salesforce_Config" target="QueryResponse">
+                    <salesforce:salesforce-query>Select ID,Name,Remittance_ID__c,Payment_Status__c,Amount__c,Client_Account_Number__c,Agency_Name__c,Agency_Contact_Id__c,Agency_Id__c,Parcel__c,Time_Calculation__c from DEL_CHU_Payment_Transaction__c where Remittance_ID__c = :rem_ID and Payment_Status__c = 'Payment Pending' and Time_Calculation__c &lt;= 50</salesforce:salesforce-query>
+                    <salesforce:parameters><![CDATA[#[output application/java
+---
+{
+       rem_ID : ("'" ++ vars.remittanceid ++ "'")
+}]]]></salesforce:parameters>
+             </salesforce:query>
+		</until-successful>
+		<logger level="INFO" doc:name="Logger query results" doc:id="996916c2-10a7-4514-9e5e-d6819ecd8e0b" message='#["QueryResponse" : vars.QueryResponse]'/>
+             <choice doc:name="Choice" doc:id="7be46270-e50d-42ad-a83c-2388ba80942b" >
+                    <when expression="#[sizeOf (vars.QueryResponse) &gt; 0]">
+                          <try doc:name="Try" doc:id="4f3bea59-fb59-4e9f-9dcd-8a1b7343fe4b" >
+                                 <ee:transform doc:name="Transform Message" doc:id="f7ad7e1d-032d-498b-9e62-18ff4f233417" >
+                                       <ee:message >
+                                              <ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+    Id: vars.QueryResponse[0].Id,
+    Payment_Status__c: "Authentication Passed",
+    Security_Id__c: payload.security_id
+}]
+]]></ee:set-payload>
+                                       </ee:message>
+                                 </ee:transform>
+                                 <salesforce:update doc:name="Update" doc:id="242a9fd8-070d-480b-b078-013d5934540c" config-ref="Salesforce_Config" type="DEL_CHU_Payment_Transaction__c">
+                          </salesforce:update>
+                                 <error-handler >
+                                       <on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="6adc1869-52ec-4ca3-9bdd-9f26d0583c08" >
+                                              <logger level="INFO" doc:name="Logger" doc:id="2f45e805-65b7-405e-bba9-820ae602257e" message='#["On Error Continue" : error.description]'/>
+                                       </on-error-continue>
+                                 </error-handler>
+                          </try>
+                          <set-payload value='#["action_type=PayNow&amp;continue_processing=true&amp;amount=" ++ (vars.QueryResponse[0].Amount__c default 0) ++ "&amp;client_account_number=" ++ (vars.QueryResponse[0].Client_Account_Number__c default "") ++ "&amp;parcel=" ++ (vars.QueryResponse[0].Parcel__c default "") ++ "&amp;user_defined1=" ++ (vars.QueryResponse[0].Agency_Name__c default "") ++ "&amp;user_defined2=" ++ (vars.QueryResponse[0].Agency_Id__c default "") ++ "&amp;user_defined3=" ++ (vars.QueryResponse[0].Agency_Contact_Id__c default "")]' doc:name="Set Payload val found" doc:id="13bc33ca-8c26-43d6-a78e-4cb7954fc241" />
+                          <logger level="INFO" doc:name=" to review payload sent" doc:id="3c3b5f8f-753b-41d8-87f5-74d1cf669bb2" message='"Completed"'/>
+                    </when>
+                    <otherwise >
+                          <set-payload value='#["action_type=PayNow&amp;continue_processing=false&amp;echo_failure=true&amp;amount=0.00"]' doc:name="Set Payload" doc:id="1645a07e-9f87-4294-bafc-1c80ed83054f" />
+                          <logger level="INFO" doc:name=" Logger to review payload sent when false" doc:id="2a10235a-70f2-46cf-81f4-9fddaa09ab54" message="#[payload]"/>
+                    </otherwise>
+             </choice>
+             <error-handler >
+                    <on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="197a5c6c-ade7-4a17-a329-2dab68dc896a" type="ANY">
+                          <logger level="INFO" doc:name="Logger" doc:id="c948a8ca-39f1-478e-ab83-29e5239fc8b0" message='#["Reason for failure" : error.description]'/>
+				<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="193e7a67-249f-488e-936a-7d258f596c41" />
+                    
+</on-error-propagate>
+             </error-handler>
+
+    </flow>
+	</mule>
