@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <sub-flow name="lovquerySub_Flow">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Direction" value="#[json:/Direction]"/>
+            <add-message-property key="LOVNames" value="#[json:/LOVNames]"/>
+        </message-properties-transformer>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Name, Partner_Code__c, FOCUS_Code__c From DEL_Interface_Picklist_Mapping__c where Name in (#[flowVars.LOVNames]) and Active__c = true" doc:name="Salesforce"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.Direction == 'Inbound']">
+                <dw:transform-message  doc:name="TM:Inbound">
+                    <dw:set-variable variableName="LOVReturned"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	($.Name ++ "-" ++ $.Partner_Code__c) : $.FOCUS_Code__c
+}]]></dw:set-variable>
+                </dw:transform-message>
+            </when>
+            <when expression="#[flowVars.Direction == 'Outbound']">
+                <dw:transform-message doc:name="TM:Outbound">
+                    <dw:set-variable variableName="LOVReturned"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c
+}]]></dw:set-variable>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+</mule>

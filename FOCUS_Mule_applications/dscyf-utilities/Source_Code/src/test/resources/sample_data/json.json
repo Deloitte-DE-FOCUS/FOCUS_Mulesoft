@@ -1,0 +1,59 @@
+{
+	"OnDemandRequest": {
+		"interfaceName": "INF049",
+		"attrList": [{
+				"attributeValue": "sftp.doestarsextract.transaction.username",
+				"attributeName": "TransactionUsername"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.transaction.port",
+				"attributeName": "TransactionPort"
+			},
+			{
+				"attributeValue": "http://dhss-doe-sit.cloudhub.io/test",
+				"attributeName": "EndpointURL"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.transaction.path",
+				"attributeName": "TransactionPath"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.transaction.host",
+				"attributeName": "TransactionHost"
+			},
+			{
+				"attributeValue": "Extract",
+				"attributeName": "InterfaceType"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.transaction.password",
+				"attributeName": "TransactionPassword"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.transaction.filename",
+				"attributeName": "Filename"
+			},
+
+			{
+				"attributeValue": "sftp.doestarsextract.archive.username",
+				"attributeName": "ArchiveUsername"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.archive.port",
+				"attributeName": "ArchivePort"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.archive.path",
+				"attributeName": "ArchivePath"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.archive.host",
+				"attributeName": "ArchiveHost"
+			},
+			{
+				"attributeValue": "sftp.doestarsextract.archive.password",
+				"attributeName": "ArchivePassword"
+			}
+		]
+	}
+}

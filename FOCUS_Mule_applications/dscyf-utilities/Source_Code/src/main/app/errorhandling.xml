@@ -1,0 +1,1064 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sap="http://www.mulesoft.org/schema/mule/sap" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:smtp="http://www.mulesoft.org/schema/mule/smtp" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:sns="http://www.mulesoft.org/schema/mule/sns" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:quartz="http://www.mulesoft.org/schema/mule/quartz"
+	xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:sqs="http://www.mulesoft.org/schema/mule/sqs" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/quartz/current/mule-quartz.xsd
+http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sqs http://www.mulesoft.org/schema/mule/sqs/current/mule-sqs.xsd
+http://www.mulesoft.org/schema/mule/sns http://www.mulesoft.org/schema/mule/sns/current/mule-sns.xsd
+http://www.mulesoft.org/schema/mule/smtp http://www.mulesoft.org/schema/mule/smtp/current/mule-smtp.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd" >
+    <smtp:gmail-connector name="SMTP"   validateConnections="true" doc:name="Gmail">
+        <reconnect count="5"/>
+    </smtp:gmail-connector>
+    <cloudhub:config name="Cloudhub__Basic_Auth_Authentication" username="${cloudhub.username}" password="${cloudhub.password}" sandbox="${cloudhub.sandbox}" doc:name="Cloudhub: Basic Auth Authentication">
+        <reconnect count="5"/>
+    </cloudhub:config>
+
+	
+    <choice-exception-strategy name="Interface-Exception-Strategy">
+        <catch-exception-strategy when="#[exception.causedBy(java.net.SocketTimeoutException)]" doc:name="SocketTimeout Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Error" doc:description="Stores the message property for logging."/>
+            <choice doc:name="Choice">
+                <when expression="[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+                <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+		<catch-exception-strategy when="#[exception.causedBy(java.net.ConnectException)]" doc:name="Connection Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+               <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+        <logger level="ERROR" message="#[exception]" doc:name="Error" doc:description="Stores the message property for logging."/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+                <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+ 		</catch-exception-strategy>
+ 		<catch-exception-strategy
+			when="#[exception.causedBy(java.io.IOException)]"
+			doc:name="FileAlreadyException Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+            </message-properties-transformer>
+			<logger level="ERROR" message="#[exception.message]"
+				doc:name="Error" doc:description="Indicates that a error has occured."/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message metadata:id="aea43d1b-8d08-4043-af1c-b3e7e833a179" doc:name="Transform Message">
+                        <dw:input-variable variableName="Exception"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="Id" type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+               <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+		</catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.api.ConnectionException)]" doc:name="SFDC Connection Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Error" doc:description="Indicates that a error has occured."/>
+            <dw:transform-message metadata:id="aea43d1b-8d08-4043-af1c-b3e7e833a179" doc:name="Transform Message">
+                <dw:input-variable variableName="Exception"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+            </dw:transform-message>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname]">
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+                <otherwise>
+                    <logger message="SFDC is Unavailable, Unable to Connect to Salesforce. Please retry after some time" level="ERROR" doc:name="Logger"/>
+                    <cloudhub:create-notification config-ref="Cloudhub__Basic_Auth_Authentication" domain="${cloudhub.domain}" message="#[ 'SFDC is Unavailable for ' + flowVars.Interface + ', Unable to Connect to Salesforce. Please retry after some time'] " priority="ERROR" doc:name="Cloudhub"/>
+
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(com.mulesoft.weave.mule.exception.WeaveExecutionException)]" doc:name="Dataweave Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="InterfaceID" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Error" doc:description="Stores the message property for logging."/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+                <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.NotAcceptableException)]" doc:name="406">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+               <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.BadRequestException)]" doc:name="400">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+              <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.http.internal.request.ResponseValidatorException)]" doc:name="401">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+              <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.NotFoundException)]" doc:name="404">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="Id" type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+             <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.MethodNotAllowedException)]" doc:name="415">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+            <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.module.apikit.exception.UnsupportedMediaTypeException)]" doc:name="405">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Logger"/>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname != null]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+                <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.modules.salesforce.exception.SalesforceException)]" doc:name="SFDC Internal Connection Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Error" doc:description="Indicates that a error has occured."/>
+            <dw:transform-message metadata:id="aea43d1b-8d08-4043-af1c-b3e7e833a179" doc:name="Transform Message">
+                <dw:input-variable variableName="Exception"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+            </dw:transform-message>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname]">
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+                <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+		<catch-exception-strategy  doc:name="Default Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="MuleErrorID" value="#[message.rootId]"/>
+                <add-message-property key="Interface" value="#[flowVars.InterfaceID !=null?flowVars.InterfaceID:'']"/>
+                <add-message-property key="Exception" value="#[exception]"/>
+            </message-properties-transformer>
+            <logger message="#[exception]" level="ERROR" doc:name="Error" doc:description="Indicates that a error has occured."/>
+            <dw:transform-message metadata:id="aea43d1b-8d08-4043-af1c-b3e7e833a179" doc:name="Transform Message">
+                <dw:input-variable variableName="Exception"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+Mule_Instance_Id__c:flowVars.MuleErrorID,
+Error_Description__c:flowVars.Exception.Message,
+Exception_Type__c:'System',
+Status__c:'Error',
+Transaction_Name__c:flowVars.Tname
+}]]]></dw:set-payload>
+            </dw:transform-message>
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.Tname]">
+                    <sfdc:upsert config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce" externalIdFieldName="Id">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:upsert>
+                </when>
+                <otherwise>
+
+                     <sfdc:query config-ref="Salesforce__Basic_Authentication"  doc:name="Salesforce" query="select Id,Log_Transaction_Attachment__c from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'">
+        </sfdc:query>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],		
+	Flag:payload.Log_Transaction_Attachment__c[0]
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="Flag" value="#[payload[0].Flag]"/>
+
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="a99bc11a-c8ae-4803-81c3-1b9d60cba570" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Id: sessionVars.TID when sessionVars.TID != null otherwise '',
+	Transaction_Name__c: flowVars.Tname,
+	Mule_Instance_Id__c: flowVars.MuleErrorID  ,
+	Status__c: 'Error',
+	Error_Description__c:flowVars.Exception.Message,
+	Exception_Type__c:'System'
+}
+]
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+                    
+                </otherwise>
+            </choice>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+
+    
+    
+
+</mule>
+
+ 

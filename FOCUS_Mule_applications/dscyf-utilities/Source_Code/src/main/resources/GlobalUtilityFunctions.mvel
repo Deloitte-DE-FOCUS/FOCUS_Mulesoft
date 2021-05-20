@@ -1,0 +1,2 @@
+def isInvalidDate(textDate,format) { gov.delaware.validation.DateValidationUtil.dateValidate(textDate,format); }
+def isDateInDST(date,TimeZoneID) { return java.util.TimeZone.getTimeZone(TimeZoneID).inDaylightTime(date);  } 

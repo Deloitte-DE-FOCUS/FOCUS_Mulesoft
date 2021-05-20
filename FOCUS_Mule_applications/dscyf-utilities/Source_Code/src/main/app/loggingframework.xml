@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+    <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}" url="${sfdc.url}" disableSessionInvalidation="true" doc:name="Salesforce: Basic Authentication">
+        <reconnect count="20" frequency="5000"/>
+    </sfdc:config>
+    
+    <configuration doc:name="Configuration">
+	    <expression-language>
+	     	<global-functions> def isValidDate(textDate,format) { gov.delaware.validation.DateValidationUtil.dateValidate(textDate,format) } </global-functions> 
+	    </expression-language>
+    </configuration>
+    <sub-flow name="CheckForExistingLoadUsingHeaderDateSub_Flow">
+<dw:transform-message doc:name="Transform Message : Get Header Date" doc:description="Get Header Date from payload">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-variable variableName="interfaceHeaderDate"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload.headerDate as :date {format : "yyyy-MM-dd"})
+]]></dw:set-variable>
+        </dw:transform-message>
+
+                <validation:is-true config-ref="Validation_Configuration-testFramework" message="This file is either already processed or seems to be old (Header Date &quot;#[dw('flowVars.interfaceHeaderDate as :date as :string {format : &quot;yyyy-MM-dd&quot;}')]&quot; is less than or equal to the Last Processed Date &quot;#[flowVars.InterfaceLastProcessedDate]&quot;). Hence, discarded from further processing." exceptionClass="java.lang.Exception" expression="#[dw('((flowVars.interfaceHeaderDate as :date) &gt; (flowVars.InterfaceLastProcessedDate as :date {format : &quot;yyyy-MM-dd&quot;})) when (flowVars.InterfaceLastProcessedDate != null) otherwise true')]" doc:name="Validation : Raise Exception " doc:description="Raise Exception since the Header Date is less than the Last Processed Date which suggests that the File has already been Processed."/>
+
+    </sub-flow>
+    <sub-flow name="UpdateLastProcessedDateUsingHeaderDateSub_Flow">
+                <dw:transform-message doc:name="Transform Message : Prepare Payload with Updated Processed Date" doc:description="Prepare Payload for Update operation
+Interface Header date is passed to the Last Processed Date field">
+                    <dw:input-payload mimeType="application/json"/>
+					<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	"Id" : flowVars.InterfaceSalesforceId,
+//	"Last_Processed_Date__c" : (payload.headerDate as :date {format : "yyyy-MM-dd"})  	
+	"Last_Processed_Date__c" : (flowVars.interfaceHeaderDate as :date)  	
+}]]]></dw:set-payload>
+                </dw:transform-message>
+                <sfdc:update config-ref="Salesforce__Basic_Authentication" type="IA_Integration_Acccelerator__c" doc:name="Salesforce : Update Last Processed Date" doc:description="Update Last Processed Date in the Interface Dashboard so that the next Transactions can be compared based on this">
+                    <sfdc:objects ref="#[payload]"/>
+                </sfdc:update>
+                <logger message="After Last Processed Date Updation #[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>    
+    <sub-flow name="LogTransactionSubFlow">
+        
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String"/>
+        <logger message="#[json:/TransactionID]" level="INFO" doc:name="Logger"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties" doc:description="Extract Transaction ID from JSON in a variable
+Extrcat Interface ID from JSON in a variable
+Extract payload from JSON in a variable
+Set today's date in a variable">
+            <add-message-property key="TransactionID" value="#[json:/TransactionID]"/>
+            <add-message-property key="InterfaceID" value="#[json:/InterfaceID]"/>
+            <add-message-property key="SubPayload" value="#[payload]"/>
+            <add-message-property key="Time" value="#[dw('(now &gt;&gt; &quot;America/New_York&quot;) as :string {format : &quot;MM/dd/yyyy&quot;}')]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.TransactionID != '']">
+                <flow-ref name="Create-NotInProgress_Transaction_Subflow" doc:name="Create-NotInProgress_Transaction_Subflow"/>
+            </when>
+            <otherwise>
+                <flow-ref name="Create-In-Progress_Transaction_Subflow" doc:name="Create-In-Progress_Transaction_Subflow"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="Create-In-Progress_Transaction_Subflow">
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id,Log_Transaction_Attachment__c,Last_Processed_Date__c  from IA_Integration_Acccelerator__c where name='#[flowVars.InterfaceID]'" doc:name="Salesforce : Get Interface Details" doc:description="Get Interface Details using Interface ID"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	Transaction_Name__c: payload.Id[0],	
+	Mule_Instance_Id__c: flowVars.SubPayload.MuleID ,
+	Status__c: flowVars.SubPayload.Status,
+	Operation__c: flowVars.SubPayload.Operation,
+	Request__c: flowVars.SubPayload.Request,
+	LogTransaction:payload[0].Log_Transaction_Attachment__c 
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="TransactionID1"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id]]></dw:set-variable>
+            <dw:set-variable variableName="InterfaceSalesforceId"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.Id[0]]]></dw:set-variable>
+            <dw:set-variable variableName="InterfaceLastProcessedDate"><![CDATA[%dw 1.0
+%output application/java
+---
+payload[0].Last_Processed_Date__c]]></dw:set-variable>
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Tname" value="#[payload[0].Transaction_Name__c]"/>
+            <add-message-property key="LogTransaction" value="#[payload[0].LogTransaction]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[ payload[0] - "LogTransaction" ]]]></dw:set-payload>
+        </dw:transform-message>
+
+
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  type="DEL_Batch_Dashboard__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:create>
+        <message-properties-transformer scope="session" doc:name="Message Properties">
+            <add-message-property key="TID" value="#[payload[0].Id]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+        	<when expression="#[sessionVars.TransAttachment != null and flowVars.LogTransaction == 'true']">
+        <choice doc:name="Choice">
+            	<when expression="#[sessionVars.TransAttachment.length() &gt; 20971520]">
+                       <!--  <set-session-variable variableName="ErrorAttachment" value="#[sessionVars.ErrorAttachment.split(System.lineSeparator())]" doc:name="Session Variable" doc:description="Split Attachement"/> -->
+						<logger message="Creating Multiple Attachments" level="INFO" doc:name="Logger"/>
+                        <expression-component doc:name="Expression" doc:description="Calculate Number of Batches Required 
+Calculate Total Bytes and set maximum threshold of Bytes for and Attachment 52 MB 
+Set Error Attachment as List of String 
+Set Total number of Lines Calculate Total Number of Bytes 
+Calculate Average Size of a Batch in terms of Lines
+Calculate the number of batches required in order to accommodate all Attachments "><![CDATA[flowVars.totalBytes = sessionVars.TransAttachment.length();
+flowVars.maxBytesPerBatch=20971520;
+sessionVars.TransAttachment = Arrays.asList(sessionVars.TransAttachment.split(System.lineSeparator()));
+flowVars.noOfLines=sessionVars.TransAttachment.size();
+flowVars.avgBytesPerLine=flowVars.totalBytes / flowVars.noOfLines;
+flowVars.batchSize=(int) Math.ceil(flowVars.maxBytesPerBatch / flowVars.avgBytesPerLine);
+flowVars.noOfBatchesRequired=(int) Math.ceil(flowVars.noOfLines / flowVars.batchSize);]]></expression-component>
+                        <dw:transform-message doc:name="Transform Message : Set Dummy Payload of Required Size" doc:description="Set Payload of type List of the same Size as the variable : noOfBatchesRequired">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function getArray(number,array,count)
+getArray(number,(array + ""),count + 1 ) when (count<number) otherwise array
+---
+getArray(flowVars.noOfBatchesRequired,[],0)]]></dw:set-payload>
+                        </dw:transform-message>
+                        <foreach   doc:name="For Each">
+                            <message-properties-transformer doc:name="Message Properties : Calculate start and Index of Sub List" scope="invocation" doc:description="Calculate start and Index of Sub List">
+                                <add-message-property key="beginIndex" value="#[(flowVars.endIndex == null ? flowVars.counter - 1 : (flowVars.endIndex + 1))]"/>
+                                <add-message-property key="endIndex" value="#[((flowVars.counter * flowVars.batchSize ) &gt;= flowVars.noOfLines ) ? flowVars.noOfLines : ((flowVars.counter * flowVars.batchSize) - 1)]"/>
+                            </message-properties-transformer>
+                            <set-payload value="#[sessionVars.TransAttachment.subList(flowVars.beginIndex, flowVars.endIndex)]" doc:name="Set Payload"/>
+                            <dw:transform-message doc:name="Transform Message">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload joinBy "\n") ++ "\n"]]></dw:set-payload>
+                            </dw:transform-message>
+                            <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                            <!--<dw:transform-message doc:name="Transform Message">
+                                <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+		ParentId: sessionVars.TID default "",
+	//ParentId: "a1nr0000000585i",
+	Name: flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "_" ++ flowVars.counter ++ "." ++ flowVars.SubPayload.CompletedFilename,
+	//Name: "Generated" ++ "_" ++ ( now as :string { format : "MM/dd/yyyy" }) ++ "_" ++ flowVars.counter ++ "." ++ "txt" ,
+	Description: 'Transaction Completed File',
+	Body: payload
+}
+] ]]></dw:set-payload>
+                            </dw:transform-message>
+                            <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce : Create Attachment" doc:description="Create Attachment which can be downloaded from the Dashboard">
+                                <sfdc:objects ref="#[payload]"/>
+                            </sfdc:create> -->
+							<logger message="#[sessionVars.TID],#[flowVars.SubPayload.CompletedFilename]" level="INFO" doc:name="Logger"/>
+							<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+							<dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.ErrorExtension default "txt" ,
+             Title : flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.ErrorExtension default "txt",
+             VersionData : payload
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+			 <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : sessionVars.TID 
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+                            
+                        </foreach>
+                        
+                    </when>
+                    <otherwise>
+            
+                <set-payload value="#[sessionVars.TransAttachment]" doc:name="Set Payload"/>
+                <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                <!--<dw:transform-message metadata:id="bc7a40a4-9181-4449-9759-b6556bcf0766" doc:name="Transform Message">
+                    <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+	ParentId: sessionVars.TID default "",
+	Name: flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.CompletedExtension ,
+	Description: 'Transaction Completed File',
+	Body: payload
+}
+] ]]></dw:set-payload>
+                </dw:transform-message>
+                <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce : Create Attachment" doc:description="Create Attachment which will be displayed in the Interface Dashboard">
+                    <sfdc:objects ref="#[payload]"/>
+                </sfdc:create>-->
+				<logger message="#[sessionVars.TID],#[flowVars.SubPayload.CompletedFilename]" level="INFO" doc:name="Logger"/>
+			<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+			<dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.CompletedExtension default "txt" ,
+             Title : flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.CompletedExtension default "txt",
+             VersionData : payload
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+			 <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : sessionVars.TID
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+            </otherwise>
+            </choice>
+            </when>
+            <otherwise>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="Create-NotInProgress_Transaction_Subflow">
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.ErrorAttachment != &quot;&quot; and sessionVars.ErrorAttachment != null]">
+                <choice doc:name="Choice">
+                    <when expression="#[sessionVars.ErrorAttachment.length() &gt; 20971520]">
+                       <!--  <set-session-variable variableName="ErrorAttachment" value="#[sessionVars.ErrorAttachment.split(System.lineSeparator())]" doc:name="Session Variable" doc:description="Split Attachement"/> -->
+						<logger message="Creating Multiple Attachments" level="INFO" doc:name="Logger"/>
+                        <expression-component doc:name="Expression" doc:description="Calculate Number of Batches Required 
+Calculate Total Bytes and set maximum threshold of Bytes for and Attachment 20 MB 
+Set Error Attachment as List of String 
+Set Total number of Lines Calculate Total Number of Bytes 
+Calculate Average Size of a Batch in terms of Lines
+Calculate the number of batches required in order to accommodate all Attachments "><![CDATA[flowVars.totalBytes = sessionVars.ErrorAttachment.length();
+flowVars.maxBytesPerBatch=20971520;
+sessionVars.ErrorAttachment = Arrays.asList(sessionVars.ErrorAttachment.split(System.lineSeparator()));
+flowVars.noOfLines=sessionVars.ErrorAttachment.size();
+flowVars.avgBytesPerLine=flowVars.totalBytes / flowVars.noOfLines;
+flowVars.batchSize=(int) Math.ceil(flowVars.maxBytesPerBatch / flowVars.avgBytesPerLine);
+flowVars.noOfBatchesRequired=(int) Math.ceil(flowVars.noOfLines / flowVars.batchSize);]]></expression-component>
+<!--                         <message-properties-transformer scope="invocation" doc:name="Message Properties" doc:description="Calculate Total Bytes and set maximum threshold of Bytes for and Attachment">
+                            <add-message-property key="totalBytes" value="#[sessionVars.ErrorAttachment.length()]"/>
+                            <add-message-property key="maxBytesPerBatch" value="#[20971520]"/>
+                        </message-properties-transformer>
+                        <message-properties-transformer scope="session" doc:name="Message Properties" doc:description="Set Error Attachment as List of String">
+                            <add-message-property key="ErrorAttachment" value="#[Arrays.asList(sessionVars.ErrorAttachment.split(System.lineSeparator()))]"/>
+                        </message-properties-transformer>
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties" doc:description="Set Total number of Lines">
+                            <add-message-property key="noOfLines" value="#[sessionVars.ErrorAttachment.size()]"/>
+                        </message-properties-transformer>
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties" doc:description="Calculate Total Number of Bytes">
+                            <add-message-property key="avgBytesPerLine" value="#[flowVars.totalBytes / flowVars.noOfLines]"/>
+                        </message-properties-transformer>
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties" doc:description="Calculate Average Size of a Batch in terms of Lines">
+                            <add-message-property key="batchSize" value="#[(int) Math.ceil(flowVars.maxBytesPerBatch / flowVars.avgBytesPerLine)]"/>
+                        </message-properties-transformer>
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties" doc:description="Calculate the number of batches required in order to accommodate all Attachments">
+                            <add-message-property key="noOfBatchesRequired" value="#[(int) Math.ceil(flowVars.noOfLines / flowVars.batchSize)]"/>
+                        </message-properties-transformer>
+ -->                        <dw:transform-message doc:name="Transform Message : Set Dummy Payload of Required Size" doc:description="Set Payload of type List of the same Size as the variable : noOfBatchesRequired">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function getArray(number,array,count)
+getArray(number,(array + ""),count + 1 ) when (count<number) otherwise array
+---
+getArray(flowVars.noOfBatchesRequired,[],0)]]></dw:set-payload>
+                        </dw:transform-message>
+                        <foreach   doc:name="For Each">
+                            <message-properties-transformer doc:name="Message Properties : Calculate start and Index of Sub List" scope="invocation" doc:description="Calculate start and Index of Sub List">
+                                <add-message-property key="beginIndex" value="#[(flowVars.endIndex == null ? flowVars.counter - 1 : (flowVars.endIndex + 1))]"/>
+                                <add-message-property key="endIndex" value="#[((flowVars.counter * flowVars.batchSize ) &gt;= flowVars.noOfLines ) ? flowVars.noOfLines : ((flowVars.counter * flowVars.batchSize) - 1)]"/>
+                            </message-properties-transformer>
+                            <set-payload value="#[sessionVars.ErrorAttachment.subList(flowVars.beginIndex, flowVars.endIndex)]" doc:name="Set Payload"/>
+                            <dw:transform-message doc:name="Transform Message">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload joinBy "\n") ++ "\n"]]></dw:set-payload>
+                            </dw:transform-message>
+                            <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                            <!--<dw:transform-message doc:name="Transform Message">
+                                <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+		ParentId: sessionVars.TID default "",
+	//ParentId: "a1nr0000000585i",
+	Name: flowVars.SubPayload.ErrorFilename ++ "_" ++ flowVars.Time ++ "_" ++ flowVars.counter ++ "." ++ flowVars.SubPayload.CompletedExtension ,
+	//Name: "Generated" ++ "_" ++ ( now as :string { format : "MM/dd/yyyy" }) ++ "_" ++ flowVars.counter ++ "." ++ "txt" ,
+	Description: 'Transaction Completed File',
+	Body: payload
+}
+] ]]></dw:set-payload>
+                            </dw:transform-message>
+                            <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce : Create Attachment" doc:description="Create Attachment which can be downloaded from the Dashboard">
+                                <sfdc:objects ref="#[payload]"/>
+                            </sfdc:create> -->
+							<logger message="#[sessionVars.TID],#[flowVars.SubPayload.CompletedFilename]" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+<dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.SubPayload.ErrorFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.CompletedExtension default "txt" ,
+             Title : flowVars.SubPayload.ErrorFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.CompletedExtension default "txt",
+             VersionData : payload
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+			 <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : sessionVars.TID
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+                            
+                        </foreach>
+                    </when>
+                    <otherwise>
+                        <set-payload value="#[sessionVars.ErrorAttachment]" doc:name="Set Payload"/>
+                        <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                        <!--<dw:transform-message  doc:name="Transform Message">
+                            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+	ParentId: flowVars.SubPayload.TransactionID,
+	Name: flowVars.SubPayload.ErrorFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.ErrorExtension ,
+	Description: 'Error/Warning log',
+	Body: payload
+}
+] ]]></dw:set-payload>
+                        </dw:transform-message>
+                        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce : Create Attachment" doc:description="Create Attachment which can be downloaded from the Dashboard">
+                            <sfdc:objects ref="#[payload]"/>
+                        </sfdc:create>-->
+						<logger message="#[sessionVars.TID],#[flowVars.SubPayload.ErrorFilename]" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+<dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.SubPayload.ErrorFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.ErrorExtension default "",
+             Title : flowVars.SubPayload.ErrorFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.ErrorExtension default "",
+             VersionData : payload
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+			 <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.SubPayload.TransactionID default ""
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+  <choice doc:name="Choice">
+            <when expression="#[sessionVars.TransAttachment != &quot;&quot; and sessionVars.TransAttachment != null]">
+            <choice doc:name="Choice">
+            	<when expression="#[sessionVars.TransAttachment.length() &gt; 20971520]">
+                       <!--  <set-session-variable variableName="ErrorAttachment" value="#[sessionVars.ErrorAttachment.split(System.lineSeparator())]" doc:name="Session Variable" doc:description="Split Attachement"/> -->
+						<logger message="Creating Multiple Attachments" level="INFO" doc:name="Logger"/>
+                        <expression-component doc:name="Expression" doc:description="Calculate Number of Batches Required 
+Calculate Total Bytes and set maximum threshold of Bytes for and Attachment 52 MB 
+Set Error Attachment as List of String 
+Set Total number of Lines Calculate Total Number of Bytes 
+Calculate Average Size of a Batch in terms of Lines
+Calculate the number of batches required in order to accommodate all Attachments "><![CDATA[flowVars.totalBytes = sessionVars.TransAttachment.length();
+flowVars.maxBytesPerBatch=20971520;
+sessionVars.TransAttachment = Arrays.asList(sessionVars.TransAttachment.split(System.lineSeparator()));
+flowVars.noOfLines=sessionVars.TransAttachment.size();
+flowVars.avgBytesPerLine=flowVars.totalBytes / flowVars.noOfLines;
+flowVars.batchSize=(int) Math.ceil(flowVars.maxBytesPerBatch / flowVars.avgBytesPerLine);
+flowVars.noOfBatchesRequired=(int) Math.ceil(flowVars.noOfLines / flowVars.batchSize);]]></expression-component>
+                        <dw:transform-message doc:name="Transform Message : Set Dummy Payload of Required Size" doc:description="Set Payload of type List of the same Size as the variable : noOfBatchesRequired">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function getArray(number,array,count)
+getArray(number,(array + ""),count + 1 ) when (count<number) otherwise array
+---
+getArray(flowVars.noOfBatchesRequired,[],0)]]></dw:set-payload>
+                        </dw:transform-message>
+                        <foreach   doc:name="For Each">
+                            <message-properties-transformer doc:name="Message Properties : Calculate start and Index of Sub List" scope="invocation" doc:description="Calculate start and Index of Sub List">
+                                <add-message-property key="beginIndex" value="#[(flowVars.endIndex == null ? flowVars.counter - 1 : (flowVars.endIndex + 1))]"/>
+                                <add-message-property key="endIndex" value="#[((flowVars.counter * flowVars.batchSize ) &gt;= flowVars.noOfLines ) ? flowVars.noOfLines : ((flowVars.counter * flowVars.batchSize) - 1)]"/>
+                            </message-properties-transformer>
+                            <set-payload value="#[sessionVars.TransAttachment.subList(flowVars.beginIndex, flowVars.endIndex)]" doc:name="Set Payload"/>
+                            <dw:transform-message doc:name="Transform Message">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload joinBy "\n") ++ "\n"]]></dw:set-payload>
+                            </dw:transform-message>
+                            <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                            <!--<dw:transform-message doc:name="Transform Message">
+                                <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+		ParentId: sessionVars.TID default "",
+	//ParentId: "a1nr0000000585i",
+	Name: flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "_" ++ flowVars.counter ++ "." ++ flowVars.SubPayload.CompletedExtension,
+	//Name: "Generated" ++ "_" ++ ( now as :string { format : "MM/dd/yyyy" }) ++ "_" ++ flowVars.counter ++ "." ++ "txt" ,
+	Description: 'Transaction Completed File',
+	Body: payload
+}
+] ]]></dw:set-payload>
+                            </dw:transform-message>
+                            <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce : Create Attachment" doc:description="Create Attachment which can be downloaded from the Dashboard">
+                                <sfdc:objects ref="#[payload]"/>
+                            </sfdc:create> -->
+                            <logger message="#[sessionVars.TID]#[flowVars.SubPayload.CompletedFilename]" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+<dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "_" ++ flowVars.counter ++ "." ++ flowVars.SubPayload.CompletedExtension default "txt",
+             Title : flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "_" ++ flowVars.counter ++ "." ++ flowVars.SubPayload.CompletedExtension default "txt",
+             VersionData : payload
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+			 <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : sessionVars.TID
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+                        </foreach>
+                    </when>
+                    <otherwise>
+                        <set-payload value="#[sessionVars.TransAttachment]" doc:name="Set Payload"/>
+                        <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                        <!--<dw:transform-message doc:name="Transform Message" metadata:id="bc7a40a4-9181-4449-9759-b6556bcf0766">
+                            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+[{
+	ParentId: flowVars.SubPayload.TransactionID,
+	Name: flowVars.SubPayload.CompletedFilename ++ "." ++ flowVars.SubPayload.CompletedExtension ,
+	Description: 'Transaction Completed File',
+	Body: payload
+}
+] ]]></dw:set-payload>
+                        </dw:transform-message>
+                        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name=" Salesforce: Create Attachment" doc:description="Create Attachment which can be downloaded from the Dashboard">
+                            <sfdc:objects ref="#[payload]"/>
+                        </sfdc:create>-->
+						<logger message="#[sessionVars.TID]#[flowVars.SubPayload.CompletedFilename]" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+<dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.CompletedFilename default "txt" ,
+             Title : flowVars.SubPayload.CompletedFilename ++ "_" ++ flowVars.Time ++ "." ++ flowVars.SubPayload.CompletedFilename default "txt",
+             VersionData : payload
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+			 <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.SubPayload.TransactionID
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+                    </otherwise>
+                    </choice>
+
+            </when>
+            
+            <otherwise>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <dw:transform-message metadata:id="cb7d8cf7-ba45-43dd-ba17-fa737fab7634" doc:name="Transform Message">
+            <dw:input-variable mimeType="application/json" variableName="SubPayload"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	Id: flowVars.SubPayload.TransactionID,	
+	Exception_Type__c: flowVars.SubPayload.ExceptionType,
+	Record_Count__c: flowVars.SubPayload.RecordCount,
+	Record_Count_Success__c: flowVars.SubPayload.RecordSuccess,
+	Record_Count_Error__c: flowVars.SubPayload.RecordError,
+	Records_Count_Skipped__c:flowVars.SubPayload.RecordSkipped default 0,
+	Error_Description__c: flowVars.SubPayload.ErrorDescription,
+	Status__c: flowVars.SubPayload.Status,
+	Response__c: flowVars.SubPayload.Response
+}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="interfaceTransactionStatus"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.SubPayload.Status
+]]></dw:set-variable>
+        </dw:transform-message>
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Batch_Dashboard__c" doc:name="Salesforce : Update Dashboard" doc:description="Update Dashboard to complete the Transaction">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+        <choice doc:name="Choice : Check whether Last Processed date will be updated" doc:description="Check whether the Last Processed date will be updated
+The Last Processed date will be updated only if the Load Interface has Header date and the Exception Type is Business and Status is Error, Success, Completed with Error(s)">
+            <when expression="#[(flowVars.interfaceTransactionStatus != null) &amp;&amp; ( (flowVars.interfaceTransactionStatus.equals(&quot;Completed with Error(s)&quot;)) || (flowVars.interfaceTransactionStatus.equals(&quot;Success&quot;)) || (flowVars.interfaceTransactionStatus.equals(&quot;Error&quot;)) ) &amp;&amp; (flowVars.interfaceHeaderDate != null)]">
+                <flow-ref name="UpdateLastProcessedDateUsingHeaderDateSub_Flow" doc:name="UpdateLastProcessedDateUsingHeaderDateSub_Flow" doc:description="Invoke flow to Update Last Processed Date in the Interface Dashboard"/>
+            </when>
+            <otherwise>
+                <logger message="Skipping Updation of Last Processed date" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+        </sub-flow>
+</mule>

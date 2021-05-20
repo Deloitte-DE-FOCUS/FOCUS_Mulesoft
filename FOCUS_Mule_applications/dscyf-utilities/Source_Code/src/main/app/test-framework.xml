@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+	xmlns:ss="http://www.springframework.org/schema/security"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd
+http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+
+    
+        <!-- <http:listener-config name="HTTP_Listener_Configuration"  host="0.0.0.0" port="${https.port}"  doc:name="HTTP Listener Configuration" connectionIdleTimeout="120000"> --> 
+         <http:listener-config name="HTTP_Listener_Configuration_testFramework"  host="0.0.0.0" port="${https.port}"  doc:name="HTTP Listener Configuration" protocol="HTTPS" connectionIdleTimeout="120000"> 
+         <tls:context>
+            <tls:key-store path="clientkeystore.jks" keyPassword="password" password="password"/>
+        </tls:context> 
+        </http:listener-config>
+	
+	
+	<sftp:connector name="SFTP-testFramework" validateConnections="true" doc:name="SFTP">
+<!-- 		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property> -->
+	</sftp:connector>    
+    <validation:config name="Validation_Configuration-testFramework" doc:name="Validation Configuration"/>
+    
+    <flow name="ConnectivityTest">
+        <http:listener config-ref="HTTP_Listener_Configuration_testFramework" path="/connectivitytest" doc:name="HTTP" />
+        <dw:transform-message doc:name="Transform Message : Convert to Java payload">
+            
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.OnDemandRequest.attrList reduce ((val, acc = {interfaceName : payload.OnDemandRequest.interfaceName }) -> acc ++ (( { (val.attributeName) : ( val.attributeValue ) } ))) ]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message : Extract Required Property">
+            <dw:set-variable variableName="Property"><![CDATA[%dw 1.0
+%output application/java
+%var InterfaceName =  {
+"INF001":"TANF Activity Extract", 
+"INF002":"TANF Request Extract", 
+"INF003":"TANF Response Load", 
+"INF004":"Medicaid Application Submission Extract", 
+"INF005":"Medicaid Application Response Load", 
+"INF006":"DHSS CCMIS Extract", 
+"INF007":"DHSS Case Activity Extract", 
+"INF008":"Child Support Application Extract", 
+"INF009":"Child Support Update Extract", 
+"INF010":"Child Support Case Load", 
+"INF011":"Child Support Payment Load", 
+"INF012":"Child Support Cost of Care Extract", 
+"INF013":"MMIS Extract", 
+"INF014":"MMIS Eligibility Load - 450", 
+"INF014b":"MMIS Eligibility Load - 450b", 
+"INF015":"HIPPA Medicaid Claims 837 Institutional Extract", 
+"INF016":"HIPPA Medicaid Claims 837 Professional Extract", 
+"INF017":"HIPAA Medicaid Claim 835 Remittance Load", 
+"INF018":"CJIS Request Extract", 
+"INF019":"CJIS Load", 
+"INF020":"CJIS Broker Schedule Information", 
+"INF021":"CJIS Broker Charge Information", 
+"INF023":"MCI Webservice", 
+"INF024":"DOE Enrolment Extract", 
+"INF025":"DOL Wage Request Extract", 
+"INF026":"DOL Wage Load", 
+"INF027":"DOL UI Load", 
+"INF028":"FSF Chartfield Load", 
+"INF029":"FSF Vendor Extract", 
+"INF030":"FSF Vendor Load", 
+"INF031":"FSF Vendor Log Load", 
+"INF032":"FSF Purchase Order Load", 
+"INF033":"FSF Payment Voucher Extract", 
+"INF034":"FSF Payment Voucher Log Load", 
+"INF035":"FSF Payment Detail Load", 
+"INF036":"FSF Transaction Detail Load", 
+"INF048":"Abuse Registry", 
+"INF049":"DOE Stars Extract", 
+"INF050":"DOE Stars Load", 
+"INF051":"TPL Carrier Information Load", 
+"INF052":"TPL Client Information Load",
+"INF053":"DOE Information Load"
+}
+---
+ {
+	TransactionHost:p(payload.TransactionHost),
+	InterfaceID:payload.interfaceName,
+	InterfaceName:InterfaceName[payload.interfaceName],
+	InterfaceType:payload.InterfaceType,	
+	TransactionPort:p(payload.TransactionPort),
+	TransactionPath:p(payload.TransactionPath),
+	TransactionUsername:p(payload.TransactionUsername),
+	TransactionPassword:p(payload.TransactionPassword),
+	Filename:payload.Filename,
+	
+	ArchiveHost: ( p(payload.ArchiveHost) ) when (payload.ArchiveHost != null and payload.ArchiveHost != "") otherwise "",	
+	ArchivePort:p(payload.ArchivePort),
+	ArchivePath:p(payload.ArchivePath),
+	ArchiveUsername:p(payload.ArchiveUsername),
+	ArchivePassword:p(payload.ArchivePassword)
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="Request Recieved #[payload]" level="INFO" doc:name="Logger"/>
+        <logger message="#[payload.InterfaceType]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice : Check Interface Type" doc:description="Choice : Check Interface Type and route to appropriate branches">
+            <when expression="#[flowVars.Property.InterfaceType == 'Load']">
+                
+                <enricher source="#[payload]" target="#[flowVars.connectivityResult]" doc:name="Message Enricher : Get Connectivity Result" doc:description="Retrieve Connectivity Result In Flow variable ">
+                    <flow-ref name="test-framework-load-transactionFlow" doc:name="test-framework-load-transactionFlow"/>
+                </enricher>
+                <choice doc:name="Choice : Check Transaction Connectivity">
+                    <when expression="#[flowVars.connectivityResult instanceof java.lang.Exception]">
+                        <logger message="Transaction SFTP Connectivity Failed" level="INFO" doc:name="Logger"/>
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Status and Message" doc:description="Set Transaction SFTP Connectivity Status to Failure
+Also Set Error Description for the Failure">
+                            <add-message-property key="transactionSFTPConnectivityStatus" value="Failure"/>
+                            <add-message-property key="transactionSFTPConnectivityErrorDescription" value="#[flowVars.connectivityResult.getMessage()]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <logger message="Transaction SFTP Connectivity Successfull" level="INFO" doc:name="Logger"/>
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Status" doc:description="Set Transaction SFTP Connectivity Status to Success">
+                            <add-message-property key="transactionSFTPConnectivityStatus" value="Success"/>
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+                <choice doc:name="Choice : Route to Archive Check if Required" doc:description="Check if Archive Connective Check is Required/Applicable">
+                    <when expression="#[(flowVars.Property.ArchiveHost != null) &amp;&amp; (!flowVars.Property.ArchiveHost.equals(&quot;&quot;))]">
+                        <set-payload value="#[flowVars.Property.InterfaceName + ' Connectivity Testing']" doc:name="Set Payload For Archive File"/>
+                        <enricher source="#[payload]" target="#[flowVars.connectivityResult]" doc:name="Message Enricher : Get Connectivity Result" doc:description="Retrieve Connectivity Result In Flow variable ">
+                            <flow-ref name="test-framework-load-archiveFlow" doc:name="test-framework-load-archiveFlow"/>
+                        </enricher>
+                        <choice doc:name="Choice : Check Archive Connectivity">
+                            <when expression="#[flowVars.connectivityResult instanceof java.lang.Exception]">
+                                <logger message="Archive SFTP Connectivity Failed" level="INFO" doc:name="Logger"/>
+                                <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Status and Message" doc:description="Set ArchiveSFTP Connectivity Status to Failure, Also Set Error Description for the Failure">
+                                    <add-message-property key="archiveSFTPConnectivityStatus" value="Failure"/>
+                                    <add-message-property key="archiveSFTPConnectivityErrorDescription" value="#[flowVars.connectivityResult.getMessage()]"/>
+                                </message-properties-transformer>
+                            </when>
+                            <otherwise>
+                                <logger message="Archive SFTP Connectivity Successfull" level="INFO" doc:name="Logger"/>
+                                <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Status" doc:description="Set Transaction SFTP Connectivity Status to Success">
+                                    <add-message-property key="archiveSFTPConnectivityStatus" value="Success"/>
+                                </message-properties-transformer>
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <logger message="Archive Connectivity Check is skipped/Not Applicable for this Test" level="INFO" doc:name="Logger"/>
+                    </otherwise>
+                </choice>
+               
+            </when>
+            <otherwise>
+                <set-payload value="#[flowVars.Property.InterfaceName + ' Connectivity Testing']" doc:name="Set Payload"/>
+                <object-to-string-transformer doc:name="Object to String"/>
+                <enricher source="#[payload]" target="#[flowVars.connectivityResult]" doc:name="Message Enricher : Get Connectivity Result" doc:description="Retrieve Connectivity Result In Flow variable ">
+                    <flow-ref name="test-framework-extract-transactionFlow" doc:name="test-framework-extract-transactionFlow"/>
+                </enricher>
+                <choice doc:name="Choice : Check Transaction Connectivity">
+                    <when expression="#[flowVars.connectivityResult instanceof java.lang.Exception]">
+                        <logger message="Transaction SFTP Connectivity Failed" level="INFO" doc:name="Logger"/>
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Status and Message" doc:description="Set Transaction SFTP Connectivity Status to Failure
+Also Set Error Description for the Failure">
+                            <add-message-property key="transactionSFTPConnectivityStatus" value="Failure"/>
+                            <add-message-property key="transactionSFTPConnectivityErrorDescription" value="#[flowVars.connectivityResult.getMessage()]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <logger message="Transaction SFTP Connectivity Successfull" level="INFO" doc:name="Logger"/>
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Status" doc:description="Set Transaction SFTP Connectivity Status to Success">
+                            <add-message-property key="transactionSFTPConnectivityStatus" value="Success"/>
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+                <choice doc:name="Check if Archive Connective Check is Required/Applicable" doc:description="Check if Archive Connective Check is Required/Applicable">
+                    <when expression="#[(flowVars.Property.ArchiveHost != null) &amp;&amp; (!flowVars.Property.ArchiveHost.equals(&quot;&quot;))]">
+                        <enricher source="#[payload]" target="#[flowVars.connectivityResult]" doc:name="Message Enricher : Get Connectivity Result" doc:description="Retrieve Connectivity Result In Flow variable ">
+                            <flow-ref name="test-framework-extract-archiveFlow" doc:name="test-framework-extract-archiveFlow"/>
+                        </enricher>
+                        <choice doc:name="Choice : Check Archive Connectivity">
+                            <when expression="#[flowVars.connectivityResult instanceof java.lang.Exception]">
+                                <logger message="Archive SFTP Connectivity Failed" level="INFO" doc:name="Logger"/>
+                                <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Status and Message" doc:description="Set ArchiveSFTP Connectivity Status to Failure, Also Set Error Description for the Failure">
+                                    <add-message-property key="archiveSFTPConnectivityStatus" value="Failure"/>
+                                    <add-message-property key="archiveSFTPConnectivityErrorDescription" value="#[flowVars.connectivityResult.getMessage()]"/>
+                                </message-properties-transformer>
+                            </when>
+                            <otherwise>
+                                <logger message="Archive SFTP Connectivity Successfull" level="INFO" doc:name="Logger"/>
+                                <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Status" doc:description="Set Transaction SFTP Connectivity Status to Success">
+                                    <add-message-property key="archiveSFTPConnectivityStatus" value="Success"/>
+                                </message-properties-transformer>
+                            </otherwise>
+                        </choice>
+                    </when>
+                    <otherwise>
+                        <logger message="Archive Connectivity Check is skipped/Not Applicable for this Test" level="INFO" doc:name="Logger"/>
+                    </otherwise>
+                </choice>
+
+                
+            </otherwise>
+        </choice>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{  
+   "SmokeTestingResponse":{  
+      "interfaceId":flowVars.Property.InterfaceID,
+      "status":"Success", 
+      "errorDescription":"",
+      "transactionStatus": flowVars.transactionSFTPConnectivityStatus default "",
+      "transactionErrorDescription": flowVars.transactionSFTPConnectivityErrorDescription default "",
+      "archiveStatus": flowVars.archiveSFTPConnectivityStatus default "",
+      "archiveErrorDescription": flowVars.archiveSFTPConnectivityErrorDescription default ""      
+      }
+}
+
+
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                <add-message-property key="Exception" value="#[exception.message]"/>
+            </message-properties-transformer>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{  
+   "SmokeTestingResponse":{  
+      "interfaceId":flowVars.Property.InterfaceID,
+      "status":"Failure", 
+      "errorDescription":flowVars.Exception
+      }
+}
+
+
+]]></dw:set-payload>
+            </dw:transform-message>
+        </catch-exception-strategy>
+
+    </flow>
+    <flow name="test-framework-load-transactionFlow">
+        <choice doc:name="Choice : Check If the Load is for Interface with Identity File" doc:description="Check If the Load is for Interface with Identity File">
+            <when expression="#[flowVars.Property.InterfaceName.equals(&quot;Medicaid Application Response Load&quot;)]">
+                <mulerequester:request resource="#[ 'sftp://' + flowVars.Property.TransactionUsername + ':' + flowVars.Property.TransactionPassword + '@' + flowVars.Property.TransactionHost + ':' + flowVars.Property.TransactionPort + flowVars.Property.TransactionPath + '?connector=SFTP-testFramework&amp;identityFile=${app.home}/classes/dti1_id_rsa']" doc:name="Mule Requester For Interfaces with Identity File" timeout="300000" doc:description="Mule Requester For Load Interfaces with Identity File"/>
+                <validation:is-not-null config-ref="Validation_Configuration-testFramework" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check if File is Present" doc:description="Check if the load file is available or not"/>
+                <object-to-string-transformer doc:name="Object to String"/>
+            </when>
+            <otherwise>
+                <mulerequester:request resource="#[ 'sftp://' + flowVars.Property.TransactionUsername + ':' + flowVars.Property.TransactionPassword + '@' + flowVars.Property.TransactionHost + ':' + flowVars.Property.TransactionPort + flowVars.Property.TransactionPath + '?connector=SFTP-testFramework&amp;myfilename=' + flowVars.Property.Filename]" doc:name="Mule Requester" timeout="300000" doc:description="Mule Requester For all Load Interfaces"/>
+                <validation:is-not-null config-ref="Validation_Configuration-testFramework" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation: Check if File is Present" doc:description="Check if the load file is available or not"/>
+                <object-to-string-transformer doc:name="Object to String"/>
+            </otherwise>
+        </choice>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-payload value="#[exception]" doc:name="Set Payload with Exception" doc:description="Set Payload with Exception"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="test-framework-load-archiveFlow">
+<!--         <choice doc:name="Choice : Check If the Load is for Interface with Identity File" doc:description="Check If the Load is for Interface with Identity File">
+            <when expression="#[flowVars.Property.InterfaceName.equals(&quot;Medicaid Application Response Load&quot;)]">
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-testFramework" outputPattern="#[flowVars.Property.Filename]" host="#[flowVars.Property.ArchiveHost]" port="#[flowVars.Property.ArchivePort]" path="#[flowVars.Property.ArchivePath]" identityFile="src/main/resources/${sftp.medicaidresponseload.archive.privatekeylocation}" responseTimeout="300000" duplicateHandling="overwrite" doc:name="SFTP Archive" doc:description="Write to Specified SFTP Directory"/>
+            </when>
+            <otherwise> -->
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-testFramework" outputPattern="#[flowVars.Property.Filename]" host="#[flowVars.Property.ArchiveHost]" port="#[flowVars.Property.ArchivePort]" path="#[flowVars.Property.ArchivePath]" user="#[flowVars.Property.ArchiveUsername]" password="#[flowVars.Property.ArchivePassword]" responseTimeout="300000" duplicateHandling="overwrite" doc:name="SFTP Archive" doc:description="Write to Specified SFTP Directory"/>
+<!--             </otherwise>
+        </choice> -->
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-payload value="#[exception]" doc:name="Set Payload with Exception" doc:description="Set Payload with Exception"/>
+        </catch-exception-strategy>
+    </flow>    
+    <flow name="test-framework-extract-transactionFlow">
+        <choice doc:name="Choice : Check If the Load is for Interface with Identity File" doc:description="Check If the Load is for Interface with Identity File">
+            <when expression="#[flowVars.Property.InterfaceName.equals(&quot;Medicaid Application Submission Extract&quot;)]">
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-testFramework" outputPattern="#[flowVars.Property.Filename]" user="#[flowVars.Property.TransactionUsername]" host="#[flowVars.Property.TransactionHost]" port="#[flowVars.Property.TransactionPort]" path="#[flowVars.Property.TransactionPath]" password="#[flowVars.Property.TransactionPassword]" identityFile="${app.home}/classes/dti1_id_rsa" responseTimeout="300000" duplicateHandling="overwrite" doc:name="SFTP Write" doc:description="Write to Specified SFTP Directory"/>
+            </when>
+            <otherwise>
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-testFramework" outputPattern="#[flowVars.Property.Filename]" host="#[flowVars.Property.TransactionHost]" port="#[flowVars.Property.TransactionPort]" path="#[flowVars.Property.TransactionPath]" user="#[flowVars.Property.TransactionUsername]" password="#[flowVars.Property.TransactionPassword]" responseTimeout="300000" duplicateHandling="overwrite" doc:name="SFTP Write" doc:description="Write to Specified SFTP Directory"/>
+            </otherwise>
+        </choice>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-payload value="#[exception]" doc:name="Set Payload with Exception" doc:description="Set Payload with Exception"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="test-framework-extract-archiveFlow">
+<!--         <choice doc:name="Choice : Check If the Load is for Interface with Identity File" doc:description="Check If the Load is for Interface with Identity File">
+            <when expression="#[flowVars.Property.InterfaceName.equals(&quot;Medicaid Application Submission Extract&quot;)]">
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-testFramework" outputPattern="#[flowVars.Property.Filename]" host="#[flowVars.Property.ArchiveHost]" port="#[flowVars.Property.ArchivePort]" path="#[flowVars.Property.ArchivePath]" identityFile="src/main/resources/${sftp.medicaidExtract.archive.privatekeylocation}" responseTimeout="300000" duplicateHandling="overwrite" doc:name="SFTP Archive" doc:description="Write to Specified SFTP Directory"/>
+            </when>
+            <otherwise> -->
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTP-testFramework" outputPattern="#[flowVars.Property.Filename]" host="#[flowVars.Property.ArchiveHost]" port="#[flowVars.Property.ArchivePort]" path="#[flowVars.Property.ArchivePath]" user="#[flowVars.Property.ArchiveUsername]" password="#[flowVars.Property.ArchivePassword]" responseTimeout="300000" duplicateHandling="overwrite" doc:name="SFTP Archive" doc:description="Write to Specified SFTP Directory"/>
+<!--             </otherwise>
+        </choice> -->
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-payload value="#[exception]" doc:name="Set Payload with Exception" doc:description="Set Payload with Exception"/>
+        </catch-exception-strategy>
+    </flow>    
+</mule>
