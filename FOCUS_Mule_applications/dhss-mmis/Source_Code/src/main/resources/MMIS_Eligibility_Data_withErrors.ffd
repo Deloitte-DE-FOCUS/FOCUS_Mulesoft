@@ -1,0 +1,17 @@
+form: FIXEDWIDTH
+name: 'MMISEligibilityDataErrors'
+values: 
+- { name: 'UniqueID', usage: M, type: String, length: 10 }
+- { name: 'MCI', usage: M, type: String, length: 10 }
+- { name: 'Elig-Start-Date', usage: M, type: String, length: 8 }
+- { name: 'Elig-End-Date', usage: M, type: String, length: 8 }
+- { name: 'Aid-Category', usage: M, type: String, length: 2 }
+- { name: 'MCO-Start-Date', usage: M, type: String, length: 8 }
+- { name: 'MCO-End-Date', usage: M, type: String, length: 8 }
+- { name: 'MCO-ID', usage: M, type: String, length: 10 }
+- { name: 'Taxonomy', usage: M, type: String, length: 10 }
+- { name: 'Date-of-Death', usage: M, type: String, length: 8 }
+- { name: 'Physician-Last-Name', usage: M, type: String, length: 35 }
+- { name: 'Physician-First-Name', usage: M, type: String, length: 25 }
+- { name: 'Physician-Phone-Number', usage: M, type: String, length: 10 }
+- { name: 'Errors', usage: M, type: String, length: 150 }
