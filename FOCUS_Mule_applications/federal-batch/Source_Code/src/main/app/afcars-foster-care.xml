@@ -566,7 +566,7 @@ Placement_InadequateHousing : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFoster
 				  
       HispanicOriginFosterCaretaker1: ((flowVars.FosterCarePerson[$]) default [])[0].Ethnicity default 0,
 
-      RaceFosterCaretaker2: ((flowVars.FosterCarePerson[$]) default [])[1].Race default "",
+      RaceFosterCaretaker2: ((flowVars.FosterCarePerson[$]) default [])[1].Race default 0,
 				   
       HispanicOriginFosterCaretaker2 : ((flowVars.FosterCarePerson[$]) default [])[1].Ethnicity default 0,
 
