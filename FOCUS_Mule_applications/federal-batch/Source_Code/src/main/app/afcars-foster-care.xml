@@ -2156,7 +2156,7 @@ flowVars.PrevCustodyEpisodeList default [] orderBy $.EpisodeStartDate]]></dw:set
 ---
 flowVars.AfcarsEpisodeList map {
       IDEpisode:$.IDEpisode,
-      PersonID:$.PersonID ,
+      PersonID:$.PersonID,
       PID:$.PID,
       EpisodeStartDate:$.EpisodeStartDate default '',
       EpisodeEndDate:$.EpisodeEndDate default '',
@@ -2513,8 +2513,8 @@ flowVars.FirstRunawayforE groupBy $.PersonID]]></dw:set-variable>
             <dw:set-variable variableName="FirstPRforE"><![CDATA[%dw 1.0
 %output application/java
 ---
-//( flowVars.FirstPlacementforE default [] ) ++ ( flowVars.FirstRunawayforE default [])
-( flowVars.FirstFosterCarePlacementforE default [] ) ++ ( flowVars.FirstRunawayforE default [])
+( flowVars.FirstPlacementforE default [] ) ++ ( flowVars.FirstRunawayforE default [])
+//( flowVars.FirstFosterCarePlacementforE default [] ) ++ ( flowVars.FirstRunawayforE default [])
 ]]></dw:set-variable>
 
             <dw:set-variable variableName="FirstRunaway"><![CDATA[%dw 1.0
@@ -2584,8 +2584,8 @@ payload map $]]></dw:set-payload>
 payload map {
             PlacementID:$.Id,
             PersonID:$.Contact__c,
-          StartDate:$.Placement_Start_Date__c as :date default '',
-           PlacementEnd:$.Placement_End_date__c as :date default '',
+          	StartDate:$.Placement_Start_Date__c as :date default '',
+           	PlacementEnd:$.Placement_End_date__c as :date default '',
             Case:$.Case_Number__c,
             CaseCounty:$.Case_Number__r.County__c,
             FosterCareSetting : $.Foster_Care_Setting_Type__c,
@@ -2682,7 +2682,8 @@ payload map {
       LastModifiedDate:$.Committee_Meeting_Date__c
 } filter ( ($.StartDate != null) and  ( (($.StartDate >= (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval as :date {format : "yyyyMMdd"}) ) when (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval != null) otherwise true ) and ($.StartDate < flowVars.extractInfo.ReportEndDate )))]]></dw:set-variable>
             </dw:transform-message>
-            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select id,Name__c,RecordType.DeveloperName,Plan_ID__r.Plan_Status__c, Plan_ID__r.Review_Status__c, Plan_ID__r.Date_of_Plan__c, Plan_ID__r.Date_of_Plan_Review__c, Plan_ID__r.Family_Goal__c, Primary_Goal__c from DEL_Person_Involved__c where ( ( (RecordType.DeveloperName ='Family_Service_Plan' OR RecordType.DeveloperName = 'Family_Service_Plan_Supervisor_App') AND Plan_ID__r.Plan_Status__c = 'Completed' AND ( Plan_ID__r.Date_of_Plan__c != null AND  Plan_ID__r.Date_of_Plan__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) ) OR ( (RecordType.DeveloperName ='Family_Service_Plan_review' OR RecordType.DeveloperName = 'Family_Service_Plan_Review_Supervisor_Approval') AND Plan_ID__r.Review_Status__c = 'Completed' AND (Plan_ID__r.Date_of_Plan_Review__c != null AND Plan_ID__r.Date_of_Plan_Review__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) ) ) and Name__c in (#[flowVars.Clausefor43])" doc:name="Salesforce Famile Plan Details "/>
+			<sfdc:query config-ref="Salesforce__Basic_Authentication" query="select id,Name__c,RecordType.DeveloperName,Plan_ID__r.Plan_Status__c, Plan_ID__r.Review_Status__c, Plan_ID__r.Date_of_Plan__c, Plan_ID__r.Date_of_Plan_Review__c, Plan_ID__r.Family_Goal__c, Primary_Goal__c from DEL_Person_Involved__c where ( ( (RecordType.DeveloperName ='Family_Service_Plan' OR RecordType.DeveloperName = 'Family_Service_Plan_Supervisor_App') AND Plan_ID__r.Plan_Status__c = 'Completed' AND ( Plan_ID__r.Date_of_Plan__c != null AND  Plan_ID__r.Date_of_Plan__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) ) OR ( (RecordType.DeveloperName ='Family_Service_Plan_review' OR RecordType.DeveloperName = 'Family_Service_Plan_Review_Supervisor_Approval') AND Plan_ID__r.Review_Status__c = 'Completed' AND (Plan_ID__r.Date_of_Plan_Review__c != null AND Plan_ID__r.Date_of_Plan_Review__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) ) ) and Name__c in (#[flowVars.Clausefor43])" doc:name="Salesforce Famile Plan Details "/>
+
             <dw:transform-message doc:name="Transform Message : Family Plan details">
                 <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="FamilyPlan"><![CDATA[%dw 1.0
 %output application/java
@@ -3762,4 +3763,3 @@ payload map {
     </sub-flow>
 
 </mule>
-	

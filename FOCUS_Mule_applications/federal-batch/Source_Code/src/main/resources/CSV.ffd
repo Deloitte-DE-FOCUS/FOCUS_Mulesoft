@@ -1,0 +1,33 @@
+form: FIXEDWIDTH
+name: 'CSV'
+values: 
+- { name: 'RecordType', usage: M, type: String, length: 2 }
+- { name: 'MedicalCaseId', usage: M, type: String, length: 10 }
+- { name: 'InsuredMCINumber', usage: M, type: String, length: 10 }
+- { name: 'InsuredSSN', usage: M, type: String, length: 9 }
+- { name: 'InsuredDOB', usage: M, type: String, length: 8 }
+- { name: 'InsuredLastName', usage: M, type: String, length: 20 }
+- { name: 'InsuredFirstName', usage: M, type: String, length: 16 }
+- { name: 'InsuranceCarrierCode', usage: M, type: String, length: 7 }
+- { name: 'InsuranceCarrierLocation', usage: M, type: String, length: 2 }
+- { name: 'PolicyHolderName', usage: M, type: String, length: 35 }
+- { name: 'PolicyHolderSSN', usage: M, type: String, length: 9 }
+- { name: 'PolicyHolderDOB', usage: M, type: String, length: 8 }
+- { name: 'PolicyHolderMCINumber', usage: M, type: String, length: 10 }
+- { name: 'PolicyNumber', usage: M, type: String, length: 18 }
+- { name: 'GroupNumber', usage: M, type: String, length: 17 }
+- { name: 'CoverageType', usage: M, type: String, length: 4 }
+- { name: 'PolicyStatus', usage: M, type: String, length: 1 }
+- { name: 'PolicyVerification', usage: M, type: String, length: 1 }
+- { name: 'PolicyStartDate', usage: M, type: String, length: 8 }
+- { name: 'PolicyEndDate', usage: M, type: String, length: 8 }
+- { name: 'Relationship', usage: M, type: String, length: 2 }
+- { name: 'EmployerName', usage: M, type: String, length: 25 }
+- { name: 'EmployerAddr1', usage: M, type: String, length: 25 }
+- { name: 'EmployerAddr2', usage: M, type: String, length: 25 }
+- { name: 'EmployerCity', usage: M, type: String, length: 20 }
+- { name: 'EmployerState', usage: M, type: String, length: 2 }
+- { name: 'EmployerZip', usage: M, type: String, length: 15 }
+- { name: 'PolicyInfoAddedDate', usage: M, type: String, length: 8 }
+- { name: 'PolicyInfoModDate', usage: M, type: String, length: 8 }
+- { name: 'Filler', usage: M, type: String, length: 17 }
