@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd">
+    <sub-flow name="stpv_pnc_ach_file_generate_subflow">
+        <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Id,Electronic_Pay__c,Transaction_Amount__c,Client_Name__c,FSF_TIN__c,  Document__r.Doc_Total_AMT__c, Provider_Name__c,Provider_Last_Name_Organization_Name__c, Provider_Last_Name_Organization_Name__r.Name,  Provider_Last_Name_Organization_Name__r.DEL_First_Name__c, Document__r.Provider_Id__r.DEL_FSF_TIN__c,Provider_Last_Name_Organization_Name__r.DEL_OIS_Vendor_Id__c,  Document__c,Document__r.Payment_Date__c,Document__r.Document_Type__c    FROM DEL_Transaction__c where Document__r.Document_Type__c='SP' and Electronic_Pay__c='Y'   and FSF_TIN__c &lt;&gt; NULL  and Document__c = #[flowVars.DocId]  " doc:name="Salesforce : Query Transactions" doc:description="Query Transactions Using Document ID"/>
+        <choice doc:name="Choice : Check Size of the Transactions Retrieved" doc:description="Checking size of Transactions retrieved
+If Size is Zero it is the current run is marked as Failure">
+            <when expression="#[payload.size() == 0]">
+                <logger message="#[&quot;No Transactions Found for the given document Id: &quot; + flowVars.DocId]" level="INFO" doc:name="Logger"/>
+                <dw:transform-message doc:name="Transform Message : Set Failure Message" doc:description="Set Failure Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": false,
+	"FailureReason": "Please ensure at least one transaction related to this document has Electronic Pay set to 'Y'"
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="TW: Convert Query Output into Canonical Java format" doc:description="Convert Query output into Java Format
+This will be used in Transaction Summary and Document Summary Report">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	Id : $.Id,
+	Electronic_Pay__c : $.Electronic_Pay__c,
+	FSFTIN: $.FSF_TIN__c,
+	DSCYTIN : $.Document__r.Provider_Id__r.DEL_FSF_TIN__c,
+	DocumentId : $.Document__c,
+	ClientId: $.Client_Name__c default "",
+	ProviderId: $.Provider_Last_Name_Organization_Name__c default "",
+	OISVendorId: $.Provider_Last_Name_Organization_Name__r.DEL_OIS_Vendor_Id__c default "",
+	ProviderLastName: $.Provider_Name__c default "",
+	ProviderFirstName: $.Provider_Last_Name_Organization_Name__r.DEL_First_Name__c default "",
+	PaymentDate: $.Document__r.Payment_Date__c default "",
+	DocumentType : $.Document__r.Document_Type__c,
+	DocTotalAmount: $.Document__r.Doc_Total_AMT__c as :number as :string {format: "#.00"} as :number ,
+	Amount: $.Transaction_Amount__c	as :number as :string {format: "#.00"} as :number
+}
+]]></dw:set-payload>
+                </dw:transform-message>
+                <logger message="Payload #[payload]" level="INFO" doc:name="Logger"/>
+                <choice doc:name="Choice : Route to Appropriate STPV Summary Report" doc:description="Route to Appropriate STPV Summary Report depending on the Report Name" >
+                    <when expression="#[flowVars.reportParams.ReportName == 'STPVTransactionSummary']">
+                        <flow-ref name="stpv_pnc_ach_Transaction_Summary_File" doc:name="stpv_pnc_ach_Transaction_Summary_File" doc:description="Invoke Flow to generate Transaction Summary Report"/>
+                    </when>
+                    <otherwise>
+                        <flow-ref name="stpv_pnc_ach_DocumentSummary_File" doc:name="stpv_pnc_ach_DocumentSummary_File" doc:description="Invoke Flow to generate Document Summary Report"/>
+                    </otherwise>
+                </choice>
+            </otherwise>
+        </choice>
+        <logger message="Before Update Array" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message : Create Payload for Update Operation" doc:description="Create Payload for Update Operation
+Contains parent Id, boolean for Attcahment generation and Failure Reason if any">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.reportParams.ReportParameters.DocId,
+		"Attachment_Generated__c": payload."Success" as :boolean default false,
+		"Failure_Reason__c": payload."FailureReason" 
+
+}]]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Before Update :#[payload]" level="INFO" doc:name="Logger"/>
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_CPA_Document__c" doc:name="Salesforce Update Document" doc:description="Salesforce Update Document
+This is essential for asynchronous processing of the Request.">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+        <logger message="After Update #[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="stpv_pnc_ach_Transaction_Summary_File">
+        <dw:transform-message doc:name="TM: GroupBy FSFTIN Number" doc:description="Group payload with FSFTIN number to and get the sum from the group">
+            <dw:input-payload doc:sample="sample_data\list_salesforcejavamsg.dwl" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload groupBy $.FSFTIN pluck
+{
+	FSFTIN: $.FSFTIN[0] ,
+	Amount: sum $.Amount 	
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: TransFile_Convert Map into Fixedwidth" doc:description="Convert to Fixed Width
+        Also contains logic to round off Amount Value to two decimal places">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath = "TransactionSummary.ffd"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map 
+{
+	FSFTIN: (pad(0,(11 - sizeOf $.FSFTIN )) ++ $.FSFTIN) when $.FSFTIN != null and $.FSFTIN != "" otherwise "00000000000",
+	Filler: "",
+	Amount: (pad(0,10 - ( sizeOf ( (abs $.Amount) as :string {format: "#.00"})) )) ++ ( (abs $.Amount) as :string {format: "#.00"})
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Prepare File Details" doc:description="Prepare File details like filename and extension">
+            <add-message-property key="FileAttachment" value="#[payload]"/>
+            <add-message-property key="FileName" value="ACH_Cons"/>
+            <add-message-property key="FileExtn" value="txt"/>
+            <add-message-property key="FileDescription" value="ACH_Cons.txt"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used so that the Payload is not modified while execting the flow">
+            <flow-ref name="stpv_add_attachment" doc:name="stpv_add_attachment" doc:description="Invoke flow to create Atttachment"/>
+            <enrich source="#[payload]" target="#[payload]"/>
+            <enrich source="#[payload]" target="#[flowVars.MainFile]"/>
+        </enricher>
+    </sub-flow>
+    <sub-flow name="stpv_pnc_ach_DocumentSummary_File">
+        <dw:transform-message doc:name="TW: DocumentSummary_Convert Java Map to FixedWidth" doc:description="Convert to Fixed Width
+Also contains logic to round off Amount Value to two decimal places">
+            <dw:input-payload doc:sample="sample_data\map_1.dwl"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath = "DocumentSummary.ffd"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%var dscytin = p('stpvpncach.dscytin')
+---
+payload groupBy $.DocumentId pluck 
+{
+	DSCYFTIN: (pad(0,(11 - (sizeOf ($[0].DSCYTIN default "")) )) ++ ($[0].DSCYTIN default "") ),
+	Filler: "",
+	Amount: pad(0, 10 - (sizeOf ( ( abs ( sum ($.Amount default [0]))) as :string {format: "#.00"}) )) ++ ( ( abs (sum ($.Amount default [0]))) as :string {format: "#.00"})
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String Consume Stream" doc:description="Consume Stream and convert to String"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Prepare File Details" doc:description="Prepare File Details like filename and extension">
+            <add-message-property key="FileAttachment" value="#[payload]"/>
+            <add-message-property key="FileName" value="ACH_trst"/>
+            <add-message-property key="FileExtn" value="txt"/>
+            <add-message-property key="FileDescription" value="ACH_trst.txt"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used so that the Payload is not modified while execting the flow">
+            <flow-ref name="stpv_add_attachment" doc:name="stpv_add_attachment" doc:description="Invoke flow to create Atttachment"/>
+            <enrich source="#[payload]" target="#[payload]"/>
+            <enrich source="#[payload]" target="#[flowVars.MainFile]"/>
+        </enricher>
+    </sub-flow>
+</mule>
