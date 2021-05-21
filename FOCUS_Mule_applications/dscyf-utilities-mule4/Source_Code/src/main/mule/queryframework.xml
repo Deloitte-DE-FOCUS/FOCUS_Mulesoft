@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<sub-flow name="lovquerySub_Flow" doc:id="2985fbbb-1264-4284-809d-0a528076e6b4" >
+		
+		<ee:transform doc:name="Transform Message" doc:id="8ebdbba0-0e28-4592-9edd-30aa01aa5bd4" >
+			
+			<ee:variables >
+				<ee:set-variable variableName="Direction" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.Direction]]></ee:set-variable>
+				<ee:set-variable variableName="LOVNames" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.LOVNames]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="e75a0cfd-fb7a-410b-8eee-c2400ef651f5" message="SELECT Name, Partner_Code__c, FOCUS_Code__c From DEL_Interface_Picklist_Mapping__c where Name in (#[vars.LOVNames]) and Active__c = true"/>
+		<salesforce:query-all doc:name="Query all" doc:id="0a654b9b-56ee-4792-896f-3058f4fb3d65" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query >SELECT Name, Partner_Code__c, FOCUS_Code__c From DEL_Interface_Picklist_Mapping__c where Name in (:LOV) and Active__c = true</salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	LOV : vars.LOVNames
+}]]]></salesforce:parameters>
+		</salesforce:query-all>
+		<ee:transform doc:name="Transform Message" doc:id="b15abc2f-6f66-461e-af75-a1e2a8a7ab00" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="LOVMapping" ><![CDATA[%dw 2.0
+output application/java
+---
+payload map (
+	if (vars.Direction == "Inbound")
+	{($.Name ++ "-" ++ $.Partner_Code__c) : $.FOCUS_Code__c}
+	else 
+	{($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c}
+)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</sub-flow>
+</mule>

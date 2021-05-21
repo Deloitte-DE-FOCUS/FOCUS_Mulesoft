@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+		
+	<!-- <flow name="loggingframeworkFlow" doc:id="6e564b50-f1aa-41c5-83d8-aad82a93606d" >
+		<scheduler doc:name="Scheduler" doc:id="26bff16e-8063-4e8d-af49-b4b4460529eb" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</scheduler>
+		<set-payload value='#[%dw 2.0
+output application/json
+-&#45;&#45;
+{"InterfaceID": "INF131",
+ "InterfaceName": "DMES-Member",
+ "ErrorFilename":"" ,
+ "ErrorExtension":"",
+ "CompletedFilename":vars.fileName,
+ "CompletedExtension":"",  
+ "TransactionID": vars.TID, 
+ "MuleID":correlationId,
+ "Status":"Success",
+ "RecordCount": 10,
+ "RecordSuccess":1,
+ "RecordError":0,
+ "ErrorDescription":"",
+ "ExceptionType":"",
+ "Operation":"Daily Extact"
+ }]' doc:name="Set Payload" doc:id="4f5551bd-f5d4-4d79-9b0c-aa7274177cc3" />
+		<flow-ref doc:name="LogTransactionSubFlow" doc:id="cfdd7d81-bad1-4dc4-9b06-bd4df65a76b1" name="LogTransactionSubFlow"/>
+	</flow> -->
+	
+	
+	<sub-flow name="LogTransactionSubFlow" doc:id="64aa96fb-7124-4ad4-be4d-101681333351" >
+		<ee:transform doc:name="Transform Message" doc:id="0ba28d1a-5223-49aa-9ffb-293e9001d8e1" >
+			
+			<ee:variables >
+				<ee:set-variable variableName="SubPayload" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="TransactionID" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.TransactionID
+]]></ee:set-variable>
+				<ee:set-variable variableName="InterfaceID" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.InterfaceID]]></ee:set-variable>
+				<ee:set-variable variableName="Time" ><![CDATA[%dw 2.0
+output application/java
+---
+now() as String {format: "MM-dd-yyyy"}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="6157b187-60d8-427c-945b-38e38df3fc0f" >
+			<when expression="#[vars.TransactionID == '']">
+				<flow-ref doc:name="Create-In-Progress_Transaction_Subflow" doc:id="a904f6c4-8860-4e59-85b6-f3b2e7215030" name="Create-In-Progress_Transaction_Subflow" />
+			</when>
+			<otherwise>
+				<flow-ref doc:name="Create-NotInProgress_Transaction_Subflow" doc:id="65ffa179-e01e-4ecf-ba27-9665ec45f087" name="Create-NotInProgress_Transaction_Subflow" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+	
+	
+	<sub-flow name="Create-In-Progress_Transaction_Subflow" doc:id="f91a098c-1f59-4064-a5a6-dc95c7a3dd12" >
+		<salesforce:query doc:id="3a93a7f6-698d-422b-b8f2-a321593ac409" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query >Select Id,Name,Log_Transaction_Attachment__c,Last_Processed_Date__c  from IA_Integration_Acccelerator__c </salesforce:salesforce-query>
+		</salesforce:query>
+		<set-payload value="#[payload filter ($.Name == vars.InterfaceID )]" doc:name="Set Payload" doc:id="178b611b-b4db-45b7-88fa-9033a3e67305" />
+		<ee:transform doc:name="Transform Message" doc:id="c9829bc2-fac5-49bf-8c9e-05d974c14b96" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Tname" ><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].Id]]></ee:set-variable>
+				<ee:set-variable variableName="LogTransaction" ><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].Log_Transaction_Attachment__c]]></ee:set-variable>
+				<ee:set-variable variableName="InterfaceSalesforceId" ><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].Id]]></ee:set-variable>
+				<ee:set-variable variableName="interfaceHeaderDate" ><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].Last_Processed_Date__c]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:create-single type="DEL_Batch_Dashboard__c" doc:name="Create single" doc:id="86e46112-de67-438f-8327-6e3a51d19f4d" config-ref="Salesforce_Config" targetValue="#[payload.id]" target="TID">
+			<salesforce:record ><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+	Transaction_Name__c : payload[0].Id,
+	Mule_Instance_Id__c : vars.SubPayload.MuleID,
+	Status__c : vars.SubPayload.Status,
+	Operation__c: vars.SubPayload.Operation,
+	Request__c: vars.SubPayload.Request,
+	//LogTransaction:payload[0].Log_Transaction_Attachment__c 
+}]]]></salesforce:record>
+		</salesforce:create-single>
+		<choice doc:name="Choice" doc:id="ed343f57-e54f-4cf3-85a9-7a735d2c5c9d" >
+			<when expression="#[vars.TransAttachment != null and vars.LogTransaction == 'true']">
+				<salesforce:create-single doc:name="Create single" doc:id="4209873b-9a6a-4c09-8105-ea79869db97d" config-ref="Salesforce_Config" type="Attachment">
+					<salesforce:record ><![CDATA[#[%dw 2.0
+import * from dw::core::Binaries
+output application/java
+---
+{
+	ParentId : vars.TID,
+	Name : vars.SubPayload.CompletedFilename ,
+	Description: 'Transaction Completed File',
+	Body: (vars.TransAttachment) as Binary,
+	ContentType: "text/plain"
+}]]]></salesforce:record>
+				</salesforce:create-single>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="49602c77-beed-4de7-a124-6a47ce6cc6f9" message="Nothing to attach"/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	
+	<sub-flow name="Create-NotInProgress_Transaction_Subflow" doc:id="1e87f3b3-189a-43c5-90b1-7aeff750e513" >
+		<choice doc:name="Choice" doc:id="470e29f3-082c-477b-b920-9724cba0003e" >
+			<when expression='#[vars.TransAttachment != null and vars.TransAttachment != ""]'>
+				<salesforce:create type="ContentVersion" doc:name="Create" doc:id="1472278b-4216-4748-b776-f9e1e5ed78f4" config-ref="Salesforce_Config">
+					<salesforce:records ><![CDATA[#[%dw 2.0
+import * from dw::core::Binaries
+output application/java
+---
+[{
+	ContentLocation: "S", 
+	Origin : "C",
+	OwnerId : "",
+	PathOnClient : vars.SubPayload.CompletedFilename,
+	Title : vars.SubPayload.CompletedFilename,
+	VersionData : (vars.TransAttachment) as Binary
+}]]]]></salesforce:records>
+				</salesforce:create>
+				<logger level="INFO" doc:name="Logger" doc:id="d69e8e34-1cbd-427f-b176-2e4ff624f124" message="#[payload[0].Id]"/>
+				<salesforce:query-single doc:name="Query single" doc:id="4e9ed10b-cc06-4c54-bbdb-055f87d31253" config-ref="Salesforce_Config">
+					<salesforce:salesforce-query ><![CDATA[SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = ':id']]></salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	id : payload[0].Id
+}]]]></salesforce:parameters>
+				
+</salesforce:query-single>
+				<logger level="INFO" doc:name="Logger" doc:id="03e50490-c542-472b-84bf-30a9d6b0495c" message="#[payload]"/>
+				<salesforce:create type="ContentDocumentLink" doc:name="Create" doc:id="9f0252f4-ad89-4714-b2ca-739ff7da0f81" config-ref="Salesforce_Config">
+					<salesforce:records ><![CDATA[#[%dw 2.0
+import * from dw::core::Binaries
+output application/java
+---
+[{
+	ShareType: "V", 
+        Visibility : "InternalUsers",
+        ContentDocumentId : payload.ContentDocumentId,
+        LinkedEntityId : vars.TID
+ }]]]]></salesforce:records>
+				</salesforce:create>			
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="50bc74d3-6cc2-4e83-8467-c7e6c6448a8f" message="Nothing to Attach"/>
+			</otherwise>
+		</choice>
+		<choice doc:name="Choice" doc:id="4f6f706b-ce2f-409b-bbd4-666aace87524" >
+			<when expression='#[vars.ErrorAttachment != null and vars.ErrorAttachment != ""]'>
+				<salesforce:create type="ContentVersion" doc:name="Create" doc:id="cfa6e5ea-9d6d-48eb-ac04-6e5b9f030fdf" config-ref="Salesforce_Config">
+					<salesforce:records ><![CDATA[#[%dw 2.0
+import * from dw::core::Binaries
+output application/java
+---
+[{
+	ContentLocation: "S", 
+	Origin : "C",
+	OwnerId : "",
+	PathOnClient : vars.SubPayload.ErrorFilename,
+	Title : vars.SubPayload.ErrorFilename,
+	VersionData : (vars.ErrorAttachment) as Binary
+}]]]]></salesforce:records>
+				</salesforce:create>
+				<logger level="INFO" doc:name="Logger" doc:id="9bcf752d-6512-40af-8f50-ad70a1dc8219" message="#[payload[0].Id]"/>
+				<salesforce:query-single doc:name="Query single" doc:id="427248fb-fdb3-4360-8d69-d80cd3a9a86e" config-ref="Salesforce_Config">
+					<salesforce:salesforce-query ><![CDATA[SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = ':id']]></salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	id : payload[0].Id
+}]]]></salesforce:parameters>
+				
+</salesforce:query-single>
+				<logger level="INFO" doc:name="Logger" doc:id="e70cd73e-4687-46d5-84a0-2a6182b6f488" message="#[payload]"/>
+				<salesforce:create type="ContentDocumentLink" doc:name="Create" doc:id="5b993808-f642-483c-a675-0491d2f36e7d" config-ref="Salesforce_Config">
+					<salesforce:records ><![CDATA[#[%dw 2.0
+import * from dw::core::Binaries
+output application/java
+---
+[{
+	ShareType: "V", 
+        Visibility : "InternalUsers",
+        ContentDocumentId : payload.ContentDocumentId,
+        LinkedEntityId : vars.TID
+ }]]]]></salesforce:records>
+				</salesforce:create>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="3a6cc9c4-bf15-4a59-8d61-35ca99bfa71e" message="Nothing to attach"/>
+			</otherwise>
+		</choice>
+		<salesforce:update type="DEL_Batch_Dashboard__c" doc:name="Update" doc:id="86ec04f9-2467-40c0-b8b8-ce2ef53d0249" config-ref="Salesforce_Config" target="interfaceTransactionStatus" targetValue='#[if(payload.success == "true") ("Success") else ("Error")]'>
+			<salesforce:records ><![CDATA[#[%dw 2.0
+output application/java
+---
+[{
+	Id: vars.SubPayload.TransactionID,	
+	Exception_Type__c: vars.SubPayload.ExceptionType,
+	Record_Count__c: vars.SubPayload.RecordCount,
+	Record_Count_Success__c: vars.SubPayload.RecordSuccess,
+	Record_Count_Error__c: vars.SubPayload.RecordError,
+	Records_Count_Skipped__c: vars.SubPayload.RecordSkipped default 0,
+	Error_Description__c: vars.SubPayload.ErrorDescription,
+	Status__c: vars.SubPayload.Status,
+	Response__c: vars.SubPayload.Response
+}]]]]></salesforce:records>
+		</salesforce:update>
+		<choice doc:name="Choice" doc:id="209d80a0-0db8-44bb-8612-1a86de75266d" >
+			<when expression='#[(vars.interfaceTransactionStatus != null) and (vars.interfaceHeaderDate != null)]'>
+				<flow-ref doc:name="UpdateLastProcessedDateUsingHeaderDateSub_Flow" doc:id="6dfa3fae-efe8-407d-9d38-0edde911d0da" name="UpdateLastProcessedDateUsingHeaderDateSub_Flow"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="04ee1caf-45af-44db-8984-204bf37cd89f" message="Skipping Updation of Last Processed date"/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="UpdateLastProcessedDateUsingHeaderDateSub_Flow" doc:id="a259f3bb-bacb-4788-bff3-cb3ca5c3ad9e" >
+		<salesforce:update type="IA_Integration_Acccelerator__c" doc:name="Update" doc:id="4b8239a8-7d3c-4bcf-b104-e2eedba6c154" config-ref="Salesforce_Config">
+			<salesforce:records ><![CDATA[#[%dw 2.0
+output application/java
+---
+[{
+	"Id" : vars.InterfaceSalesforceId,
+//	"Last_Processed_Date__c" : (payload.headerDate as :date {format : "yyyy-MM-dd"})  	
+	"Last_Processed_Date__c" : (vars.interfaceHeaderDate as Date)  	
+}]]]]></salesforce:records>
+		</salesforce:update>
+	</sub-flow>
+	<sub-flow name="CheckForExistingLoadUsingHeaderDateSub_Flow" doc:id="cb413977-c462-46be-9f34-68e931c6942f" >
+		<ee:transform doc:name="Transform Message" doc:id="3ec2a71f-d773-4603-a555-6fe7725137f6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+(payload.headerDate as Date {format : "yyyy-MM-dd"})
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<validation:is-true doc:id="9bf86493-36d6-4586-b47c-ec9f78c992c0" expression="true" message='This file is either already processed or seems to be old (Header Date #[vars.interfaceHeaderDate as Date as :string {format : "yyyy-MM-dd"}] is less than or equal to the Last Processed Date #[vars.InterfaceLastProcessedDate]. Hence, discarded from further processing.'/>
+	</sub-flow>
+</mule>

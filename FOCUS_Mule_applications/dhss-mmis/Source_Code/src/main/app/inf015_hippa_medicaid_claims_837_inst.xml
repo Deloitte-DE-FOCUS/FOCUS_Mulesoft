@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd">
+    
+	<custom-transformer name="X12_Transformer" class="gov.delaware.edi.x12.util.X12HIPPATransformer" doc:name="Java"/>
+    <!-- <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8087" doc:name="HTTP Listener Configuration"/> -->
+    
+    <flow name="inf015_hippa_medicaid_claims_837_institutional_Flow">
+         <enricher doc:name="Message Enricher" doc:description="Invokes the flow which will invoke the Logging Framework and therefore initiate logging for this Interfcae. Using Enricher will not alter the payload">
+            <flow-ref name="inf015_LogInProgressTransaction_Sub_Flow" doc:name="inf015_LogInProgressTransaction_Sub_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>  
+<!--         <set-variable variableName="interfaceName" value="#['HIPPA Medicaid Claims 837 Institutional Extract']" doc:name="Variable : Set Interface Name" doc:description="Set the Interface Name, This will be used by the generic On Demand Interface"/>
+        <set-variable variableName="uniqueId" value="#[org.apache.commons.lang.RandomStringUtils.randomNumeric(9)]" doc:name="Variable : Set Unique ID of length 9 to be passed in the X12 File" doc:description="Set Unique ID to be passed in the X12 File,
+Unique ID created using Apache RandomStringUtils utility class
+Unique ID is created of length 9"/>
+-->
+        <set-variable variableName="batchKey" value="#[dw('now as :string {format : &quot;yyyyMMddHHmm&quot; }')]#[org.apache.commons.lang.RandomStringUtils.randomNumeric(8)]" doc:name="Variable : Create Batch Key" doc:description="Creating Batch Key which will be used in the BHT segment of the file.
+Batch key is a unique ID created in this format Date(yyyyMMdd) + time(HHmm) + random number(length 8)"/> 
+        <!-- <set-variable variableName="claimConfigurations" value="#[payload]" doc:name="Variable : Store the Claim Configurations" doc:description="Storing the Claim Configurations in the variable"/> -->
+         <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Interface Name,Unique ID,Batch ID,Claim Configurations" doc:description="Message Properties : Set Interface Name,Unique ID,Batch ID,Claim Configurations
+TAll of these will be used in the X12 message mapping
+Interface Name will be used by the generic On Demand Interface
+Batch key is a unique ID created in this format Date(yyyyMMdd) + time(HHmm) + random number(length 8)
+Unique ID is created using Apache RandomStringUtils utility class
+Unique ID is created of length 9">
+            <add-message-property key="claimConfigurations" value="#[payload]"/>
+            <add-message-property key="interfaceName" value="#['HIPPA Medicaid Claims 837 Institutional Extract']"/>
+            <add-message-property key="uniqueId" value="#[org.apache.commons.lang.RandomStringUtils.randomNumeric(9)]"/>
+            <add-message-property key="uniqueGroupControlNumber" value="#[org.apache.commons.lang.RandomStringUtils.randomNumeric(9)]"/>
+            <add-message-property key="transactionSetControlNumber" value="#[org.apache.commons.lang.RandomStringUtils.randomNumeric(9)]"/>
+            <add-message-property key="environment" value="${x12.hippamedicaidclaims837I.environment}"/>
+            <!-- <add-message-property key="batchKey" value="#[dw('now as :string {format : &quot;yyyyMMddHHmm&quot; }')]#[org.apache.commons.lang.RandomStringUtils.randomNumeric(8)]"/> -->
+        </message-properties-transformer>
+        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set Segment,Record and Component Separators" doc:description="Set Segment,Record and Component Separators 
+These variables will be passed to the X12 transformer
+This also takes care of the Business Rule &quot;Segments are ended with the ~&quot;, 
+Business Rule &quot;The Interchange Control Header is a fixed length delimited by * and does not count as a Character&quot;,
+Business Rule &quot;The Claim, Diagnosis, and Service segments are separated by both : and *&quot;,
+Business Rule &quot;All other segment fields are separated with *&quot;
+Business Rule &quot;All other segment fields are separated with *&quot; by adding the required Element, Component and Segment separators ">
+            <add-message-property key="elementSeparator" value="#[flowVars.claimConfigurations[&quot;Element Separator&quot;] != null ? flowVars.claimConfigurations[&quot;Element Separator&quot;] : &quot;*&quot; ]"/>
+            <add-message-property key="componentSeparator" value="#[flowVars.claimConfigurations[&quot;Component Separator&quot;] != null ? flowVars.claimConfigurations[&quot;Component Separator&quot;] : &quot;:&quot; ]"/>
+            <add-message-property key="segmentSeparator" value="#[flowVars.claimConfigurations[&quot;Segment Separator&quot;] != null ? flowVars.claimConfigurations[&quot;Segment Separator&quot;] : System.lineSeparator() ]"/>
+        </message-properties-transformer>
+       <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id,ICN_Number__c,National_Healthcare_Procedure_Code_Calc__c,Patient_Type_Calc__c,Attending_Physician_NPI__c,Claim_Note__c,Number_of_Units__c,Provider_EIN__c,Provider_SSN_Formula__c,Client_ID__c,Comments__c,Attending_Physician_Healthcare_Taxonomy__c,Void_Claim_ICN__c,Service_Admission_Date__c,Service_Discharge_Date__c,Service_Start_Date__c,Service_End_Date__c,Batch_Key__c,Provider_First_Name__c,Client_Last_Name__c,Client_First_Name__c,Client_Middle_Name__c,Client_Suffix__c,Client_MCI__c,Client_DOB__c,Client_Sex__c,Provider_ID_Formula__c,Provider_Name_Formula__c, Claim_Type__c,Claim_Number__c,Medicaid_Bill_Amount__c,Primary_Diagnosis_Code__c,Staff_Last_Name__c, Staff_First_Name__c,Provider_NPI__c,Healthcare_Provider_Taxonomy__c,Revenue_Code__c,Service_Rate__c,Amount_Paid__c,Remittance_Advice_Date__c,Claim_Record_Status__c,Place_of_Service_Code_Calc__c from DEL_Medicaid_Billing__c where Claim_Type__c = 'Institutional' and ((Claim_Record_Status__c = 'Claim - Pending' and Initial_Submission_Date__c = null) or (Claim_Record_Status__c = 'Claim - Void' and Void_Submission_Date__c = null)) ORDER BY Provider_ID_Formula__c" doc:name="Salesforce : Query Claim Information" doc:description="Query to retrieve Claim information from Salesforce Also this takes care of the Business Rule  &quot;Only claims with the Claim Type as Institutional will be selected for this file&quot; by adding the where clause for getting Institutional Claims only Also this takes care of the Business Rule &quot;When executed by the user the 837 file generation execution will take all claims records in Pending Claims status and must have the Claims Frequency Type Code based on the criteria below a. 1 When Admission and Discharge Dates match exactly dates of service b. 2 When Admission Date equals From Date of Service and To Date of Service is Lesser Than Discharge Date (or no Discharge Date)  c. 3 When From Date of Service Greater Than Admission Date and To Date of Service is Lesser Than Discharge Date (or no Discharge Date)  d. 4 When From Date of Service is Greater Than Admission Date and To Date of Service equals Discharge Date e. System will date stamp the Initial Submission Date field on the claim record&quot; by "/>
+        <dw:transform-message doc:name="Transform Message to List of Maps" doc:description="Transform payload to List of Maps">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="RecordCount" value="#[payload.size()]" doc:name="Variable : Total number of Records" doc:description="Store Total number of Records"/>
+        <choice doc:name="Choice" doc:description="Check if records existss">
+            <when expression="#[payload.size() &lt; 1]">
+                <logger message="No Records Found" level="INFO" doc:name="Logger"/>
+                <set-variable variableName="RecordError" value="#[0]" doc:name="Variable : Total Number of Failure Records"/>
+                <set-variable variableName="RecordSuccess" value="#[payload.size()]" doc:name="Variable : Total number of Success Records"/>
+         		<set-payload value="{&quot;InterfaceID&quot;: &quot;INF015&quot;, &quot;InterfaceName&quot;: &quot;HIPPA Medicaid Claims 837 Institutional Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;: &quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;No Records found &quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;On Demand Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="et Payload is used to provide JSON for the Logging Framework to Log Transaction"/>
+				<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework to log Transaction" />
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message : Enrich with Interface Logic" doc:description="Add Claim Frequency code to the records by using Interface logic
+Also this takes care of the Business rule &quot;When executed by the user the 837 file generation execution will take all claims records in Pending Claims status and must have the Claims Frequency Type Code based on the criteria below
+a. 1 When Admission and Discharge Dates match exactly dates of service
+b. 2 When Admission Date equals From Date of Service and To Date of Service is Lesser Than Discharge Date (or no Discharge Date) 
+c. 3 When From Date of Service Greater Than Admission Date and To Date of Service is Lesser Than Discharge Date (or no Discharge Date) 
+d. 4 When From Date of Service is Greater Than Admission Date and To Date of Service equals Discharge Date
+e. System will date stamp the Initial Submission Date field on the claim record&quot; by adding Claims Frequency Type Code
+
+This also takes care of the Business Rule &quot;If the claim record contains an ICN Number on the Void ICN field because the claim record was created as a result of a Void and Replace claim, then the new claim record must have the Claims Frequency Type Code equals 7
+a. System will date stamp the Initial Submission Date field on the claim record
+b. The job will stamp the system date in the Void Submit Date field on the voided claim record when the job was executed&quot; since it sets 7 as Claims frequency code when the conditions are satisfied
+
+This also takes care of the Business Rule &quot;If the claim record was previously in a reimbursed status with a RA Date populated and now is void, then the job will send the Void claim and must pick up the Void claim record and the Claims Frequency Type Code equals 8
+a. The job will stamp the system date in the Void Submit Date field on the claim record when the job was executed&quot; since it sets 7 as Claims frequency code when the conditions are satisfied
+
+This also takes care of the Business Rule &quot;If a claim record was previously in Denied-Resubmit status, and 335 days have elapsed since the service end date, then the ICN Number of the original Denied claim must be inserted into the Claim Note field of the new claim record
+a. System will date stamp the Initial Submission Date field on the claim record
+&quot; by setting the Claims frequency code as required
+
+This also takes care of the Business Rule &quot;If a claim record was previously in Denied-Resubmit status, and less than 335 days have elapsed since the service end date, then the claim will be treated as a new claim with the Claim Frequency Type based on the criteria below:
+a. 1equalsAdmission and Discharge Dates match exactly dates of service
+b. 2 equals Admission Date equals From Date of Service and To Date of Service is Lesser Than Discharge Date (or no Discharge Date) 
+c. 3 equals From Date of Service Greater Than Admission Date and To Date of Service is Lesser Than Discharge Date (or no Discharge Date) 
+d. 4 equals From Date of Service is Greater Than Admission Date and To Date of Service equals Discharge Date
+e. System will date stamp the Initial Submission Date field
+&quot; by setting the Claims frequency code as required
+">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+
+	($),
+
+	"parameters"  : 
+	{claimsFrequencyTypeCode :"7","updateStatus" : true,"ISDate" : now,"findOGRec" : true} when ($.Void_Claim_ICN__c != null) 
+	otherwise ({claimsFrequencyTypeCode :"8","updateStatus" : false,"VSDate" : now} when ($.Claim_Record_Status__c == "Claim - Void" and $.Remittance_Advice_Date__c != null)
+		otherwise ({claimsFrequencyTypeCode :"1","updateStatus" : true,"ISDate" : now} when (($.Service_Admission_Date__c == $.Service_Start_Date__c) and ($.Service_Discharge_Date__c == $.Service_End_Date__c) ) 
+			otherwise ({claimsFrequencyTypeCode :"2","updateStatus" : true,"ISDate" : now} when (($.Service_Admission_Date__c == $.Service_Start_Date__c) and ($.Service_Discharge_Date__c == null or ($.Service_End_Date__c < $.Service_Discharge_Date__c)) )
+				otherwise ({claimsFrequencyTypeCode :"3","updateStatus" : true,"ISDate" : now} when (($.Service_Admission_Date__c < $.Service_Start_Date__c) and ($.Service_Discharge_Date__c == null or ( $.Service_End_Date__c < $.Service_Discharge_Date__c)) )
+					otherwise ({claimsFrequencyTypeCode :"4","updateStatus" : true,"ISDate" : now} when (($.Service_Admission_Date__c < $.Service_Start_Date__c) and ($.Service_Discharge_Date__c == $.Service_End_Date__c ) ) 
+						otherwise {}
+					)
+				)
+			)
+		)
+	)
+	
+}]]></dw:set-payload>
+                </dw:transform-message>
+ 
+        <foreach doc:name="For Each" batchSize="${dmes.hippa.837I.claim.record.size}" doc:description="Iterate the records with the configured Batch size
+This also takes care of the Business Rule &quot;File is limited to not more than 5000 CLM statements&quot; by passing only 5000 to the processing block which in turn creates the File">
+
+        <dw:transform-message metadata:id="cb1fa140-e332-445d-b002-551609ff01d8" doc:name="Transform Message : Create X12 HIPPA 837 Message" doc:description="Create X12 HIPPA 837 Message Envelope">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) ( pad(char, times - 1) ++ char ) when times > 0 otherwise ""
+---
+{
+	functionalGroups: [{
+		functionalGroupHeader: {
+			applicationReceiversCode: flowVars.claimConfigurations['Receiver ETIN'] default "", // Claims Conf 2
+			applicationSendersCode: flowVars.claimConfigurations['Submitter ETIN'] default "", // Claim Configuration Parameter 6
+			date: (now >> "America/New_York") as :string {format : "yyyyMMdd"}, //GS04 yyyyMMDD
+			functionalIDCode: "HC",
+			groupControlNumber: flowVars.uniqueGroupControlNumber, // GS06 Unique Number
+			responsibleAgencyCode: "X",
+			time: (now >> "America/New_York") as :string {format : "HHmm"},
+			versionReleaseIndustryIDCode: "005010X223A2"
+		},
+		functionalGroupTrailer: {
+			groupControlNumber: flowVars.uniqueGroupControlNumber, // GS06 Unique Number
+			numberOfTransactionsSetsIncluded: "1" // Number of Transaction 1 is fixed for 837 Inst and Prof
+		},
+		transactions: [{
+			detailMessage837: {
+				BHT: {
+					date: (now >> "America/New_York") as :string {format : "yyyyMMdd"},
+					hierarchicalStructureCode: "0019",
+					referenceIdentification: flowVars.batchKey, // FOCUS Batch Key : Need to generate 
+					time: (now >> "America/New_York") as :string {format : "HHmm"},
+					transactionSetPurposeCode: "00",
+					transactionTypeCode: flowVars.claimConfigurations['Claim or Encounter ID'] default "" // Claim Conf - CH or RP
+				},
+				HLLoopList: payload groupBy $.Provider_ID_Formula__c map {
+					parentHL: {
+						PRV: {
+							providerCode: "BI",//PRV01
+							referenceIdentification: flowVars.claimConfigurations["Billing/Pay-To Provider Taxonomy"] default "", //PRV03  Provider taxonomy code
+							referenceIdentificationQualifier: "PXC"//PRV02
+						},
+						NM1List: [
+					{ // Billing Provider Name Mappings
+							REF: {
+								referenceIdentification: ($[0].Provider_SSN_Formula__c default "") when ( $[0].Provider_First_Name__c !=null ) otherwise ($[0].Provider_EIN__c default ""), // REF02  Depends on Provider first name 
+								referenceIdentificationQualifier: "SY" when (	$[0].Provider_First_Name__c !=null ) otherwise "EI" // REF01 - Depends on Provider first name 
+							},
+							entityIdentifierCode: "85", // NM101
+							entityTypeQualifier: "1" when (	$[0].Provider_First_Name__c !=null ) otherwise "2", // NM102 - Depends on Provider first name 
+							identificationCode: $[0].Provider_NPI__c default "", // NM109 - Provider_NPI__c
+							identificationCodeQualifier: "XX", // NM108
+							n3: {
+								addressInformation1: flowVars.claimConfigurations['Billing Provider Street 1'] default "", // Claim Configuration Parameters -12
+								(addressInformation2: flowVars.claimConfigurations['Billing Provider Street 2'] ) when ((flowVars.claimConfigurations['Billing Provider Street 2'] != null) and (flowVars.claimConfigurations['Billing Provider Street 2'] != "") )  // Claim Configuration Parameters -8
+							},
+							n4: {
+								cityName: flowVars.claimConfigurations['Billing Provider City'] default "", // Claims Config 14
+								stateOrProvinceCode: flowVars.claimConfigurations['Billing Provider State'] default "", // Claims Config 15
+								postalCode: flowVars.claimConfigurations['Billing Provider Zip Code'] default "" // Claims Config 16								
+							},
+							//nameFirst: $[0].Provider_First_Name__c default "", // NM104
+							nameFirst: ( pad('0',(60 - (sizeOf $[0].Provider_First_Name__c) )) ++ $[0].Provider_First_Name__c ) when (($[0].Provider_First_Name__c  !=null) and ($[0].Provider_First_Name__c != '') ) otherwise "", // NM104
+							//nameLastOrOrganizationName: $[0].Provider_Name_Formula__c default "", // NM103
+							nameLastOrOrganizationName: ($[0].Provider_Name_Formula__c[0..59] default "") when ((sizeOf ($[0].Provider_Name_Formula__c default "")) > 60) otherwise ($[0].Provider_Name_Formula__c default ""), // NM103
+							nameMiddle: "", // NM105 Blank
+							namePrefix: "", // NM106 Blank
+							nameSuffix: "" // NM107 Blank
+						}
+				],
+						hierarchicalChildCode: 1,
+						//hierarchicalIDNumber: 1, // need to add logic
+						hierarchicalLevelCode: 20
+						//hierarchicalParentIDNumber: "" // Blank Field
+					},
+					childHLList : $ groupBy $.Client_ID__c  map 
+						{
+						CLMList : $ map 
+						{
+							CL1: {
+								admissionSourceCode: "1" when ($.parameters.claimsFrequencyTypeCode == "1" or $.parameters.claimsFrequencyTypeCode == "4") otherwise "1", // CL102 '0' if CLM05-3 =1 or 4, otherwise this field is updated with '1
+								admissionTypeCode: "1", // CL101
+								patientStatusCode: "01" when ($.parameters.claimsFrequencyTypeCode == "1" or $.parameters.claimsFrequencyTypeCode == "4") otherwise "30" // CL103 '01' if CLM05-3 = 1 or 4, otherwise this field is updated with '30'.
+							},
+							//CN1: { Not used by interface
+								//contractAmount: $.Medicaid_Bill_Amount__c, // CN102 Medicaid Billing Amount
+								//contractTypeCode: "02" // CN101
+							//},
+							DTPList: [
+							({ // Discharge Hour
+								dateTimePeriod: "1700", // DTP03
+								dateTimePeriodFormatQualifier: "TM", // DTP02
+								dateTimeQualifier: "096" // DTP01
+							}) when ($.Service_Discharge_Date__c == $.Service_End_Date__c),
+							{ // Statement Dates
+								dateTimePeriod: ( $.Service_Start_Date__c as :date  as :string {format : "yyyyMMdd"}) ++ "-" ++ ($.Service_End_Date__c as :date as :string {format : "yyyyMMdd"}), // DTP03 Service_Start_Date__c-Service_End_Date__c in YYYYMMDD-YYYYMMDD
+								dateTimePeriodFormatQualifier: "RD8", // DTP02
+								dateTimeQualifier: "434" // DTP01
+							},
+							{ // Admission Date/Hour
+								dateTimePeriod: ($.Service_Admission_Date__c as :date as :string {format : "yyyyMMdd"} ) ++ "0900", // DTP03
+								dateTimePeriodFormatQualifier: "DT", // DTP02
+								dateTimeQualifier: "435" // DTP01
+							}														
+							],
+							HIList: [
+								{ // Principal Diagnosis
+								content: "ABK" ++ flowVars.componentSeparator ++ (($.Primary_Diagnosis_Code__c default "") replace "." with "" )  // Component BK:Primary_Diagnosis_Code__c
+							},
+								{ // Principal Diagnosis
+								content: "ABJ" ++ flowVars.componentSeparator ++ (($.Primary_Diagnosis_Code__c default "") replace "." with "" ) // Component BJ:Primary_Diagnosis_Code__c
+							},
+								{ // Value Information
+								content: "BE" ++ flowVars.componentSeparator ++ "80" ++ flowVars.componentSeparator ++ flowVars.componentSeparator ++ flowVars.componentSeparator ++ (($.Number_of_Units__c default "0") as :number as :string {format : "0" }) // Component BE:80:::(Service_End_Date__c - Service_Start_Date__c in days)
+							}														
+							],
+							LXList : [
+								{
+									DTPList : [
+										{ //  Service Date
+											dateTimePeriod: ($.Service_Start_Date__c as :date as :string {format : "yyyyMMdd"}) ++ "-" ++ ($.Service_End_Date__c as :date as :string {format : "yyyyMMdd"}), // DTP03 Service_End_Date__c - Service_Start_Date__c i
+											dateTimePeriodFormatQualifier: "RD8", // DTP02
+											dateTimeQualifier: "472" // DTP01
+										}
+									],
+									SV2 : {
+										"productOrServiceID" : $.National_Healthcare_Procedure_Code_Calc__c default "",//SV201 - Healthcare_Procedure_Code_Calc__c changed to National_Healthcare_Procedure_Code_Calc__c 
+										"compositeMedicalProcedureIdentifier" : "",//SV202 Blank Field
+										"lineItemChargeAmount" : (($.Medicaid_Bill_Amount__c default "0") as :number) as :string {format : "0.00"} , //SV203 - Medicaid_Bill_Amount__c
+										"unitorBasisforMeasurementCode" : "DA",//SV204
+										"serviceUnitsOrDays" : ($.Number_of_Units__c default "0") as :number as :string {format : "0" }	//SV205 - Number_of_Units__c									
+									},
+									assignedNumber : "1" //LX01
+								}
+							],
+					NM1List: [
+					{ // Attending Provider Name
+								entityIdentifierCode: "71", // NM101
+								entityTypeQualifier: "1", // NM102 
+								identificationCode: $.Attending_Physician_NPI__c default "", // NM109 - Provider_NPI__c
+								identificationCodeQualifier: "XX", // NM108
+								nameFirst: $.Staff_First_Name__c default "", // NM104 -  Staff_First_Name__c
+								nameLastOrOrganizationName: $.Staff_Last_Name__c default "", // NM103 - Staff_Last_Name__c
+								nameMiddle: "", // NM105 Blank Field
+								namePrefix: "", // NM106 Blank Field
+								nameSuffix: "" // NM107 Blank Field
+					}
+				],
+				(REF: { //Payer Claim Control Number
+								referenceIdentification: ($.Void_Claim_ICN__c default "") when ($.parameters.claimsFrequencyTypeCode == '7') otherwise (( $.ICN_Number__c  default "") when ($.parameters.claimsFrequencyTypeCode == '8') otherwise "" ), // REF01  Depends on Provider first name 
+								referenceIdentificationQualifier: "F8"// REF01 
+					}) 		when (($.parameters.claimsFrequencyTypeCode == '7' and $.Void_Claim_ICN__c != null) or (($.parameters.claimsFrequencyTypeCode == '8') and $.ICN_Number__c != null) ), 
+				
+							(NTE : {
+								"noteReferenceCode" : "ADD",//NTE01
+								"claimNoteText" : $.Claim_Note__c  //NTE02 Claim_Note__c
+							}) when (($.Claim_Note__c != null) and ($.Claim_Note__c != "")) ,
+							PRV: { //Attending Provider Specialty Information
+								providerCode: "AT", //PRV01
+								referenceIdentificationQualifier: "PXC",//PRV02
+								referenceIdentification: $.Attending_Physician_Healthcare_Taxonomy__c default "" //PRV03 Attending Physician Healthcare Taxonomy
+							},
+							patientAccountNumber : ($.Claim_Number__c default "") , // CLM01 Claim_Type__c + Claim_Number__c
+							totalClaimChargeAmount : (($.Medicaid_Bill_Amount__c default "0") as :number) as :string {format : "0.00"} , // CLM02 Claim_Billing_amt__c
+							claimFilingIndicatorCode: "", // CLM03 Blank Field
+							nonInstitutionalClaimTypeCode: "", // CLM04 Blank Field
+							healthCareServiceLocationInformation: ( "11" when (($.Patient_Type_Calc__c default "") == "Inpatient") otherwise "13"  ) ++ flowVars.componentSeparator ++ "A" ++ flowVars.componentSeparator ++ ($.parameters.claimsFrequencyTypeCode default ""), // CLM05 - Component - 	Place_of_Service_Code_Calc__c:A:Claim Frequency Code
+							yesNoConditionOrResponseCode1: "", // CLM06 Empty for Institutional
+							medicareAssignmentCode: "C", // CLM07
+							benefitsAssignmentCertificationIndicator: "Y", // CLM08
+							releaseofInformationCode: "Y" // CLM09	
+					} //End of Claim Line
+						,
+							NM1List : [
+							{ // Subscriber Name
+								DMG : {
+									dateTimePeriod: ("") when ($[0].Client_DOB__c == null) otherwise ($[0].Client_DOB__c as :date as :string { format : "yyyyMMdd"} ), // DMG02 - Client_DOB__c
+									dateTimePeriodFormatQualifier: "D8", // DMG01,
+									genderCode: "M" when (($[0].Client_Sex__c default "" )== "Male") otherwise ("F" when (($[0].Client_Sex__c default "") == "Female") otherwise "") // DMG03 - Client_Sex__c : Also LOV Mapping
+								},
+								entityIdentifierCode: "IL", // NM101
+								entityTypeQualifier: "1", // NM102 - Interface Logic to be added
+								identificationCode: ( pad('0',(10 - (sizeOf $[0].Client_MCI__c) )) ++ $[0].Client_MCI__c ) when (($[0].Client_MCI__c  !=null) and ($[0].Client_MCI__c != '') ) otherwise "" , // NM109 - Client_MCI__c padded to 10 chars
+								identificationCodeQualifier: "MI", // NM108
+								n3: {
+									addressInformation1: flowVars.claimConfigurations["Subscriber Street 1"] default "" // Claim Configuration Parameters -17
+								// addressInformation2: "" // not used in Subscriber Name mappings
+								},
+								n4: {
+									cityName: flowVars.claimConfigurations["Subscriber City"] default "", // N401 Claim Configuration Parameters - 19
+									stateOrProvinceCode: flowVars.claimConfigurations["Subscriber State"] default "", // N402 Claim Configuration Parameters - 20
+									postalCode: flowVars.claimConfigurations["Subscriber Zip Code"] default "" // N403 Claim Configuration Parameters - 21								
+								},
+								nameFirst: $[0].Client_First_Name__c default "", // NM104 Client_First_Name__c
+								nameLastOrOrganizationName: $[0].Client_Last_Name__c default "", // NM103 Client_Last_Name__c
+								nameMiddle: $[0].Client_Middle_Name__c default "", // NM105 Client_Middle_Name__c
+								namePrefix: "", // Blank Field NM106
+								nameSuffix: $[0].Client_Suffix__c default "" // NM107 Client_Suffix__c
+							},
+							{ // Payer Name
+		
+								// REF: {
+								// referenceIdentification: "", // REF02 : Not used by interface
+								// referenceIdentificationQualifier: "G2" // REF01
+								// },
+								entityIdentifierCode: "PR", // NM101
+								entityTypeQualifier: "2", // NM102 
+								identificationCode: flowVars.claimConfigurations["Payer TIN"] default "", // NM109 Claim config ID  23
+								identificationCodeQualifier: "PI", // NM108
+					
+								n4: {
+									cityName: flowVars.claimConfigurations["Payer City"] default "", // N401 Claim Configuration Parameters - 26
+									stateOrProvinceCode: flowVars.claimConfigurations["Payer State"] default "", // N402 Claim Configuration Parameters - 27
+									postalCode: flowVars.claimConfigurations["Payer Zip Code"] default "" // N403 Claim Configuration Parameters - 28								
+								},
+								nameFirst: "", // NM104 Blank field
+								nameLastOrOrganizationName: flowVars.claimConfigurations["Payer Name"] default "State of Delaware", // NM103 Claim Configuration Parameter -22
+								nameMiddle: "", // NM105 Blank field
+								namePrefix: "", // Blank Field NM106
+								nameSuffix: "" // NM107 Blank Field
+							}
+							],
+						SBRList : [
+					{
+							claimFilingIndicatorCode: "MC", // Blank Field SBR09
+							conditionorResponseCode: "", // Blank Field SBR07
+							coordinationofBenefitsCode: "", // Blank Field SBR06
+							employmentStatusCode: "", // Blank Field SBR08
+							individualRelationshipCode: "18", // SBR02
+							insuranceTypeCode: "", // Blank Field SBR05
+							insuredGrouporPolicyNumber: "", // Blank Field SBR03
+							otherInsuredGroupName: "", // Blank Field SBR04
+							payerResponsibilitySequenceNumberCode: "P" // SBR01
+						}
+				],
+						hierarchicalChildCode: 0,
+						//hierarchicalIDNumber: 2, // need to add logic
+						hierarchicalLevelCode: 22
+						//hierarchicalParentIDNumber: 1	 // need to add logic
+					}
+					
+				},
+				NM1List: [
+					{ // Submitted Name Mappings
+					PER: {
+						communiationNumber1: flowVars.claimConfigurations["Submitter Contact Phone"] default "", //PER04 Claims Config 4
+						communicationNumberQualifier1: "TE",//PER03 TE to represent Telephone
+						contactFunctionCode: "IC",//PER01
+						name: flowVars.claimConfigurations["Submitter Contact Name"] default "" //PER02 Claims Config -3
+					},
+					entityIdentifierCode: "41",//NM101
+					entityTypeQualifier: "2",//NM102
+					identificationCode: flowVars.claimConfigurations["Submitter ETIN"] default "", //NM109 Claims Config 2
+					identificationCodeQualifier: "46",//NM108
+					nameFirst: "", //NM104 Blank field
+					nameLastOrOrganizationName: flowVars.claimConfigurations["Submitter Name"] default "", //NM103 Claims Config 1
+					nameMiddle: "", //NM105 Blank field
+					namePrefix: "", //NM106 Blank field
+					nameSuffix: "" //NM107 Blank field
+				},
+				{ // Receiver Name Mapping section
+					entityIdentifierCode: "40",//NM101
+					entityTypeQualifier: "2",//NM102
+					identificationCode: flowVars.claimConfigurations["Receiver ETIN"] default "", //NM109 Claims Config -6
+					identificationCodeQualifier: "46",//NM108
+					nameFirst: "", //NM104 Blank field
+					nameLastOrOrganizationName: flowVars.claimConfigurations["Receiver Name"] default "", //NM103 Claims Config 5
+					nameMiddle: "", //NM105 Blank field
+					namePrefix: "", //NM106 Blank field
+					nameSuffix: "" //NM107 Blank field
+				}
+				]
+			},
+			transactionSetHeader: {
+				implementationConventionReference: "005010X223A2",
+				transactionSetControlNumber: flowVars.transactionSetControlNumber,
+				transactionSetIDCode: "837"
+			},
+			transactionSetTrailer: {
+				transactionSegmentCount: "0", // Need to implement, should be auto-calculated
+				transactionSetControlNumber: flowVars.transactionSetControlNumber
+			}
+		}]
+	}],
+	interchangeControlHeader: {
+		acknowledgmentRequested: "1", // No Acknowledgment Requested
+		authInfoQualifier: "00",
+		authInformation: "          ",
+		componentElementSeparator:  flowVars.componentSeparator,
+		interchangeControlNumber: flowVars.uniqueId,
+		interchangeControlVersionNumber: "00501",
+		interchangeDate: (now >> "America/New_York") as :string {format : "yyMMdd"},
+		interchangeIDQualifierReceiver: "ZZ",
+		interchangeIDQualifierSender: "ZZ",
+		interchangeReceiverID: ( flowVars.claimConfigurations["Receiver ETIN"] default "" ++ pad(" ",(15 - (sizeOf flowVars.claimConfigurations["Receiver ETIN"])  ))  ) when (flowVars.claimConfigurations["Receiver ETIN"]  != null ) otherwise "               ",  // Claim Configuration Parameter 6
+		interchangeSenderID: ( flowVars.claimConfigurations["Submitter ETIN"] ++ pad(" ",(15 - (sizeOf flowVars.claimConfigurations["Submitter ETIN"])  )) ) when (flowVars.claimConfigurations["Submitter ETIN"]  != null ) otherwise "               ", // Claim Configuration Parameter 2
+		interchangeTime: (now >> "America/New_York") as :string {format : "HHmm"},
+		repetitionSeparator: "!",
+		securityInfoQualifier: "00",
+		securityInformation: "          ",
+		usageIndicator: p('x12.hippamedicaidclaims837I.environment')
+	},
+	"interchangeControlTrailer" : {
+		interchangeControlNumber: flowVars.uniqueId,
+		numberOfIncludedFunctionalGroups: "1" // Number of Functional Groups 1 is fixed for 837 Inst and Prof
+	}
+} as :object {
+	class : "gov.delaware.edi.x12.message.InterchangeEnvelope"
+}]]></dw:set-payload>
+        </dw:transform-message>
+            <transformer ref="X12_Transformer" doc:name="Transformer Reference : Call X12 Transformer" doc:description="Call Global X12 HIPPA Transformer, which will convert Interchange Envelope to X12 format String
+This also takes care of the Business Rule &quot;Segment fields that are null do not have any spaces, just * &quot;,
+Business Rule &quot;New segments all begin with the header code&quot;,
+Business Rule &quot;Null segments are not created and skipped on the file&quot; by custom JAVA Logic"/>
+            <object-to-string-transformer doc:name="Object to String : Convert to String the transformer output" doc:description="Convert Object to String the Transformer Output" mimeType="text/plain"/>
+            <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties : Set Transaction Attachment" doc:description="Set Transaction Attachment for the Logging Framework, the Files are send as Attachments and will be available to be downloaded in the Interface Dashboard">
+                <add-message-property key="transAttachment" value="#[payload]"/>
+            </message-properties-transformer>
+            <set-variable variableName="claimsFilename" value="${x12.hippamedicaidclaims837I.filename}#[flowVars.environment.equals(&quot;T&quot;) ? &quot;test&quot; : &quot;&quot;]#[dw('(now &gt;&gt; &quot;US/Eastern&quot;) as :string { format : &quot;yyyyMMddHHmm&quot;}')]_#[flowVars.counter].${x12.hippamedicaidclaims837I.filename.extension}" doc:name="Variable : Prepare Full Filename " doc:description="Prepare Full FileName
+This also takes care of the Business Rule &quot;The file is generated as a .txt file&quot; by adding the required extension
+This also takes care of the Business Rule &quot;If the file is generated from the Production environment, the file name format must be FFS-545572159_837Iyyyymmddhhmm.txt&quot; by using the required format for Production environment 
+This also takes care of the Business Rule &quot;If the file is generated from the Test environment, the file name format must be FFS-545572159_837Itestyyyymmddhhmm.txt&quot; by using the required format for Test environment 
+This also takes care of the Business Rule &quot;16. If this file is generated from the Production environment of FOCUS, then the Usage Indicator field must be P&quot; by using the required indicator for Production environment 
+This also takes care of the Business Rule &quot;If this file is generated from the Test environment of FOCUS, then the Usage Indicator field must be T&quot; by using the required indicator for Test environment 
+
+"/>
+            <set-variable variableName="claimsFilenameDashBoard" value="${x12.hippamedicaidclaims837I.filename}#[flowVars.environment.equals(&quot;T&quot;) ? &quot;test&quot; : &quot;&quot;]#[dw('now as :string { format : &quot;yyyyMMddHHmm&quot;}')]_#[flowVars.counter]" doc:name="Variable : Prepare Filename for Dashboard" doc:description="Prepare FileName
+This also takes care of the Business Rule &quot;If the file is generated from the Production environment, the file name format must be FFS-545572159_837Iyyyymmddhhmm.txt&quot; by using the required format for Production environment 
+This also takes care of the Business Rule &quot;If the file is generated from the Test environment, the file name format must be FFS-545572159_837Itestyyyymmddhhmm.txt&quot; by using the required format for Test environment 
+This also takes care of the Business Rule &quot;16. If this file is generated from the Production environment of FOCUS, then the Usage Indicator field must be P&quot; by using the required indicator for Production environment 
+This also takes care of the Business Rule &quot;If this file is generated from the Test environment of FOCUS, then the Usage Indicator field must be T&quot; by using the required indicator for Test environment 
+"/>
+            <set-variable variableName="ext" value="${x12.hippamedicaidclaims837I.filename.extension}" doc:name="Variable : Prepare Filename " doc:description="Prepare FileName"/>
+            
+             <sftp:outbound-endpoint exchange-pattern="request-response"
+			connector-ref="SFTPConnector"
+			outputPattern="#[flowVars.claimsFilename]"
+			host="${sftp.dmes.hippa.837I.transaction.host}" port="${sftp.dmes.hippa.837I.transaction.port}" path="${sftp.dmes.hippa.837I.transaction.path}"
+			user="${sftp.dmes.hippa.837I.transaction.user}" password="${sftp.dmes.hippa.837I.transaction.password}"
+			responseTimeout="10000" doc:name="SFTP : Write X12 837 File"
+			duplicateHandling="overwrite" doc:description="Write the File in the configured SFTP directory
+This also takes care of the Business Rule &quot;The file that is generated, is time stamped and stored in the SFTP Archive&quot; by storing the File in dashboard
+" /> 
+			  <set-variable variableName="RecordError" value="#[0]" doc:name="Variable : Total Number of Failure Records" doc:description="Set total Number of Failure Records"/>
+             <set-variable variableName="RecordSuccess" value="#[flowVars.RecordCount]" doc:name="Variable : Total number of Success Records" doc:description="Set total number of Success Records"/>  
+            <enricher doc:name="Message Enricher" doc:description="Invoking the Logging Framework Operation in Message Enricher so that the payload is not modified">
+                <flow-ref name="inf015_LogOnCompleteProgressTransaction_Sub_Flow" doc:name="inf015_LogOnCompleteProgressTransaction_Sub_Flow" doc:description="Invoking the Logging Framework to complete Transaction and store the Extract File in Interface Dashboard
+This also takes care of the Business Rule &quot;File can be downloaded from Interface Dashboard in Focus up to 3 months after generation&quot; by storing the File in dashboard
+"/>
+                <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+                <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+            </enricher>
+            <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties : Delete TransAttachment" doc:description="Delete TransAttachment so that it does not get logged again">
+                <delete-message-property key="transAttachment"/>
+            </message-properties-transformer>
+            
+        </foreach>
+        
+                <flow-ref name="inf015_hippa_medicaid_claims_837_inst_get_ICN_Flow" doc:name="inf015_hippa_medicaid_claims_837_inst_get_ICN_Flow" doc:description="Invoke the flow to get ICN details List"/>
+                <dw:transform-message doc:name="PreUpdate Data for salesforce" doc:description="This Transformation prepares data for Update and maps data as per field of the Corresponding Object in Salesforce">
+                    <dw:set-variable variableName="preUpdatePayload"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map {
+	Id : $.Id,
+	(Initial_Submission_Date__c : $.parameters.ISDate) when ($.parameters.ISDate !=null), 
+	(Void_Submission_Date__c : $.parameters.VSDate) when ($.parameters.VSDate != null),
+	(Claim_Record_Status__c : "Claim - Submitted") when ($.parameters.updateStatus != null and $.parameters.updateStatus == true)
+} ) ++ (flowVars.updateList default [])]]></dw:set-variable>
+                </dw:transform-message>
+                <enricher source="#[payload.equals(&quot;&quot;) ? null : payload]" target="#[sessionVars.errorAttachment1]" doc:name="Message Enricher : Invoke Update" doc:description="Invoking the Update flow  Message Enricher so that the payload is not modified">
+                    <flow-ref name="inf015_hippa_medicaid_claims_837_inst_update_Flow" doc:name="inf015_hippa_medicaid_claims_837_inst_update_Flow" doc:description="Invoke flow to uddate claims information in FOCUS"/>
+                </enricher>
+               
+            </otherwise>
+        </choice>
+
+        <!--  <sfdc:query config-ref="Salesforce__Basic_Authentication_Config" query="select Void_Claim_ICN__c,Service_Admission_Date__c,Service_Discharge_Date__c,Service_Start_Date__c,Service_End_Date__c,Batch_Key__c,Provider_First_Name__c,NPI__c,Client_Last_Name__c,Client_First_Name__c,Client_Middle_Name__c,Client_Suffix__c,Client_MCI__c,Client_DOB__c,Client_Sex__c,Provider_ID_Formula__c,Provider_Name_Formula__c, Claim_Type__c,Claim_Number__c,Medicaid_Bill_Amount__c,Primary_Diagnosis_Code__c,Staff_Last_Name__c, Staff_First_Name__c,Provider_NPI__c,Healthcare_Provider_Taxonomy__c,Revenue_Code__c,Service_Type_Code__c,Service_Modifier_1_Calc__c,Service_Modifier_2_Calc__c,Service_Modifier_3_Calc__c,Service_Modifier_4_Calc__c,Service_Rate__c,Amount_Paid__c,Remittance_Advice_Date__c,Claim_Record_Status__c from DEL_Medicaid_Billing__c where Claim_Type__c = 'Institutional' and Claim_Record_Status__c IN ('Claim - Pending','Claim - Void')" doc:name="Salesforce : Query Claim Information" doc:description="Query to retrieve Claim information from Salesforce"/> -->
+ 
+    </flow>
+    <flow name="inf015_hippa_medicaid_claims_837_inst_update_Flow">
+        <foreach batchSize="200" doc:name="For Each : Iterate 200 update records at a time" collection="#[flowVars.preUpdatePayload]" doc:description=" Iterate 10000 update records at a time">
+            <dw:transform-message doc:name="Transform Message : Get Mule Payload from Mule Message" doc:description="Get Mule Payload from Mule Message">
+                <dw:set-variable variableName="updatePayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+            </dw:transform-message>
+            <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Medicaid_Billing__c" doc:name="Salesforce : Update Required Claim Records" doc:description="Updates 10000 records at a time Updating Required Claim Records for Buisness rules 4 to 9">
+                <sfdc:objects ref="#[updatePayload]"/>
+            </sfdc:update>
+<!--             <dw:transform-message doc:name="Transform Message : Transform Error Result">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+-
+payload map $]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer doc:name="Object to String"/> -->
+            
+<!--             <enricher source="#[payload]" target="#[flowVars.batchInfo]" doc:name="Message Enricher" doc:description="Invoking Salesforce Operation in Message Enricher so that the payload is not modified">
+                <sfdc:update-bulk config-ref="Salesforce__Basic_Authentication_Config" type="DEL_Medicaid_Billing__c" doc:name="Salesforce : Update Required Claim Records" doc:description="Updates 10000 records at a time
+Updating Required Claim Records for Buisness rules 4 to 9">
+                    <sfdc:objects ref="#[flowVars.updatePayload]"/>
+                </sfdc:update-bulk>
+            </enricher>
+            <until-successful maxRetries="500" synchronous="true" doc:name="Until Successful : Retrieve when ready" millisBetweenRetries="2000" doc:description="Retrieve Batch Result Stream when it is ready as a Bulk Job in Salesforce">
+                <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication_Config" doc:name="Salesforce : Batch Result Stream" doc:description="Obtain Batch Result Stream from the Update Bulk Job">
+                    <sfdc:batch-info ref="#[flowVars.batchInfo]"/>
+                </sfdc:batch-result-stream>
+            </until-successful>
+            <object-to-string-transformer mimeType="application/xml" doc:name="Object to String : Consume Result Stream" doc:description="Consume Result Stream and Convert to String with mime type as application/xml"/>
+            <sfdc:close-job config-ref="Salesforce__Basic_Authentication_Config" jobId="#[flowVars.batchInfo.jobId]" doc:name="Salesforce : Close Update Bulk Job" doc:description="Closing the Update Bulk Job"/>
+ -->
+        </foreach>
+
+<!--         <dw:transform-message doc:name="Transform Message : Create Update Error Report">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv
+-
+payload filter ($.success == false) map {
+	
+	"Error Message" : $.errors[0].message,
+	"statusCode" : $.errors[0].statusCode
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String : Consume Stream" doc:description="Consume Stream to make it Serializable"/>
+ -->    </flow>
+    <flow name="inf015_hippa_medicaid_claims_837_inst_get_ICN_Flow">
+        <dw:transform-message doc:name="Create Void ICN List for Query" doc:description="Create Void ICN List for Query">
+            <dw:set-variable variableName="VoidICNList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.Void_Claim_ICN__c != null) map ("'" ++ $.Void_Claim_ICN__c ++ "'" ) ]]></dw:set-variable>
+        </dw:transform-message>
+
+        <foreach collection="#[flowVars.VoidICNList]" batchSize="150" doc:name="For Each : Iterate over VoidICN List" doc:description="Iterate 150 records from Void ICN List at a time. This is done because of the where clause charcter limit of 4000 charcters for an SOQL Query">
+            <dw:transform-message doc:name="Transform Message : prepare Payload for Salesforce Query" doc:description="This Transformation creates a Command Separated List of Void ICN to be used in Salesforce Query">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ( $ ) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+        
+
+
+<!--         <choice doc:name="Choice : Route depending on ICN List" doc:description="Route depending on ICN List">
+            <when expression="#[flowVars.VoidICNList.equals(&quot;&quot;)]">
+                <logger message="Continue Processing" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise> -->
+                <enricher source="#[dw(&quot;(flowVars.updateList default []) ++ (payload map $)&quot;)]" target="#[flowVars.updateList]" doc:name="Message Enricher" doc:description="Message Enricher is used to Query SFDC without altering the Payload.">
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id from DEL_Medicaid_Billing__c where ICN_Number__c IN (#[payload])" doc:name="Salesforce : Get ID with Void ICN match" doc:description="Get ID with Void ICN matches with ICN Number, these records will be updated with VOID Submit date"/>
+                </enricher>
+          </foreach>          
+                <dw:transform-message doc:name="Transform Message : Prepare Update List Using the Query Result" doc:description="Prepare Update List Using the Query Result
+Void Submission Date is set to the current date">
+                    <dw:set-variable variableName="updateList"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.updateList default [] map {
+	Id : $.Id,
+	Void_Submission_Date__c : now
+}]]></dw:set-variable>
+                </dw:transform-message>
+<!--             </otherwise>
+        </choice> -->
+
+    </flow>
+    
+	<sub-flow name="inf015_LogInProgressTransaction_Sub_Flow">
+		<set-payload value="{&quot;InterfaceID&quot;: &quot;INF015&quot;, &quot;InterfaceName&quot;: &quot;HIPPA Medicaid Claims 837 Institutional Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload : In Progress Transaction" doc:description="Set JSON payload for the Logging framework to start a Transacion record"/>
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging Framework to start Transaction" />
+	</sub-flow>
+	
+	<sub-flow name="inf015_LogOnCompleteProgressTransaction_Sub_Flow">
+		 <set-payload value="{&quot;InterfaceID&quot;: &quot;INF015&quot;, &quot;InterfaceName&quot;: &quot;HIPPA Medicaid Claims 837 Institutional Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;: &quot;#[flowVars.claimsFilenameDashBoard]&quot;,&quot;CompletedExtension&quot;:&quot;#[flowVars.ext]&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;On Demand Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="Set JSON payload to start a Transacion record for the Logging Framework to complete transaction"/>
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging Framework to complete Transaction"/>
+		<!-- <logger message="Session : #[sessionVars]" level="INFO" doc:name="Logger"/> -->
+	</sub-flow>
+</mule>

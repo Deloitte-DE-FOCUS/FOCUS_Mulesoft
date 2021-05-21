@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+
+
+<!-- 	<custom-transformer name="MMISCustomTransformer2"
+		class="gov.delaware.util.MMISErrorLoadTransformer" doc:name="Java" /> -->
+    <validation:config name="Validation_Configuration1" doc:name="Validation Configuration"/>
+	<flow name="inf0140b_mmis_eligibility_error_load_Flow" processingStrategy="synchronous">
+       <!--  <vm:inbound-endpoint exchange-pattern="one-way" path="mmis_eligibility_error_load" doc:name="VM : Listen for mmis_eligibility_error_load process Request" doc:description="VM : Listen for mmis_eligibility_error_load process Request"/> 
+ --><!--  		<poll doc:name="Poll">
+			<schedulers:cron-scheduler expression="0 15 13 3 1/1 ? *" timeZone="US/Eastern"/>
+			<schedulers:cron-scheduler expression="0 3/4 * * 1/1 ? *" timeZone="US/Eastern" />
+			<set-payload value="INF0140b" doc:name="Set Payload to Interface ID" />
+		</poll>  -->
+        <object-to-string-transformer  doc:name="Object to String" doc:description="Consume Payload and retrieve Interface ID as String"/>
+		<set-variable variableName="InterfaceID" value="#[payload]"
+			doc:name="FV: Set Interface ID" doc:description="Set Interface ID in flow variable InterfaceID, this will be used for the Logging framework Transactions"/>
+        <enricher doc:name="Message Enricher : Invoke Logging Framework" doc:description="Invoking Logging Framework in message Enricher, so that Payload is not overwritten. Transaction Name and ID is retrieved Transactio ID and Transaction Name is retrived back from the framework">
+            <flow-ref name="MMIS_Eligibility_ErrorLoad_LogInProgressTransaction_Sub_Flow" doc:name="MMIS_Eligibility_ErrorLoad_LogInProgressTransaction_Sub_Flow" doc:description="Invoking Logging Framework to start Transaction This starts a new Transaction for MMIS 450B File and thus takes care of the Business rule &quot;FOCUS needs to create a separate transaction record for 450B file in the interface dashboard and generate exception report using 450b and log it under transaction record and send an email to business users to evaluate the exception report&quot; by creating Transaction"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+
+        <until-successful maxRetries="5" millisBetweenRetries="10000"  synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
+			<mulerequester:request
+			resource="sftp://${sftp.MMISEligibilityLoad.transaction.username}:${sftp.MMISEligibilityLoad.transaction.password}@${sftp.MMISEligibilityLoad.transaction.host}:${sftp.MMISEligibilityLoad.transaction.port}${sftp.MMISEligibilityLoad.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.MMISEligibilityLoad.transaction.errorfilename}?autoDelete=true"
+			timeout="120000" doc:name="Mule Requester: Retrieve MMIS Eligibility Error Load File" doc:description="Retrieve MMIS Eligibility Error Load File, the filename is passed to the Requestor. Returns file content if file is found otherwise returns null
+Also this takes care of the Business Rule &quot;DMMA Places two files in DTI SFP folder. One is 450 response file with all Eligibility details and 450b with exception report where given MCI does not exists on their end or given MCI do not hold any Eligibility records.&quot; by getting the 450b exception report file"/>
+        </until-successful>
+        <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validate that the Requestor didn't give Null Payload. If Null payload is recieved , an Exception is thrown, this will happen when there is no file in the SFTP directory" config-ref="Validation_Configuration1"/>
+		<object-to-string-transformer doc:name="Object to String : Consume Payload"
+			doc:description="Consume Payload and convert to String to make it reusable" mimeType="text/plain"/>
+		<set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="Set TransAttachment" doc:description="Creating TransAttachment for the Logging framework, this is backup of the file to Stored in Salesforce"/>
+							
+		<enricher doc:name="Message Enricher : Invoke Logging Framework" doc:description="Invoking Logging Framework in message Enricher, so that Payload is not overwritten. Transaction Name and ID is retrieved
+Transactio ID and Transaction Name is retrived back from the framework">
+            <processor-chain doc:name="Processor Chain">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF014b&quot;, &quot;InterfaceName&quot;: &quot;MMIS Elibility Load  - 450b&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;File_Backup_MMIS_elibility_error_load&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="Flow Reference"/>
+            </processor-chain>
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]" />
+		</enricher>
+			
+		<sftp:outbound-endpoint exchange-pattern="request-response"
+			connector-ref="SFTPConnector"
+			outputPattern="${sftp.MMISEligibilityLoad.archive.errorfilename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt"
+			host="${sftp.MMISEligibilityLoad.archive.host}" port="${sftp.MMISEligibilityLoad.archive.port}"
+			path="${sftp.MMISEligibilityLoad.archive.path}" user="${sftp.MMISEligibilityLoad.archive.username}"
+			password="${sftp.MMISEligibilityLoad.archive.password}" responseTimeout="10000" doc:name="SFTP : Archive File"
+			duplicateHandling="overwrite" doc:description="Archive File in the configured SFTP Location"/>	
+		<set-payload value="#[sessionVars.TransAttachment.split(&quot;\n&quot;)]"
+			doc:name="Set Payload : Split Records by Line Feed character"
+			doc:description="Split Records by Line Feed character" mimeType="application/java"/>
+        <message-properties-transformer scope="session" doc:name="Message Properties : Delete Trans Attachment" doc:description="Delete TransAttachment so that the attachment does not get stored in subsequent Log transactions Also Deletes 450 MMIS Eligibility Load Transaction Error Attachment if present">
+            <delete-message-property key="TransAttachment"/>
+            <delete-message-property key="ErrorAttachment"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+            <when expression="#[payload[0]== &quot;&quot;]">
+                <logger message="No Records found." level="INFO" doc:name="Logger"/>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF014b&quot;, &quot;InterfaceName&quot;: &quot;MMIS Elibility Load  - 450b&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_MMISEligibilityLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;MMIS_Eligibility_Error_Load&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;#[0]&quot;,&quot;RecordSuccess&quot;:&quot;#[0]&quot;,&quot;RecordError&quot;:&quot;#[0]&quot;,&quot;ErrorDescription&quot;:&quot;See attached file for details&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;#[0]&quot;}" doc:name="Set Payload"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </when>
+            <otherwise>
+                <set-session-variable variableName="totalRecCount" value="#[payload.length]" doc:name="Session Variable : Set Total Record Count" doc:description="Set Total Record Count determined by the length of array obtained. Total Error Count will be the same as this count"/>
+            
+
+			<dw:transform-message
+			doc:name="Transform Message : Invalid Length Records Process" doc:description="This Transformation Filters out records which are not of Correct length
+Also this step creates a Error Report for these records
+This will be added to the overall Error report">
+            <dw:set-variable variableName="ErrorAttachment"><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+payload filter ((sizeOf $) != 68) map {
+	"record" : $,
+	"error" : "Size of the record expected is 68 but found " ++ (sizeOf $)
+}]]></dw:set-variable>
+		</dw:transform-message>
+		<set-session-variable variableName="ErrorAttachment"
+			value="#[(flowVars.ErrorAttachment:java.lang.String).toString().equals(&quot;&quot;) ? null : flowVars.ErrorAttachment:java.lang.String]" doc:name="Session Variable : Set Error Attachment" doc:description="Error Attachment is created this will end up as a separate file other than the main csv format file in the Logging Transaction record"/>		
+		<dw:transform-message
+			doc:name="Transform Message : Valid Length Record Process" doc:description="This Transformation filters out valid Length Records
+Also this step creates a Fixed Width payload">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter ((sizeOf $) == 68) joinBy "\n") ++ "\n"]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="Transform Message : Fixed Width Transform" doc:description="This Transformation performs Fixed Width Transformation and converts Fixed Width Payload to Java payload of List of Maps">
+			<dw:input-payload mimeType="text/plain">
+				<dw:reader-property name="schemaPath"
+					value="MMIS_Eligibility_ErrorData.ffd" />
+			</dw:input-payload>
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/csv 
+---
+payload map {
+	"PID" : trim $.UniqueID,
+	"MCI" : $.MCI,
+	"ErrorDescription" : $.ErrorDescription		
+}]]></dw:set-payload>
+		</dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String : Consume Payload" doc:description="Consume Payload and Convert to String"/>
+
+		<set-session-variable variableName="TransAttachment"
+			value="#[payload]" doc:name="Session Variable : Set Trans Attachment"
+			doc:description="Transaction Attachment is created this will end up as a csv format file  in the Logging Transaction record" />
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Set Success Count, Record Status"
+			overwrite="true" doc:description="Set Success Count, Record Status
+These variables will be used by the Logging framework">
+			<add-message-property key="totalSuccCount"
+				value="#[0]" />
+			<add-message-property key="totalSkipCount"
+				value="#[0]" />
+			<add-message-property key="recStatus" value="#['Success']" />
+		</message-properties-transformer>
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF014b&quot;, &quot;InterfaceName&quot;: &quot;MMIS Elibility Load  - 450b&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_MMISEligibilityLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;MMIS_Eligibility_Error_Load&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;ErrorDescription&quot;:&quot;See attached file for details&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;#[sessionVars.totalSkipCount]&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework, for Completing the Transaction"/>
+
+		 <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke the Logging framework for Transaction completion"/> 
+		 </otherwise>
+            </choice>
+		 <exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" /> 
+	</flow>
+
+    <sub-flow name="MMIS_Eligibility_ErrorLoad_LogInProgressTransaction_Sub_Flow">
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF014b&quot;, &quot;InterfaceName&quot;: &quot;MMIS Elibility Load  - 450b&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;File_Backup_MMIS_elibility_error_load&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework for Starting a transaction" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework for Starting a transaction"/>
+		<!-- <logger message="Session : #[sessionVars]" level="INFO" doc:name="Logger"/> -->
+	</sub-flow>
+</mule>

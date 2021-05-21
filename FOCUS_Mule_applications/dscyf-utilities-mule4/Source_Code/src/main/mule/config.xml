@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="f35e3dc1-5644-4aff-b419-5d650a58c7c8" >
+		<salesforce:cached-basic-connection username="${sfdc.username}" password="${sfdc.password}" url="${sfdc.url}" securityToken="${sfdc.token}"/>
+	</salesforce:sfdc-config>
+	
+	<configuration-properties file="${env}.properties" />
+	<global-property doc:name="Global Property" doc:id="197d75b5-2bdb-41a2-b1bf-6228fde7afc3" name="env" value="sit" />
+	
+	
+	
+</mule>
