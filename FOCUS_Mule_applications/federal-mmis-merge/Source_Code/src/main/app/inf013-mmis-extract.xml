@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd">
+   	 
+   <!--  <sfdc:config name="Salesforce__Basic_Authentication_Config" username="Bbansal@state.de.us.focusdev" password="WelcomeYou%5" url="https://dscyfkidsfocusdev.cs32.my.salesforce.com/services/Soap/u/37.0" doc:name="Salesforce: Basic Authentication"/> -->
+   
+    
+   
+    <flow name="inf013-mmis-extract-Flow" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="This poll will trigger the mule flow every Thursday at 5 PM">
+            <schedulers:cron-scheduler expression="0 5 17 ? * MON,TUE,WED,THU,FRI *" timeZone="US/Eastern"/>
+            <set-payload value="INF013" doc:name="Set Payload to Interface ID"/>
+
+        </poll>
+
+        <message-properties-transformer scope="invocation" doc:name="MP:Save Last5Years,Last26 variable and Interface ID" doc:description="Save :
+Last5Years: Used to get records in Last five years
+Last26Years: Used to get CLients aged less than 26 
+ Interface ID: Used for Logging and Error Framework.">
+            <add-message-property key="InterfaceID" value="#[payload]"/>
+            <add-message-property key="Last5Years" value="#[server.dateTime.plusYears(${MMISExtract.Last5Years})]"/>
+            <add-message-property key="Last26Years" value="#[server.dateTime.plusYears(${MMISExtract.Last26Years}).format('yyyy-MM-dd')]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the logging framework without altering the payload, the payload which is the output of the logging framework will not change the main Payload i.e. the query result">
+            <flow-ref name="In-Progress_MMIS-Extract" doc:name="In-Progress_MMIS-Extract" doc:description="This flow reference calls the sub flow In-Progree_MMIS-Extract to create the In-Progress transaction in SFDC interface tab for MMIS extract"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Person__r.FirstName, Person__r.MiddleName, Person__r.LastName, Person__r.Birthdate, Person__r.DEL_PID__c, Person__r.DEL_MCI__c, Person__r.DEL_Gender__c, Person__r.DEL_Race_Primary__c, Person__r.DEL_Ethnicity__c, CreatedDate, Person_Start_Date__c from DEL_Person_Cases__c where (Person_End_Date__c &gt; #[flowVars.Last5Years] or Person_End_Date__c = null) and Person__r.DEL_PID__c != null and Person__r.Birthdate &gt;  #[flowVars.Last26Years] order by Person_Start_Date__c ASC" doc:name="SFDC: Query SFDC to get records" doc:description="This Query extracts all clients who have an end date in the last five years or end date is yet not pouplated in the Person Cases object and whose Age is less than or equal to 26"/>
+<enricher doc:name="Message Enricher" doc:description="Message Enricher is used to call the NoPayload sub flow without altering the payload.">
+            <flow-ref name="inf013-mmis-request-extract-No-Payload-subflow" doc:name="inf013-mmis-request-extract-No-Payload-subflow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+       <expression-filter expression="#[payload.size() != 0]" doc:name="Expression: Stop flow if 0 records" doc:description="Expression will stop the flow if zero records are present"/>
+
+
+
+
+
+
+
+
+
+
+        <dw:transform-message metadata:id="d42f62a7-56bf-4254-9425-ac3902c88a00" doc:name="TM:Convert Query to map">
+            <dw:input-payload doc:sample="sample_data\empty.xml" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[//This dataweave code converts the SFDC query output to a array list
+%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	MCI: pad('0',10 - (sizeOf $.Person__r.DEL_MCI__c)  ) ++ $.Person__r.DEL_MCI__c default "",
+	PID: $.Person__r.DEL_PID__c as :number as :string,
+	LastName: $.Person__r.LastName,
+	FirstName: $.Person__r.FirstName,
+	MiddleName: $.Person__r.MiddleName,
+	BirthDate: $.Person__r.Birthdate as :date {format: "yyyy-MM-dd"} as :string {format: "MM/dd/yyyy"} default null,
+	Age: ($.Person__r.Birthdate - now ) when ($.Person__r.Birthdate != null) otherwise "" ,
+	Sex: $.Person__r.DEL_Gender__c,
+	Race: $.Person__r.DEL_Race_Primary__c,
+	Ethnicity: $.Person__r.DEL_Ethnicity__c,
+	PersonStartDate: $.Person_Start_Date__c as :date as :string {format: "MM/dd/yyyy"} default '',
+	PersonCreatedDate: $.CreatedDate as :datetime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"} as :string {format: "MM/dd/yyyy"} default ''
+} ]]></dw:set-payload>
+
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM:Convert Array to Fixed Width file">
+            <dw:set-payload><![CDATA[//Convert Array to Fixed Width file
+%dw 1.0
+%output text/plain schemaPath = "MMIS.ffd"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload filter ($.MCI != null and $.MCI != "") groupBy $.PID pluck  {
+	MCI: $.MCI[0],
+	PID: pad(' ',10 - (sizeOf $.PID[0])  ) ++ $.PID[0] default ""
+} ]]></dw:set-payload>
+            <dw:set-session-variable variableName="ErrorAttachment"><![CDATA[// The Dataweave code will generate array which will be used ni generating the error report.
+%dw 1.0
+%output application/java
+---
+payload filter ($.MCI == null or $.MCI == "") groupBy $.PID pluck  {
+	PID : $.PID[0],
+	PersonCaseDetails : {
+		MCI:$.MCI[0],
+		LastName:$.LastName[0],
+		FirstName:$.FirstName[0],
+		MiddleName:$.MiddleName[0],
+		Sex:$.Sex[0],
+		Ethnicity:$.Ethnicity[0],
+		Race:$.Race[0],
+		BirthDate:$.BirthDate[0],
+		Age: $.Age[0].Years,
+		PersonCreatedDate:$.PersonCreatedDate[0],
+	    PersonStartDate:$.PersonStartDate[0] 
+    } 
+}]]></dw:set-session-variable>
+        </dw:transform-message> 
+
+        <dw:transform-message metadata:id="0ce64bed-014e-4438-bb61-6b5f3a956507" doc:name="TM: Generate ErrorAttachment">
+            <dw:set-session-variable variableName="ErrorAttachment"><![CDATA[// The Dataweave code generates the error attachment CSV
+%dw 1.0
+%output application/csv separator = ",", quoteValues=true, escape="\""
+---
+sessionVars.ErrorAttachment map {
+	//PersonCaseDetails : {
+	"Error Type":'Business Rule Error',
+	"Field Name in Error":'MCI',
+	"Field Value in Error":$.PersonCaseDetails.MCI,
+	"Error Description":'MCI is missing',
+	"PID":$.PID,
+	"Last Name":$.PersonCaseDetails.LastName,
+	"First Name":$.PersonCaseDetails.FirstName,
+	"Middle Name":$.PersonCaseDetails.MiddleName,
+	"Sex":$.PersonCaseDetails.Sex,
+	"Ethnicity":$.PersonCaseDetails.Ethnicity,
+	"Race":$.PersonCaseDetails.Race,
+	"Date of Birth":$.PersonCaseDetails.BirthDate,
+	"Age": $.PersonCaseDetails.Age,
+	"Person Created Date":$.PersonCaseDetails.PersonCreatedDate,
+    "Person Start date on a case":$.PersonCaseDetails.PersonStartDate
+}]]></dw:set-session-variable>
+
+
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+
+        <message-properties-transformer overwrite="true" scope="invocation" metadata:id="32690d77-a9e8-4d27-a862-66e925480bfc" doc:name="MP:Set Record-Error,Count,Success " doc:description="This meddage property is used to set the total records, succesfull records and the records which errored out">
+            <add-message-property key="RecordSuccess" value="#[payload.split(&quot;\n&quot;).length]"/>
+            <add-message-property key="RecordError" value="#[sessionVars.ErrorAttachment != null &amp;&amp; sessionVars.ErrorAttachment != &quot;&quot; ? (sessionVars.ErrorAttachment.split(&quot;\n&quot;).length - 1) : 0]"/>
+            <add-message-property key="RecordCount" value="#[payload.split(&quot;\n&quot;).length + (sessionVars.ErrorAttachment != null and sessionVars.ErrorAttachment != &quot;&quot; ? (sessionVars.ErrorAttachment.split(&quot;\n&quot;).length - 1) : 0)]"/>
+
+        </message-properties-transformer>
+
+        <flow-ref name="Write_to_SFTP-MMIS" doc:name="Write_to_SFTP-MMIS" doc:description="This flow reference is used to call the sub flow Write_to_SFTP-MMIS which will write the final fixed width file to the SFTP server ."/>
+
+       <set-payload value="{&quot;InterfaceID&quot;: &quot;INF013&quot;, &quot;InterfaceName&quot;: &quot;MMIS Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_MMISExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_rexx447_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;dat&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Weekly Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="This Set Payload is used to set the Payload to a JSON for the Logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This Sub flow call the Logging frmaework to create the comlete/success transaction in SFTP for the MMIS Extract interface."/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+        
+        </flow>
+    <sub-flow name="In-Progress_MMIS-Extract">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF013&quot;, &quot;InterfaceName&quot;: &quot;MMIS Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set JSON payload for logging Framework" doc:description="This Set Payload is used to set the payload for the Logging Framework to a JSON to create the In-Progress Transaction."/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
+    </sub-flow>
+    <sub-flow name="Write_to_SFTP-MMIS">
+
+        <until-successful maxRetries="5" millisBetweenRetries="10000"  synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
+        	<sftp:outbound-endpoint connector-ref="SFTPConnector" exchange-pattern="one-way" outputPattern="${sftp.mmisextract.transaction.filename}" host="${sftp.mmisextract.transaction.host}" port="${sftp.mmisextract.transaction.port}" path="${sftp.mmisextract.transaction.path}" user="${sftp.mmisextract.transaction.username}" password="${sftp.mmisextract.transaction.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main folder" doc:description="This SFTP connector writes the final file to the SFTP location "/>
+        </until-successful>
+
+        <message-properties-transformer scope="session" doc:name="MP : Create TransAttachment ErrorAttachment" overwrite="true" doc:description="This message property will set the TransAttachment and ErrorAttachment for the Logging Framework">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="ErrorAttachment" value="#[sessionVars.ErrorAttachment]"/>
+        </message-properties-transformer>
+        <sftp:outbound-endpoint connector-ref="SFTPConnector" exchange-pattern="one-way" outputPattern="${sftp.mmisextract.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt" host="${sftp.mmisextract.archive.host}" port="${sftp.mmisextract.archive.port}" path="${sftp.mmisextract.archive.path}" user="${sftp.mmisextract.archive.username}" password="${sftp.mmisextract.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP:Write to Archive" doc:description="This SFTP connector writes the final file to the SFTP location "/>
+
+       <!-- <set-payload value="#[sessionVars.InitialPayload]" doc:name="Set Payload: to Initial Payload for updating flag to true" encoding="UTF-8" metadata:id="ff2f6868-efb1-4038-8d95-6f380f192776" mimeType="application/csv"/>
+        <dw:transform-message metadata:id="b330c174-e4a9-4ded-85a4-250218ce87d4" doc:name="TM:Create Update Array for SFDC">
+            <dw:input-payload doc:sample="sample_data\list_csv.csv" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/csv
+%output application/java
+
+payload map ((payload01 , indexOfPayload01) -> {
+	Id: payload01.SFDCID,
+	Sent_To_Interface__c: "Interfaced to DHSS"
+})]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="View Success/Failure Message"/>
+         <sfdc:update config-ref="Salesforce__Basic_Authentication_Config" type="DEL_Child_Support_Application__c" doc:name="SFDC:Update Records with flag True">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+        <logger message="Salesforce update: #[payload]" level="INFO" doc:name="Salesforce Update Outcome"/> -->
+    </sub-flow>
+
+
+
+
+
+
+
+
+
+
+<sub-flow name="inf013-mmis-request-extract-No-Payload-subflow" doc:description="This sub flow will check if records were extracted or not.">
+        <choice doc:name="Choice : Check if Payload has records" doc:description="Choice router to check if payload size is equal to zero">
+            <when expression="#[payload.size()==0]">
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF013&quot;, &quot;InterfaceName&quot;: &quot;MMIS Extract&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to No Records Found for Logging Framework" doc:description="In case of zero records present in the extract Error will be logged in the Logging framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </when>
+            <otherwise>
+                <logger message="Records Extracted" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+
+
+
+    
+    </mule>

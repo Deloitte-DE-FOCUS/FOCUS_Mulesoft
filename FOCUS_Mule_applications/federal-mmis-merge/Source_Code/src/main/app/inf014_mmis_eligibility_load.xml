@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    
+    <spring:beans>
+         <spring:bean id="MMIS_Eligibility_Load_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean> 
+         <spring:bean id="MMIS_Eligibility_Load_Error_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean>
+   	</spring:beans>
+   	<objectstore:config name="MMIS_Eligibility_Load_Object_Store__Connector" doc:name="ObjectStore: Connector" objectStore-ref="MMIS_Eligibility_Load_Object_Store"/>
+   	<objectstore:config name="MMIS_Eligibility_Load_Error_Object_Store__Connector" doc:name="ObjectStore: Connector" objectStore-ref="MMIS_Eligibility_Load_Error_Object_Store"/>
+
+<!--     <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   	  <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans>  -->
+
+
+
+	
+    
+    <custom-transformer name="MMISCustomTransformer" class="gov.delaware.util.MMISTransformer" doc:name="Java"/>
+    <validation:config name="Validation_Configuration" doc:name="Validation Configuration">
+        <validation:exception-factory class="gov.delaware.validation.DelawareValidationExceptionFactory"/>
+    </validation:config>
+	<configuration doc:name="Configuration">
+    <expression-language>
+     	<global-functions> def isInvalidDate(textDate,format) { gov.delaware.validation.DateValidationUtil.dateValidate(textDate,format) } 
+     	def isDateInDST(date,TimeZoneID) { return java.util.TimeZone.getTimeZone(TimeZoneID).inDaylightTime(date);  }
+     	def isValidNumber(textNumber) { org.mule.util.NumberUtils.isNumber(textNumber) }
+     	</global-functions> 
+    </expression-language>
+    </configuration>
+    <asynchronous-processing-strategy name="Asynchronous_Processing_Strategy" maxThreads="7" minThreads="3" poolExhaustedAction="WAIT" doc:name="Asynchronous Processing Strategy" threadWaitTimeout="-1"/>    
+
+    <sub-flow name="LOVMappingSubFlow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'AID_CATEGORY','MCO_ID'&quot;} " mimeType="text/json" doc:name="Set Payload" doc:description="Set Payload for LOV Framework the specified LOV Names is passed to the framework"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow" doc:description="Invoke LOV Query Framework to retrieve the LOV values"/>
+    </sub-flow>
+    
+    <flow name="inf014_mmis_eligibility_loadFlow" processingStrategy="synchronous" >
+       <poll doc:name="Poll : MMIS Eligibility Load" doc:description="Polls and triggers the flow Every Sunday at 6 PM
+Poller run's in EST timezone ">
+             <schedulers:cron-scheduler expression="0 0 18 ? * 1 *" timeZone="US/Eastern"/>   
+             <!-- <schedulers:cron-scheduler expression="0 1/3 * * 1/1 ? *" />    --> 
+            <set-payload value="INF014" doc:name="Set Payload to Interface ID for MMIS Eligibility Batch Load" doc:description="Set Interface ID in payload so that the flow is triggered
+Interface ID is required in the Logging Framework" />
+        </poll> 
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="Interface is stored in flow variable
+InterfaceID which is used by the Logging framework "/>
+
+                    <until-successful maxRetries="5" millisBetweenRetries="10000"  synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
+ <mulerequester:request resource="sftp://${sftp.MMISEligibilityLoad.transaction.username}:${sftp.MMISEligibilityLoad.transaction.password}@${sftp.MMISEligibilityLoad.transaction.host}:${sftp.MMISEligibilityLoad.transaction.port}${sftp.MMISEligibilityLoad.transaction.path}?connector=SFTPFilenameMatchNoDeleteConnector&amp;myfilename=${sftp.MMISEligibilityLoad.transaction.filename}" timeout="180000" doc:name="Mule Requester: Retrieve MMIS Eligibility Load File" doc:description="Retrieves the Load file if available
+The Filename is passed to the Requester If the File is not found then Null is returned,
+The connector used for this request will not Delete the File once its read
+ The File content is used for Archive purpose only" config-ref="Mule_Requester"/>
+                    </until-successful>
+       
+        <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown" config-ref="Validation_Configuration1"/>        
+        <!-- <set-variable variableName="fileSize" value="#[message.inboundProperties['fileSize']]" doc:name="Variable : Get File Size" doc:description="Variable : Get File Size"/> -->
+        <sftp:outbound-endpoint exchange-pattern="request-response"
+			connector-ref="SFTPFilenameMatchConnector"
+			outputPattern="${sftp.MMISEligibilityLoad.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].${sftp.MMISEligibilityLoad.archive.fileextension}"
+			host="${sftp.MMISEligibilityLoad.archive.host}" port="${sftp.MMISEligibilityLoad.archive.port}" path="${sftp.MMISEligibilityLoad.archive.path}"
+			user="${sftp.MMISEligibilityLoad.archive.username}" password="${sftp.MMISEligibilityLoad.archive.password}"
+			responseTimeout="180000" doc:name="SFTP : Archive File "
+			duplicateHandling="overwrite" doc:description="SFTP Archive in Request-Response to ensure that the next component is not invoked until the File Write is complete
+Also Timeout is set sufficiently to allow writing of the file till that time"/>
+  		<enricher doc:name="Message Enricher : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+			<flow-ref name="MMIS_Eligibility_Load_LogInProgressTransaction_Sub_Flow" doc:name="MMIS_Eligibility_Load_LogInProgressTransaction_Sub_Flow" />
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+		</enricher>	 	
+
+                    <until-successful maxRetries="5" millisBetweenRetries="10000"  synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
+        <mulerequester:request resource="sftp://${sftp.MMISEligibilityLoad.transaction.username}:${sftp.MMISEligibilityLoad.transaction.password}@${sftp.MMISEligibilityLoad.transaction.host}:${sftp.MMISEligibilityLoad.transaction.port}${sftp.MMISEligibilityLoad.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.MMISEligibilityLoad.transaction.filename}" timeout="180000" doc:name="Mule Requester: Retrieve File Again" doc:description="Retrives the Load file again, this time the file content is to be used for Inteface business Rules
+Also the Connector used this time will delete the File once it is completely read
+Also this takes care of the Business Rule &quot;DMMA Places two files in DTI SFP folder. One is 450 response file with all Eligibility details and 450b with exception report where given MCI does not exists on their end or given MCI do not hold any Eligibility records&quot; by getting the 450 load file" config-ref="Mule_Requester"/>
+                    </until-successful>        
+        
+        <transformer ref="MMISCustomTransformer" doc:name="Transformer Reference : Get Split Iterator from input Stream, of records grouped with PID" doc:description="Refrence to a Global transformer.
+Get Split Iterator, from Input Stream of records grouped with PID
+Each record from the iterator is the combination of all records for one particular Child identified by its PID in String format
+The Iterator is made over the Input Stream resulting from the Mule Requester SFTP file retrieve.
+The Iterator will be passed to the batch component which will Load data from the SFTP File using this Iterator"/>
+        <enricher source="#[payload.Id]" target="#[flowVars.RecordID_MMIS]" doc:name="Recieve MMIS Record Type ID" doc:description="Recieve TANF Record Type ID">
+            <sfdc:query-single config-ref="Salesforce__Basic_Authentication" query="select Id from RecordType where name = 'Medicaid Eligibility'" doc:name="Salesforce : Query MMIS RecordType ID"/>
+        </enricher>  
+        <set-variable variableName="fileRunDate" value="#[dw('(now &gt;&gt; |+00:00| )')]" doc:name="Variable : Store MMIS Medicaid Eligibility File Run date" doc:description="Store MMIS Medicaid Eligibility File Run date which will be used later in the load"/>
+         <enricher doc:name="Message Enricher : Retrieve LOV" doc:description="Retrieve LOV mappings to be used in Transformations">
+            <flow-ref name="LOVMappingSubFlow" doc:name="LOVMappingSubFlow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>         
+        <batch:execute name="inf014_mmis_eligibility_load_Batch" doc:name="inf014_mmis_eligibility_load_Batch" doc:description="Invoke the Batch Load, Split Iterator from the custom transformer is passed to the Batch. "/>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/> 
+    </flow>
+    <batch:job  name="inf014_mmis_eligibility_load_Batch" block-size="200" max-failed-records="-1">
+        <batch:process-records>
+            <batch:step name="Batch_Step_ProcessRecords" doc:description="This Batch step processes the Eligibility records grouped by PID">
+                <batch:commit size="200" doc:name="Batch Commit" doc:description="Using Batch Commit sothat we can process a Set of Records at a time Assuming a 200 records on an average per unique Client">
+                    <dw:transform-message doc:name="Transform Message : Join All the Record Sets as a String" doc:description="Merge All records which came under this Batch Commit block">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload joinBy "")]]></dw:set-payload>
+                    </dw:transform-message>
+                    <expression-transformer mimeType="application/java" expression="#[payload.split(&quot;\n&quot;)]" doc:name="Expression : Split Payload by Line Feed" doc:description="Spliting Payload by Line Feed, The java Transaformer before takes care to enrich each line with Line Feed charcter at the end"/>
+                    <set-variable variableName="totalRecordCount" value="#[payload.length]" doc:name="Variable : Total Record Count" doc:description="Get Total record Count of the current records"/>
+                    <dw:transform-message doc:name="Transform Message : Get InValid records Report" doc:description="This Transformation Filters out records which are not of Correct length
+Also this step creates a Error Report for these records
+This will be added to Error report">
+                        <dw:set-variable variableName="InvalidLengthErrors"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+---
+payload filter ((sizeOf $) != 152) map {
+	"record" : $,
+	"description" : "Length of the record is invalid; Expected 152 but is " ++ (sizeOf $)
+}]]></dw:set-variable>
+    </dw:transform-message>
+    <set-variable variableName="validRecsCount" value="#[flowVars.InvalidLengthErrors.equals(&quot;&quot;) ? flowVars.totalRecordCount :  (flowVars.totalRecordCount - flowVars.InvalidLengthErrors.split(&quot;\n&quot;).length)]" doc:name="Variable: Get Valid records Count" doc:description="Get Valid Records Count (Valid Length Records count)"/>
+                    <choice doc:name="Choice : Check for Valid Records" doc:description="Check if there any Valid Records">
+                        <when expression="#[(flowVars.validRecsCount) == 0]">
+                            <logger message="No valid Records are present in this Set" level="INFO" doc:name="Logger"/>
+                        </when>
+                        <otherwise>
+                            <dw:transform-message doc:name="Valid Child Records String" doc:description="This Transformation filters out valid Length Records
+Also this step creates a Fixed Width payload">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter ((sizeOf $) == 152) joinBy "\n") ++ "\n"]]></dw:set-payload>
+                            </dw:transform-message>
+                            <dw:transform-message doc:name="Transform : Fixed Width  String to List" doc:description="This Transformation performs Fixed Width Transformation and converts Fixed Width Payload to Java payload of List of Maps">
+                                <dw:input-payload mimeType="text/plain">
+                                    <dw:reader-property name="schemaPath" value="MMIS_Eligibility_Data.ffd"/>
+                                </dw:input-payload>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                            </dw:transform-message>
+                            <dw:transform-message doc:name="Transform Message : Get List of MCI" doc:description="This transformation creates a List of all Valid and Unique MCI
+This Transformation creates a Command Separated List of MCI to be used in a Salesforce Query later">
+                                <dw:input-payload doc:sample="sample_data\string.dwl"/>
+                                <dw:set-variable variableName="MCIList"><![CDATA[%dw 1.0
+%output application/java
+---
+payload 
+filter (($.MCI != null)
+	and ((trim $.MCI) != "")
+and (isValidNumber(trim $.MCI) )
+)  
+map ("'" ++ ((trim $.MCI) as :number as :string) ++ "'")
+ distinctBy $ joinBy ","]]></dw:set-variable>
+                            </dw:transform-message>
+                            <choice doc:name="Choice" doc:description="Check if any Valid MCI is present">
+                                <when expression="#[flowVars.MCIList.equals(&quot;&quot;)]">
+                                    <set-variable variableName="PersonTypeIDMap" value="#[{}]" mimeType="application/java" doc:name="Variable : Person ID Map" doc:description="Create a Empty Person ID Map, This was created so that Salesforce Step is not invoked when there are no Valid PID"/>
+                                </when>
+                                <otherwise>
+<!--                                     <enricher source="#[dw('( payload reduce ((val, acc = {}) -&gt; acc ++ ( { (val.Person__r.DEL_MCI__c as :string) : val.Id  } )) ) when (payload != null) otherwise {}')]" target="#[flowVars.PersonTypeIDMap]" doc:name="Message Enricher : Get Person Type ID Map" doc:description="Invoking Salesforce Operation in Message Enricher so that the payload is not modified
+This step also has an inline Dataweave transformation using a MEL dataweave function to get lookup
+of MCI as Key and Person Type ID as value"> -->
+										<enricher source="#[dw('( payload reduce ((val, acc = {}) -&gt; acc ++ ( { (val.DEL_MCI__c as :string) : { PersonTypeId : val.DEL_Client_Person_Type__c, PersonId : val.Id }  } )) ) when (payload != null) otherwise {}')]" target="#[flowVars.PersonTypeIDMap]" doc:name="Message Enricher : Get Person Type ID Map" doc:description="Invoking Salesforce Operation in Message Enricher so that the payload is not modified
+This step also has an inline Dataweave transformation using a MEL dataweave function to get lookup
+of MCI as Key and Person Type ID and Person ID as value">
+                                        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select  Id, DEL_Client_Person_Type__c, DEL_MCI__c from Contact where DEL_MCI__c IN (#[flowVars.MCIList])" doc:name="Salesforce : Query Person Type ID" doc:description="Salesforce : Query Person Type ID of type Client, with the MCI List"/>
+                                    </enricher>
+                                </otherwise>
+                            </choice>
+                            <dw:transform-message doc:name="Missing Fields Records Transform" doc:description="This Transformation creates a Error Report for all Invalid records which have Missing Field or Incorrect Format of data
+This will be added to the overall Error report
+Also the records not having Person type id and added to this report
+Also this step identifies invalid dates for FOCUS and thus takes care of the Business Rule &quot;Treat any of these dates as NULL/blank for any date fields (like Eligibility Start Date, Eligibility End Date, MCO Start Date and MCO End Date) and then perform the Mandatory validations before loading Eligibility records into FOCUS
+   99999999,00000000,12319999&quot; by adding the records having such dates to the Exception report">
+                                <dw:set-variable variableName="missingFieldRecords"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+---
+payload filter (($.UniqueID == null) or ($.MCI == null) 
+	or ( not (isValidNumber(trim $.UniqueID)))
+	or ( not (isValidNumber(trim $.MCI)))
+	or ( flowVars.PersonTypeIDMap[( (trim $.MCI) as :number as :string )] == null )
+	or ( flowVars.PersonTypeIDMap[((trim $.MCI) as :number as :string default "")].PersonTypeId == null )
+	or ($.Elig-Start-Date == null ) 
+	or ( ( $.Elig-Start-Date != null ) and  ($.Elig-Start-Date == "99999999") ) 
+	or ( ( $.Elig-Start-Date != null ) and  ($.Elig-Start-Date == "00000000") )
+	or ( ( $.Elig-Start-Date != null ) and  ($.Elig-Start-Date == "99991231") )
+	or (( $.Elig-Start-Date != null ) and  ( isInvalidDate($.Elig-Start-Date,"yyyyMMdd") )  )	
+	or ($.Elig-End-Date == null ) 
+	or (( $.Elig-End-Date != null ) and  ($.Elig-End-Date == "99999999") ) 
+	or (( $.Elig-End-Date != null ) and  ($.Elig-End-Date == "00000000") )
+	or (( $.Elig-End-Date != null ) and  ($.Elig-End-Date == "99991231") )
+	or (( $.Elig-End-Date != null ) and  ( isInvalidDate($.Elig-End-Date,"yyyyMMdd") )  )	
+	or ($.Aid-Category == null) 
+	or (($.MCO-ID == null) and ($.MCO-Start-Date != null ) and ( not ((isValidNumber(trim $.MCO-Start-Date)) and (((trim $.MCO-Start-Date) as :number as :string) == "0")) ) )  
+	or (($.MCO-ID == null) and ($.MCO-End-Date != null ) and ( not ((isValidNumber(trim $.MCO-End-Date)) and (((trim $.MCO-End-Date) as :number as :string) == "0")) ) )  
+	or ($.MCO-ID != null and (flowVars.LOVReturned[("MCO_ID-" ++ ($.MCO-ID default ""))][0] default "") == '') 
+	or ((($.MCO-ID != null) and ($.MCO-Start-Date == null )) or ( ($.MCO-ID != null) and ( $.MCO-Start-Date != null ) and  ( isInvalidDate($.MCO-Start-Date,"yyyyMMdd") )  ) )		
+	or ((($.MCO-ID != null) and ($.MCO-End-Date == null )) or ( ($.MCO-ID != null) and ( $.MCO-End-Date != null ) and  ( isInvalidDate($.MCO-End-Date,"yyyyMMdd") )  ) )		
+) map {
+	UniqueID : $.UniqueID default "",
+	MCI : $.MCI default "",
+	Elig-Start-Date : $.Elig-Start-Date default "",
+	Elig-End-Date : $.Elig-End-Date default "",
+	Aid-Category : $.Aid-Category default "",
+	MCO-Start-Date : $.MCO-Start-Date default "",
+	MCO-End-Date : $.MCO-End-Date default "",
+	MCO-ID : $.MCO-ID default "",
+	Taxonomy : $.Taxonomy default "",
+	Date-of-Death : $.Date-of-Death default "",
+	Physician-Last-Name : $.Physician-Last-Name default "",
+	Physician-First-Name : $.Physician-First-Name default "",
+	Physician-Phone-Number : $.Physician-Phone-Number default "",												
+	Errors :  ("Missing FOCUS PID" when ($.UniqueID == null) otherwise "") 
+				++ (" Missing MCI " when ($.MCI == null) otherwise "") 
+				++ (" Invalid PID " when ( not (isValidNumber(trim $.UniqueID))) otherwise "")
+				++ (" Invalid MCI " when ( not (isValidNumber(trim $.MCI))) otherwise "")				
+				++ (("MCI not found in FOCUS") when ( flowVars.PersonTypeIDMap[( (trim $.MCI) as :number as :string )] == null ) otherwise ("Person Type Client does not exist") when ( flowVars.PersonTypeIDMap[((trim $.MCI) as :number as :string default "")].PersonTypeId == null) otherwise "") 
+				++ (" Missing Eligibility Start Date  " when ( $.Elig-Start-Date == null ) otherwise "")
+				++ (" Value 99991231 is considered as Null for Eligibility Start Date but it is a Mandatory Field " when ( ($.Elig-Start-Date != null) and ( $.Elig-Start-Date  == "99991231" ) ) otherwise "")		
+				++ (" Eligibility Start Date is Invalid " when ( ($.Elig-Start-Date != null) and ( isInvalidDate($.Elig-Start-Date,"yyyyMMdd")   ) ) otherwise "")				
+				++ (" Missing Eligibility End Date " when ($.Elig-End-Date == null ) otherwise "")
+				++ (" Value 99991231 is considered as Null for Eligibility End Date but it is a Mandatory Field " when ( ($.Elig-End-Date != null) and ( $.Elig-End-Date  == "99991231" ) ) otherwise "")
+				++ (" Eligibility End Date is Invalid " when ( ($.Elig-End-Date != null) and ( isInvalidDate($.Elig-End-Date,"yyyyMMdd")   ) ) otherwise "")					
+				++ (" Missing Aid Category " when ($.Aid-Category == null) otherwise "")
+				++ (" Missing MCO Start Date " when (($.MCO-ID != null) and ($.MCO-Start-Date == null )) otherwise "")
+				++ (" Missing MCO End Date " when (($.MCO-ID != null) and ($.MCO-End-Date == null )) otherwise "")
+				++ (" MCO Start Date present but MCO ID is not present " when (($.MCO-ID == null) and ( ($.MCO-Start-Date != null ) and ( not ((isValidNumber(trim $.MCO-Start-Date)) and (((trim $.MCO-Start-Date) as :number as :string) == "0")) ) ) ) otherwise "")
+				++ (" MCO End Date present but MCO ID is not present " when (($.MCO-ID == null) and ($.MCO-End-Date != null ) and ( not ((isValidNumber(trim $.MCO-End-Date)) and (((trim $.MCO-End-Date) as :number as :string) == "0")) ) ) otherwise "")
+				++ (" MCO ID is Invalid or not present " when (($.MCO-ID != null) and (flowVars.LOVReturned[("MCO_ID-" ++ ($.MCO-ID default ""))][0] default "") == '') otherwise "")
+				++ (" MCO Start Date is Invalid or not present " when (($.MCO-ID != null) and ($.MCO-Start-Date != null) and ( isInvalidDate($.MCO-Start-Date,"yyyyMMdd") ) ) otherwise "")
+				++ (" MCO End Date is Invalid or not present " when (($.MCO-ID != null) and ($.MCO-End-Date != null)  and ( isInvalidDate($.MCO-End-Date,"yyyyMMdd") ) ) otherwise "")	
+} ]]></dw:set-variable>
+</dw:transform-message>
+                           <!--  <logger message="Hi" level="INFO" doc:name="Logger"/> -->
+        <expression-component doc:name="Expression : Calculate Valid Record Count" doc:description="Get Missing Records as String , this is required since Dataweave gives output as Stream
+Calculate Valid Records count after removing Missing Field records"><![CDATA[flowVars.missingFieldRecords = flowVars.missingFieldRecords:java.lang.String;
+flowVars.validRecsCount = flowVars.missingFieldRecords.equals("") ? flowVars.validRecsCount : (flowVars.validRecsCount - flowVars.missingFieldRecords.split("\n").length) ]]></expression-component>
+
+                            <choice doc:name="Choice : Check for Valid Records" doc:description="Check if valid records are present">
+                                <when expression="#[(flowVars.validRecsCount) == 0]">
+                                    <logger message="No valid Records are present in this Set" level="INFO" doc:name="Logger"/>
+                                </when>
+                                <otherwise>
+                                    <dw:transform-message doc:name="Valid Records Transform" doc:description="This transform step filters out Valid data not having Missing Fields or Incorrect form of data
+Also this step removes the records not having Person Type ID
+Also this step removes records having invalid dates identified for FOCUS and thus takes care of the Business Rule &quot;Treat any of these dates as NULL/blank for any date fields (like Eligibility Start Date, Eligibility End Date, MCO Start Date and MCO End Date) and then perform the Mandatory validations before loading Eligibility records into FOCUS
+   99999999,00000000,12319999&quot; by removing such records">
+                                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter 
+(
+	($.UniqueID != null) and ($.MCI != null)
+	and (isValidNumber(trim $.UniqueID))
+	and (isValidNumber(trim $.MCI))
+	and ( flowVars.PersonTypeIDMap[( (trim $.MCI) as :number as :string )] != null ) 
+	and ( $.Elig-Start-Date != null and ( not ( isInvalidDate($.Elig-Start-Date,"yyyyMMdd") ) ))
+	and ( ( $.Elig-Start-Date != null ) and  ($.Elig-Start-Date != "99999999") ) 
+	and ( ( $.Elig-Start-Date != null ) and  ($.Elig-Start-Date != "00000000") )
+	and ( ( $.Elig-Start-Date != null ) and  ($.Elig-Start-Date != "99991231") )
+	and ($.Elig-End-Date != null and ( not ( isInvalidDate($.Elig-End-Date,"yyyyMMdd") )))
+	and ( ( $.Elig-End-Date != null ) and  ($.Elig-End-Date != "99999999") ) 
+	and ( ( $.Elig-End-Date != null ) and  ($.Elig-End-Date != "00000000") )
+	and ( ( $.Elig-End-Date != null ) and  ($.Elig-End-Date != "99991231") )
+	and ($.Aid-Category != null) 
+	and ((($.MCO-ID == null) and (($.MCO-Start-Date == null) or (($.MCO-Start-Date != null) and ((isValidNumber(trim $.MCO-Start-Date)) and (((trim $.MCO-Start-Date) as :number as :string) == "0")) ) ) and (($.MCO-End-Date == null) or ((isValidNumber(trim $.MCO-End-Date)) and (((trim $.MCO-End-Date) as :number as :string) == "0")) ) )
+		or
+		(($.MCO-ID != null) and ((flowVars.LOVReturned[("MCO_ID-" ++ ($.MCO-ID default ""))][0] default "") != '') and ($.MCO-Start-Date != null) and ($.MCO-End-Date != null) and ( not ( isInvalidDate($.MCO-Start-Date,"yyyyMMdd") )) and ( not ( isInvalidDate($.MCO-End-Date,"yyyyMMdd") )) )
+	)
+)				]]></dw:set-payload>
+                                    </dw:transform-message>
+                                    <dw:transform-message doc:name="Transform : Prepare Data for Upsert" doc:description="This Transformation prepares data for Upsert and maps data as per field of the Corresponding Object in Salesforce">
+                                        <dw:set-variable variableName="preUpsertData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	"RecordTypeId" : flowVars.RecordID_MMIS,
+	//"Start_Date__c" : $.Elig-Start-Date as :date {format: "yyyyMMdd"},
+	Start_Date__c: (("4000" ++ $.Elig-Start-Date[4..7] as :string) when ($.Elig-Start-Date[0..3] as :number) > 4000  otherwise $.Elig-Start-Date )  as :date {format: "yyyyMMdd"},	
+	
+	//"End_Date__c" : $.Elig-End-Date as :date  {format: "yyyyMMdd"},
+	"End_Date__c" : (("4000" ++ $.Elig-End-Date[4..7] as :string) when ($.Elig-End-Date[0..3] as :number) > 4000  otherwise $.Elig-End-Date )  as :date {format: "yyyyMMdd"},	
+	//"Person_type_ID__c" : flowVars.PersonTypeID,
+	//"Monthly_Amount__c"	: $.Elig-Start-Date,
+	//"MCO_Start_Date__c" : $.MCO-Start-Date as :date  {format: "yyyyMMdd"},
+	("MCO_Start_Date__c" :  (("4000" ++ $.MCO-Start-Date[4..7] as :string) when ($.MCO-Start-Date[0..3] as :number) > 4000  otherwise $.MCO-Start-Date )  as :date {format: "yyyyMMdd"} ) when (($.MCO-Start-Date != null) and ( not ((isValidNumber(trim $.MCO-Start-Date)) and (((trim $.MCO-Start-Date) as :number as :string) == "0")) ) ),	
+	//"MCO_End_Date__c" : $.MCO-End-Date as :date  {format: "yyyyMMdd"},
+	( "MCO_End_Date__c" :  (("4000" ++ $.MCO-End-Date[4..7] as :string) when ($.MCO-End-Date[0..3] as :number) > 4000  otherwise $.MCO-End-Date )  as :date {format: "yyyyMMdd"} ) when (($.MCO-End-Date != null) and ( not ((isValidNumber(trim $.MCO-End-Date)) and (((trim $.MCO-End-Date) as :number as :string) == "0")) ) ),	
+	("MCO_Name__c" : flowVars.LOVReturned[("MCO_ID-" ++ ($.MCO-ID default ""))][0] default "") when ($.MCO-ID != null),	
+	"Aid_Category__c" : $.Aid-Category,
+	"Aid_Category_Description__c" : flowVars.LOVReturned[("AID_CATEGORY-" ++ ($.Aid-Category default ""))][0] default "",
+	 Medicaid_File_Run_Date__c : flowVars.fileRunDate,
+	//"Name_of_PCP__c" : (( $.Physician-Last-Name ++ ", " ) when ($.Physician-Last-Name != null) otherwise "" ) ++ ($.Physician-First-Name) default "",
+	"Name_of_PCP__c" : ( $.Physician-Last-Name default "") ++ ((", " ) when ( $.Physician-Last-Name != null and $.Physician-First-Name != null ) otherwise "" ) ++ ( $.Physician-First-Name default "" ),
+	"Phone_number_of_PCP__c" : $.Physician-Phone-Number,
+	"Person_Type__c" : flowVars.PersonTypeIDMap[((trim $.MCI) as :number as :string default "")].PersonTypeId,
+	//"Person_Type__c" : 123,
+	"Person_LkID__c" : flowVars.PersonTypeIDMap[((trim $.MCI) as :number as :string default "")].PersonId,
+	"External_Interface_Id__c" : (trim $.MCI) ++ "-" ++ $.Elig-End-Date ++ "-" ++ $.Elig-Start-Date ++ "-" ++ flowVars.RecordID_MMIS
+}]]></dw:set-variable>
+                                        <dw:set-variable variableName="validPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+                                    </dw:transform-message>
+
+                    <enricher source="#[payload]" target="#[flowVars.jobInfo]" doc:name="Message Enricher" doc:description="Invoking Salesforce operation in Enricher so that the Payload is not altered">
+                        <sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Income_Eligibility__c" externalIdFieldName="External_Interface_Id__c" doc:name="Salesforce : Upsert Records for the Child" doc:description="Upsert Records for the Child in Bulk
+Also this Step takes care of the Business rule &quot;The DMMA Eligibility Load interface only inserts records into the tables once and logs when the load has been completed successfully to prevent multiple entries&quot; by loading records">
+                            <sfdc:objects ref="#[flowVars.preUpsertData]"/>
+                        </sfdc:upsert-bulk>
+                    </enricher>
+                    <until-successful maxRetries="50" millisBetweenRetries="30000"  synchronous="true" doc:name="Until Successful" doc:description="Pause the thread until the SFDC Batch Job Result Stream is Ready">
+                   <!-- <processor-chain doc:name="Processor Chain"> -->
+<!--                             <sfdc:batch-info config-ref="Salesforce__Basic_Authentication_Config" doc:name="Salesforce : Check Batch Status" doc:description="Check Batch Status">
+                                <sfdc:batch-info ref="#[flowVars.jobInfo]"/>
+                            </sfdc:batch-info> -->
+                    <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Get Batch Result Stream" doc:description="Get Batch Result Stream for the Upsert Operation">
+                        <sfdc:batch-info ref="#[flowVars.jobInfo]"/>
+                    </sfdc:batch-result-stream>
+                   <!-- <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+                        </processor-chain> -->
+                    </until-successful>
+                    
+
+                    <!-- <logger message="Hi" level="INFO" doc:name="Logger"/> -->
+                                    <enricher source="#[payload]" target="#[flowVars.closeJobResult]" doc:name="Message Enricher" doc:description="Invoking Salesforce Operation in Message Enricher so that the payload is not modified">
+                                        <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.jobInfo.jobId]" doc:name="Salesforce: Close Job " doc:description="Close Job Since the Batch was processed and not needed further"/>
+                                    </enricher> 
+                    
+                    <object-to-string-transformer mimeType="application/xml" doc:name="Object to String : Consume Stream" doc:description="Consume Stream and convert to String make it Serializable"/>
+					
+                    <dw:transform-message doc:name="Transform Message : Enrich Payload with Success Flag" doc:description="Enrich Payload with Success Flag to mark them as success for further processing">
+                        <dw:input-payload  mimeType="application/xml"/>
+                        <dw:set-variable variableName="validPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.validPayload map {
+	($ mapObject {
+	    ($$):$
+	  }
+	),
+	"success" : payload.results.*result[$$].success
+}]]></dw:set-variable>
+
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="Transform Message : Get SFDC Errors Report" doc:description="This will be added to the overall Error report">
+                        <dw:input-payload  mimeType="application/xml"/>
+                        <dw:set-variable variableName="SFDCUpsertErrors"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+---
+payload.results.*result map {
+	UniqueID : flowVars.validPayload[$$].UniqueID,
+	MCI : flowVars.validPayload[$$].MCI,
+	Elig-Start-Date : flowVars.validPayload[$$].Elig-Start-Date,
+	Elig-End-Date : flowVars.validPayload[$$].Elig-End-Date,
+	Aid-Category : flowVars.validPayload[$$].Aid-Category,
+	MCO-Start-Date : flowVars.validPayload[$$].MCO-Start-Date,
+	MCO-End-Date : flowVars.validPayload[$$].MCO-End-Date,
+	MCO-ID : flowVars.validPayload[$$].MCO-ID,
+	Taxonomy : flowVars.validPayload[$$].Taxonomy,
+	Date-of-Death : flowVars.validPayload[$$].Date-of-Death,
+	Physician-Last-Name : flowVars.validPayload[$$].Physician-Last-Name,
+	Physician-First-Name : flowVars.validPayload[$$].Physician-First-Name,
+	Physician-Phone-Number : flowVars.validPayload[$$].Physician-Phone-Number,
+	("Errors" : ($.errors.message)		
+	) when ($.success == "false")
+} filter $.Errors != null]]></dw:set-variable>
+
+</dw:transform-message>
+                    <expression-component doc:name="Expression : Calculate Valid Record Count" doc:description="Get Missing Records as String , this is required since Dataweave gives output as Stream"><![CDATA[flowVars.SFDCUpsertErrors = flowVars.SFDCUpsertErrors:java.lang.String;
+flowVars.validRecsCount = flowVars.SFDCUpsertErrors.equals("") ? flowVars.validRecsCount : (flowVars.validRecsCount - flowVars.SFDCUpsertErrors.split("\n").length) 
+]]></expression-component>
+                                    <choice doc:name="Choice : Check for Valid Records" doc:description="Check for valid records. If any records are present then they will be used in Update operation later">
+                                        <when expression="#[(flowVars.validRecsCount) == 0]">
+                                            <logger message="No valid Records are present in this Set" level="INFO" doc:name="Logger"/>
+                                        </when>
+                                        <otherwise>
+                                            <dw:transform-message doc:name="Transform Message : Group Valid recs by MCI" doc:description="Group Valid records by MCI
+Valid records are identified using the Success flag
+This step orders the records with the Eligibility Start Date for every block of records identified by their MCI">
+                                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.validPayload 
+filter ($.success != null and $.success == "true") default []
+ groupBy $.MCI default {}
+  map  (
+  	($ orderBy (($.Elig-Start-Date ++ " 00:00:00+00:00" ) as :datetime { format: "yyyyMMdd HH:mm:ssXXX" } ) )[-1..0]
+  )[0] ]]></dw:set-payload>
+                                            </dw:transform-message>
+                                            <dw:transform-message doc:name="Transform Message : Prepare payload for Update" doc:description="Get Record with latest Eligibility Start Date
+                                            Prepare payload for Update Salesforce operation">
+                                                <dw:set-variable variableName="preUpdateData"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+
+		
+		Id : flowVars.PersonTypeIDMap[((trim $.MCI) as :number as :string default "")].PersonTypeId,			
+		("Medicaid_MCO__c" : flowVars.LOVReturned[("MCO_ID-") ++ ($.MCO-ID default "")][0] default "") when ($.MCO-ID != null),
+		("Medicaid_StartDate__c" : ($.MCO-Start-Date) as :date  {format: "yyyyMMdd"} ) when (($.MCO-Start-Date != null) and ( not ((isValidNumber(trim $.MCO-Start-Date)) and (((trim $.MCO-Start-Date) as :number as :string) == "0")) ) ),	
+		("Medicaid_EndDate__c" : ($.MCO-End-Date) as :date  {format: "yyyyMMdd"} ) when (($.MCO-End-Date != null) and ( not ((isValidNumber(trim $.MCO-End-Date)) and (((trim $.MCO-End-Date) as :number as :string) == "0")) ) ),
+		//"Name_of_PCP__c" : (( $.Physician-Last-Name ++ ", " ) when ( $.Physician-Last-Name != null ) otherwise "" ) ++ ( $.Physician-First-Name default "" ),
+		"Name_of_PCP__c" : ( $.Physician-Last-Name default "") ++ ((", " ) when ( $.Physician-Last-Name != null and $.Physician-First-Name != null ) otherwise "" ) ++ ( $.Physician-First-Name default "" ),
+		"Phone_number_of_PCP__c" : $.Physician-Phone-Number 												
+	
+}]]></dw:set-variable>
+                                            </dw:transform-message>
+                                            <enricher source="#[payload]" target="#[flowVars.updateResult]" doc:name="Message Enricher" doc:description="Invoking Salesforce Operation in Message Enricher so that the payload is not modified">
+                                                <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Person_Type__c" doc:name="Salesforce : Update Person Type With Medicaid Info" doc:description="Update Person Type With Medicaid Info in FOCUS, the records of a child having latest Eligibility Date is used for update
+This also takes care of the Business Rule &quot;Populate the latest MCO details on the Person Type Client (meaning Eligibility record which has latest Eligibility Start Date)&quot; by populating the latest MCO details">
+                                                    <sfdc:objects ref="#[flowVars.preUpdateData]"/>
+                                                </sfdc:update>
+                                            </enricher>
+                                            <dw:transform-message doc:name="Update Error Report" doc:description="This Transformation creates a Error Report for all the records which failed in Salesforce
+This will be added to the overall Error report">
+                                                <dw:set-variable variableName="updateResult"><![CDATA[%dw 1.0
+%output application/csv header = false , separator = "," , quoteValues=true, escape="\""
+---
+payload map  {
+	UniqueID : $.UniqueID,
+	MCI : $.MCI,
+	Elig-Start-Date : $.Elig-Start-Date,
+	Elig-End-Date : $.Elig-End-Date,
+	Aid-Category : $.Aid-Category,
+	MCO-Start-Date : $.MCO-Start-Date,
+	MCO-End-Date : $.MCO-End-Date,
+	MCO-ID : $.MCO-ID,
+	Taxonomy : $.Taxonomy,
+	Date-of-Death : $.Date-of-Death,
+	Physician-Last-Name : $.Physician-Last-Name,
+	Physician-First-Name : $.Physician-First-Name,
+	Physician-Phone-Number : $.Physician-Phone-Number,
+	("Errors" : (flowVars.updateResult[$$].errors[0].message)		
+	) when (flowVars.updateResult[$$].success == false)
+} filter $.Errors != null]]></dw:set-variable>
+        </dw:transform-message>
+        <expression-component doc:name="Expression : Get SFDC Update failure" doc:description="Get SFDC Update failure Records as String , this is required since Dataweave gives output as Stream"><![CDATA[flowVars.updateResult = flowVars.updateResult:java.lang.String
+]]></expression-component>
+    </otherwise>
+</choice>
+
+
+
+                                </otherwise>
+                            </choice>
+
+        
+    </otherwise>
+</choice>
+     
+               <objectstore:store config-ref="MMIS_Eligibility_Load_Object_Store__Connector" key="recordChildSuccCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.validRecsCount]" doc:name="ObjectStore: Store Count of Valid Records in the current set" doc:description="Store Count of Valid Records in the current set
+Storing with unique key so that the Object store entry is not overwritten in other invocations
+Storing in Object Store so that it can be retrieved after Batch Process"/>
+               <objectstore:store config-ref="MMIS_Eligibility_Load_Object_Store__Connector" key="recordChildTotalCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.totalRecordCount]" doc:name="ObjectStore: Store Count of All Records  in the current set" doc:description="Store Count of All Records  in the current set
+Storing with unique key so that the Object store entry is not overwritten in other invocations
+Storing in Object Store so that it can be retrieved after Batch Process"/>
+          
+                    <expression-filter expression="#[(((flowVars.totalRecordCount - flowVars.validRecsCount ) &gt; 0) || ((flowVars.updateResult != null) &amp;&amp; (!flowVars.updateResult.equals(&quot;&quot;)) ) )]" doc:name="Expression : Check for InValid Records" doc:description="Check for InValid Records If Invalid Records are found then they will be stored in Object Store in next subsequent steps
+Also checking for existense of SFDC Update Errors, these errors will be not added to the success or failure count since it is a different operation"/>
+
+                    <objectstore:store config-ref="MMIS_Eligibility_Load_Object_Store__Connector" key="recordErrors#[java.util.UUID.randomUUID().toString()]" value-ref="#[((flowVars.InvalidLengthErrors == null ? &quot;&quot; : flowVars.InvalidLengthErrors ) + (flowVars.missingFieldRecords == null ? &quot;&quot; : flowVars.missingFieldRecords) + (flowVars.SFDCUpsertErrors == null ? &quot;&quot; : flowVars.SFDCUpsertErrors) + (flowVars.updateResult == null ? &quot;&quot; : flowVars.updateResult ) )]" doc:name="ObjectStore: Store Record Errors" doc:description="Store Record Errors for records of this Set
+Storing with unique key so that the Object store entry is not overwritten in other invocations
+Storing in Object Store so that it can be retrieved after Batch Process"/>
+
+
+</batch:commit>                
+            </batch:step>
+
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>
+                    <choice doc:name="Choice : Check if Exception Occured">
+                        <when expression="#[payload.size() &gt; 0]">
+                            <objectstore:store config-ref="MMIS_Eligibility_Load_Error_Object_Store__Connector" key="ExceptionOccuredFlag#[java.util.UUID.randomUUID().toString()]" value-ref="#['true']" overwrite="true" doc:name="ObjectStore : Exception Occured Flag"/>
+
+                        </when>
+                        <otherwise>
+                            <logger message="No Exception occured for this Batch" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+                    <foreach collection="#[payload]" doc:name="For Each">
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( payload == null  ) ? "" : payload.message )  + ( payload.cause == null ? "" :  ", " + payload.cause.message + ( ( (payload.cause.cause == null) || (payload.cause.message.contains(payload.cause.cause.message)) )   ? "" : " , " + payload.cause.cause.message ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+                    <expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>
+                    <objectstore:store config-ref="MMIS_Eligibility_Load_Error_Object_Store__Connector" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="MMIS_Eligibility_Load_Error_Object_Store__Connector" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+                </batch:commit>
+            </batch:step>
+
+        </batch:process-records>
+        <batch:on-complete>
+        <set-session-variable variableName="uniqueRecCount" value="#[payload.loadedRecords]" doc:name="Session Variable : Get Unique Record Count from Batch Job Result" doc:description="Session Variable : Get Unique Record Count from Batch Job Result"/>
+            <choice doc:name="Choice">
+                <when expression="#[(flowVars.validRecsCount) == 0]">
+                    <logger message="No valid Records are present in this Set, Hence won't delete the records" level="INFO" doc:name="Logger"/>
+                </when>
+                <otherwise>
+                    <set-variable variableName="runDateString" value="#[dw('(flowVars.fileRunDate &gt;&gt; |+00:00|) as :string ')]" doc:name="FV: Get Interface run Date in SFDC format" doc:description="Get Interface run Date in SFDC format"/>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select id from DEL_Income_Eligibility__c where RecordTypeId = '#[flowVars.RecordID_MMIS]' and Medicaid_File_Run_Date__c &lt; #[flowVars.runDateString]" doc:name="Salesforce : Get Id of all old records" doc:description="Get Id of all old records, These Id's will be used for the subsequent Delete operation"/>
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Calculate Number of Batches Required" doc:description="Set Total Batch size and number of iterations required And Initialize an atomic integer to keep track of the parallel processes">
+                        <add-message-property key="deleteBatchSize" value="#[ (payload.size() == 0) ? new Integer(&quot;0&quot;) : new Integer((int) Math.ceil((double) payload.size() / new Integer(10000)))]"/>
+                        <add-message-property key="atomicCount" value="#[new java.util.concurrent.atomic.AtomicInteger()]"/>
+                    </message-properties-transformer>
+                    <logger message="select id from DEL_Income_Eligibility__c where RecordTypeId = '#[flowVars.RecordID_MMIS]' and Medicaid_File_Run_Date__c &lt; #[flowVars.runDateString]" level="DEBUG" doc:name="Logger : Query for Records to be deleted"/>
+                    <foreach batchSize="10000" doc:name="For Each" doc:description="Fetching 10000 records at a time from Consumer Iterator, to avoid loading entire Delete IDs in memory">
+                        <async doc:name="Async">
+                            <flow-ref name="inf0140_mmis_eligibility_load_deleteOldRecordsFlow" doc:name="inf0140_mmis_eligibility_load_deleteOldRecordsFlow" doc:description="Invoking the flow which will delete the records passed to it"/>
+                        </async>
+                    </foreach>
+                    <until-successful maxRetries="1000" millisBetweenRetries="30000" failureExpression="#[payload != flowVars.deleteBatchSize]" synchronous="true" doc:name="Until Successful : Wait for deletion" doc:description="Wait until all the parallel delete operations are complete">
+                        <set-payload value="#[new Integer(flowVars.atomicCount.get())]" doc:name="Set payload to latest Count " doc:description="Set payload to latest Count of parallel Delete process completed"/>
+                    </until-successful>
+                </otherwise>
+            </choice>
+
+
+            
+           <objectstore:retrieve-all-keys config-ref="MMIS_Eligibility_Load_Error_Object_Store__Connector" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Get all Exception Keys for this Load"/>
+           <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize variables">
+                <add-message-property key="exceptionOccured" value="#[false]"/>
+                <add-message-property key="exceptionRecordCount" value="#[payload.size()]"/>
+            </message-properties-transformer>
+
+<foreach doc:name="For Each : Iterate over Exception Keys" doc:description="For Each : Iterate over Exception Keys">
+                <choice doc:name="Choice" doc:description="Check for SFDC Connection errors">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="MMIS_Eligibility_Load_Error_Object_Store__Connector" key="#[payload]" doc:name="Exception ObjectStore : Retrieve and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retrieve and Remove a record having SFDC Connection Exception Count
+Store the value of the entry in Payload
+Remove Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Update Total SFDC Connection Error Count" doc:description="Update Total SFDC Connection Error Count">
+                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <when expression="#[payload.contains(&quot;ExceptionOccuredFlag&quot;)]">
+                        <objectstore:remove config-ref="MMIS_Eligibility_Load_Error_Object_Store__Connector" key="#[payload]" doc:name="ObjectStore : Remove Exception Occured Flag" doc:description="Remove Exception Occured flag" />
+                        <message-properties-transformer scope="invocation" doc:name="Message Properties : Update Exception Occured Flag" doc:description="Update Exception Occured Flag">
+                            <add-message-property key="exceptionOccured" value="#[true]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="MMIS_Eligibility_Load_Error_Object_Store__Connector" key="#[payload]" doc:name="Exception ObjectStore : Retrieve and Remove a record having Exception Details" doc:description="Retrieve and Remove a record having Exception Details
+Store the value of the entry in Payload
+Remove Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+                            <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload : flowVars.AggregatedErrorDetails +  payload]"/>
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+
+            </foreach>
+            <message-properties-transformer scope="invocation" doc:name="Message Properties : Aggregate Error Details">
+                <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails != null ? flowVars.AggregatedErrorDetails : ((flowVars.exceptionOccured == true) ? &quot;Unexpected error occured !&quot; : null  )]"/>
+            </message-properties-transformer>
+		  
+            <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow" doc:description="Invoke Flow which will raise Exception if any Technical Exception had occured during the Batch job execution"/>
+
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if no Exceptions occured" doc:description="Choice : Route to process Further if no Exceptions occured
+If Exceptions occured flow is passed to a different branch which will handle clean up">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="MMIS_Eligibility_Load_Object_Store__Connector" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="MMIS_Eligibility_Load_Object_Store__Connector" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Removes all the enteries and Clean Object Store"/>
+                    </foreach>
+              </when>
+              <otherwise>
+              	       <message-properties-transformer overwrite="true" scope="session" doc:name="Initialize variables
+These variables will be used in the Interface Dashboard">
+	                          <add-message-property key="totalRecCount" value="#[0]"/>
+	                          <add-message-property key="totalErrorCount" value="#[0]"/>
+	                          <add-message-property key="totalSuccCount" value="#[0]"/>
+	                          <add-message-property key="errorDetails" value="#[new StringBuilder()]"/>
+	                   </message-properties-transformer>
+	                    
+               <objectstore:retrieve-all-keys config-ref="MMIS_Eligibility_Load_Object_Store__Connector"
+				doc:name="ObjectStore : Get all Keys" doc:description="Get all Keys for this Load"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate over each key" doc:description="Iterate over each key">
+                        <choice doc:name="Choice : Route all Counting entries stored in Object Store ">
+                            <when expression="#[ payload.contains('Count') ]">
+                                <choice doc:name="Choice : Route all counter key which are total count markers">
+                                    <when expression="#[ payload.contains('TotalCount') ]">
+                                        <objectstore:remove config-ref="MMIS_Eligibility_Load_Object_Store__Connector" key="#[payload]" doc:name="Remove and get object store entry
+                                        Store the value of the entry in Payload
+Remove Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                                        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update Total Count" doc:description="Update total count">
+                                            <add-message-property key="totalRecCount" value="#[ sessionVars.totalRecCount + (new java.lang.Integer(payload))]"/>
+                                        </message-properties-transformer>
+                                    </when>
+                                    <otherwise>
+                                        <objectstore:remove config-ref="MMIS_Eligibility_Load_Object_Store__Connector" key="#[payload]" doc:name="Remove and get object store enteries
+Store the value of the entry in Payload
+Remove Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                                        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update Total Valid Count" doc:description="Update Total Valid Count">
+                                            <add-message-property key="totalSuccCount" value="#[ sessionVars.totalSuccCount + (new java.lang.Integer(payload))]"/>
+                                        </message-properties-transformer>
+                                    </otherwise>
+                                </choice>
+                            </when>
+                            <otherwise>
+                                <objectstore:remove config-ref="MMIS_Eligibility_Load_Object_Store__Connector" key="#[payload]" doc:name="Remove and get object store enteries
+Store the value of the entry in Payload
+Remove Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                                <!-- <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update totalErrorCount, ErrorAttachment"> -->
+                                    <expression-component doc:name="Expression : Add Errors to error Report" doc:description="Append Errors to Error Report"><![CDATA[ sessionVars.errorDetails.append(( payload )) ]]></expression-component>
+                                <!-- </message-properties-transformer> -->
+                            </otherwise>
+                        </choice>
+                    </foreach>
+			
+			
+			<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Error count" doc:description="Update Error count">
+				<add-message-property key="totalErrorCount"
+					value="#[sessionVars.totalRecCount -  sessionVars.totalSuccCount]" />
+			</message-properties-transformer>
+			<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Record Status, ErrorAttachment" doc:description="Update Record Status, ErrorAttachment
+These variables will be passed to the Interface dashboard">
+				<add-message-property key="recStatus"
+					value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+				<add-message-property key="ErrorAttachment" value="#[sessionVars.totalErrorCount==0  ? null : ('PID,MCI,Eligibility Start  Date,Eligibility End Date,Aid Category,MCO Start Date,MCO End Date,MCO ID,Taxonomy, DateofDeath,Physician Last Name,Physician First Name,Physician PhoneNumber,Error' + System.lineSeparator() + sessionVars.errorDetails.toString() )]"/> 
+			</message-properties-transformer>
+  			<set-payload
+				value="{&quot;InterfaceID&quot;: &quot;INF014&quot;, &quot;InterfaceName&quot;: &quot;MMIS Eligibility Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_MMISEligibilityLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;Number of Unique Record(s) - #[sessionVars.uniqueRecCount] #[sessionVars.totalErrorCount != 0?'and See attached file for Error details.':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;0&quot;}"
+				mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework for Transaction completion" />                    
+             <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework for Transaction completion" /> 
+                      
+              </otherwise>
+            </choice>
+            <set-payload value="INF014b" doc:name="Set Payload to Interface ID for MMIS Eligibility Batch Error Load" doc:description="Set Payload to Interface ID for MMIS Eligibility Batch Error Load
+The Interface ID set will identify the interface"/>
+            <message-properties-transformer scope="session" doc:name="Message Properties : Delete Session variables before invoking Error Load" doc:description="Delete Session variables before invoking Error Load so that they are not used again">
+                <delete-message-property key="TID"/>
+                <delete-message-property key="errorDetails"/>
+                <delete-message-property key="ErrorAttachment"/>
+                <delete-message-property key="uniqueRecCount"/>
+                <delete-message-property key="recStatus"/>
+                <delete-message-property key="totalErrorCount"/>
+                <delete-message-property key="totalSuccCount"/>
+                <delete-message-property key="totalRecCount"/>
+            </message-properties-transformer>
+            <flow-ref name="inf0140b_mmis_eligibility_error_load_Flow" doc:name="inf0140b_mmis_eligibility_error_load_Flow" doc:description="Invoke MMIS Eligibility Error Load"/>
+             <!-- <vm:outbound-endpoint exchange-pattern="one-way" path="mmis_eligibility_error_load" doc:name="VM: Invoke MMIS Eligibility Batch Error Load" doc:description="VM: Invoke MMIS Eligibility Batch Error Load"/> --> 
+		 
+        </batch:on-complete>
+    </batch:job>
+    
+    <flow name="Interface-handle-batch-errors-Flow">
+        <!-- <logger message="FlowVars From Flow #[flowVars]" level="INFO" doc:name="Logger"/> -->
+   		<validation:custom-validator doc:name="Validation" exceptionClass="org.mule.api.ConnectionException" class="gov.delaware.validation.DelawareValidator" config-ref="Validation_Configuration"/>
+        <!-- <logger message="After Validation : In flow" level="INFO" doc:name="Logger"/> -->
+         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/> 
+    </flow>
+    <flow name="inf0140_mmis_eligibility_load_deleteOldRecordsFlow"  processingStrategy="Asynchronous_Processing_Strategy">
+                                <dw:transform-message doc:name="Transform Message : Prepare ID for Delete">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map { Id : $.Id}]]></dw:set-payload>
+                </dw:transform-message>
+        <logger message="Deletion THread number : #[flowVars.atomicCount.get()]" level="INFO" doc:name="Logger"/>
+                <enricher source="#[payload]" target="#[flowVars.jobInfo]" doc:name="Message Enricher" doc:description="Execute Bulk Delete and store the Bulk job Batch Info ">
+                    <sfdc:hard-delete-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Income_Eligibility__c" doc:name="Salesforce : Delete old records" doc:description="Salesforce : Delete old records 5000 records at a time
+Also this step takes care of the Business Rule &quot;The DMMA Eligibility Load interface deletes all Medicaid eligibility data (Of Type Medicaid Eligibility) in Client Eligibility tables&quot; by deleting old records">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:hard-delete-bulk>
+                </enricher>
+
+                <until-successful maxRetries="50" synchronous="true" doc:name="Until Successful" millisBetweenRetries="30000">
+                    <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Check if the Batch is Completed">
+                        <sfdc:batch-info ref="#[flowVars.jobInfo]"/>
+                    </sfdc:batch-result-stream>
+                </until-successful>
+                <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.jobInfo.jobId]" doc:name="Salesforce : Close Job" doc:description="Closes the SFDC Bulk job"/>
+        <expression-component doc:name="Expression : Increment Atomic counter by 1" doc:description="Increment Atomic count by 1 to mark completion of this Delete Batch"><![CDATA[flowVars.atomicCount.addAndGet(1)]]></expression-component>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <expression-component doc:name="Expression : Increment Atomic counter by 1" doc:description="Increment Atomic count by 1 to mark complete processing of this Delete Batch"><![CDATA[flowVars.atomicCount.addAndGet(1)]]></expression-component>
+        </catch-exception-strategy>
+    
+    
+    </flow>
+    
+    <sub-flow name="MMIS_Eligibility_Load_LogInProgressTransaction_Sub_Flow">
+    	<set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="SV: Set TransactionAttachment" doc:description="Creating Transaction Attachment for the Logging framework"/>
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF014&quot;, &quot;InterfaceName&quot;: &quot;MMIS Eligibility Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_${sftp.MMISEligibilityLoad.transaction.filename}&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
+		
+	</sub-flow>
+    
+</mule>
