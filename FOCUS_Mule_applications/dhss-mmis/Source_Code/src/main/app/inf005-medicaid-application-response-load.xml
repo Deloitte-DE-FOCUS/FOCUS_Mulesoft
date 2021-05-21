@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd">
+    <validation:config name="Validation_Configuration_resp_load" doc:name="Validation Configuration"/>
+    <!-- <sftp:connector name="MMISSFTPOverride" validateConnections="true" doc:name="SFTP" >
+        <reconnect count="5"/>
+    </sftp:connector> -->
+    <!-- <spring:beans>
+		<spring:import resource="classpath:/loggingframework.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/errorhandling.xml" />
+	</spring:beans>
+	<spring:beans>
+         <spring:import resource="classpath:/queryframework.xml" /> 
+   	</spring:beans>  -->
+    <!-- <sfdc:config name="Local_Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}" url="${sfdc.url}" disableSessionInvalidation="true" doc:name="Salesforce: Basic Authentication">
+        <reconnect count="5"/>
+    </sfdc:config> -->
+    <objectstore:config name="MedicaidResLoadObjectStore__Connector" partition="MedicaidResLoadObjectStore__Connector" doc:name="ObjectStore: Connector"/>
+    <flow name="inf005-medicaid-app-response-load-flow" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="This is a batch process scheduled daily (Sunday  to Saturday) at 5:45 PM EST">
+            <schedulers:cron-scheduler expression="0 45 17 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF005" doc:name="SP: Set Interface ID" doc:description="Payload is set with interface ID in the POLL connector because if interface is failed while connecting to SFTP connector, exception will be logged in Salesforce using this InterfaceID.
+
+You cannot use flowvariable within Poll as scope of flowvariable ends once cursor moves away from Poll. Hence, setpayload connector is used."/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV: Set Interface ID" doc:description="retaining the Interface ID in the InterfaceID flowvariable."/>
+        <set-variable variableName="isKeyRequired" value="${sftp.medicaidresponseload.transaction.isKeyRequired}" doc:name="Variable : Set Key Required" doc:description="Check if Private Key (Identity File) is required for this Interface
+Depending on this the Mule SFTP Requester will be configured"/>
+        <choice doc:name="Choice : Check if Key is Required" doc:description="Check if Private Key (Identity File) is Required for SFTP Connection
+Depending on this the flow is routed to the appropriate MuleRequester">
+            <when expression="#[flowVars.isKeyRequired.equals(&quot;true&quot;)]">
+                <mulerequester:request resource="sftp://${sftp.medicaidresponseload.transaction.username}:${sftp.medicaidresponseload.transaction.password}@${sftp.medicaidresponseload.transaction.host}:${sftp.medicaidresponseload.transaction.port}${sftp.medicaidresponseload.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.medicaidresponseload.transaction.filename}" timeout="300000" doc:name="Mule Requester with Identity File" doc:description="Mule Requestor connector is used to read the Medicaid Response Load from SFTP folder.
+This is configured with the identity File"/>            
+			</when>
+            <otherwise>
+                <mulerequester:request resource="sftp://${sftp.medicaidresponseload.transaction.username}:${sftp.medicaidresponseload.transaction.password}@${sftp.medicaidresponseload.transaction.host}:${sftp.medicaidresponseload.transaction.port}${sftp.medicaidresponseload.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.medicaidresponseload.transaction.filename}" timeout="300000" doc:name="Mule Requester without Identity File" doc:description="Mule Requestor connector is used to read the Medicaid Response Load from SFTP folder.
+This is configured without the identity File"/>
+            </otherwise>
+        </choice>
+
+        <validation:is-not-null config-ref="Validation_Configuration1" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validation : If file is not found then Null is returned, this component validates for Not null, if Null is returned then Exception will be thrown."/>
+        <object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="MP: Set Trans Attachment">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+            <add-message-property key="SalesforceErrors" value="#[&quot;&quot;]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher" doc:description="Using Message Enricher to retain the payload.">
+            <flow-ref name="Medicaid_Res_Load_Log_Inprogress_Transaction" doc:name="Medicaid_Res_Load_Log_Inprogress_Transaction"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <message-properties-transformer scope="session" doc:name="Message Properties : Delete Trans Attachment" doc:description="We don't need this session variable as attachment is created in Interface dashboard in the previous step. Hence, deleting it to clean the memory.">
+            <delete-message-property key="TransAttachment"/>
+        </message-properties-transformer>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPFilenameMatchConnector" outputPattern="${sftp.medicaidresponseload.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].csv" host="${sftp.medicaidresponseload.archive.host}" port="${sftp.medicaidresponseload.archive.port}" path="${sftp.medicaidresponseload.archive.path}" user="${sftp.medicaidresponseload.archive.username}" password="${sftp.medicaidresponseload.archive.password}" responseTimeout="10000" duplicateHandling="overwrite" doc:name="SFTP: Archive File" doc:description="System copies DHSS  file to archive folder. it is DSCYF requirement to archive the incoming file."/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="QueryforLOVMapping" doc:name="QueryforLOVMapping"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <set-session-variable variableName="TotalRecCount" value="#[payload.split(&quot;\n&quot;).length-1]" doc:name="SV: Set Total Record Count" doc:description="Identify the number of records count from file as we need to set the total record count in the interface dashboard for this transaction."/>
+        <choice doc:name="Choice : If there are Failed Records">
+            <when expression="#[sessionVars.TotalRecCount > 0]">
+				<set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Split Records"/>
+				<dw:transform-message doc:name="Transform Message - Get Detail Level Records">
+					<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[1..-1]]]></dw:set-payload>
+				</dw:transform-message>
+				<dw:transform-message doc:name="TM: Join By \n">
+					<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload joinBy "\n") ++ "\n"]]></dw:set-payload>
+				</dw:transform-message>
+				<object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+				<dw:transform-message doc:name="TM: Convert CSV to Map" metadata:id="bd815b65-995a-49aa-92d7-f769666a58db">
+					<dw:input-payload doc:sample="sample_data\list_csv.csv" mimeType="application/csv">
+						<dw:reader-property name="header" value="false"/>
+					</dw:input-payload>
+					<dw:set-payload><![CDATA[%dw 1.0
+%input payload application/csv
+%output application/java
+---
+payload map
+{
+	RecordType: $[0],
+	MCI: $[1],
+	Status: $[2],
+	FailMsg: $[3]
+}]]></dw:set-payload>
+				</dw:transform-message>
+				<dw:transform-message doc:name="TW: Filter Valid and Invalid Records">
+					<dw:input-payload doc:sample="sample_data\list_string.dwl"/>
+					<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+	RecordType : $.RecordType default "",
+	MCI : $.MCI default "",
+	Status : $.Status default "",
+	ErrorDescription : (("Record Type is invalid : Detail level records should start with D ") when ($.RecordType != null and $.RecordType != "D" ) otherwise (" Record Type is missing ") when ($.RecordType == null or $.RecordType == "") otherwise "") ++ 					   
+					   ((" MCI is missing ") when ($.MCI == null or $.MCI == "") otherwise (" MCI is Invalid ") when ($.MCI != null and ($[1] matches /(\d+)/) == false) otherwise "") ++ 					   
+					   ((" Status is missing ") when ($.Status == null or $.Status == "") otherwise (" Status is Invalid ") when ($.Status != null and $.Status != "" and ($.Status != "P" and $.Status != "F")) otherwise "")
+} filter $.ErrorDescription == null or $.ErrorDescription == ""]]></dw:set-payload>
+            <dw:set-variable variableName="InvalidRecords"><![CDATA[%dw 1.0
+%output application/csv header = false
+---
+payload map 
+{
+	RecordType : $.RecordType default "",
+	MCI : $.MCI default "",
+	Status : $.Status default "",
+	ErrorDescription : (("Record Type is invalid : Detail level records should start with D ") when ($.RecordType != null and $.RecordType != "D" ) otherwise (" Record Type is missing ") when ($.RecordType == null or $.RecordType == "") otherwise "") ++ 					   
+					   ((" MCI is missing ") when ($.MCI == null or $.MCI == "") otherwise (" MCI is Invalid ") when ($.MCI != null and ($[1] matches /(\d+)/) == false) otherwise "") ++ 					   
+					   ((" Status is missing ") when ($.Status == null or $.Status == "") otherwise (" Status is Invalid ") when ($.Status != null and $.Status != "" and ($.Status != "P" and $.Status != "F")) otherwise "")
+} filter $.ErrorDescription != null and $.ErrorDescription != ""]]></dw:set-variable>
+            <dw:set-variable variableName="StatusFailRecords"><![CDATA[%dw 1.0
+%output application/csv 
+---
+payload map 
+{
+	RecordType : $.RecordType default "",
+	MCI : $.MCI default "",
+	Status : $.Status default "",
+	ErrorDescription : $.FailMsg when ($.FailMsg != null and $.FailMsg != "" ) otherwise "Warning: Status Failed (F)"
+} filter $.Status ~= "F"]]></dw:set-variable>
+				</dw:transform-message>
+				<set-variable variableName="InvalidRecordsLength" value="#[flowVars.InvalidRecords != null and flowVars.InvalidRecords != '' ? flowVars.InvalidRecords.split(&quot;\n&quot;).length : 0]" doc:name="FV: Count Invalid Records"/>
+				<dw:transform-message doc:name="TW: Remove zeros from MCI number">
+					<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+	RecordType : $.RecordType default "",
+	MCI : $.MCI as :number as :string,
+	Status : $.Status default ""
+}]]></dw:set-payload>
+				</dw:transform-message>
+				<set-variable variableName="Last14Days" value="#[server.dateTime.plusDays(${smtp.medicaidExtract.lastSubmissionFailDaysCount}).format('yyyy-MM-dd')]" doc:name="FV: Last14DaysDate"/>
+				<flow-ref name="inf005-UpdateMedicaidRecords_Subflow" doc:name="inf005-UpdateMedicaidRecords_Subflow"/>
+
+            </when>
+            <otherwise>
+               <logger message="There are no records in the file!" level="INFO" doc:name="Logger"/>
+				<set-session-variable variableName="RecordCount" value="0" doc:name="SV: Records Count"/>
+				<set-session-variable variableName="RecordSuccessCount" value="0" doc:name="SV: Records Success Count"/>
+				<set-session-variable variableName="RecordErrorCount" value="0" doc:name="SV: Records Error Count"/>
+				<flow-ref name="Log_Complete_Transaction_Sub_Flow" doc:name="Flow Reference"/>
+            </otherwise>
+        </choice>
+
+
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+    <sub-flow name="Medicaid_Res_Load_Log_Inprogress_Transaction">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF005&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Response Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_SFTP_DSS_ASSIST_DSCYF_MAappsResults&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="text/json" doc:name="Set Payload"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+    </sub-flow>
+    <sub-flow name="QueryforLOVMapping">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'MEDICAID_STATUS'&quot;} " mimeType="text/json" doc:name="Set Payload"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+    <sub-flow name="inf005-UpdateMedicaidRecords_Subflow">
+        <foreach batchSize="150" doc:name="For Each">
+            <set-variable variableName="PayloadbeforePrcessing" value="#[payload]" doc:name="Variable "/>
+            <dw:transform-message doc:name="TW: Get Comma Separated MCI Numbers">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.MCI ++ "'" )) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id, Person_Type__r.Person__r.DEL_MCI__c, Initial_Submission_Fail_Date__c FROM DEL_Income_Eligibility__c WHERE RecordType.Name='Medicaid Application Read Only' AND Application_Type__c = 'Initial Foster Care' AND ( Submission_Status__c = 'Submitted' OR (Submission_Status__c = 'Fail' AND Initial_Submission_Fail_Date__c &gt;= #[flowVars.Last14Days])) AND Person_Type__r.person__r.DEL_MCI__c in (#[payload]) " doc:name="Salesforce : QUery for Medicaid Application Records"/>
+            <dw:transform-message doc:name="TW: Group By Query Output with MCI">
+                <dw:set-variable variableName="MedcaidRecordsSFMap"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	MCI: $.Person_Type__r.Person__r.DEL_MCI__c as :string,
+	Id: $.Id,
+	Initial_Submission_Date: $.Initial_Submission_Fail_Date__c
+} groupBy $.MCI]]></dw:set-variable>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM: Prepare Records to Update and Wron MCI Errors" metadata:id="53f6173c-1c6d-43c6-9ee6-a4c5cefb4c4d">
+                <dw:input-payload doc:sample="sample_data\list_QueryOutput.dwl" mimeType="application/java"/>
+                <dw:input-variable doc:sample="sample_data\list_OriginalJavaPayload.dwl" mimeType="application/java" variableName="PayloadbeforePrcessing"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+
+flowVars.PayloadbeforePrcessing map {
+	Id : flowVars.MedcaidRecordsSFMap[($.MCI)][0].Id,		
+	Submission_Status__c : flowVars.LOVReturned[("MEDICAID_STATUS-" ++ $.Status)][0],
+	(Initial_Submission_Fail_Date__c: now as :date {format: "yyyy-MM-dd"}) when (flowVars.MedcaidRecordsSFMap[$.MCI][0].Initial_Submission_Date == "null" or flowVars.MedcaidRecordsSFMap[$.MCI][0].Initial_Submission_Date == null or flowVars.MedcaidRecordsSFMap[$.MCI][0].Initial_Submission_Date == "") and $.Status == "F"	
+} filter $.Id != null and $.Id != ""
+]]></dw:set-payload>
+                <dw:set-variable variableName="BeforeUpdatePayload"><![CDATA[%dw 1.0
+%output application/java
+---
+
+flowVars.PayloadbeforePrcessing map {
+	Id : flowVars.MedcaidRecordsSFMap[$.MCI][0].Id,		
+	Submission_Status__c : flowVars.LOVReturned[("MEDICAID_STATUS-" ++ $.Status)][0],
+	(Initial_Submission_Fail_Date__c: now as :date {format: "yyyy-MM-dd"}) when (flowVars.MedcaidRecordsSFMap[$.MCI][0].Initial_Submission_Date == "null" or flowVars.MedcaidRecordsSFMap[$.MCI][0].Initial_Submission_Date == null or flowVars.MedcaidRecordsSFMap[$.MCI][0].Initial_Submission_Date == "") and $.Status == "F"	
+} filter $.Id != null and $.Id != ""]]></dw:set-variable>
+                <dw:set-variable variableName="WrongMCIErrorsJava"><![CDATA[%dw 1.0
+%output application/java
+---
+
+flowVars.PayloadbeforePrcessing map {
+	Id : flowVars.MedcaidRecordsSFMap[$.MCI][0].Id,		
+	MCI: $.MCI,
+	Status: $.Status,
+	Error : "Medicaid Application Record is either not found in FOCUS or it is already processed for the respective MCI Number. Hence discarding the record from further processing."
+} filter $.Id == null or $.Id == ""]]></dw:set-variable>
+            </dw:transform-message>
+            <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Income_Eligibility__c" doc:name="Salesforce: Update Medicaid Eligibility Records">
+                <sfdc:objects ref="#[payload]"/>
+            </sfdc:update>
+            <dw:transform-message doc:name="TM : Store SF Error Messages">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false , quoteValues=true
+---
+payload map 
+{
+	RecordType: "D",
+	MCI: flowVars.BeforeUpdatePayload[$$].MCI,
+	Status: flowVars.BeforeUpdatePayload[$$].Status,
+	ErrorDescription: $.errors[0].message 
+} filter $.ErrorDescription != null and $.ErrorDescription != "" ]]></dw:set-payload>
+            </dw:transform-message>
+            <object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+            <set-session-variable variableName="SalesforceErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot; ? sessionVars.SalesforceErrors + payload  : sessionVars.SalesforceErrors)]" mimeType="application/csv" doc:name="Session Variable : Store Salesforce Errors"/>
+            <dw:transform-message doc:name="TM: Wrong MCI CSV File">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false , quoteValues=true
+---
+flowVars.WrongMCIErrorsJava map 
+{
+	RecordType: "D",
+	MCI: $.MCI,
+	Status: $.Status,
+	ErrorDescription: $.Error 
+} ]]></dw:set-payload>
+            </dw:transform-message>
+            <set-session-variable variableName="SalesforceErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot; ? sessionVars.SalesforceErrors + payload  : sessionVars.SalesforceErrors)]" mimeType="application/csv" doc:name="Session Variable : Store Wrong MCI Errors"/>
+        </foreach>
+        <set-variable variableName="SalesForceErrorCount" value="#[(sessionVars.SalesforceErrors != null and sessionVars.SalesforceErrors != &quot;&quot; ? sessionVars.SalesforceErrors.split(&quot;\n&quot;).length : 0)]" doc:name="FV: SFDCErrorCount"/>
+        <set-session-variable variableName="RecordErrorCount" value="#[SalesForceErrorCount   + InvalidRecordsLength]" doc:name="SV: Add all Failed Record Counts"/>
+        <message-properties-transformer scope="session" doc:name="MP: Set Error Attachment and SuccessCount">
+            <add-message-property key="RecordSuccessCount" value="#[TotalRecCount - RecordErrorCount]"/>
+            <add-message-property key="ErrorAttachment" value="#[flowVars.InvalidRecords + sessionVars.SalesforceErrors]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice : If there are any errors">
+            <when expression="#[sessionVars.ErrorAttachment != null &amp;&amp; sessionVars.ErrorAttachment != &quot;&quot;]">
+                <message-properties-transformer scope="session" doc:name="MP: Set Error Attachment Header">
+                    <add-message-property key="ErrorAttachment" value="#[(&quot;Record Type, MCI, Status, ErrorDescription&quot; + &quot;\n&quot; + sessionVars.ErrorAttachment)]"/>
+                </message-properties-transformer>
+            </when>
+            <otherwise>
+                <message-properties-transformer scope="session" doc:name="MP : Delete Error Attachment Variable">
+                    <delete-message-property key="ErrorAttachment"/>
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+
+        <flow-ref name="Log_Complete_Transaction_Sub_Flow" doc:name="Log_Complete_Transaction_Sub_Flow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="Log_Complete_Transaction_Sub_Flow">
+        <choice doc:name="Choice : If there are Failed Records">
+            <when expression="#[flowVars.StatusFailRecords != null &amp;&amp; flowVars.StatusFailRecords != &quot;&quot;]">
+                <set-session-variable variableName="TransAttachment" value="#[flowVars.StatusFailRecords]" doc:name="SV : Set Failed records as Trans Attachment"/>
+            </when>
+            <otherwise>
+                <logger message="There are no Failed records in the file!" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF005&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Response Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_MedicaidApplicationResponseLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Status_Fail_Records_Warning&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordCount==0?'Success':sessionVars.RecordSuccessCount==0?'Error':sessionVars.RecordErrorCount==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[TotalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordErrorCount !=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="text/json" doc:name="Set Payload : Set Completed Transaction Payload"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+ <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="isKeyRequired"/>
+				<delete-message-property key="TotalRecCount"/>
+				<delete-message-property key="InvalidRecords"/>
+				<delete-message-property key="StatusFailRecords"/>
+				<delete-message-property key="InvalidRecordsLength"/>
+				<delete-message-property key="Last14Days"/>
+				<delete-message-property key="PayloadbeforePrcessing"/>
+				<delete-message-property key="MedcaidRecordsSFMap"/>
+				<delete-message-property key="BeforeUpdatePayload"/>
+				<delete-message-property key="WrongMCIErrorsJava"/>
+				
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+				<delete-message-property key="SalesforceErrors"/>
+				<delete-message-property key="RecordErrorCount"/>
+				<delete-message-property key="RecordSuccessCount"/>
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="TransAttachment"/>
+				
+			</message-properties-transformer>
+    </sub-flow>
+
+
+</mule>

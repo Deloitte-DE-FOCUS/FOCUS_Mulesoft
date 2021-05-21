@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+   <!--  <sfdc:config name="Salesforce__Basic_Authentication_Local" username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}" url="${sfdc.url}" disableSessionInvalidation="true" doc:name="Salesforce: Basic Authentication"/>  -->
+   <!--  <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />      
+   	</spring:beans>
+   	 <spring:beans>
+         <spring:import resource="classpath:/errorhandling.xml" /> 
+   	</spring:beans>  -->
+   	<!-- <spring:beans>
+         <spring:import resource="classpath:/queryframework.xml" /> 
+   	</spring:beans>   -->
+    <!-- <sftp:connector name="SFTP_MedicaidExtract" validateConnections="true" doc:name="SFTP" autoDelete="false">
+        <reconnect count="3"/>
+    </sftp:connector>     -->
+    <flow name="inf004-medicaid-application-submission-extractFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <schedulers:cron-scheduler expression="0 0 18 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF004" doc:name="Set Payload" doc:description="Set Payload to INF004 so that if any exception occurs, then a transaction log will be created in FOCUS"/>
+        </poll>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set interface Id and last N days value" doc:description="Set Interface ID and Last N days value which will be coming from mule app properties">
+            <add-message-property key="InterfaceID" value="#[payload]"/>
+            <add-message-property key="Last14Days" value="#[server.dateTime.plusDays(${smtp.medicaidExtract.lastSubmissionFailDaysCount}).format('yyyy-MM-dd')]"/>
+            <add-message-property key="todayDate" value="#[server.dateTime.format('yyyy-MM-dd')]"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="MedcaidAppExtractInProgressTransaction_Subflow" doc:name="MedcaidAppExtractInProgressTransaction_Subflow" doc:description="Create In Progress Transaction record"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select id, name, Person_Type__c, Person_Type__r.Person__c, Date_of_Birth__c, Gender__c, Ethnicity__c, Marital_Status__c, Is_child_pregnant__c, Due_date_if_pregnant__c, School_Enrollment_Status__c, High_School_Graduation_Status__c, Application_Status__c, MCI__c, Race_Primary__c, SSN__c, Expedite__c, Is_child_receiving_SSI__c, Potentially_eligible_for_SSI__c, Highest_Grade_Completed__c, Date_Submitted__c, Submission_Status__c, Division__c, Application_Type__c, Application_Date__c, Child_s_Age_at_Application__c, Place_of_Birth__c, Date_entered_U_S__c, Alien_Status__c, Alien_Reg_ID__c, Citizen__c, Country_of_Origin__c, Refugee_Asylee_Status__c, Previous_Address_Line_1__c, Previous_Address_Line_2__c, Have_a_Sponsor__c, Is_Sponsor_Individual_or_Organization__c, Sponsor_PO_Box_Number__c, Sponsor_Address_Line_1__c, Spronsor_Address_Line_2__c, Sponsor_City__c, Organization_Sponsor_Name__c, Sponsor_State__c, Sponsor_Zip_Code__c, Current_Provider_Type__c, Previous_County__c, Case_Worker_Country__c, Client_PID__c, Current_Address_Line_1__c, Current_Address_Line_2__c, Current_City__c,  Current_State__c, Current_Zip_Code__c,  Person_Type__r.Person__r.FirstName,  Person_Type__r.Person__r.LastName,  Person_Type__r.Person__r.MiddleName,  Person_Type__r.Person__r.DEL_Suffix__c, CreatedBy.FirstName, CreatedBy.LastName, IV_E_Eligible__c, IV_E_Date_Eligible__c, Retro__c, Is_retro_financial_info_reflected__c, Unpaid_bills_from_the_last_three_months__c, (Select id, name, Income_Type__c, Frequency__c, Employer_Name__c, Amount__c, Eligibility__c from Eligibility_Attributes__r) from DEL_Income_Eligibility__c where RecordType.Name='Medicaid Application Read Only' AND Application_Status__c = 'Completed' AND Application_Type__c = 'Initial Foster Care' AND ( Submission_Status__c = 'Pending' OR (Submission_Status__c = 'Fail' AND Initial_Submission_Fail_Date__c &gt;= #[flowVars.Last14Days]))" doc:name="Salesforce : Query on Medicaid Records" doc:description="Get all qualified medicaid records"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf004-medicaid-application-submission-extract-No-Payload-subflow" doc:name="inf004-medicaid-application-submission-extract-No-Payload-subflow" doc:description="Check if there are no records returned then log an exception"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+        </enricher>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression : If payload has records" doc:description="If query returned some records then execute further logic"/>
+        <message-properties-transformer scope="invocation" doc:name="MP:Set Record-Error,Count,Success " doc:description="Set Error and Success record count">
+            <add-message-property key="RecordError" value="#[0]"/>
+            <add-message-property key="RecordSuccess" value="#[payload.size()]"/>
+            <add-message-property key="RecordCount" value="#[payload.size()]"/>
+        </message-properties-transformer>
+        <dw:transform-message metadata:id="ec470c77-548f-4e3f-af34-1c03cc328675" doc:name="TM :  Parse SF details to XML format">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	AssistApplications: {
+		(payload map {
+			AssistApplication: {
+				MedicaidSFID : $.Id,
+				PersonTypeSFID : $.Person_Type__c,
+				PersonSFID : $.Person_Type__r.Person__c,
+				ApplicationInformation: {
+					ApplicationNumber: '0',
+					ApplicationOrigin @(Code: 'A'): '',
+					ProgramAppliedFor: {
+						ProgramName @(Code: 'MA'): ''
+					},
+					PoolNumber @(Code: '30'): '',
+					PleaseIdentifyYourSelf: {
+						IAmApplyingFor @(Code: '6'): ''
+					},
+					ApplicationSubmitDate: now as :date,
+					ApplicantAddress: {
+						AddressStreetName: $.Current_Address_Line_1__c,
+						AddressLine2: $.Current_Address_Line_2__c,
+						City: $.Current_City__c,
+						State: $.Current_State__c,
+						ZIP: $.Current_Zip_Code__c,
+						ZIPExtension: $.Current_Zip_Code__c
+					},
+					HaveAlternateAddress @(Code: 'N'): '',
+					Esignature: {
+						IndividualName: {
+							FirstName: $.CreatedBy.FirstName,
+							MiddleInitial: null,
+							LastName: $.CreatedBy.LastName,
+							Suffix: null
+						}
+					},
+					ApplicationQuestions: {
+						EmploymentIncomeQuestions: {
+							(AnyOneHasOtherIncome @(Code: lookup("HasOtherIncome_Flow", $.Eligibility_Attributes__r)): '') ,
+							AnyOneHasEmployment @(Code: lookup("HasEmployment_Flow", $.Eligibility_Attributes__r)): ''
+						},
+						InsuranceQuestions: {
+							DoesAnyoneHaveHealthInsuranceIncludingMedicareOrLTC @(Code: 'N'): ''
+						}
+					},
+					AdditionalInformation : 
+					'IVE Eligible - ' ++ ($.IV_E_Eligible__c when $.IV_E_Eligible__c != null otherwise  "") ++ '\n' ++
+					'IVE Eligible Effective date -' ++ ($.IV_E_Date_Eligible__c when $.IV_E_Date_Eligible__c != null otherwise  "") //++ '\n' ++
+					//'Retro - ' ++ ($.Retro__c when $.Retro__c != null otherwise  "") ++ '\n' ++
+					//'Financial Information during Retro Period - ' ++  ($.Is_retro_financial_info_reflected__c when //$.Is_retro_financial_info_reflected__c != null otherwise  "") ++ '\n' ++ 
+					//'Past bills in the last 3 months - ' ++  ($.Unpaid_bills_from_the_last_three_months__c when $.Unpaid_bills_from_the_last_three_months__c != null otherwise  "")	
+				},
+				HouseholdInformation: {
+					IndividualInformation: {
+						Name: {
+							FirstName: $.Person_Type__r.Person__r.FirstName,
+							MiddleInitial: $.Person_Type__r.Person__r.MiddleName,
+							LastName: $.Person_Type__r.Person__r.LastName,
+							Suffix: $.Person_Type__r.Person__r.DEL_Suffix__c
+						},
+						CurrentLivingSituation @(Code: $.Current_Provider_Type__c): '',
+						IsThisIndividualTheHeadOfHousehold @(Code: 'Y'): '',
+						ProgramsForWhichIndividualIsApplying: {
+							ProgramName @(Code: 'MA'): ''
+						},
+						DateOfBirth: $.Date_of_Birth__c,
+						SocialSecurityNumber: $.SSN__c,
+						Sex @(Code: $.Gender__c): '',
+						PregnancyInformation: {
+							IsPregnant @(Code: $.Is_child_pregnant__c): '',
+							NumberOfBabiesExpected: '1' when $.Is_child_pregnant__c == 'Yes' otherwise '0',
+							PregnancyDueDate : $.Due_date_if_pregnant__c
+						},
+						Citizenship @(Code: ($.Citizen__c when $.Citizen__c != null otherwise 'Unknown')): '' ,
+						CitizenshipInformation: {
+							DateEnteredUS: $.Date_entered_U_S__c,
+							Country @(Code: $.Country_of_Origin__c): '',
+							OtherCountry: $.Country_of_Origin__c,
+							RefugeeAsyleeStatus @(Code: $.Refugee_Asylee_Status__c): '',
+							AlienStatus @(Code: $.Alien_Status__c): '',
+							AlienRegistrationNumber: $.Alien_Reg_ID__c,
+							HaveSponsor @(Code: $.Have_a_Sponsor__c): '',
+							IsTheSponsorAnIndividualOrAnOrganization @(Code: $.Is_Sponsor_Individual_or_Organization__c): '',
+							SponsorOrganizationName: $.Organization_Sponsor_Name__c,
+							SponsorAddress: {
+								AddressLine1: $.Sponsor_Address_Line_1__c,
+								AddressLine2: $.Spronsor_Address_Line_2__c,
+								City: $.Sponsor_City__c,
+								State: $.Sponsor_State__c,
+								ZIP: $.Sponsor_Zip_Code__c,
+								ZIPExtension: $.Sponsor_Zip_Code__c
+							}
+						},
+						MaritalStatus @(Code: $.Marital_Status__c): '',
+						RaceInformation: {
+							PrimaryRace @(Code: $.Race_Primary__c): '',
+							Ethnicity @(Code: $.Ethnicity__c): ''
+						},
+						PlaceOfBirth @(Code: $.Place_of_Birth__c): '',
+						StudentInformation: {
+							EnrollmentStatus @(Code: $.School_Enrollment_Status__c): '',
+							HighestGradeLevelCompleted @(Code: $.Highest_Grade_Completed__c): '',
+							HighestSchoolGradeStatusCompleted @(Code: $.High_School_Graduation_Status__c): ''
+						},
+						IsthisIndividualApplying @(Code: 'Y'): '',
+						IsthisIndividualApplyingForRetroMA @(Code : ($.Retro__c[0] when $.Retro__c != null otherwise  "")) : '',
+						MCINumber: $.MCI__c
+					}
+				},
+				(EmploymentIncomeInformation: {
+					( $.Eligibility_Attributes__r map {
+						(CurrentEmployment: {
+							EmployerName: $.Employer_Name__c,
+							OnStrike @(Code: 'N'): '',
+							NumberOfHoursWorkedPerWeek: 40,
+							IncomeFrequency @(Code: $.Frequency__c): '',
+							GrossIncomePerPayPeriodBforeTaxesAndDedctns: $.Amount__c
+						}) when $.Income_Type__c == 'Employment',
+						(OtherIncome: {
+							OtherIncomeType @(Code: $.Income_Type__c): '',
+							AmountOfIncomeBeforeTaxesAndDeducations: $.Amount__c,
+							IncomeFrequency @(Code: 'I'): ''
+						}) when $.Income_Type__c != 'Employment'
+					})
+				} )  when ($.Eligibility_Attributes__r?) == true
+			}
+		})
+	}
+}]]></dw:set-payload>
+            <dw:set-variable variableName="personTypeIds"><![CDATA[ %dw 1.0
+%output application/csv header=false
+---
+payload map 
+		{
+		personTypeId : '\'' ++ $.Person_Type_ID__c ++ '\''
+		," " : " " // empty column to add , at the end of each row
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String" doc:description="Convert payload to XML format"/>
+        <set-session-variable variableName="InitialPayload" value="#[payload]" mimeType="application/xml" doc:name="Session Variable : Store Initial Payload" doc:description="Store the Initial payload in a session variable"/>
+
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="LOVDetails_Subflow" doc:name="LOVDetails_Subflow" doc:description="Get LOV Details"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+        <flow-ref name="GetRelatedDetails_SubFlow" doc:name="GetRelatedDetails_SubFlow" doc:description="Get Related Entity Details for Address Type, TANF Eligibility Details"/>
+
+        <set-payload value="#[sessionVars.InitialPayload]" mimeType="application/xml" doc:name="Set Payload :  Set Initial Payload" doc:description="Set Initial Payload"/>
+        <dw:transform-message metadata:id="ec470c77-548f-4e3f-af34-1c03cc328675" doc:name="TM :  Parse SF details to XML format">
+            <dw:input-payload/>
+            <dw:input-variable doc:sample="sample_data\map.dwl" variableName="AddressMap"/>
+            <dw:input-variable doc:sample="sample_data\map_1.dwl" variableName="TANFEligibleMap"/>
+            <dw:input-session-variable doc:sample="sample_data\AssistApplications_1.xml" variableName="InitialPayload"/>
+            <dw:set-payload><![CDATA[// Prepare the final XML output
+%dw 1.0
+%output application/xml inlineCloseOn = "empty",skipNullOn = "everywhere"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+{
+	AssistApplications: {
+		(sessionVars.InitialPayload.AssistApplications.*AssistApplication map ((assistApplication , indexOfAssistApplication) -> {
+			AssistApplication: {
+				ApplicationInformation: {
+					ApplicationNumber: assistApplication.ApplicationInformation.ApplicationNumber,
+					ApplicationOrigin @(Code: assistApplication.ApplicationInformation.ApplicationOrigin.@Code): '',
+					ProgramAppliedFor: {
+						(assistApplication.ApplicationInformation.ProgramAppliedFor.*ProgramName map ((programName , indexOfProgramName) -> {
+							ProgramName @(Code: programName.@Code): programName
+						}))
+					},
+					PoolNumber @(Code: assistApplication.ApplicationInformation.PoolNumber.@Code): '',
+					PleaseIdentifyYourSelf: {
+						IAmApplyingFor @(Code: assistApplication.ApplicationInformation.PleaseIdentifyYourSelf.IAmApplyingFor.@Code): ''
+					},
+					ApplicationSubmitDate: assistApplication.ApplicationInformation.ApplicationSubmitDate,
+					(ApplicantAddress: {
+						(AddressStreetName: assistApplication.ApplicationInformation.ApplicantAddress.AddressStreetName[0..25] when (sizeOf assistApplication.ApplicationInformation.ApplicantAddress.AddressStreetName) > 26 otherwise assistApplication.ApplicationInformation.ApplicantAddress.AddressStreetName) when assistApplication.ApplicationInformation.ApplicantAddress.AddressStreetName != null and assistApplication.ApplicationInformation.ApplicantAddress.AddressStreetName != '',
+						(AddressLine2: assistApplication.ApplicationInformation.ApplicantAddress.AddressLine2[0..25]  when (sizeOf assistApplication.ApplicationInformation.ApplicantAddress.AddressLine2) > 26 otherwise assistApplication.ApplicationInformation.ApplicantAddress.AddressLine2) when assistApplication.ApplicationInformation.ApplicantAddress.AddressLine2 != null and assistApplication.ApplicationInformation.ApplicantAddress.AddressLine2 != '',
+						(City: assistApplication.ApplicationInformation.ApplicantAddress.City[0..15]  when (sizeOf assistApplication.ApplicationInformation.ApplicantAddress.City) > 16 otherwise assistApplication.ApplicationInformation.ApplicantAddress.City) when assistApplication.ApplicationInformation.ApplicantAddress.City != null and assistApplication.ApplicationInformation.ApplicantAddress.City != '',
+						(State @(Code: flowVars.LOVReturned[("STATECODE-" ++ assistApplication.ApplicationInformation.ApplicantAddress.State)][0] ): '') when assistApplication.ApplicationInformation.ApplicantAddress.State != null and assistApplication.ApplicationInformation.ApplicantAddress.State != '',
+						(ZIP: assistApplication.ApplicationInformation.ApplicantAddress.ZIP[0..4]) when assistApplication.ApplicationInformation.ApplicantAddress.ZIP != null and assistApplication.ApplicationInformation.ApplicantAddress.ZIP != '' and (sizeOf assistApplication.ApplicationInformation.ApplicantAddress.ZIP) > 4,
+						(ZIPExtension: assistApplication.ApplicationInformation.ApplicantAddress.ZIP[6..9]) when assistApplication.ApplicationInformation.ApplicantAddress.ZIP != null and assistApplication.ApplicationInformation.ApplicantAddress.ZIP != '' and (sizeOf assistApplication.ApplicationInformation.ApplicantAddress.ZIP) > 9
+					}) when ((assistApplication.ApplicationInformation.ApplicantAddress.AddressStreetName != null and assistApplication.ApplicationInformation.ApplicantAddress.AddressStreetName != '') or (assistApplication.ApplicationInformation.ApplicantAddress.AddressLine2 != null and assistApplication.ApplicationInformation.ApplicantAddress.AddressLine2 != '') or 
+					(assistApplication.ApplicationInformation.ApplicantAddress.City != null and assistApplication.ApplicationInformation.ApplicantAddress.City != '') or (assistApplication.ApplicationInformation.ApplicantAddress.State.@Code != null and assistApplication.ApplicationInformation.ApplicantAddress.State.@Code != '' and assistApplication.ApplicationInformation.ApplicantAddress.State != null and assistApplication.ApplicationInformation.ApplicantAddress.State != '') or 
+						(assistApplication.ApplicationInformation.ApplicantAddress.ZIP != null and assistApplication.ApplicationInformation.ApplicantAddress.ZIP != '')),
+					(HaveAlternateAddress @(Code: "Y"): ''),
+					AlternateAddress: {
+						AddressStreetName : p('medicaidExtract.AlternateAddress.AddressStreetName'),
+						AddressLine2 : p('medicaidExtract.AlternateAddress.AddressLine2'),
+						City : p('medicaidExtract.AlternateAddress.City'),
+						State @(Code: p('medicaidExtract.AlternateAddress.State')): '',
+						ZIP : p('medicaidExtract.AlternateAddress.ZIP'),
+						ZIPExtension : p('medicaidExtract.AlternateAddress.ZIPExtension')
+					},
+					Esignature: {
+						IndividualName: {
+							(FirstName: assistApplication.ApplicationInformation.Esignature.IndividualName.FirstName[0..14] when (sizeOf assistApplication.ApplicationInformation.Esignature.IndividualName.FirstName) > 15 otherwise assistApplication.ApplicationInformation.Esignature.IndividualName.FirstName) when assistApplication.ApplicationInformation.Esignature.IndividualName.FirstName != '',
+							(MiddleInitial: assistApplication.ApplicationInformation.Esignature.IndividualName.MiddleInitial[0..0]) when assistApplication.ApplicationInformation.Esignature.IndividualName.MiddleInitial != '',
+							(LastName: assistApplication.ApplicationInformation.Esignature.IndividualName.LastName[0..20]  when (sizeOf assistApplication.ApplicationInformation.Esignature.IndividualName.LastName) > 21 otherwise assistApplication.ApplicationInformation.Esignature.IndividualName.LastName) when assistApplication.ApplicationInformation.Esignature.IndividualName.LastName != '',
+							(Suffix: assistApplication.ApplicationInformation.Esignature.IndividualName.Suffix) when assistApplication.ApplicationInformation.Esignature.IndividualName.Suffix != ''
+						}
+					},
+					ApplicationQuestions: {
+						EmploymentIncomeQuestions: {
+							AnyOneHasOtherIncome @(Code: assistApplication.ApplicationInformation.ApplicationQuestions.EmploymentIncomeQuestions.AnyOneHasOtherIncome.@Code): '',
+							AnyOneHasEmployment @(Code: assistApplication.ApplicationInformation.ApplicationQuestions.EmploymentIncomeQuestions.AnyOneHasEmployment.@Code): ''
+						},
+						InsuranceQuestions : {
+							DoesAnyoneHaveHealthInsuranceIncludingMedicareOrLTC @(Code: 'N'): ''
+						}
+					},
+					
+					AdditionalInformation: assistApplication.ApplicationInformation.AdditionalInformation ++ '\n' ++
+						'TANF Eligible - ' ++ ( 'Yes' when flowVars.TANFEligibleMap[assistApplication.PersonTypeSFID] != null otherwise 'No')
+				},
+				HouseholdInformation: {
+					(assistApplication.HouseholdInformation.*IndividualInformation map ((individualInformation , indexOfIndividualInformation) -> {
+						IndividualInformation: {
+							Name: {
+								(FirstName: individualInformation.Name.FirstName[0..14] when (sizeOf individualInformation.Name.FirstName) > 15 otherwise individualInformation.Name.FirstName ) when individualInformation.Name.FirstName != '',
+								(MiddleInitial: individualInformation.Name.MiddleInitial[0..0] ) when individualInformation.Name.MiddleInitial != '',
+								(LastName: individualInformation.Name.LastName[0..20]  when (sizeOf individualInformation.Name.LastName) > 21 otherwise individualInformation.Name.LastName ) when individualInformation.Name.LastName != '',
+								(Suffix: individualInformation.Name.Suffix) when individualInformation.Name.Suffix != ''
+							},
+							(CurrentLivingSituation @(Code: flowVars.LOVReturned[("CURRENTLIVINGSITUATION-" ++ individualInformation.CurrentLivingSituation.@Code)][0]): '') when flowVars.LOVReturned[("CURRENTLIVINGSITUATION-" ++ individualInformation.CurrentLivingSituation.@Code)][0] != null and flowVars.LOVReturned[("CURRENTLIVINGSITUATION-" ++ individualInformation.CurrentLivingSituation.@Code)][0] != '',
+							IsThisIndividualTheHeadOfHousehold @(Code: individualInformation.IsThisIndividualTheHeadOfHousehold.@Code): '',
+							ProgramsForWhichIndividualIsApplying: {
+								(individualInformation.ProgramsForWhichIndividualIsApplying.*ProgramName map ((programName , indexOfProgramName) -> {
+									ProgramName @(Code: programName.@Code): programName
+								}))
+							},
+							(DateOfBirth: individualInformation.DateOfBirth) when individualInformation.DateOfBirth != '',
+							(SocialSecurityNumber: individualInformation.SocialSecurityNumber) when individualInformation.SocialSecurityNumber != '',
+							(Sex @(Code: flowVars.LOVReturned[("SEX-" ++ individualInformation.Sex.@Code)][0] ): '') when flowVars.LOVReturned[("SEX-" ++ individualInformation.Sex.@Code)][0] != null and flowVars.LOVReturned[("SEX-" ++ individualInformation.Sex.@Code)][0] != '',
+							PregnancyInformation: {
+								(IsPregnant @(Code: flowVars.LOVReturned[("ISPREGNANT-" ++ individualInformation.PregnancyInformation.IsPregnant.@Code)][0]): '') when flowVars.LOVReturned[("ISPREGNANT-" ++ individualInformation.PregnancyInformation.IsPregnant.@Code)][0] != null and flowVars.LOVReturned[("ISPREGNANT-" ++ individualInformation.PregnancyInformation.IsPregnant.@Code)][0] != '',
+								(NumberOfBabiesExpected: individualInformation.PregnancyInformation.NumberOfBabiesExpected) when individualInformation.PregnancyInformation.NumberOfBabiesExpected != '',
+								(PregnancyDueDate: individualInformation.PregnancyInformation.PregnancyDueDate) when individualInformation.PregnancyInformation.PregnancyDueDate != ''
+							},
+							(Citizenship @(Code: flowVars.LOVReturned[("CITIZENSHIP-" ++ individualInformation.Citizenship.@Code)][0] ): '') when flowVars.LOVReturned[("CITIZENSHIP-" ++ individualInformation.Citizenship.@Code)][0] != null and flowVars.LOVReturned[("CITIZENSHIP-" ++ individualInformation.Citizenship.@Code)][0] != '',
+							(CitizenshipInformation: {
+								(DateEnteredUS: individualInformation.CitizenshipInformation.DateEnteredUS) when individualInformation.CitizenshipInformation.DateEnteredUS != '',
+								(Country @(Code: flowVars.LOVReturned[("COUNTRY_ORIGIN-" ++ individualInformation.CitizenshipInformation.Country.@Code)][0]): '') when flowVars.LOVReturned[("COUNTRY_ORIGIN-" ++ individualInformation.CitizenshipInformation.Country.@Code)][0] != null and flowVars.LOVReturned[("COUNTRY_ORIGIN-" ++ individualInformation.CitizenshipInformation.Country.@Code)][0] != '',
+								(OtherCountry: individualInformation.CitizenshipInformation.OtherCountry) when individualInformation.CitizenshipInformation.OtherCountry != '',
+								(RefugeeAsyleeStatus @(Code: flowVars.LOVReturned[("REFUGEEASYLEESTATUS-" ++ individualInformation.CitizenshipInformation.RefugeeAsyleeStatus.@Code)][0] ): '') when flowVars.LOVReturned[("REFUGEEASYLEESTATUS-" ++ individualInformation.CitizenshipInformation.RefugeeAsyleeStatus.@Code)][0] != '' and flowVars.LOVReturned[("REFUGEEASYLEESTATUS-" ++ individualInformation.CitizenshipInformation.RefugeeAsyleeStatus.@Code)][0] != null,
+								(AlienStatus @(Code: flowVars.LOVReturned[("ALIENSTATUS-" ++ individualInformation.CitizenshipInformation.AlienStatus.@Code)][0]) : '') when flowVars.LOVReturned[("ALIENSTATUS-" ++ individualInformation.CitizenshipInformation.AlienStatus.@Code)][0] != '' and flowVars.LOVReturned[("ALIENSTATUS-" ++ individualInformation.CitizenshipInformation.AlienStatus.@Code)][0] != null,
+								(AlienRegistrationNumber: individualInformation.CitizenshipInformation.AlienRegistrationNumber as :number {format: "########"}) when (individualInformation.CitizenshipInformation.AlienRegistrationNumber != '' and individualInformation.CitizenshipInformation.AlienRegistrationNumber != null),
+								(HaveSponsor @(Code: flowVars.LOVReturned[("HAVESPONSOR-" ++ individualInformation.CitizenshipInformation.HaveSponsor.@Code)][0]): '') when flowVars.LOVReturned[("HAVESPONSOR-" ++ individualInformation.CitizenshipInformation.HaveSponsor.@Code)][0] != null and flowVars.LOVReturned[("HAVESPONSOR-" ++ individualInformation.CitizenshipInformation.HaveSponsor.@Code)][0] != '',
+								(IsTheSponsorAnIndividualOrAnOrganization @(Code: flowVars.LOVReturned[("ISTHESPONSORINDORORG-" ++ individualInformation.CitizenshipInformation.IsTheSponsorAnIndividualOrAnOrganization.@Code)][0]): '') when flowVars.LOVReturned[("ISTHESPONSORINDORORG-" ++ individualInformation.CitizenshipInformation.IsTheSponsorAnIndividualOrAnOrganization.@Code)][0] != '' and flowVars.LOVReturned[("ISTHESPONSORINDORORG-" ++ individualInformation.CitizenshipInformation.IsTheSponsorAnIndividualOrAnOrganization.@Code)][0] != null,
+								(SponsorOrganizationName: individualInformation.CitizenshipInformation.SponsorOrganizationName[0..36]   when (sizeOf individualInformation.CitizenshipInformation.SponsorOrganizationName) > 37 otherwise individualInformation.CitizenshipInformation.SponsorOrganizationName) when individualInformation.CitizenshipInformation.SponsorOrganizationName != '',
+								(SponsorAddress: {
+										(AddressLine1: individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1[0..29]  when (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1) > 30 otherwise individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1) when (individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != '' and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != null) ,
+										(AddressLine2: individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2[0..29]  when (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2) > 30 otherwise individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2) when (individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != '' and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != null),
+										(City: individualInformation.CitizenshipInformation.SponsorAddress.City[0..14]  when (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.City) > 15 otherwise individualInformation.CitizenshipInformation.SponsorAddress.City) when (individualInformation.CitizenshipInformation.SponsorAddress.City != '' and individualInformation.CitizenshipInformation.SponsorAddress.City != null),
+										(State @(Code: flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State)][0] ): '') when flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State)][0] != null and flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State)][0] != '',
+										(ZIP: individualInformation.CitizenshipInformation.SponsorAddress.ZIP[0..4]) when individualInformation.CitizenshipInformation.SponsorAddress.ZIP != null and individualInformation.CitizenshipInformation.SponsorAddress.ZIP != '' and (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.ZIP) > 4,
+										(ZIPExtension: individualInformation.CitizenshipInformation.SponsorAddress.ZIPExtension[6..9]) when individualInformation.CitizenshipInformation.SponsorAddress.ZIP != null and individualInformation.CitizenshipInformation.SponsorAddress.ZIP != '' and (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.ZIP) > 9
+									}) when ((individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != null and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != '') or (individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != null and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != '') or 
+								             (individualInformation.CitizenshipInformation.SponsorAddress.City != null and individualInformation.CitizenshipInformation.SponsorAddress.City != '') or (individualInformation.CitizenshipInformation.SponsorAddress.State.@Code != null and individualInformation.CitizenshipInformation.SponsorAddress.State.@Code != '' and individualInformation.CitizenshipInformation.SponsorAddress.State != null and individualInformation.CitizenshipInformation.SponsorAddress.State != '') or 
+								             (individualInformation.CitizenshipInformation.SponsorAddress.ZIP != null and individualInformation.CitizenshipInformation.SponsorAddress.ZIP != ''))
+						}) when (individualInformation.CitizenshipInformation.DateEnteredUS != null and individualInformation.CitizenshipInformation.DateEnteredUS != '') or 
+							(flowVars.LOVReturned[("COUNTRY_ORIGIN-" ++ individualInformation.CitizenshipInformation.Country.@Code)][0] != null and flowVars.LOVReturned[("COUNTRY_ORIGIN-" ++ individualInformation.CitizenshipInformation.Country.@Code)][0] != '') or 
+							(individualInformation.CitizenshipInformation.OtherCountry != null and individualInformation.CitizenshipInformation.OtherCountry != '') or 
+							(flowVars.LOVReturned[("REFUGEEASYLEESTATUS-" ++ individualInformation.CitizenshipInformation.RefugeeAsyleeStatus.@Code)][0] != '' and flowVars.LOVReturned[("REFUGEEASYLEESTATUS-" ++ individualInformation.CitizenshipInformation.RefugeeAsyleeStatus.@Code)][0] != null) or 
+							( flowVars.LOVReturned[("ALIENSTATUS-" ++ individualInformation.CitizenshipInformation.AlienStatus.@Code)][0] != '' and flowVars.LOVReturned[("ALIENSTATUS-" ++ individualInformation.CitizenshipInformation.AlienStatus.@Code)][0] != null) or 
+							(individualInformation.CitizenshipInformation.AlienRegistrationNumber != '' and individualInformation.CitizenshipInformation.AlienRegistrationNumber != null) or 
+							(flowVars.LOVReturned[("HAVESPONSOR-" ++ individualInformation.CitizenshipInformation.HaveSponsor.@Code)][0] != null and flowVars.LOVReturned[("HAVESPONSOR-" ++ individualInformation.CitizenshipInformation.HaveSponsor.@Code)][0] != '') or 
+							(flowVars.LOVReturned[("ISTHESPONSORINDORORG-" ++ individualInformation.CitizenshipInformation.IsTheSponsorAnIndividualOrAnOrganization.@Code)][0] != '' and flowVars.LOVReturned[("ISTHESPONSORINDORORG-" ++ individualInformation.CitizenshipInformation.IsTheSponsorAnIndividualOrAnOrganization.@Code)][0] != null) or 
+							(individualInformation.CitizenshipInformation.SponsorOrganizationName != null and individualInformation.CitizenshipInformation.SponsorOrganizationName != '') or 
+							(individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != null and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != '') or (individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != null and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != '') or 
+							 (individualInformation.CitizenshipInformation.SponsorAddress.City != null and individualInformation.CitizenshipInformation.SponsorAddress.City != '') or (individualInformation.CitizenshipInformation.SponsorAddress.State.@Code != null and individualInformation.CitizenshipInformation.SponsorAddress.State.@Code != '' and individualInformation.CitizenshipInformation.SponsorAddress.State != null and individualInformation.CitizenshipInformation.SponsorAddress.State != '') or 
+							 (individualInformation.CitizenshipInformation.SponsorAddress.ZIP != null and individualInformation.CitizenshipInformation.SponsorAddress.ZIP != ''),
+							(MaritalStatus @(Code: flowVars.LOVReturned[("MARITALSTATUS-" ++ individualInformation.MaritalStatus.@Code)][0]): '') when flowVars.LOVReturned[("MARITALSTATUS-" ++ individualInformation.MaritalStatus.@Code)][0] != null and flowVars.LOVReturned[("MARITALSTATUS-" ++ individualInformation.MaritalStatus.@Code)][0] != '',
+							RaceInformation: {
+								(PrimaryRace @(Code: flowVars.LOVReturned[("PRIMARYRACE-" ++ individualInformation.RaceInformation.PrimaryRace.@Code)][0] ): '') when flowVars.LOVReturned[("PRIMARYRACE-" ++ individualInformation.RaceInformation.PrimaryRace.@Code)][0]  != null and flowVars.LOVReturned[("PRIMARYRACE-" ++ individualInformation.RaceInformation.PrimaryRace.@Code)][0]  != '',
+								(Ethnicity @(Code: flowVars.LOVReturned[("ETHNICITY_MEDICAIDAPP-" ++ individualInformation.RaceInformation.Ethnicity.@Code)][0] ): '') when flowVars.LOVReturned[("ETHNICITY_MEDICAIDAPP-" ++ individualInformation.RaceInformation.Ethnicity.@Code)][0] != null and flowVars.LOVReturned[("ETHNICITY_MEDICAIDAPP-" ++ individualInformation.RaceInformation.Ethnicity.@Code)][0] != ''
+							},
+							(PlaceOfBirth @(Code: flowVars.LOVReturned[("PLACEOFBIRTH-" ++ individualInformation.PlaceOfBirth.@Code)][0]): '') when flowVars.LOVReturned[("PLACEOFBIRTH-" ++ individualInformation.PlaceOfBirth.@Code)][0] != null and flowVars.LOVReturned[("PLACEOFBIRTH-" ++ individualInformation.PlaceOfBirth.@Code)][0] != '',
+							StudentInformation: {
+								(EnrollmentStatus @(Code: flowVars.LOVReturned[("ENROLLMENTSTATUS-" ++ individualInformation.StudentInformation.EnrollmentStatus.@Code)][0]): '') when flowVars.LOVReturned[("ENROLLMENTSTATUS-" ++ individualInformation.StudentInformation.EnrollmentStatus.@Code)][0] != null and flowVars.LOVReturned[("ENROLLMENTSTATUS-" ++ individualInformation.StudentInformation.EnrollmentStatus.@Code)][0] != '',
+								(HighestGradeLevelCompleted @(Code: flowVars.LOVReturned[("HIGHESTGRADE-" ++ individualInformation.StudentInformation.HighestGradeLevelCompleted.@Code)][0]): '') when flowVars.LOVReturned[("HIGHESTGRADE-" ++ individualInformation.StudentInformation.HighestGradeLevelCompleted.@Code)][0] != null and flowVars.LOVReturned[("HIGHESTGRADE-" ++ individualInformation.StudentInformation.HighestGradeLevelCompleted.@Code)][0] != '',
+								(HighestSchoolGradeStatusCompleted @(Code: flowVars.LOVReturned[("HIGHESTSCHOOLGRAD-" ++ individualInformation.StudentInformation.HighestSchoolGradeStatusCompleted.@Code)][0] ): '') when flowVars.LOVReturned[("HIGHESTSCHOOLGRAD-" ++ individualInformation.StudentInformation.HighestSchoolGradeStatusCompleted.@Code)][0] != null and flowVars.LOVReturned[("HIGHESTSCHOOLGRAD-" ++ individualInformation.StudentInformation.HighestSchoolGradeStatusCompleted.@Code)][0] != ''
+							},
+							IsthisIndividualApplying @(Code: individualInformation.IsthisIndividualApplying.@Code): '',
+							IsthisIndividualApplyingForRetroMA @(Code: individualInformation.IsthisIndividualApplyingForRetroMA.@Code): '',
+							(MCINumber: pad('0',10 - (sizeOf individualInformation.MCINumber)  ) ++ individualInformation.MCINumber) when individualInformation.MCINumber != null and individualInformation.MCINumber != ''
+						}
+					}))
+				},
+				
+				(EmploymentIncomeInformation: {
+          			((assistApplication.EmploymentIncomeInformation.*CurrentEmployment map (emprecord, indexOfemperecord) -> { 
+                      CurrentEmployment: {
+                              (EmployerName: emprecord.EmployerName[0..29]  when (sizeOf emprecord.EmployerName) > 30 otherwise emprecord.EmployerName) when emprecord.EmployerName != '',
+                              (OnStrike @(Code: emprecord.OnStrike.@Code): '') when emprecord.OnStrike.@Code != null and emprecord.OnStrike.@Code != '' ,
+                              (NumberOfHoursWorkedPerWeek: emprecord.NumberOfHoursWorkedPerWeek) when emprecord.NumberOfHoursWorkedPerWeek != null and emprecord.NumberOfHoursWorkedPerWeek != '',
+                              (IncomeFrequency @(Code: flowVars.LOVReturned[("INCOMEFREQUENCY-" ++ emprecord.IncomeFrequency.@Code)][0]): '') when flowVars.LOVReturned[("INCOMEFREQUENCY-" ++ emprecord.IncomeFrequency.@Code)][0] != null and flowVars.LOVReturned[("INCOMEFREQUENCY-" ++ emprecord.IncomeFrequency.@Code)][0] != '',
+                              (GrossIncomePerPayPeriodBforeTaxesAndDedctns: emprecord.GrossIncomePerPayPeriodBforeTaxesAndDedctns) when emprecord.GrossIncomePerPayPeriodBforeTaxesAndDedctns != '' and emprecord.GrossIncomePerPayPeriodBforeTaxesAndDedctns != null
+                            }
+                                    
+                    }) unless ((assistApplication.EmploymentIncomeInformation is :object and assistApplication.EmploymentIncomeInformation.CurrentEmployment?) == false) otherwise (CurrentEmployment : null)) ,
+                    ((assistApplication.EmploymentIncomeInformation.*OtherIncome map (otherIncomerecord, indexOfotherIncomerecord) -> { 
+	                        OtherIncome: {
+	                              (OtherIncomeType @(Code: flowVars.LOVReturned[("OTHERINCOMETYPE-" ++ otherIncomerecord.OtherIncomeType.@Code)][0]): '') when otherIncomerecord.OtherIncomeType.@Code != null and otherIncomerecord.OtherIncomeType.@Code != '' and flowVars.LOVReturned[("OTHERINCOMETYPE-" ++ otherIncomerecord.OtherIncomeType.@Code)][0] != null and flowVars.LOVReturned[("OTHERINCOMETYPE-" ++ otherIncomerecord.OtherIncomeType.@Code)][0] != '',
+	                              (AmountOfIncomeBeforeTaxesAndDeducations: otherIncomerecord.AmountOfIncomeBeforeTaxesAndDeducations) when otherIncomerecord.AmountOfIncomeBeforeTaxesAndDeducations != '',
+	                              IncomeFrequency @(Code: otherIncomerecord.IncomeFrequency.@Code): ''
+	                        } 
+	                  }) unless ((assistApplication.EmploymentIncomeInformation is :object and assistApplication.EmploymentIncomeInformation.OtherIncome?) == false) otherwise (OtherIncome : null))
+	                  
+	            }) when (assistApplication.EmploymentIncomeInformation?) == true
+			}
+		}))
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer mimeType="application/xml" doc:name="OS:Convert to XML format" doc:description="Convert to XML FOrmat"/>
+        <flow-ref name="WriteToSFTP_SubFlow" doc:name="WriteToSFTP_SubFlow"/>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF004&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Submission Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_SFTP_DSS_ASSIST_DSCYF_MAappsInput_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;xml&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="This Set Payload is used to set the Payload to a JSON for the Logging Framework"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Create the completed transaction"/>
+        <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+	<delete-message-property key="isKeyRequired"/>
+	<delete-message-property key="Last14Days"/>
+	<delete-message-property key="personTypeIds"/>
+	<delete-message-property key="RecordError"/>
+	<delete-message-property key="RecordCount"/>
+	<delete-message-property key="TANFEligibleMap"/>
+	<delete-message-property key="todayDate"/>
+	<delete-message-property key="RecordSuccess"/>	
+	<delete-message-property key="InterfaceID"/>
+	<delete-message-property key="interfaceTransactionStatus"/>
+	<delete-message-property key="TransactionID"/>
+	<delete-message-property key="LOVReturned"/>
+	<delete-message-property key="SubPayload"/>
+	<delete-message-property key="Tname"/>
+	<delete-message-property key="Time"/>
+	<delete-message-property key="exceptionRecordCount"/>
+</message-properties-transformer>
+
+<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+	<delete-message-property key="InitialPayload"/>
+	<delete-message-property key="TID"/>
+	<delete-message-property key="TransAttachment"/>
+</message-properties-transformer>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+
+
+    </flow>
+    <sub-flow name="GetRelatedDetails_SubFlow">
+        <set-payload value="#[sessionVars.InitialPayload]" mimeType="application/xml" doc:name="Set Payload :  Set Initial Payload" doc:description="Set Initial Payload"/>
+        <mulexml:xslt-transformer mimeType="text/plain" xsl-file="xslt.txt" maxIdleTransformers="2" maxActiveTransformers="5" doc:name="XSLT : Get person Type Ids" doc:description="Parse the payload to get the person type IDs"/>
+        <object-to-string-transformer mimeType="text/plain" doc:name="Object to String" doc:description="Convert to plain text format"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="logger to store the person type IDs"/>
+        <set-payload value="#[payload.split(&quot;,&quot;)]" doc:name="Set Payload"/>
+        <foreach batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="TM: Prepare , separated person Type Ids">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ( $ )) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Name, Start_Date__c, End_Date__c, Person_Type__c from DEL_Income_Eligibility__c where Person_Type__c IN (#[payload]) AND RecordType.Name='TANF Eligibility' AND Start_Date__c &lt;= #[flowVars.todayDate] AND  End_Date__c &gt;= #[flowVars.todayDate] " doc:name="Salesforce : Get TANF Records" doc:description="Query on Eligibility object to get the TANF records"/>
+            <dw:transform-message doc:name="Transform Message : Store TANF Eligible Records">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	(payload map {
+		($.Person_Type__c as :string) : 'Yes'
+	})
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM: Concatenate TANF Eligible Records">
+                <dw:set-variable variableName="TANFEligibleMap"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.TANFEligibleMap default {}) ++ (payload)]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+
+    </sub-flow>
+    <sub-flow name="LOVDetails_Subflow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'CURRENTLIVINGSITUATION','SEX','CITIZENSHIP','COUNTRY_ORIGIN','REFUGEEASYLEESTATUS','ALIENSTATUS','ISPREGNANT','HAVESPONSOR','ISTHESPONSORINDORORG','MARITALSTATUS','PRIMARYRACE','ETHNICITY_MEDICAIDAPP','PLACEOFBIRTH','ENROLLMENTSTATUS','HIGHESTGRADE','HIGHESTSCHOOLGRAD','INCOMEFREQUENCY','OTHERINCOMETYPE','STATECODE'&quot;} " mimeType="application/json" doc:name="Set Payload : Query LOV Details" doc:description="Set payload: Direction as Outbound and set the LOV names"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow" doc:description="Call the LOV Framework to get the Partner code and FOCUS Code values"/>
+    </sub-flow>
+    <sub-flow name="MedcaidAppExtractInProgressTransaction_Subflow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF004&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Submission Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload : In Progress Transaction" doc:description="Set payload to create In Progress Transacion record"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Call the LogTransaction Framework to create In-Progress Transaction record"/>
+    </sub-flow>
+    <flow name="HasOtherIncome_Flow">
+        <choice doc:name="Choice" doc:description="Check logic to check if there are any Income records">
+            <when expression="#[payload != null]">
+                <dw:transform-message doc:name="Transform Message: Check if there are other income records">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter $.Income_Type__c != 'Employment' map {
+	hasIncome : 'Y'	
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <set-payload value="#[payload.size()&gt;0 ? 'Y' : 'N']" doc:name="Set Payload : Set N or Y and return to main flow" doc:description="If payload size  &gt; 0 then set to Y, else set to N"/>
+            </when>
+            <otherwise>
+                <set-payload value="N" doc:name="Set Payload : Set N as the payload is null" doc:description="Set N as the payload is null"/>
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="HasEmployment_Flow">
+        <choice doc:name="Choice : If Payload not null" doc:description="Check if the payload is not null">
+            <when expression="#[payload != null]">
+                <dw:transform-message doc:name="Transform Message: Check if there are Employment records">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter $.Income_Type__c == 'Employment' map {
+	hasIncome : 'Y'	
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <set-payload value="#[payload.size()&gt;0 ? 'Y' : 'N']" doc:name="Set Payload : Set N or Y and return to main flow" doc:description="If payload size  &gt; 0 then set to Y, else set to N"/>
+            </when>
+            <otherwise>
+                <set-payload value="N" doc:name="Set Payload : Set 'N' as the payload is null" doc:description="Set to N"/>
+            </otherwise>
+        </choice>
+    </flow>
+    <sub-flow name="inf004-medicaid-application-submission-extract-No-Payload-subflow">
+        <choice doc:name="Choice : Check if Payload has records">
+            <when expression="#[payload.size()==0]">
+                <dw:transform-message doc:name="TM Empty data XML">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	AssistApplications: {}
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+                <flow-ref name="WriteMedicaildSFTP" doc:name="WriteMedicaildSFTP"/>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF004&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Submission Extract&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_SFTP_DSS_ASSIST_DSCYF_MAappsInput_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;xml&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to No Records Found for Logging Framework"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+            </when>
+            <otherwise>
+                <logger message="Records found in salesforce extraction" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="WriteToSFTP_SubFlow">
+        <logger message="'Final File'+#[payload]" level="INFO" doc:name="Logger" doc:description="Display Final File before loading it into SFTP"/>
+        <flow-ref name="WriteMedicaildSFTP" doc:name="WriteMedicaildSFTP"/>
+
+        <set-payload value="#[sessionVars.InitialPayload]" doc:name="Set Payload: to Initial payload to update status to completed" mimeType="application/xml" doc:description="Set payload to Completed transaction detail"/>
+        <dw:transform-message doc:name="Transform Message :  To update Medicaid records" metadata:id="16b51dc4-4924-4577-b069-9fb41b2f8e8b">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.AssistApplications.*AssistApplication map {
+	Id: $.MedicaidSFID,
+	Submission_Status__c: 'Submitted'
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:update-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Income_Eligibility__c" doc:name="Salesforce : Bullk Update Eligibility Records" doc:description="Update Eligibility records to Submitted Status">
+            <sfdc:objects ref="#[payload]"/>
+
+        </sfdc:update-bulk>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="JobId" value="#[payload.jobId]"/>
+        </message-properties-transformer>
+        <until-successful maxRetries="50" synchronous="true" doc:name="Until Successful">
+            <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Check if the batch is completed"/>
+        </until-successful>
+
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <dw:transform-message doc:name="TM : Prepare error details while updating status">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.results.*result map {
+	ID:$.id default '',
+	Field:$.errors.fields,
+	Name:sessionVars.InitialPayload[$$].ID,
+	Error:$.errors.statusCode,
+	Description:$.errors.message
+} filter $.ID == '' ]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Errors while updating the status details: #[payload]" level="INFO" doc:name="Logger: Salesforce update result" doc:description="Final Updated result from salesforce"/>
+        <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[flowVars.JobId]" doc:name="Salesforce : close the job"/>
+
+    </sub-flow>
+   <sub-flow name="WriteMedicaildSFTP">
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPConnector" outputPattern="${sftp.medicaidExtract.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].xml" host="${sftp.medicaidExtract.archive.host}" port="${sftp.medicaidExtract.archive.port}" path="${sftp.medicaidExtract.archive.path}" user="${sftp.medicaidExtract.archive.username}" password="${sftp.medicaidExtract.archive.password}" responseTimeout="300000" duplicateHandling="addSeqNo" doc:name="SFTP:Write to Archive" doc:description="Store the Archive File"/>
+        <set-variable variableName="isKeyRequired" value="${sftp.medicaidExtract.transaction.isKeyRequired}" doc:name="Variable : Set Key Required" doc:description="Check if Private Key (Identity File) is required for this Interface Depending on this the SFTP Outbound operation will be configured"/>
+        <choice doc:name="Choice : Check if Key is Required" doc:description="Check if Private Key (Identity File) is Required for SFTP Connection Depending on this the flow is routed to the appropriate SFTP configuration">
+            <when expression="#[flowVars.isKeyRequired.equals(&quot;true&quot;)]">
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPConnector" outputPattern="${sftp.medicaidExtract.transaction.filename}" host="${sftp.medicaidExtract.transaction.host}" port="${sftp.medicaidExtract.transaction.port}" path="${sftp.medicaidExtract.transaction.path}" user="${sftp.medicaidExtract.transaction.username}" password="${sftp.medicaidExtract.transaction.password}" responseTimeout="300000" identityFile="${app.home}/classes/dti1_id_rsa" duplicateHandling="overwrite" doc:name="SFTP:Write to Main Folder with Identity File" doc:description="Place the final file in destination folder This is configured with the identity File"/>
+            </when>
+            <otherwise>
+                <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPConnector" outputPattern="${sftp.medicaidExtract.transaction.filename}" host="${sftp.medicaidExtract.transaction.host}" port="${sftp.medicaidExtract.transaction.port}" path="${sftp.medicaidExtract.transaction.path}" user="${sftp.medicaidExtract.transaction.username}" password="${sftp.medicaidExtract.transaction.password}" responseTimeout="300000" duplicateHandling="overwrite" doc:name="SFTP:Write to Main Folder" doc:description="Place the final file in destination folder This is configured with the Password"/>
+            </otherwise>
+        </choice>
+        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties : Set Transaction Attachment" doc:description="Set Transaction Attachment to load it into FOCUS">
+            <add-message-property key="TransAttachment" value="#[payload]"/>
+        </message-properties-transformer>
+    </sub-flow>
+</mule>
