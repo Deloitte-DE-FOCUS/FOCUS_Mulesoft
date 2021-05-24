@@ -474,8 +474,8 @@ flowVars.ClientIDList filter ( flowVars.Client[$][0].PID != null ) map {
       
       LatestRemoval:flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval default "",
       
-      RemovalTransactionDate: (((flowVars.FirstPRforE[$][0].CompletedDate when ((flowVars.FirstPRforE[$][0].StartDate != null) and (flowVars.FirstPRforE[$][0].StartDate >= flowVars.GroupAfcarsCustody[$][-1].CustodyStart)) otherwise flowVars.GroupAfcarsCustody[$][-1].InitialCompletionDate ) as :date as :string {format:"yyyyMMdd"} ) default "") 
-      	when (flowVars.Element19[$][0].Size > 1) otherwise (((flowVars.FirstEverPR[$][0].CompletedDate when ((flowVars.FirstEverPR[$][0].StartDate != null) and (flowVars.FirstEverPR[$][0].StartDate >= flowVars.GroupAfcarsCustody[$][-1].CustodyStart)) otherwise flowVars.GroupAfcarsCustody[$][-1].InitialCompletionDate ) as :date as :string {format:"yyyyMMdd"} ) default ""),
+      RemovalTransactionDate: (((flowVars.FirstPRforE[$][0].CompletedDate when ((flowVars.FirstPRforE[$][0].StartDate != null) and (flowVars.FirstPRforE[$][0].StartDate >= flowVars.GroupAfcarsCustody[$][-1].CustodyStart)) otherwise flowVars.GroupAfcarsCustody[$][-1].InitialCompletionDate ) as :date as :string {format:"yyyyMMdd"} ) default ""),
+	  
 	  RemovalTransactionDate2 : (flowVars.GroupAfcarsCustody[$][-1].InitialCompletionDate ) as :date as :string {format:"yyyyMMdd"} default "",
 
 	  PlacementCurrentFosterCare:((( flowVars.LatestPlacementOrTRUfor23[$][0].StartDate ) when ((flowVars.GroupAfcarsCustody[$][-1].CustodyStart as :date) <= (flowVars.LatestPlacementOrTRUfor23[$][0].StartDate as :date)) otherwise (flowVars.GroupAfcarsCustody[$][-1].CustodyStart )) as :date as :string {format:"yyyyMMdd"}) default "",
