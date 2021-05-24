@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <flow name="federal_report__generation_Flow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/federalreports" doc:name="HTTP"/>
+        <http:basic-security-filter realm="mule-realm"/>  
+           <object-to-string-transformer mimeType="application/json" doc:name="OS: Consume Stream"/>
+         
+        <logger message="Extract Invoked !! #[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message : Get Report Details">
+            <dw:set-variable variableName="reportParams"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <!-- <set-variable variableName="DocId" value="#[&quot;'&quot; + flowVars.DocId + &quot;'&quot;]" doc:name="FV: Add single Quotes to the DocId"/> -->
+        <logger message="SELECT FSF_TIN__c, Transaction_Amount__c, Document__c, Document__r.Doc_Total_AMT__c, Provider_Name__c, Provider_Last_Name_Organization_Name__r.DEL_First_Name__c, Provider_Last_Name_Organization_Name__c, Document__r.Payment_Date__c, Document__r.Document_Type__c   FROM DEL_Transaction__c WHERE Document__c = #[flowVars.DocId]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice : Route to Report Creation based on Report name" doc:description="Route to Report Creation based on Report name">
+            <when expression="#[flowVars.reportParams.ReportName == 'STPVWarrantFile']">
+                <set-variable variableName="DocId" value="'#[flowVars.reportParams.ReportParameters.DocId]'" doc:name="FV: Read DocId from Payload"/>
+                <set-variable variableName="InterfaceName" value="STPVWarrantFile" doc:name="Variable : Store Interface Name" doc:description="Store Interface Name"/>
+                <async doc:name="Async">
+                    <flow-ref name="stpv_warrant_file_generate_subflow" doc:name="stpv_warrant_file_generate_subflow" doc:description="Invoke STPV Warrant File generation"/>
+                </async>
+
+            </when>
+            <when expression="#[flowVars.reportParams.ReportName == 'STPVDocumentSummary' || flowVars.reportParams.ReportName == 'STPVTransactionSummary']">
+                <set-variable variableName="DocId" value="'#[flowVars.reportParams.ReportParameters.DocId]'" doc:name="Read DocId from Payload"/>
+                <set-variable variableName="InterfaceName" value="flowVars.reportParams.ReportName" doc:name="Variable : Store Interface Name" doc:description="Store Interface Name"/>
+                <async doc:name="Async">
+                    <flow-ref name="stpv_pnc_ach_file_generate_subflow" doc:name="stpv_pnc_ach_file_generate_subflow" doc:description="Invoke PNC ACH File generation"/>
+                </async>
+
+            </when>
+			<when expression="#[flowVars.reportParams.ReportName == 'NCANDS']">
+                <set-variable variableName="InterfaceName" value="NCANDS" doc:name="Variable"/>
+                <async doc:name="Async">
+                    <flow-ref name="ncands-report-generation-Sub_Flow" doc:name="ncands-report-generation-Sub_Flow" doc:description="Invoke NCANDS Report Generation"/>
+                </async>
+            </when> 
+            <when expression="#[flowVars.reportParams.File_Type__c == 'Foster Care AFCARS']">
+                <set-variable variableName="InterfaceName" value="AFCARSFoster" doc:name="Variable"/>
+                <async doc:name="Async">
+                    <flow-ref name="afcars-fostercareFlow" doc:name="afcars-fostercareFlow" doc:description="Invoke AFCARS Foster Care Report Generation"/>
+                </async>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message : Set Failure Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": false,
+	"FailureReason": "Report Name : " ++ (flowVars.reportParams.ReportName default "") ++ " is not Valid"
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <expression-filter expression="#[payload.Success != false]" doc:name="Expression"/>
+            </otherwise>
+        </choice>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": true,
+	"FailureReason": ""
+}]]></dw:set-payload>
+            <dw:set-variable variableName="ResponseFlag"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	Flag:true
+}]]></dw:set-variable>
+
+        </dw:transform-message>
+         <exception-strategy ref="Federal-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+ 
+
+
+
+    </flow>
+    <sub-flow name="stpv_add_attachment">
+        <set-payload value="#[flowVars.FileAttachment]" doc:name="Set Payload"/>
+        <string-to-byte-array-transformer doc:name="String to Byte Array"/>
+        <set-variable variableName="FileBody" value="#[payload]" doc:name="Variable : Store File Body"/>
+        <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	{
+		ParentId: flowVars.reportParams.ReportParameters.DocId, 
+		Name: flowVars.FileName ++ "." ++ flowVars.FileExtn,
+		Description: flowVars.FileDescription,
+		Body: flowVars.FileBody
+	}
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Attachment" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+<!--         <choice doc:name="Choice : Check for Attachment Success">
+            <when expression="#[payload[0].success == true]"> -->
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+                <dw:transform-message doc:name="Transform Message : Create Response">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": payload[0].success,
+	"FailureReason": "Unable to create Attachment" when (payload[0].success == false) otherwise ""
+}]]></dw:set-payload>
+                </dw:transform-message>
+<!--          <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+-
+123.00 as :string {format : "#.00"} ]]></dw:set-payload>
+        </dw:transform-message> -->
+<!--             </when>
+            <otherwise>
+        <logger message="After Standard Attachment #[payload]" level="INFO" doc:name="Logger"/>
+        
+        <dw:transform-message doc:name="Transform Message : Prepare Payload for Custom Attachment">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+-
+[{
+	Extract_ID__c : flowVars.reportParams.ReportParameters.DocId,
+	Attachment_File_Name__c : flowVars.FileName ++ "." ++ flowVars.FileExtn,
+	Attachment_File_Type__c : "txt",
+	Attachment_Type__c : "STPV Warrant File",
+	AttchId__c : payload[0].Id					
+}]]]></dw:set-payload>
+        </dw:transform-message>
+		<logger message="Before Custom Attachment XML : #[payload]" level="INFO" doc:name="Logger"/>        
+        <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="DEL_CustomAttachment__c" doc:name="Salesforce : Create Custom Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create> 
+    	<logger message="After Custom Attachment XML : #[payload]" level="INFO" doc:name="Logger"/>
+                
+            </otherwise>
+        </choice> -->
+    </sub-flow>
+
+</mule>

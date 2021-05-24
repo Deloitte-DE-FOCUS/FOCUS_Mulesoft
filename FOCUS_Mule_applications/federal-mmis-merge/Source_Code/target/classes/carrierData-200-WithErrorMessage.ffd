@@ -1,0 +1,15 @@
+form: FIXEDWIDTH
+name: 'carrierData'
+values: 
+- { name: 'INS-COMP-HEADER', usage: M, type: String, length: 2 }
+- { name: 'INSURANCE-COMPANY-NAME', usage: M, type: String, length: 45 }
+- { name: 'INSURANCE-COMPANY-CARRIER-CODE', usage: M, type: String, length: 7 }
+- { name: 'FILLER', usage: M, type: String, length: 2 }
+- { name: 'INSURANCE-COMPANY-ADDRESS1', usage: M, type: String, length: 25 }
+- { name: 'INSURANCE-COMPANY-ADDRESS2', usage: M, type: String, length: 25 }
+- { name: 'INSURANCE-COMPANY-CITY', usage: M, type: String, length: 20 }
+- { name: 'INSURANCE-COMPANY-STATE', usage: M, type: String, length: 2 }
+- { name: 'INSURANCE-COMPANY-ZIP', usage: M, type: String, length: 15 }
+- { name: 'INSURANCE-COMPANY-PHONE', usage: M, type: String, length: 10 }
+- { name: 'SPACES', usage: M, type: String, length: 47 }
+- { name: 'ERROR-MESSAGE', usage: M, type: String, length: 200 }

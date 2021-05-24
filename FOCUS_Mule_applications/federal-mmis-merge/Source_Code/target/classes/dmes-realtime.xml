@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="${https.host}" port="${https.port}" doc:name="HTTP Listener Configuration" protocol="HTTPS">
+        <tls:context>
+            <tls:key-store type="jks" path="focus_interface.jks" alias="focus_interfaces" keyPassword="password" password="password"/>
+        </tls:context>
+    </http:listener-config>
+    
+
+
+    
+    <flow name="dmes-realtime-Flow" doc:description="This flow is triggered with HTTP Listener and parses the JSON recieved to trigger the various HIPPA interfaces depending on the JSON" processingStrategy="synchronous">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/dmesrequest" doc:name="HTTP" doc:description="Listen to the incoming OnDemand requests" allowedMethods="POST"/>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String" doc:description="Consume Stream and Convert it to Stream"/>
+        <logger message="JSON Recieved:: #[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="499271d9-f6e6-460a-8492-d0bcb3b9d907" doc:name="Transform Message : Convert to Key Value pairs" doc:description="Convert the data passed to Interface from Claim Configurations into Key Value pairs">
+            <dw:input-payload doc:sample="OnDemandRequest.json" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.OnDemandRequest.attrList reduce ((val, acc = {interfaceName : payload.OnDemandRequest.interfaceName}) -> acc ++ (( { (val.attributeName) : ( val.attributeValue ) } )))]]></dw:set-payload>
+        </dw:transform-message>
+        
+        <set-session-variable variableName="interfaceName" value="#[payload['interfaceName']]" doc:name="Session Variable : Store the Interface Name" doc:description="Store the Interface Name"/>
+
+            <choice doc:name="Choice : Route request to the appropriate HIPPA Interface" doc:description="Route request to the appropriate HIPPA Interface">
+                <when expression="#[sessionVars.interfaceName.equals(&quot;INF015&quot;)]">
+                    
+                    <flow-ref name="inf015_hippa_medicaid_claims_837_institutional_Flow" doc:name="inf015_hippa_medicaid_claims_837_institutional_Flow" doc:description="Invoke the flow to handle a 837 institutional request"/>
+                </when>
+                <when expression="#[sessionVars.interfaceName.equals(&quot;INF016&quot;)]">
+                    <flow-ref name="inf016_hippa_medicaid_claims_837_pro_Flow" doc:name="inf016_hippa_medicaid_claims_837_pro_Flow" doc:description="Invoke the flow to handle a 837 professional request"/>
+                </when>
+                <when expression="#[sessionVars.interfaceName.equals(&quot;INF017&quot;)]">
+                    <flow-ref name="inf017-hipaa835-remittance-loadFlow" doc:name="inf017-hipaa835-remittance-loadFlow" doc:description="Invoke the flow to handle a 835 Remittance load"/>
+                </when>
+                <otherwise>
+                    <logger message="No Interface found with the provided Interface Code!" level="ERROR" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+        <dw:transform-message doc:name="Transform Message : On Demand Response" doc:description="Create Response to be sent back to Salesforce">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"OnDemandResponse": {
+		"interfaceName":  sessionVars.interfaceName,
+		"interfaceTransactionId" : sessionVars.TID
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+<!--     <flow name="inf016_Flow"> 
+           <logger message="INF016 Invoked" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="inf017_Flow">
+    	<logger message="INF017 Invoked" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="inf018_Flow">
+    	<logger message="INF018 Invoked" level="INFO" doc:name="Logger"/>
+    </flow>
+ -->
+</mule>
