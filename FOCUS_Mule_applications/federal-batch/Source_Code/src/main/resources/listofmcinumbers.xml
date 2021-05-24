@@ -1,0 +1,102 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<root>
+  <record>
+    <MedicaidCaseId>2001115431</MedicaidCaseId>
+    <MCINumber>8787876788</MCINumber>
+    <SSN>987789678</SSN>
+    <DOB>20001128</DOB>
+    <LastName>Jacob</LastName>
+    <FirstName>Diaz</FirstName>
+    <CompanyCarrierCode>20168</CompanyCarrierCode>
+    <LocationCode>3055</LocationCode>
+    <PolicyHolderName>John  Martin</PolicyHolderName>
+    <PolicyHolderSSN>999999999</PolicyHolderSSN>
+    <PolicyHolderDOB>19781231</PolicyHolderDOB>
+    <PolicyHolderMCI>4312243211</PolicyHolderMCI>
+    <PolicyNumber>LUF058792613344</PolicyNumber>
+    <GroupNumber>123457</GroupNumber>
+    <CoverageType>0001</CoverageType>
+    <PolicyStatus>A</PolicyStatus>
+    <PolicyVerification>Y</PolicyVerification>
+    <StartDate>20090901</StartDate>
+    <EndDate>20801231</EndDate>
+    <Relationship>19</Relationship>
+    <EmployerName>STATE OF DELAWARE</EmployerName>
+    <EmployerAddress1>401 FEDERAL STREET</EmployerAddress1>
+    <EmployerAddress2>Line2</EmployerAddress2>
+    <EmployerCity>DOVER</EmployerCity>
+    <EmployerState>DE</EmployerState>
+    <EmployerZip>198010000</EmployerZip>
+    <PolicyInfoAddedDate>20110915</PolicyInfoAddedDate>
+    <PolicyInfoModDate>20110915</PolicyInfoModDate>
+    <ExternalId>8787876788-LUF058792613344-123457-2009-09-01-2080-12-31-3055-20168</ExternalId>
+    <PersonTypeId>a02r000000152OeAAI</PersonTypeId>
+    <MedicalInsuranceId>a0pr0000000ChdTAAS</MedicalInsuranceId>
+  </record>
+  <record>
+    <MedicaidCaseId>3006814431</MedicaidCaseId>
+    <MCINumber>5544663766</MCINumber>
+    <SSN>547547435</SSN>
+    <DOB>20001128</DOB>
+    <LastName>DIAZ</LastName>
+    <FirstName>ROBIN</FirstName>
+    <CompanyCarrierCode>81156</CompanyCarrierCode>
+    <LocationCode>0512</LocationCode>
+    <PolicyHolderName>John  Martin</PolicyHolderName>
+    <PolicyHolderSSN>999999999</PolicyHolderSSN>
+    <PolicyHolderDOB>19781231</PolicyHolderDOB>
+    <PolicyHolderMCI>43243211LU</PolicyHolderMCI>
+    <PolicyNumber>F058792613344</PolicyNumber>
+    <GroupNumber></GroupNumber>
+    <CoverageType>0001</CoverageType>
+    <PolicyStatus>E</PolicyStatus>
+    <PolicyVerification>Y</PolicyVerification>
+    <StartDate>20090901</StartDate>
+    <EndDate>20801231</EndDate>
+    <Relationship>19</Relationship>
+    <EmployerName></EmployerName>
+    <EmployerAddress1></EmployerAddress1>
+    <EmployerAddress2></EmployerAddress2>
+    <EmployerCity></EmployerCity>
+    <EmployerState></EmployerState>
+    <EmployerZip>000000000</EmployerZip>
+    <PolicyInfoAddedDate>20110915</PolicyInfoAddedDate>
+    <PolicyInfoModDate>20110915</PolicyInfoModDate>
+    <ExternalId>5544663766-F058792613344--2009-09-01-2080-12-31-0512-81156</ExternalId>
+    <PersonTypeId>a02r000000151SIAAY</PersonTypeId>
+    <MedicalInsuranceId>a0pr0000000ChdOAAS</MedicalInsuranceId>
+  </record>
+  <record>
+    <MedicaidCaseId>0000224400</MedicaidCaseId>
+    <MCINumber>6789987655</MCINumber>
+    <SSN>995989959</SSN>
+    <DOB>20040224</DOB>
+    <LastName>ATHIMJ</LastName>
+    <FirstName>CTSGF</FirstName>
+    <CompanyCarrierCode>00269</CompanyCarrierCode>
+    <LocationCode>0001</LocationCode>
+    <PolicyHolderName>CTIFFF N ATHIMJ</PolicyHolderName>
+    <PolicyHolderSSN>995619906</PolicyHolderSSN>
+    <PolicyHolderDOB>19810522</PolicyHolderDOB>
+    <PolicyHolderMCI>0000007969</PolicyHolderMCI>
+    <PolicyNumber>SOD200768</PolicyNumber>
+    <GroupNumber>107360</GroupNumber>
+    <CoverageType>0010</CoverageType>
+    <PolicyStatus>E</PolicyStatus>
+    <PolicyVerification>Y</PolicyVerification>
+    <StartDate>20070601</StartDate>
+    <EndDate>40001231</EndDate>
+    <Relationship>19</Relationship>
+    <EmployerName>STATE OF DELAWARE</EmployerName>
+    <EmployerAddress1>401 FEDERAL STREET</EmployerAddress1>
+    <EmployerAddress2></EmployerAddress2>
+    <EmployerCity>DOVER</EmployerCity>
+    <EmployerState>DE</EmployerState>
+    <EmployerZip>199010000</EmployerZip>
+    <PolicyInfoAddedDate>20060601</PolicyInfoAddedDate>
+    <PolicyInfoModDate>20120622</PolicyInfoModDate>
+    <ExternalId>6789987655-SOD200768-107360-2007-06-01-4000-12-31-0001-00269</ExternalId>
+    <PersonTypeId>a02r000000151VgAAI</PersonTypeId>
+    <MedicalInsuranceId></MedicalInsuranceId>
+  </record>
+</root>

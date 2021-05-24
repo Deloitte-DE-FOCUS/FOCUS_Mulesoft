@@ -1,0 +1,1048 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+
+    <objectstore:config name="ObjectStore__Connector_AllClaimErrors" partition="ObjectStore__Connector_AllClaimErrors" doc:name="ObjectStore: Connector"/>
+    <!-- <spring:beans>
+     	<spring:import resource="classpath:/loggingframework.xml" />
+     </spring:beans>
+     <spring:beans>
+        <spring:import resource="classpath:/errorhandling.xml" />
+     </spring:beans>
+     <spring:beans>
+        <spring:import resource="classpath:/queryframework.xml" /> 
+     </spring:beans>  -->
+    <objectstore:config name="ObjectStore__Connector_OnlyClaimErrors" partition="ObjectStore__Connector_OnlyClaimErrors" doc:name="ObjectStore: Connector"/>
+    <validation:config name="File_Validation_Configuration" doc:name="Validation Configuration"/>
+    <objectstore:config name="ObjectStore__Connector_HIPAA835BatchErrors" partition="HIPAA835BatchErrors" doc:name="ObjectStore: Connector"/>
+     
+    <flow name="inf017-hipaa835-remittance-loadFlow" processingStrategy="synchronous">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Set Incoming Payload and usage Indicator">
+            <add-message-property key="RequestDetailsFromSF" value="#[payload]"/>
+            <add-message-property key="UsageIndicator" value="${HIPAA835Load.UsageIndicator}"/>
+            <add-message-property key="WarningFile" value="#[]"/>
+            <add-message-property key="InterfaceID" value="INF017"/>
+        </message-properties-transformer>
+        <logger message="'Interface Name'#[flowVars.InterfaceID] 'Trans ID' #[sessionVars.TID]" level="INFO" doc:name="Logger"/>
+        <mulerequester:request config-ref="Mule_Requester" resource="sftp://${sftp.HIPAA835Load.transaction.username}:${sftp.HIPAA835Load.transaction.password}@${sftp.HIPAA835Load.transaction.host}:${sftp.HIPAA835Load.transaction.port}${sftp.HIPAA835Load.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.HIPAA835Load.transaction.filename}&amp;isContainsCheckEnabled=true" doc:name="Mule Requester"/>
+        <validation:is-not-null config-ref="File_Validation_Configuration" message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : If file not found"/>
+        <object-to-string-transformer  doc:name="Object to String"/>
+        <set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="Session Variable"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf017-InProgress-Transaction-subflow" doc:name="inf017-InProgress-Transaction-subflow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPFilenameMatchConnector" outputPattern="#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].835" host="${sftp.HIPAA835Load.archive.host}" port="${sftp.HIPAA835Load.archive.port}" responseTimeout="10000" doc:name="SFTP: Archive File" duplicateHandling="addSeqNo" password="${sftp.HIPAA835Load.archive.password}" path="${sftp.HIPAA835Load.archive.path}" user="${sftp.HIPAA835Load.archive.username}"/>
+        <set-variable variableName="ElementSeparator" value="#[message.payload.substring(3,4)]" doc:name="Variable : Store the Element Separator"/>
+        <set-payload value="#[dw('payload splitBy (flowVars.ElementSeparator)')]" doc:name="Set Payload : Split by the Element Separator"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Get Header Details ">
+            <add-message-property key="DSCYFETIN" value="#[payload[8]]"/>
+            <add-message-property key="ProdorTest" value="#[payload[15]]"/>
+            <add-message-property key="ComponentElementSeparator" value="#[payload[16].substring(0,1)]"/>
+            <add-message-property key="RowSeparator" value="#[payload[16].substring(1,2) ]"/>
+        </message-properties-transformer>
+        <set-payload value="#[dw('sessionVars.TransAttachment splitBy (flowVars.RowSeparator ++ &quot;CLP&quot;)')]" doc:name="Set Payload  : Split by CLP"/>
+        <remove-session-variable variableName="TransAttachment" doc:name="Session Variable : Remove Trans Attachment"/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="INF017-GetHeaderDetails-Sub_Flow" doc:name="INF017-GetHeaderDetails-Sub_Flow"/>
+            <enrich source="#[payload]" target="#[flowVars.icnDate]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf017-Check-ValidRecords-Sub_Flow" doc:name="inf017-Check-ValidRecords-Sub_Flow"/>
+            <enrich source="#[flowVars.ErrorMsgs]" target="#[flowVars.ErrorMsgs]"/>
+        </enricher>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.ErrorMsgs == &quot;&quot; ]">
+                <enricher doc:name="Message Enricher">
+                    <flow-ref name="inf017-QueryforLOVMapping" doc:name="inf017-QueryforLOVMapping"/>
+                    <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+                </enricher>
+                <set-payload value="#[dw('payload[1..-1]')]" doc:name="Set Payload"/>
+                <message-properties-transformer scope="session" doc:name="Message Properties">
+                    <add-message-property key="ConsolidatedPayload" value="#[[]]"/>
+                    <add-message-property key="totalRecCount" value="#[payload.size()]"/>
+                </message-properties-transformer>
+                <foreach doc:name="For Each">
+                    <flow-ref name="inf017-PrepareClaimData_Sub_Flow" doc:name="inf017-PrepareClaimData_Sub_Flow"/>
+                </foreach>
+                <set-payload value="#[sessionVars.ConsolidatedPayload]" mimeType="application/java" doc:name="Set Payload : Set the consolidated payload"/>
+                <batch:execute name="inf017-hipaa835-remittance-loadBatch" doc:name="inf017-hipaa835-remittance-loadBatch"/>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message="File is Invalid" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="inf017-InProgress-Transaction-subflow">
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF017&quot;, &quot;InterfaceName&quot;: &quot;HIPAA 835 Remittance Load&quot;, &quot;TransactionID&quot;:&quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;, &quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;HIPAARemittanceLoad&quot;, &quot;CompletedExtension&quot; : &quot;835&quot;, &quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;On-Demand&quot;}" mimeType="application/json" doc:name="Set Payload"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+    </sub-flow>
+    <sub-flow name="inf017-CompletedTransaction-Subflow">
+        <choice doc:name="Choice : If there are any warning details (name mismatch)">
+            <when expression="#[flowVars.WarningFile != null and flowVars.WarningFile != '']">
+                <set-session-variable variableName="TransAttachment" value="#[&quot;Claim Number,MCI Number,ICN Number,Client Last Name Sent,Client First Name Sent,Client Middle Name Sent,Client Last Name Corrected,Client First Name Corrected,Client Middle Name Corrected\n&quot; + flowVars.WarningFile]" doc:name="Session Variable : Set Warning File"/>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <choice doc:name="Choice : Check if there are any errors">
+            <when expression="#[sessionVars.AllClaimErrors != null and sessionVars.AllClaimErrors != &quot;&quot;]">
+                <set-session-variable variableName="ErrorAttachment" value="#[&quot;Claim Number,MCI Number,ICN Number,RA Date,Amount Billed,Amount Paid,Claim Status Code,Claim Adjustment Code,RA Remark,Error Message\n&quot; +sessionVars.AllClaimErrors]" doc:name="Session Variable :Set Error File"/>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF017&quot;, &quot;InterfaceName&quot;: &quot;HIPAA 835 Remittanc Load&quot;,&quot;ErrorFilename&quot;:&quot;Error_HIPAAMedicaidRemittacnceLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Warning_HIPAAMedicaidRemittacnceLoad&quot;,&quot;CompletedExtension&quot;:&quot;CSV&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.totalErrorCount==0?'Success':sessionVars.totalErrorCount&gt;0?'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Manual&quot;}" mimeType="application/json" doc:name="Set Payload : Completed Transaction"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+    </sub-flow>
+    <sub-flow name="inf017-QueryforLOVMapping">
+        <set-payload value="{&quot;Direction&quot; : &quot;Inbound&quot;, &quot;LOVNames&quot; : &quot;'REMITTANCE_REFERENCE_CODE','ADJUSTMENT_REASON_CODE','CLAIM_STATUS_CODE'&quot;} " mimeType="text/json" doc:name="Set Payload"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+    <sub-flow name="inf017-Check-ValidRecords-Sub_Flow">
+        <set-payload value="#[dw('payload[0..0]')]" doc:name="Set Payload : Get the Header Details"/>
+        <set-payload value="#[payload[0].split('\n')]" doc:name="Set Payload"/>
+        <set-variable variableName="ErrorList" value="#[[]]" doc:name="Variable"/>
+        <foreach doc:name="For Each">
+            <dw:transform-message doc:name="TM: Split by *">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload splitBy flowVars.ElementSeparator]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM: Get Error Messages">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	({
+		ErrorMessage : "Wrong ETIN number found in file. Expected ETIN number is " ++ flowVars.RequestDetailsFromSF['Interchange Receiver ID']
+	}) when payload[8]? == true and (trim payload[8]) != flowVars.RequestDetailsFromSF['Interchange Receiver ID'] and payload[0] == 'ISA',
+	({
+		ErrorMessage : "Wrong Usage Indicator found in file: Expected Usage Indicator is P"
+	}) when payload[15] != flowVars.UsageIndicator and flowVars.UsageIndicator == 'P' and payload[0] == 'ISA',
+	({
+		ErrorMessage : "Wrong Application Sender Code found in file. Expected Application Sender Code is " ++ flowVars.RequestDetailsFromSF['Application Sender\'s Code']
+	}) when payload[2] != flowVars.RequestDetailsFromSF['Application Sender\'s Code'] and payload[0] == 'GS',
+	({
+		ErrorMessage : "Wrong Application Receiver Code found in file. Expected Application Receiver Code is " ++ flowVars.RequestDetailsFromSF['Application Receiver\'s Code']
+	}) when payload[3] != flowVars.RequestDetailsFromSF['Application Receiver\'s Code'] and payload[0] == 'GS',
+	({
+		ErrorMessage : "Wrong Transaction Set Identifier Code found in file. Expected is Transaction Set Identifier Code is " ++ flowVars.RequestDetailsFromSF['Transaction Set Identifier Code']
+	}) when payload[1] != flowVars.RequestDetailsFromSF['Transaction Set Identifier Code'] and payload[0] == 'ST'
+	
+]]]></dw:set-payload>
+            </dw:transform-message>
+            <set-variable variableName="ErrorList" value="#[flowVars.ErrorList == null ? payload : dw('flowVars.ErrorList ++ payload')]" doc:name="Variable"/>
+        </foreach>
+        <dw:transform-message doc:name="TM: Error Msgs join by">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.ErrorList map ($.ErrorMessage) joinBy ";")
+]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="ErrorMsgs" value="#[payload]" doc:name="Variable : Store Error Msgs"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload != null and payload !=&quot;&quot; ]">
+                <remove-session-variable variableName="TransAttachment" doc:name="Session Variable : Remove Attachment"/>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF017&quot;, &quot;InterfaceName&quot;: &quot;HIPAA 835 Remittance Load&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;#[payload]&quot;, &quot;ErrorFilename&quot;: &quot;&quot;, &quot;CompletedFilename&quot;: &quot;HIPAARemittanceLoad&quot;, &quot;CompletedExtension&quot; : &quot;835&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;On-Demand&quot;}" doc:name="Set Payload : Log Transaction Error file"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+                <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="INF017-GetHeaderDetails-Sub_Flow">
+        <set-payload value="#[dw('payload[0..0]')]" doc:name="Set Payload : Get the header element Details"/>
+        <set-payload value="#[dw('payload[0] splitBy (flowVars.RowSeparator)')]" doc:name="Set Payload : Split by \n"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "DTM")]]></dw:set-payload>
+        </dw:transform-message>
+        <set-payload value="#[payload[0].split('\\*')[2]]" doc:name="Set Payload"/>
+    </sub-flow>
+    <sub-flow name="inf017-PrepareClaimData_Sub_Flow">
+        <set-payload value="#[payload.startsWith(&quot;CLP&quot;) ? payload : (&quot;CLP&quot; + payload) ]" doc:name="Set Payload : Add CLP"/>
+        <set-variable variableName="OriginalCLPPayloadRecord" value="#[payload]" doc:name="Variable : Store Original Payload"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Override Flow Vars to blank values">
+            <add-message-property key="CASCodes" value="#[[]]"/>
+            <add-message-property key="ReferenceCodes" value="#[[]]"/>
+            <add-message-property key="MCINumber" value="#[[]]"/>
+            <add-message-property key="ClaimDetails" value="#[[]]"/>
+        </message-properties-transformer>
+        <set-payload value="#[dw('payload splitBy (flowVars.RowSeparator)')]" doc:name="Set Payload : split by \n "/>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="inf017-GetCLPDetails-Sub_Flow" doc:name="inf017-GetCLPDetails-Sub_Flow"/>
+            <enrich source="payload" target="flowVars.ClaimDetails"/>
+        </enricher>
+        <enricher doc:name="Message Enricher - SVC">
+            <flow-ref name="inf017-GetSVCDetails-Sub_Flow" doc:name="inf017-GetSVCDetails-Sub_Flow"/>
+            <enrich source="#[payload]" target="#[flowVars.SVCDetails]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher : NM1">
+            <flow-ref name="inf017-GetNM1Details-MCINumber-Sub_Flow" doc:name="inf017-GetNM1Details-MCINumber-Sub_Flow"/>
+            <enrich source="#[flowVars.MCINumber]" target="#[flowVars.MCINumber]"/>
+            <enrich source="#[flowVars.WarningFile]" target="#[flowVars.WarningFile]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher - MIA or MOA or LQ">
+            <flow-ref name="inf017-GetRARemarksDetails-Sub_Flow" doc:name="inf017-GetRARemarksDetails-Sub_Flow"/>
+            <enrich source="#[payload]" target="#[flowVars.ReferenceCodes]"/>
+        </enricher>
+        <enricher doc:name="Message Enricher for CAS">
+            <flow-ref name="inf017-GetClaimAdjustmentDetails-Sub_Flow" doc:name="inf017-GetClaimAdjustmentDetails-Sub_Flow"/>
+            <enrich source="#[payload]" target="#[flowVars.CASCodes]"/>
+        </enricher>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[//
+%dw 1.0
+%output application/java
+---
+[{
+	ClaimNumber : flowVars.ClaimDetails.ClaimNumber default "",
+	ProcessedStatus: flowVars.ClaimDetails.ProcessedStatus default "",
+	AmountBilled: flowVars.ClaimDetails.BilledAmount default 0.0 as :number,
+	AmountPaid: flowVars.ClaimDetails.ReimbursedAmount default 0.0 as :number,
+	Status: 'Update Logic Reimbursed etc.',
+	RAICN: flowVars.ClaimDetails.MedicaidICN default "",
+	RADate: flowVars.icnDate default "",
+	MCINumber: flowVars.MCINumber.MCINumber default "",
+	SVCProcedureCode:flowVars.SVCDetails default "",
+	MIAMOALQRefCodes: flowVars.ReferenceCodes default "",
+	CASCodes: flowVars.CASCodes default "",
+	(ClaimExternalID: flowVars.ClaimDetails.ClaimNumber ++ '-' ++ flowVars.MCINumber.MCINumber) when flowVars.ClaimDetails.ClaimNumber != null and flowVars.MCINumber.MCINumber != null 
+}] ]]></dw:set-payload>
+        </dw:transform-message>
+        <set-session-variable variableName="ConsolidatedPayload" value="#[sessionVars.ConsolidatedPayload == null ? payload : dw('sessionVars.ConsolidatedPayload ++ payload')]" doc:name="Session Variable : Consolidated payload" mimeType="application/java"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <batch:job name="inf017-hipaa835-remittance-loadBatch">
+        <batch:process-records>
+            <batch:step name="Batch_Step_LoadData">
+                <batch:commit size="100" doc:name="Batch Commit">
+                    <set-variable variableName="InitialBatchPayload" value="#[payload]" doc:name="Variable : Store the initial batch payload"/>
+                    <dw:transform-message doc:name="Transform Messag - Prepare , separated external Ids">
+                        <dw:set-payload><![CDATA[//generate comma separated list of External Ids so that it can be queried against FOCUS to get the claim records
+%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.ClaimExternalID ++ "'" )) joinBy ","]]></dw:set-payload>
+                        <dw:set-variable variableName="RecoupmentPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.InitialBatchPayload filter $.ProcessedStatus == "22" and ((($.RAICN startsWith "20") == true) or (($.RAICN startsWith "59") == true)) )]]></dw:set-variable>
+
+                        <dw:set-variable variableName="ClaimExteranalIDStatusCode"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.InitialBatchPayload groupBy $.ClaimExternalID )]]></dw:set-variable>
+                    </dw:transform-message>
+                    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Name, Medicaid_Bill_Amount__c, ICN_Number__c, Interface_External_Id__c from DEL_Medicaid_Billing__c where Interface_External_Id__c IN (#[payload]) and (ICN_Number__c = null or (ICN_Number__c like '20%') or (ICN_Number__c like '59%'))" doc:name="Salesforce : Query to get Claim Records"/>
+
+                    <dw:transform-message doc:name="TM: Prepare Claim External ID SFID Map">
+                        <dw:set-variable variableName="ClaimExternalIdSFIdMap"><![CDATA[%dw 1.0
+%output application/java
+//%var ClaimProcessedStatus = {( flowVars.ClaimExteranalIDStatusCode map (record, index) -> {
+  //          (record.ClaimExternalId as :string) : record.ProcessedStatus default ""
+//})}
+---
+payload map 
+{
+      ClaimExternalID : ($.Interface_External_Id__c),
+      ICNNum : $.ICN_Number__c,
+      //ICNFile : flowVars.ClaimExteranalIDStatusCode[$.Interface_External_Id__c][0].RAICN,
+      StatusCode : flowVars.ClaimExteranalIDStatusCode[$.Interface_External_Id__c][0].ProcessedStatus,
+      SFId : $.Id when ((($.ICN_Number__c == null or $.ICN_Number__c == "") and flowVars.ClaimExteranalIDStatusCode[$.Interface_External_Id__c][0].ProcessedStatus != "22") or ((( $.ICN_Number__c != null and ((($.ICN_Number__c startsWith "20") == true) or (($.ICN_Number__c startsWith "59") == true))) and $.ICN_Number__c == flowVars.ClaimExteranalIDStatusCode[$.Interface_External_Id__c][0].RAICN) and flowVars.ClaimExteranalIDStatusCode[$.Interface_External_Id__c][0].ProcessedStatus == "22")) otherwise ""
+} groupBy $.ClaimExternalID]]></dw:set-variable>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Claim Salesforce Format">
+                        <dw:input-variable variableName="InitialBatchPayload"/>
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+//%var ClaimSFId = {( flowVars.ClaimExternalIdSFIdMap filter $.SFId != "" and $.SFId != null map {
+  //         ($.ClaimExternalID) : $.SFId
+//})}
+---
+flowVars.InitialBatchPayload filter (($.RAICN != null and $.RAICN != '' and ((($.RAICN startsWith "20") == true) or (($.RAICN startsWith "59") == true))) and ($.ProcessedStatus == '1' or $.ProcessedStatus == '2' or $.ProcessedStatus == '3' or $.ProcessedStatus == '4') ) map {
+      
+    Id : flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].SFId[0],
+   (Remittance_Advice_Date__c: (flowVars.icnDate[0..3] ++ "/" ++ flowVars.icnDate[4..5] ++ "/" ++ flowVars.icnDate[6..7]) as :date {format: "yyyy/MM/dd"}) when flowVars.icnDate != null and (flowVars.icnDate matches /(\d+)/) and ( sizeOf trim flowVars.icnDate) >= 8,
+   ICN_Number__c: $.RAICN when ($.RAICN != null and $.RAICN != '' and (flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].ICNNum[0] == null or flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].ICNNum[0] == '' )) otherwise "",
+    //Medicaid_Bill_Amount__c : $.AmountBilled,
+    Amount_Paid__c : $.AmountPaid default 0.0,
+    //Code_Set__c : flowVars.LOVReturned[("CLAIM_STATUS_CODE-" ++ $.ProcessedStatus)][0], 
+    Claim_Record_Status__c : "Claim - Reimbursed" when ($.AmountPaid == $.AmountBilled)
+	     otherwise ("Claim - Denied" when ($.AmountPaid != null and ($.AmountPaid as :number) == 0.00) 
+	     otherwise "Claim - Partially Reimbursed"
+	 	)
+	//Status__c :  "Claim - Reimbursed" when ($.AmountPaid == $.AmountBilled)
+	  //   otherwise ("Claim - Denied" when ($.AmountPaid != null and ($.AmountPaid as :number) == 0.00) 
+	    // otherwise "Claim - Partially Reimbursed"
+	 	//)
+            
+} filter $.Id != null and $.Id != '' and $.ICN_Number__c != null and $.ICN_Number__c != '']]></dw:set-payload>
+                        <dw:set-variable variableName="ClaimErrorFile"><![CDATA[%dw 1.0
+%output application/csv header=false , quoteValues=true
+---
+flowVars.InitialBatchPayload map 
+{   
+    //Id : ClaimSFId[$.ClaimExternalID],
+    ClaimNumber : $.ClaimNumber,
+    MCINumber : $.MCINumber,
+   (ICN_Number__c: $.RAICN) when $.RAICN != null and $.RAICN != '',
+   (Remittance_Advice_Date__c: (flowVars.icnDate[0..3] ++ "/" ++ flowVars.icnDate[4..5] ++ "/" ++ flowVars.icnDate[6..7]) as :date {format: "yyyy/MM/dd"}) when flowVars.icnDate != null and (flowVars.icnDate matches /(\d+)/) and ( sizeOf trim flowVars.icnDate) >= 8,
+    Medicaid_Bill_Amount__c : $.AmountBilled,
+    Amount_Paid__c : $.AmountPaid,
+    ProcessedStatus : $.ProcessedStatus,
+    ClaimAdjustment: '',
+    RARemarks: '',
+    //Code_Set__c : flowVars.LOVReturned[("CLAIM_STATUS_CODE-" ++ $.ProcessedStatus)][0], 
+	ErrorMessage: "Claim Record ICN# should start with either 20 or 59" when (flowVars.InitialBatchPayload[$$].RAICN != null and flowVars.InitialBatchPayload[$$].RAICN != "" and ((flowVars.InitialBatchPayload[$$].RAICN startsWith "20") == false) and ((flowVars.InitialBatchPayload[$$].RAICN startsWith "59") == false)) otherwise ("Claim Status Code should be either 1 or 2 or 3 or 4 or 22" when (flowVars.InitialBatchPayload[$$].ProcessedStatus != '1' and flowVars.InitialBatchPayload[$$].ProcessedStatus != '2' and flowVars.InitialBatchPayload[$$].ProcessedStatus != '3' and flowVars.InitialBatchPayload[$$].ProcessedStatus != '4' and flowVars.InitialBatchPayload[$$].ProcessedStatus != '22')  otherwise ( "Claim Record (Claim Number, MCI Number) doesn't exist in FOCUS or is already processed in FOCUS. Hence, this claim record is discarded from further processing"  
+    	when ((flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].SFId[0] == null or flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].SFId[0] == "")  ) otherwise  ( "Claim Record (Claim Number, MCI Number) doesn't exist in FOCUS or is already processed in FOCUS. Hence, this claim record is discarded from further processing"  
+    	when ((flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].SFId[0] != null and flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].SFId[0] != "") and (flowVars.InitialBatchPayload[$$].ProcessedStatus != '22') and (flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].ICNNum[0] != null and flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].ICNNum[0] != '' ) ) otherwise "" )))	
+	    
+} filter ($.ErrorMessage != null and $.ErrorMessage != "")]]></dw:set-variable>
+
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM : Filter to Update Records">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter $.Id != null and $.Id != ''
+]]></dw:set-payload>
+                        <dw:set-variable variableName="InitialBatchPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.InitialBatchPayload filter (((($.RAICN startsWith "20") == true) or (($.RAICN startsWith "59") == true) ) and ($.ProcessedStatus == '1' or $.ProcessedStatus == '2' or $.ProcessedStatus == '3' or $.ProcessedStatus == '4')) map {
+	ClaimNumber : $.ClaimNumber,
+	ProcessedStatus: $.ProcessedStatus,
+	AmountBilled: $.AmountBilled,
+	AmountPaid: $.AmountPaid,
+	//Status: 'Update Logic Reimbursed etc.',
+	RAICN: $.RAICN,
+	RADate: $.RADate,
+	MCINumber: $.MCINumber,
+	SVCProcedureCode: $.SVCProcedureCode,
+	MIAMOALQRefCodes: $.MIAMOALQRefCodes,
+	CASCodes: $.CASCodes,
+	ClaimExternalID : $.ClaimExternalID,
+	ClaimSFId : flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].SFId[0]
+}]]></dw:set-variable>
+                        <dw:set-variable variableName="RecoupmentPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.RecoupmentPayload map {
+	ClaimNumber : $.ClaimNumber,
+	ProcessedStatus: $.ProcessedStatus,
+	AmountBilled: $.AmountBilled,
+	AmountPaid: $.AmountPaid,
+	//Status: 'Update Logic Reimbursed etc.',
+	RAICN: $.RAICN,
+	RADate: $.RADate,
+	MCINumber: $.MCINumber,
+	SVCProcedureCode: $.SVCProcedureCode,
+	MIAMOALQRefCodes: $.MIAMOALQRefCodes,
+	CASCodes: $.CASCodes,
+	ClaimExternalID : $.ClaimExternalID,
+	ClaimSFId : flowVars.ClaimExternalIdSFIdMap[$.ClaimExternalID].SFId[0]
+}]]></dw:set-variable>
+                    </dw:transform-message>
+                    <objectstore:store config-ref="ObjectStore__Connector_OnlyClaimErrors" key="OnlyClaimErrors__#[server.nanoTime()]" value-ref="#[flowVars.ClaimErrorFile]" doc:name="ObjectStore"/>
+                    <choice doc:name="Choice">
+                        <when expression="#[payload.size() &gt; 0]">
+                            <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Medicaid_Billing__c" doc:name="Salesforce : Update Claims records">
+                                <sfdc:objects ref="#[payload]"/>
+                            </sfdc:update>
+                            <dw:transform-message doc:name="TM: Prepare CSV Error File; Ext Id SF Id map">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false , quoteValues=true
+---
+payload map 
+{
+      ClaimNumber: flowVars.InitialBatchPayload[$$].ClaimNumber,
+      MCINumber: flowVars.InitialBatchPayload[$$].MCINumber,
+      ICN_Number__c: flowVars.InitialBatchPayload[$$].RAICN,
+     (Remittance_Advice_Date__c: (flowVars.icnDate[0..3] ++ "/" ++ flowVars.icnDate[4..5] ++ "/" ++ flowVars.icnDate[6..7]) as :date {format: "yyyy/MM/dd"}) when flowVars.icnDate != null and (flowVars.icnDate matches /(\d+)/) and ( sizeOf trim flowVars.icnDate) >= 8,
+     Medicaid_Bill_Amount__c : flowVars.InitialBatchPayload[$$].AmountBilled,
+     Amount_Paid__c : flowVars.InitialBatchPayload[$$].AmountPaid,
+     ProcessedStatus : flowVars.InitialBatchPayload[$$].ProcessedStatus,
+     ClaimAdjustment: '',
+     RARemarks: '',
+      ErrorDescription: $.errors[0].message 
+} filter $.ErrorDescription != null and $.ErrorDescription != "" ]]></dw:set-payload>
+                            </dw:transform-message>
+                            <object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+                            <objectstore:store config-ref="ObjectStore__Connector_OnlyClaimErrors" key="OnlyClaimErrors_#[server.nanoTime()]" value-ref="#[payload]" doc:name="ObjectStore"/>
+
+                        </when>
+                        <otherwise>
+                            <logger message="No Claim records to update" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+
+                    <set-session-variable variableName="AllClaimErrors" value="#[&quot;&quot;]" mimeType="application/csv" doc:name="Session Variable : Error File"/>
+
+
+                    <dw:transform-message doc:name="TM: Get MIAMOALQ codes from initial batch payload">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+//%var ClaimSFId = {( flowVars.ClaimExternalIdSFIdMap map (record, index) -> {
+  //          (record.ClaimExternalID) : record.SFId default ""
+//})}
+---
+flowVars.InitialBatchPayload filter $.ClaimSFId != null and $.ClaimSFId != "" map (record,index) ->
+{   
+    rec : record.MIAMOALQRefCodes map {
+    	Medicaid_Billing__c : record.ClaimSFId,
+    	RA_Remark_Code__c : $.ReferenceCode,
+    	(RA_Remark_Description__c : flowVars.LOVReturned[("REMITTANCE_REFERENCE_CODE-" ++ $.ReferenceCode)][0] when flowVars.LOVReturned[("REMITTANCE_REFERENCE_CODE-" ++ $.ReferenceCode)][0] != null and flowVars.LOVReturned[("REMITTANCE_REFERENCE_CODE-" ++ $.ReferenceCode)][0] != ''
+	     otherwise
+	     {
+			 RA_Remark_Description__c: $.ReferenceCode
+	 	}),
+	 	Medicaid_RA_Remark_ID__r :
+		{		
+			type: "DEL_Remittance__c",
+			Interface_External_Id__c: $.ReferenceCode
+		}
+    }
+            
+}]]></dw:set-payload>
+                        <dw:set-variable variableName="ClaimRecordsBeforeUpdate"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.InitialBatchPayload map (record,index) ->
+{   
+    rec : record.MIAMOALQRefCodes map {
+    	ClaimNumber : record.ClaimNumber,
+    	MCINumber : record.MCINumber,
+    	RemarkCode : $.ReferenceCode,
+    	RAICN: record.RAICN,
+    	ProcessedStatus: record.ProcessedStatus,
+    	AmountBilled: record.AmountBilled,
+    	AmountPaid: record.AmountPaid
+    }
+            
+}]]></dw:set-variable>
+                    </dw:transform-message>
+                    <choice doc:name="Choice : Check if there are any RX Remark records">
+                        <when expression="#[payload.size() &gt; 0]">
+                            <dw:transform-message doc:name="TM: RA Remarks Salesforce format">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(flatten payload.rec)]]></dw:set-payload>
+                                <dw:set-variable variableName="ClaimRecordsBeforeUpdate"><![CDATA[%dw 1.0
+%output application/java
+---
+flatten flowVars.ClaimRecordsBeforeUpdate.rec]]></dw:set-variable>
+                            </dw:transform-message>
+                            <choice doc:name="Choice : If there are RA Remarks">
+                                <when expression="#[payload.size() &gt; 0]">
+                                    <foreach batchSize="200" doc:name="For Each">
+                                        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="DEL_Medicaid_Remittance_Advice_Remark__c" doc:name="Salesforce : Create RA Remarks">
+                                            <sfdc:objects ref="#[payload]"/>
+                                        </sfdc:create>
+                                        <dw:transform-message doc:name="Transform Message">
+                                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false , quoteValues=true
+---
+payload map 
+{
+      ClaimNumber: flowVars.ClaimRecordsBeforeUpdate[$$].ClaimNumber,
+      MCI: flowVars.ClaimRecordsBeforeUpdate[$$].MCINumber,
+      (ICN_Number__c: flowVars.ClaimRecordsBeforeUpdate[$$].RAICN) when flowVars.ClaimRecordsBeforeUpdate[$$].RAICN != null and flowVars.ClaimRecordsBeforeUpdate[$$].RAICN != '',
+     (Remittance_Advice_Date__c: (flowVars.icnDate[0..3] ++ "/" ++ flowVars.icnDate[4..5] ++ "/" ++ flowVars.icnDate[6..7]) as :date {format: "yyyy/MM/dd"}) when flowVars.icnDate != null and (flowVars.icnDate matches /(\d+)/) and ( sizeOf trim flowVars.icnDate) >= 8,
+     Medicaid_Bill_Amount__c : flowVars.ClaimRecordsBeforeUpdate[$$].AmountBilled,
+     Amount_Paid__c : flowVars.ClaimRecordsBeforeUpdate[$$].AmountPaid,
+     ProcessedStatus : flowVars.ClaimRecordsBeforeUpdate[$$].ProcessedStatus,
+     ClaimAdjustment: '',
+     RARemarks: flowVars.ClaimRecordsBeforeUpdate[$$].RemarkCode,
+     ErrorDescription: $.errors[0].message
+} filter $.ErrorDescription != null and $.ErrorDescription != "" 
+
+]]></dw:set-payload>
+                                        </dw:transform-message>
+                                        <object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+                                        <set-session-variable variableName="AllClaimErrors" value="#[(payload == null || payload == &quot;&quot;) ? sessionVars.AllClaimErrors : payload+ ','  +sessionVars.AllClaimErrors]" mimeType="application/csv" doc:name="Session Variable : All Claim Errors"/>
+                                    </foreach>
+                                </when>
+                                <otherwise>
+                                    <logger level="INFO" doc:name="Logger"/>
+                                </otherwise>
+                            </choice>
+
+                        </when>
+                        <otherwise>
+                            <logger message="'No RX Remarks codes to be loaded'" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+
+
+                    <dw:transform-message doc:name="TM: Get CAS Codes from initial batch payload">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+//%var ClaimSFId = {( flowVars.ClaimExternalIdSFIdMap map (record, index) -> {
+  //          (record.ClaimExternalID) : record.SFId default ""
+//})}
+---
+flowVars.InitialBatchPayload filter $.ClaimSFId != null and $.ClaimSFId != "" map (record,index) ->
+{   
+    rec : record.CASCodes map {
+    	Medicaid_Billing__c : record.ClaimSFId,
+    	Claim_Adjustment_Reason_Code__c : $.ReferenceCode,
+    	Claim_Adjustment_Group_Code__c  : $.GroupCode,
+    	Claim_Adjustment_Amount__c : $.CASAmount,
+    	(Claim_Adjustment_Reason_Description__c : flowVars.LOVReturned[("ADJUSTMENT_REASON_CODE-" ++ $.ReferenceCode)][0] when flowVars.LOVReturned[("ADJUSTMENT_REASON_CODE-" ++ $.ReferenceCode)][0] != null and flowVars.LOVReturned[("ADJUSTMENT_REASON_CODE-" ++ $.ReferenceCode)][0] != ''
+	     otherwise
+	     {
+			 Claim_Adjustment_Reason_Description__c: $.ReferenceCode
+	 	}),
+	 	Medicaid_Claim_Adjustment_ID__r :
+	 	{		
+	 		type: "DEL_Adjustment_Reason__c",
+			Interface_External_Id__c: $.ReferenceCode
+		}
+    }
+            
+}]]></dw:set-payload>
+                        <dw:set-variable variableName="CASRecordsBeforeUpdate"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.InitialBatchPayload map (record,index) ->
+{   
+    rec : record.CASCodes map {
+    	ClaimNumber : record.ClaimNumber,
+    	MCINumber : record.MCINumber,
+    	CASCode : $.ReferenceCode,
+    	RAICN: record.RAICN,
+    	ProcessedStatus: record.ProcessedStatus,
+    	AmountBilled: record.AmountBilled,
+    	AmountPaid: record.AmountPaid
+    }
+            
+}]]></dw:set-variable>
+                    </dw:transform-message>
+                    <logger message="'CAS Codes to Load '#[payload]" level="INFO" doc:name="Logger"/>
+
+                    <choice doc:name="Choice : Check if there are any CAS Adjustment records">
+                        <when expression="#[payload.size() &gt; 0]">
+                            <dw:transform-message doc:name="TM :  CAS Codes to Salesforce format">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(flatten payload.rec)]]></dw:set-payload>
+                                <dw:set-variable variableName="CASRecordsBeforeUpdate"><![CDATA[%dw 1.0
+%output application/java
+---
+flatten flowVars.CASRecordsBeforeUpdate.rec]]></dw:set-variable>
+                            </dw:transform-message>
+                            <choice doc:name="Choice">
+                                <when expression="#[payload.size() &gt; 0]">
+                                    <foreach batchSize="200" doc:name="For Each">
+                                        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="DEL_Medicaid_Claim_Adjustment__c" doc:name="Salesforce : Create Claim Adjustment Records in batch">
+                                            <sfdc:objects ref="#[payload]"/>
+                                        </sfdc:create>
+
+                                        <dw:transform-message doc:name="TM : Generate Error File">
+                                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false , quoteValues=true
+---
+payload map 
+{
+     ClaimNumber: flowVars.CASRecordsBeforeUpdate[$$].ClaimNumber,
+     MCI: flowVars.CASRecordsBeforeUpdate[$$].MCINumber,
+     ICN_Number__c: flowVars.CASRecordsBeforeUpdate[$$].RAICN,
+     (Remittance_Advice_Date__c: (flowVars.icnDate[0..3] ++ "/" ++ flowVars.icnDate[4..5] ++ "/" ++ flowVars.icnDate[6..7]) as :date {format: "yyyy/MM/dd"}) when flowVars.icnDate != null and (flowVars.icnDate matches /(\d+)/) and ( sizeOf trim flowVars.icnDate) >= 8,
+     Medicaid_Bill_Amount__c : flowVars.CASRecordsBeforeUpdate[$$].AmountBilled,
+     Amount_Paid__c : flowVars.CASRecordsBeforeUpdate[$$].AmountPaid,
+     ProcessedStatus : flowVars.CASRecordsBeforeUpdate[$$].ProcessedStatus,
+     ClaimAdjustment: flowVars.CASRecordsBeforeUpdate[$$].CASCode,
+     RARemarks: '',
+     ErrorDescription:  $.errors[0].message 
+} filter $.ErrorDescription != null and $.ErrorDescription != "" ]]></dw:set-payload>
+                                        </dw:transform-message>
+                                        <object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+                                        <set-session-variable variableName="AllClaimErrors" value="#[(payload == null || payload == &quot;&quot;) ? sessionVars.AllClaimErrors : payload+ ','  +sessionVars.AllClaimErrors]" mimeType="application/csv" doc:name="Session Variable : All Claim Error File"/>
+                                    </foreach>
+                                </when>
+                                <otherwise>
+                                    <logger message="No CAS records to update" level="INFO" doc:name="Logger"/>
+                                </otherwise>
+                            </choice>
+
+                        </when>
+                        <otherwise>
+                            <logger message="'There are no CAS adjustment records' " level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+                    
+                     <dw:transform-message doc:name="TM: Get Recoupment Records from payload">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+//%var ClaimSFId = {( flowVars.ClaimExternalIdSFIdMap map (record, index) -> {
+  //          (record.ClaimExternalID) : record.SFId default ""
+//})}
+---
+flowVars.RecoupmentPayload filter $.ClaimSFId != null and $.ClaimSFId != "" map 
+{   
+    Medicaid_Billing__c : $.ClaimSFId,
+    Recoupment_Amount__c : $.AmountPaid when ($.AmountPaid > 0) otherwise ($.AmountPaid * -1),
+    (Recoupment_Date__c : (flowVars.icnDate[0..3] ++ "/" ++ flowVars.icnDate[4..5] ++ "/" ++ flowVars.icnDate[6..7]) as :date {format: "yyyy/MM/dd"}) when flowVars.icnDate != null and (flowVars.icnDate matches /(\d+)/) and ( sizeOf trim flowVars.icnDate) >= 8,
+    Recoupment_Ledger_Code__c : $.RAICN,
+    (Interface_External_Id__c : (flowVars.icnDate[0..3] ++ "-" ++ flowVars.icnDate[4..5] ++ "-" ++ flowVars.icnDate[6..7] ++ "-" ++ $.RAICN)) when flowVars.icnDate != null and (flowVars.icnDate matches /(\d+)/) and ( sizeOf trim flowVars.icnDate) >= 8 and $.RAICN != null and $.RAICN != ""
+} filter $.Medicaid_Billing__c != null and  $.Medicaid_Billing__c != ""]]></dw:set-payload>
+                        <dw:set-variable variableName="CASRecordsBeforeUpdate"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.RecoupmentPayload filter $.ClaimSFId != null and $.ClaimSFId != ""  map (record,index) ->
+{   
+	ClaimNumber : record.ClaimNumber,
+	MCINumber : record.MCINumber,
+	RAICN: record.RAICN,
+	ProcessedStatus: record.ProcessedStatus,
+	AmountBilled: record.AmountBilled,
+	AmountPaid: record.AmountPaid
+            
+}]]></dw:set-variable>
+                    </dw:transform-message>
+                    <logger message="'Recoupment Records' #[payload]" level="INFO" doc:name="Logger"/>
+
+                    <choice doc:name="Choice : Check if there are any Medicaid Recoupment records">
+                        <when expression="#[payload.size() &gt; 0]">
+                            <sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="Interface_External_Id__c" type="DEL_Medicaid_Recoupment__c" doc:name="Salesforce : Create Medicaid Recoupment Records in batch">
+                                <sfdc:objects ref="#[payload]"/>
+                            </sfdc:upsert>
+
+
+                            <dw:transform-message doc:name="TM : Generate Error File">
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false , quoteValues=true
+---
+payload map 
+{
+     ClaimNumber: flowVars.CASRecordsBeforeUpdate[$$].ClaimNumber,
+     MCI: flowVars.CASRecordsBeforeUpdate[$$].MCINumber,
+     ICN_Number__c: flowVars.CASRecordsBeforeUpdate[$$].RAICN,
+     (Remittance_Advice_Date__c: (flowVars.icnDate[0..3] ++ "/" ++ flowVars.icnDate[4..5] ++ "/" ++ flowVars.icnDate[6..7]) as :date {format: "yyyy/MM/dd"}) when flowVars.icnDate != null and (flowVars.icnDate matches /(\d+)/) and ( sizeOf trim flowVars.icnDate) >= 8,
+     Medicaid_Bill_Amount__c : flowVars.CASRecordsBeforeUpdate[$$].AmountBilled,
+     Amount_Paid__c : flowVars.CASRecordsBeforeUpdate[$$].AmountPaid,
+     ProcessedStatus : flowVars.CASRecordsBeforeUpdate[$$].ProcessedStatus,
+     ClaimAdjustment: flowVars.CASRecordsBeforeUpdate[$$].CASCode,
+     RARemarks: '',
+     ErrorDescription: $.errors[0].message 
+} filter $.ErrorDescription != null and $.ErrorDescription != "" ]]></dw:set-payload>
+                            </dw:transform-message>
+                            <object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+                            <objectstore:store config-ref="ObjectStore__Connector_OnlyClaimErrors" key="OnlyClaimErrors_#[server.nanoTime()]" value-ref="#[payload]" doc:name="ObjectStore"/>
+
+
+
+                        </when>
+                        <otherwise>
+                            <logger message="'There are no Medicaid Recoupment records to Insert' " level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+                    <objectstore:store config-ref="ObjectStore__Connector_AllClaimErrors" key="BatchInfo_#[server.nanoTime()]" value-ref="#[sessionVars.AllClaimErrors]" doc:name="ObjectStore"/>
+
+
+                    <set-payload value="#[[]]" doc:name="Set Payload : Set it to blank"/>
+                </batch:commit>
+            </batch:step>
+            
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>
+                    <objectstore:store config-ref="ObjectStore__Connector_HIPAA835BatchErrors" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="ObjectStore__Connector_HIPAA835BatchErrors" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+
+
+                </batch:commit>
+            </batch:step>
+
+        </batch:process-records>
+        <batch:on-complete>
+            <message-properties-transformer scope="session" doc:name="Message Properties">
+                <add-message-property key="OnlyClaimErrors" value="#[&quot;&quot;]"/>
+                <add-message-property key="AllClaimErrors" value="#[&quot;&quot;]"/>
+            </message-properties-transformer>
+            <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_OnlyClaimErrors" doc:name="ObjectStore"/>
+            <foreach doc:name="For Each">
+                <set-variable variableName="key" value="#[payload]" doc:name="Variable"/>
+                <objectstore:retrieve config-ref="ObjectStore__Connector_OnlyClaimErrors" key="#[payload]" doc:name="ObjectStore"/>
+                <message-properties-transformer scope="session" doc:name="Message Properties : Only Claim Errors">
+                    <add-message-property key="OnlyClaimErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot;) ? sessionVars.OnlyClaimErrors + payload : sessionVars.OnlyClaimErrors]"/>
+
+
+                </message-properties-transformer>
+
+                <objectstore:remove config-ref="ObjectStore__Connector_OnlyClaimErrors" key="#[key]" ignoreNotExists="true" doc:name="ObjectStore"/>
+            </foreach>
+            <set-session-variable variableName="totalErrorCount" value="#[(sessionVars.OnlyClaimErrors != '' &amp;&amp; sessionVars.OnlyClaimErrors != null) ? sessionVars.OnlyClaimErrors.split('\n').size() : 0]" doc:name="Session Variable : Claim Error Count"/>
+            <message-properties-transformer scope="session" doc:name="Message Properties : Set Success Count and status">
+                <add-message-property key="totalSuccCount" value="#[sessionVars.totalRecCount - sessionVars.totalErrorCount]"/>
+            </message-properties-transformer>
+            <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_AllClaimErrors" doc:name="ObjectStore"/>
+            <foreach doc:name="For Each">
+                <set-variable variableName="key" value="#[payload]" doc:name="Variable"/>
+                <objectstore:retrieve config-ref="ObjectStore__Connector_AllClaimErrors" key="#[payload]" doc:name="ObjectStore"/>
+                <message-properties-transformer scope="session" doc:name="Message Properties : All Claim Errors">
+                    <add-message-property key="AllClaimErrors" value="#[(payload != null &amp;&amp; payload != &quot;&quot;) ? sessionVars.AllClaimErrors + payload : sessionVars.AllClaimErrors]"/>
+
+                </message-properties-transformer>
+                <objectstore:remove config-ref="ObjectStore__Connector_AllClaimErrors" key="#[key]" doc:name="ObjectStore"/>
+            </foreach>
+            <set-session-variable variableName="AllClaimErrors" value="#[sessionVars.OnlyClaimErrors + sessionVars.AllClaimErrors]" mimeType="application/csv" doc:name="Session Variable"/>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_HIPAA835BatchErrors" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys"/>
+            <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>
+
+            <foreach doc:name="For Each : Iterate over Exception Keys" doc:description="For Each : Iterate over Exception Keys">
+                <choice doc:name="Choice">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="ObjectStore__Connector_HIPAA835BatchErrors" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Update Total SFDC Connection Error Count" doc:description="Message Properties: Update Total SFDC Connection Error Count">
+                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+                        </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="ObjectStore__Connector_HIPAA835BatchErrors" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details" doc:description="Exception ObjectStore : Retrive and Remove a record having Exception Details"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Message Properties: Aggregate Exception Details">
+                            <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+                        </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </foreach>
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if Exceptions occured" doc:description="Choice : Route to process Further if Exceptions occured
+If Exceptions occured flow is passed to a different branch which will handle clean up">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="ObjectStore__Connector_HIPAA835BatchErrors" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="For Each : Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="ObjectStore__Connector_HIPAA835BatchErrors" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Removes all the enteries and Clean Object Store"/>
+
+
+                    </foreach>
+                    <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow"/>
+              </when>
+              <otherwise>
+                    <flow-ref name="inf017-CompletedTransaction-Subflow" doc:name="inf017-CompletedTransaction-Subflow"/>
+
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+            </choice>
+
+        </batch:on-complete>
+    </batch:job>
+    <sub-flow name="inf017-GetCLPDetails-Sub_Flow">
+        <dw:transform-message doc:name="TM: Starts with CLP">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "CLP")]]></dw:set-payload>
+        </dw:transform-message>
+
+        <dw:transform-message doc:name="TM: Split By *">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[0] splitBy flowVars.ElementSeparator
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <dw:transform-message doc:name="TM : Get Claim Details">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	ClaimNumber : payload[1],
+	ProcessedStatus: payload[2],
+	BilledAmount: payload[3] default 0.0 as :number,
+	ReimbursedAmount: payload[4] default 0.0 as :number,
+	MedicaidICN: payload[7]
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </sub-flow>
+    <sub-flow name="inf017-GetSVCDetails-Sub_Flow">
+        <dw:transform-message doc:name="TM: Starts with SVC">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "SVC")]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression : If there are any records"/>
+        <dw:transform-message doc:name="TM : SPlit by *">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[0] splitBy flowVars.ElementSeparator]]></dw:set-payload>
+        </dw:transform-message>
+        <set-payload value="#[payload[1].split(':')]" doc:name="Set Payload"/>
+        <set-payload value="#[payload[1]]" doc:name="Set Payload"/>
+
+
+    </sub-flow>
+    <sub-flow name="inf017-GetNM1Details-MCINumber-Sub_Flow">
+        <dw:transform-message doc:name="TM: Starts with NM1">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "NM1")]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression : If there are any records"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload.size() &gt;= 2]">
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "NM1*QC")]]></dw:set-payload>
+                    <dw:set-variable variableName="NameMismatchRow"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "NM1*74")]]></dw:set-variable>
+                </dw:transform-message>
+                <dw:transform-message doc:name="TM: Split by *">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[0] splitBy flowVars.ElementSeparator]]></dw:set-payload>
+                    <dw:set-variable variableName="NameMismatchRow"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.NameMismatchRow[0] splitBy flowVars.ElementSeparator) when ((sizeOf flowVars.NameMismatchRow) > 0) otherwise null]]></dw:set-variable>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="TM: Get NM1*QC Row">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "NM1*QC")]]></dw:set-payload>
+                </dw:transform-message>
+                <dw:transform-message doc:name="TM : Split by *">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[0] splitBy flowVars.ElementSeparator]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+
+
+        <dw:transform-message doc:name="TM: Get MCI Number">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+            <dw:set-variable variableName="MCINumber"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	(MCINumber : payload[9] as :number as :string) when payload[9] != null
+}]]></dw:set-variable>
+
+        </dw:transform-message>
+        <choice doc:name="Choice : If there is a name mismatch row">
+            <when expression="#[flowVars.NameMismatchRow != null and flowVars.NameMismatchRow != '']">
+                <dw:transform-message doc:name="TM: Name Mismatch warning file">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false
+---
+[{
+	ClaimNumber : flowVars.ClaimDetails.ClaimNumber,
+	MCINumber : payload[9],
+	ICNNumber: flowVars.ClaimDetails.MedicaidICN,
+	ClientLastNameSent: payload[3],
+	ClientFirstNameSent: payload[4],
+	ClientMiddleNameSent: payload[5],
+	ClientLastNameCorrected: flowVars.NameMismatchRow[3],
+	ClientFirstNameCorrected: flowVars.NameMismatchRow[4],
+	ClientMiddleNameCorrected: flowVars.NameMismatchRow[5]
+}]]]></dw:set-payload>
+                </dw:transform-message>
+                <object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+                <set-variable variableName="WarningFile" value="#[flowVars.WarningFile == null ? payload : payload +flowVars.WarningFile]" mimeType="application/csv" doc:name="Variable"/>
+            </when>
+            <otherwise>
+                <logger message="'No Name Mismatch found'" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="inf017-GetRARemarksDetails-Sub_Flow">
+        <dw:transform-message doc:name="TM: Starts with LQ, MOA, MIA">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (($ startsWith "LQ") or ($ startsWith "MOA") or ($ startsWith "MIA"))]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression : If there are any records"/>
+        <set-session-variable variableName="RARemarks" value="#[[]]" doc:name="Session Variable"/>
+        <foreach doc:name="For Each">
+            <set-payload value="#[dw('payload splitBy (flowVars.ElementSeparator)')]" doc:name="Set Payload : Split By *"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+
+		({
+			ReferenceCode: payload[5]
+		}) when payload[5]? == true and payload[0] == 'MIA',
+		({
+			ReferenceCode: payload[20]
+		}) when payload[20]? == true and payload[0] == 'MIA',
+		({
+			(ReferenceCode : payload[21])
+		}) when payload[21]? == true and payload[0] == 'MIA',
+		({
+			ReferenceCode: payload[22]
+		}) when payload[22]? == true and payload[0] == 'MIA',
+		({
+			ReferenceCode: payload[23]
+		}) when payload[23]? == true and payload[0] == 'MIA',
+		({
+			ReferenceCode: payload[3]
+		}) when payload[3]? == true and payload[0] == 'MOA',
+		({
+			ReferenceCode: payload[4]
+		}) when payload[4]? == true and payload[0] == 'MOA',
+		({
+			(ReferenceCode : payload[5])
+		}) when payload[5]? == true and payload[0] == 'MOA',
+		({
+			ReferenceCode: payload[6]
+		}) when payload[6]? == true and payload[0] == 'MOA',
+		({
+			(ReferenceCode : payload[7])
+		}) when payload[7]? == true and payload[0] == 'MOA',
+		({
+			(ReferenceCode : payload[2])
+		}) when payload[2]? == true and payload[0] == 'LQ'
+] ]]></dw:set-payload>
+            </dw:transform-message>
+
+            <set-session-variable variableName="RARemarks" value="#[sessionVars.RARemarks == null ? payload : dw('sessionVars.RARemarks ++ payload')]" doc:name="Session Variable"/>
+        </foreach>
+        <dw:transform-message doc:name="TM : Distinct by Ref Code">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(sessionVars.RARemarks distinctBy $)
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[sessionVars.RARemarks]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="inf017-GetClaimAdjustmentDetails-Sub_Flow">
+        <dw:transform-message doc:name="TM: Starts with CAS">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($ startsWith "CAS")]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression : If there are any records"/>
+        <set-payload value="#[dw('payload[0] splitBy (flowVars.ElementSeparator)')]" doc:name="Set Payload : Split By *"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[({
+	GroupCode: payload[1],
+	CASAmount : payload[3],
+	ReferenceCode: payload[2]
+}) when payload[2]? == true,
+({
+	GroupCode: payload[1],
+	ReferenceCode: payload[5],
+	CASAmount : payload[6]
+}) when payload[5]? == true,
+({
+	GroupCode: payload[1],
+	(ReferenceCode : payload[8]),
+	CASAmount : payload[9]
+}) when payload[8]? == true,
+({
+	GroupCode: payload[1],
+	(ReferenceCode : payload[11]),
+	CASAmount : payload[12]
+}) when payload[11]? == true,
+({
+	GroupCode: payload[1],
+	(ReferenceCode : payload[14]),
+	CASAmount : payload[15]
+}) when payload[14]? == true,
+({
+	 GroupCode: payload[1],
+	(ReferenceCode : payload[17]),
+	CASAmount : payload[18]
+}) when payload[17]? == true  ] ]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="TM: Distinct by CAS Code">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload distinctBy $)]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+
+    </sub-flow>
+</mule>

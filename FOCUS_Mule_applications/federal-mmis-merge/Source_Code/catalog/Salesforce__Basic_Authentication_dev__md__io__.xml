@@ -1,0 +1,255 @@
+<metadata__cache__entry>
+  <version>5.2.0.0</version>
+  <connectorName>Salesforce__Basic_Authentication_dev</connectorName>
+  <metadataIo class="tree-map">
+    <entry>
+      <string>http://www.mulesoft.org/schema/mule/sfdc/query</string>
+      <map>
+        <entry>
+          <string>Select Id,Service_Taxonomy__r.Level_Three_Subservices__c,Support_Services__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,Start_Date__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Referral_ID__r.Worker_Name__c,Provider_Name__r.DEL_Provider_Full_Name__c FROM DEL_IL_Services__c Where IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND Start_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND ( (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )</string>
+          <org.mule.tooling.metadata.cache.DefaultMetadataCacheEntry>
+            <output class="org.mule.common.metadata.DefaultMetaData">
+              <payload class="org.mule.common.metadata.DefaultListMetaDataModel">
+                <dataType>LIST</dataType>
+                <metaDataModelPropertiesManager>
+                  <properties/>
+                </metaDataModelPropertiesManager>
+                <model class="org.mule.tooling.metadata.api.TypeRefMetaDataModel">
+                  <connectorName>Salesforce__Basic_Authentication_dev</connectorName>
+                  <typeId>Select Id,Service_Taxonomy__r.Level_Three_Subservices__c,Support_Services__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,Start_Date__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Referral_ID__r.Worker_Name__c,Provider_Name__r.DEL_Provider_Full_Name__c FROM DEL_IL_Services__c Where IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND Start_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND ( (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )</typeId>
+                  <category>SObjectMetadataCategory</category>
+                </model>
+                <isArray>false</isArray>
+              </payload>
+              <properties class="tree-map">
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>FLOW</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>INBOUND</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>OUTBOUND</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>SESSION</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>RECORD</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+              </properties>
+            </output>
+          </org.mule.tooling.metadata.cache.DefaultMetadataCacheEntry>
+        </entry>
+        <entry>
+          <string>Select Id,Case__c,Order_Type__c,Completed_Date__c,Court_Order_Status__c, (Select Id,Name__c,PID__c,Ethnicity__c,Gender__c,Primary_Race__c,Secondary_Race__c,State_Agency_Involvment__c,Role__c,Child_Placed_by__c,Child_Placed_from__c,Adoptive_Parents_Family_Structure__c,Adoptive_Parents_Relationship_to_Child__c,              Was_Mom_Married_at_Time_of_Child_Birth__c,Is_Child_Receiving_a_Monthly_Subsidy__c,What_is_the_Monthly_Amount__c,Is_Child_Receiving_IV_E_Assistance__c,Date_Adoption_was_Finalized__c from Children_Involved__r where RecordType.DeveloperName=&apos;Adoption_Hearing_Child&apos; LIMIT 1              )  From DEL_Court_Order__c where Court_Order_Status__c=&apos;Completed&apos; and RecordType.DeveloperName=&apos;Final_Order_of_Adoption&apos; and Court_Decision__c=&apos;Decree Signed&apos; and Completed_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] and Completed_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] </string>
+          <org.mule.tooling.metadata.cache.DefaultMetadataCacheEntry>
+            <output class="org.mule.common.metadata.DefaultMetaData">
+              <payload class="org.mule.common.metadata.DefaultListMetaDataModel">
+                <dataType>LIST</dataType>
+                <metaDataModelPropertiesManager>
+                  <properties/>
+                </metaDataModelPropertiesManager>
+                <model class="org.mule.tooling.metadata.api.TypeRefMetaDataModel">
+                  <connectorName>Salesforce__Basic_Authentication_dev</connectorName>
+                  <typeId>Select Id,Case__c,Order_Type__c,Completed_Date__c,Court_Order_Status__c, (Select Id,Name__c,PID__c,Ethnicity__c,Gender__c,Primary_Race__c,Secondary_Race__c,State_Agency_Involvment__c,Role__c,Child_Placed_by__c,Child_Placed_from__c,Adoptive_Parents_Family_Structure__c,Adoptive_Parents_Relationship_to_Child__c,              Was_Mom_Married_at_Time_of_Child_Birth__c,Is_Child_Receiving_a_Monthly_Subsidy__c,What_is_the_Monthly_Amount__c,Is_Child_Receiving_IV_E_Assistance__c,Date_Adoption_was_Finalized__c from Children_Involved__r where RecordType.DeveloperName=&apos;Adoption_Hearing_Child&apos; LIMIT 1              )  From DEL_Court_Order__c where Court_Order_Status__c=&apos;Completed&apos; and RecordType.DeveloperName=&apos;Final_Order_of_Adoption&apos; and Court_Decision__c=&apos;Decree Signed&apos; and Completed_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] and Completed_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] </typeId>
+                  <category>SObjectMetadataCategory</category>
+                </model>
+                <isArray>false</isArray>
+              </payload>
+              <properties class="tree-map">
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>FLOW</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>INBOUND</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>OUTBOUND</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>SESSION</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>RECORD</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+              </properties>
+            </output>
+          </org.mule.tooling.metadata.cache.DefaultMetadataCacheEntry>
+        </entry>
+        <entry>
+          <string>Select Id,Service_Taxonomy__r.Level_Three_Subservices__c,Support_Services__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,Start_Date__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Referral_ID__r.Worker_Name__c,Provider_Name__r.DEL_Provider_Full_Name__c FROM DEL_IL_Services__c Where IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND Service_Type__c =&apos;Transitional Living&apos; AND Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND Start_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND ( (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )</string>
+          <org.mule.tooling.metadata.cache.DefaultMetadataCacheEntry>
+            <output class="org.mule.common.metadata.DefaultMetaData">
+              <payload class="org.mule.common.metadata.DefaultListMetaDataModel">
+                <dataType>LIST</dataType>
+                <metaDataModelPropertiesManager>
+                  <properties/>
+                </metaDataModelPropertiesManager>
+                <model class="org.mule.tooling.metadata.api.TypeRefMetaDataModel">
+                  <connectorName>Salesforce__Basic_Authentication_dev</connectorName>
+                  <typeId>Select Id,Service_Taxonomy__r.Level_Three_Subservices__c,Support_Services__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,Start_Date__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Referral_ID__r.Worker_Name__c,Provider_Name__r.DEL_Provider_Full_Name__c FROM DEL_IL_Services__c Where IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND Service_Type__c =&apos;Transitional Living&apos; AND Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND Start_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND ( (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )</typeId>
+                  <category>SObjectMetadataCategory</category>
+                </model>
+                <isArray>false</isArray>
+              </payload>
+              <properties class="tree-map">
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>FLOW</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>INBOUND</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>OUTBOUND</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>SESSION</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>RECORD</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+              </properties>
+            </output>
+          </org.mule.tooling.metadata.cache.DefaultMetadataCacheEntry>
+        </entry>
+        <entry>
+          <string>Select Id,Support_Service__c,IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,IL_Service__r.Contact_Date__c,IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Service__r.IL_Referral_ID__r.Worker_Name__c,IL_Service__r.Provider_Name__r.DEL_Provider_Full_Name__c from DEL_Support_Service__c  Where IL_Service__r.IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND ( IL_Service__r.Contact_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  AND IL_Service__r.Contact_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate]  ) AND ( (IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) ) AND Support_Service__c != &apos;Administrative Services&apos; </string>
+          <org.mule.tooling.metadata.cache.DefaultMetadataCacheEntry>
+            <output class="org.mule.common.metadata.DefaultMetaData">
+              <payload class="org.mule.common.metadata.DefaultListMetaDataModel">
+                <dataType>LIST</dataType>
+                <metaDataModelPropertiesManager>
+                  <properties/>
+                </metaDataModelPropertiesManager>
+                <model class="org.mule.tooling.metadata.api.TypeRefMetaDataModel">
+                  <connectorName>Salesforce__Basic_Authentication_dev</connectorName>
+                  <typeId>Select Id,Support_Service__c,IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,IL_Service__r.Contact_Date__c,IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Service__r.IL_Referral_ID__r.Worker_Name__c,IL_Service__r.Provider_Name__r.DEL_Provider_Full_Name__c from DEL_Support_Service__c  Where IL_Service__r.IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND ( IL_Service__r.Contact_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  AND IL_Service__r.Contact_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate]  ) AND ( (IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) ) AND Support_Service__c != &apos;Administrative Services&apos; </typeId>
+                  <category>SObjectMetadataCategory</category>
+                </model>
+                <isArray>false</isArray>
+              </payload>
+              <properties class="tree-map">
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>FLOW</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>INBOUND</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>OUTBOUND</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>SESSION</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+                <entry>
+                  <org.mule.common.metadata.MetaDataPropertyScope>RECORD</org.mule.common.metadata.MetaDataPropertyScope>
+                  <org.mule.common.metadata.MetaDataProperties>
+                    <fields class="sorted-set">
+                      <comparator class="org.mule.common.metadata.MetaDataProperties$MetaDataFieldComparator"/>
+                    </fields>
+                  </org.mule.common.metadata.MetaDataProperties>
+                </entry>
+              </properties>
+            </output>
+          </org.mule.tooling.metadata.cache.DefaultMetadataCacheEntry>
+        </entry>
+      </map>
+    </entry>
+  </metadataIo>
+</metadata__cache__entry>

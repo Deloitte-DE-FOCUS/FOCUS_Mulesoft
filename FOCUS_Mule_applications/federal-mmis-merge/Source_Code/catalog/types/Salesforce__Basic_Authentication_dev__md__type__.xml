@@ -1,0 +1,1591 @@
+<metadata__catalog__entry>
+  <version>5.2.0.0</version>
+  <types class="tree-map">
+    <entry>
+      <org.mule.common.metadata.DefaultMetaDataKey>
+        <id>Select Id,Case__c,Order_Type__c,Completed_Date__c,Court_Order_Status__c, (Select Id,Name__c,PID__c,Ethnicity__c,Gender__c,Primary_Race__c,Secondary_Race__c,State_Agency_Involvment__c,Role__c,Child_Placed_by__c,Child_Placed_from__c,Adoptive_Parents_Family_Structure__c,Adoptive_Parents_Relationship_to_Child__c,              Was_Mom_Married_at_Time_of_Child_Birth__c,Is_Child_Receiving_a_Monthly_Subsidy__c,What_is_the_Monthly_Amount__c,Is_Child_Receiving_IV_E_Assistance__c,Date_Adoption_was_Finalized__c from Children_Involved__r where RecordType.DeveloperName=&apos;Adoption_Hearing_Child&apos; LIMIT 1              )  From DEL_Court_Order__c where Court_Order_Status__c=&apos;Completed&apos; and RecordType.DeveloperName=&apos;Final_Order_of_Adoption&apos; and Court_Decision__c=&apos;Decree Signed&apos; and Completed_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] and Completed_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] </id>
+        <category>SObjectMetadataCategory</category>
+        <metaDataKeyPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+          </properties>
+        </metaDataKeyPropertiesManager>
+      </org.mule.common.metadata.DefaultMetaDataKey>
+      <org.mule.common.metadata.DefaultDefinedMapMetaDataModel>
+        <dataType>MAP</dataType>
+        <metaDataModelPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+              <metaDataKey class="org.mule.common.metadata.DefaultMetaDataKey" reference="../../../../../org.mule.common.metadata.DefaultMetaDataKey"/>
+              <derivedStructure>false</derivedStructure>
+              <generatedStructure>false</generatedStructure>
+            </org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+          </properties>
+        </metaDataModelPropertiesManager>
+        <fields>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Case__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.String</implementationClass>
+              <dataType>STRING</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators>
+                    <org.mule.common.query.expression.LessOperator/>
+                    <org.mule.common.query.expression.LessOrEqualsOperator/>
+                    <org.mule.common.query.expression.EqualsOperator/>
+                    <org.mule.common.query.expression.GreaterOperator/>
+                    <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                    <org.mule.common.query.expression.NotEqualsOperator/>
+                    <org.mule.common.query.expression.LikeOperator/>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Children_Involved__r</name>
+            <model class="org.mule.common.metadata.DefaultListMetaDataModel">
+              <dataType>LIST</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+              <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+                <dataType>MAP</dataType>
+                <metaDataModelPropertiesManager>
+                  <properties/>
+                </metaDataModelPropertiesManager>
+                <fields>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Adoptive_Parents_Family_Structure__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Married Couple</string>
+                            <string>Married Same Sex Couple</string>
+                            <string>Married but Individually Adopting or Obtaining Legal Guardianship</string>
+                            <string>Unmarried Couple</string>
+                            <string>Unmarried Same Sex Couple</string>
+                            <string>Single Female</string>
+                            <string>Single Male</string>
+                            <string>Civil Union</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Adoptive_Parents_Relationship_to_Child__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Paternal Grandparent(s)</string>
+                            <string>Maternal Grandparent(s)</string>
+                            <string>Other Paternal Relative(s)</string>
+                            <string>Other Maternal Relative(s)</string>
+                            <string>Siblings</string>
+                            <string>Kin</string>
+                            <string>Non-relatives</string>
+                            <string>Foster Parent - Relative</string>
+                            <string>Foster Parent - Non-relative</string>
+                            <string>Foster parent(s)</string>
+                            <string>Stepparent</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Child_Placed_by__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Private Agency</string>
+                            <string>Public Agency</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Child_Placed_from__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Another Country</string>
+                            <string>Another State</string>
+                            <string>Within State</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Date_Adoption_was_Finalized__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.util.Date</implementationClass>
+                      <dataType>DATE</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators>
+                            <org.mule.common.query.expression.LessOperator/>
+                            <org.mule.common.query.expression.LessOrEqualsOperator/>
+                            <org.mule.common.query.expression.EqualsOperator/>
+                            <org.mule.common.query.expression.GreaterOperator/>
+                            <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                            <org.mule.common.query.expression.NotEqualsOperator/>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Ethnicity__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.String</implementationClass>
+                      <dataType>STRING</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators>
+                            <org.mule.common.query.expression.LessOperator/>
+                            <org.mule.common.query.expression.LessOrEqualsOperator/>
+                            <org.mule.common.query.expression.EqualsOperator/>
+                            <org.mule.common.query.expression.GreaterOperator/>
+                            <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                            <org.mule.common.query.expression.NotEqualsOperator/>
+                            <org.mule.common.query.expression.LikeOperator/>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Gender__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.String</implementationClass>
+                      <dataType>STRING</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators>
+                            <org.mule.common.query.expression.LessOperator/>
+                            <org.mule.common.query.expression.LessOrEqualsOperator/>
+                            <org.mule.common.query.expression.EqualsOperator/>
+                            <org.mule.common.query.expression.GreaterOperator/>
+                            <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                            <org.mule.common.query.expression.NotEqualsOperator/>
+                            <org.mule.common.query.expression.LikeOperator/>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Id</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.String</implementationClass>
+                      <dataType>STRING</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators>
+                            <org.mule.common.query.expression.LessOperator/>
+                            <org.mule.common.query.expression.LessOrEqualsOperator/>
+                            <org.mule.common.query.expression.EqualsOperator/>
+                            <org.mule.common.query.expression.GreaterOperator/>
+                            <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                            <org.mule.common.query.expression.NotEqualsOperator/>
+                            <org.mule.common.query.expression.LikeOperator/>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Is_Child_Receiving_a_Monthly_Subsidy__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Yes</string>
+                            <string>No</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Is_Child_Receiving_IV_E_Assistance__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Yes</string>
+                            <string>No</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Name__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.String</implementationClass>
+                      <dataType>STRING</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators>
+                            <org.mule.common.query.expression.LessOperator/>
+                            <org.mule.common.query.expression.LessOrEqualsOperator/>
+                            <org.mule.common.query.expression.EqualsOperator/>
+                            <org.mule.common.query.expression.GreaterOperator/>
+                            <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                            <org.mule.common.query.expression.NotEqualsOperator/>
+                            <org.mule.common.query.expression.LikeOperator/>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>PID__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.String</implementationClass>
+                      <dataType>STRING</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators>
+                            <org.mule.common.query.expression.LessOperator/>
+                            <org.mule.common.query.expression.LessOrEqualsOperator/>
+                            <org.mule.common.query.expression.EqualsOperator/>
+                            <org.mule.common.query.expression.GreaterOperator/>
+                            <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                            <org.mule.common.query.expression.NotEqualsOperator/>
+                            <org.mule.common.query.expression.LikeOperator/>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Primary_Race__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>American Indian or Alaskan Native</string>
+                            <string>Asian</string>
+                            <string>Black or African American</string>
+                            <string>Native Hawaiian or Other Pacific Islander</string>
+                            <string>Unable to Determine</string>
+                            <string>White</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Role__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Adult</string>
+                            <string>Biological Father</string>
+                            <string>Biological Mother</string>
+                            <string>Birth Parent 1</string>
+                            <string>Birth Parent 2</string>
+                            <string>CASA</string>
+                            <string>Child</string>
+                            <string>Child Attorney</string>
+                            <string>Client Child</string>
+                            <string>Contracted Provider</string>
+                            <string>Father</string>
+                            <string>Former Adoptive Father</string>
+                            <string>Former Adoptive Mother</string>
+                            <string>Former Adoptive Parent 1</string>
+                            <string>Former Adoptive Parent 2</string>
+                            <string>Foster Parent(s)</string>
+                            <string>Guardian 1 or Permanent Guardian 1</string>
+                            <string>Guardian 2 or Permanent Guardian 2</string>
+                            <string>Maternal Relative</string>
+                            <string>Mother</string>
+                            <string>Non-Relative</string>
+                            <string>Other Household Members</string>
+                            <string>Parent / Custodian</string>
+                            <string>Paternal Relative</string>
+                            <string>Petitioner</string>
+                            <string>Post-Permanent Guardianship Child</string>
+                            <string>Respondent</string>
+                            <string>Respondent - Father</string>
+                            <string>Respondent - Mother</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Secondary_Race__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>American Indian or Alaskan Native</string>
+                            <string>Asian</string>
+                            <string>Black or African American</string>
+                            <string>Native Hawaiian or Other Pacific Islander</string>
+                            <string>Unable to Determine</string>
+                            <string>White</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>State_Agency_Involvment__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Yes</string>
+                            <string>No</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>Was_Mom_Married_at_Time_of_Child_Birth__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Enum</implementationClass>
+                      <dataType>ENUM</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators class="java.util.Arrays$ArrayList">
+                            <a class="org.mule.common.query.expression.Operator-array">
+                              <org.mule.common.query.expression.EqualsOperator/>
+                              <org.mule.common.query.expression.NotEqualsOperator/>
+                            </a>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                          <validStrings>
+                            <string>Yes</string>
+                            <string>No</string>
+                            <string>Unable to Determine</string>
+                          </validStrings>
+                        </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                  <org.mule.common.metadata.DefaultMetaDataField>
+                    <name>What_is_the_Monthly_Amount__c</name>
+                    <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                      <implementationClass>java.lang.Double</implementationClass>
+                      <dataType>DOUBLE</dataType>
+                      <metaDataModelPropertiesManager>
+                        <properties/>
+                      </metaDataModelPropertiesManager>
+                    </model>
+                    <accessType>READ_WRITE</accessType>
+                    <metaDataFieldPropertyManager>
+                      <properties>
+                        <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                        <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                          <supportedOperators>
+                            <org.mule.common.query.expression.LessOperator/>
+                            <org.mule.common.query.expression.LessOrEqualsOperator/>
+                            <org.mule.common.query.expression.EqualsOperator/>
+                            <org.mule.common.query.expression.GreaterOperator/>
+                            <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                            <org.mule.common.query.expression.NotEqualsOperator/>
+                          </supportedOperators>
+                        </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                      </properties>
+                    </metaDataFieldPropertyManager>
+                  </org.mule.common.metadata.DefaultMetaDataField>
+                </fields>
+                <name>Children_Involved__r</name>
+              </model>
+              <isArray>false</isArray>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators/>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Completed_Date__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.util.Date</implementationClass>
+              <dataType>DATE</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators>
+                    <org.mule.common.query.expression.LessOperator/>
+                    <org.mule.common.query.expression.LessOrEqualsOperator/>
+                    <org.mule.common.query.expression.EqualsOperator/>
+                    <org.mule.common.query.expression.GreaterOperator/>
+                    <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                    <org.mule.common.query.expression.NotEqualsOperator/>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Court_Order_Status__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.Enum</implementationClass>
+              <dataType>ENUM</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators class="java.util.Arrays$ArrayList">
+                    <a class="org.mule.common.query.expression.Operator-array">
+                      <org.mule.common.query.expression.EqualsOperator/>
+                      <org.mule.common.query.expression.NotEqualsOperator/>
+                    </a>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                  <validStrings>
+                    <string>Worklisted</string>
+                    <string>Pending</string>
+                    <string>Completed</string>
+                    <string>Abridged</string>
+                  </validStrings>
+                </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Id</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.String</implementationClass>
+              <dataType>STRING</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators>
+                    <org.mule.common.query.expression.LessOperator/>
+                    <org.mule.common.query.expression.LessOrEqualsOperator/>
+                    <org.mule.common.query.expression.EqualsOperator/>
+                    <org.mule.common.query.expression.GreaterOperator/>
+                    <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                    <org.mule.common.query.expression.NotEqualsOperator/>
+                    <org.mule.common.query.expression.LikeOperator/>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Order_Type__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.Enum</implementationClass>
+              <dataType>ENUM</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators class="java.util.Arrays$ArrayList">
+                    <a class="org.mule.common.query.expression.Operator-array">
+                      <org.mule.common.query.expression.EqualsOperator/>
+                      <org.mule.common.query.expression.NotEqualsOperator/>
+                    </a>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                  <validStrings>
+                    <string>Adjudicatory</string>
+                    <string>Age of Majority - No Hearing (No Further Hearings)</string>
+                    <string>Amenability</string>
+                    <string>Arbitration</string>
+                    <string>Arraignment</string>
+                    <string>Bail/Bond</string>
+                    <string>Case Review</string>
+                    <string>Child Deceased</string>
+                    <string>Civil Citation</string>
+                    <string>Combined Adjudicatory and Dispositional Hearing</string>
+                    <string>Combined Ex Parte and Preliminary Protective Hearing</string>
+                    <string>Combined Preliminary Protective and Adjudicatory</string>
+                    <string>Combined Preliminary Protective and Dispositional Order</string>
+                    <string>Court Rescission Order - No Hearing</string>
+                    <string>Court Review</string>
+                    <string>Dispositional</string>
+                    <string>Diversion</string>
+                    <string>Ex Parte</string>
+                    <string>Final Order of Adoption</string>
+                    <string>Guardianship</string>
+                    <string>Interstate Compact</string>
+                    <string>Mixing</string>
+                    <string>Mixing Petition</string>
+                    <string>None/Withdrawn</string>
+                    <string>Permanency</string>
+                    <string>Post Permanency Review</string>
+                    <string>Preliminary</string>
+                    <string>Preliminary Protective</string>
+                    <string>Probable Cause</string>
+                    <string>Probation Before Adjudication</string>
+                    <string>Release of Mandatory</string>
+                    <string>Reverse Amenability</string>
+                    <string>Secure Care Release</string>
+                    <string>Sentence Review</string>
+                    <string>Sentencing</string>
+                    <string>Status Update/No New Sentencing</string>
+                    <string>Subpoena</string>
+                    <string>Violation of Probation</string>
+                  </validStrings>
+                </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+        </fields>
+        <name>DEL_Court_Order__c</name>
+      </org.mule.common.metadata.DefaultDefinedMapMetaDataModel>
+    </entry>
+    <entry>
+      <org.mule.common.metadata.DefaultMetaDataKey>
+        <id>Select Id,Service_Taxonomy__r.Level_Three_Subservices__c,Support_Services__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,Start_Date__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Referral_ID__r.Worker_Name__c,Provider_Name__r.DEL_Provider_Full_Name__c FROM DEL_IL_Services__c Where IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND Service_Type__c =&apos;Transitional Living&apos; AND Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND Start_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND ( (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )</id>
+        <category>SObjectMetadataCategory</category>
+        <metaDataKeyPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+          </properties>
+        </metaDataKeyPropertiesManager>
+      </org.mule.common.metadata.DefaultMetaDataKey>
+      <org.mule.common.metadata.DefaultDefinedMapMetaDataModel>
+        <dataType>MAP</dataType>
+        <metaDataModelPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+              <metaDataKey class="org.mule.common.metadata.DefaultMetaDataKey">
+                <id>Select Id,Service_Taxonomy__r.Level_Three_Subservices__c,Support_Services__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,Start_Date__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Referral_ID__r.Worker_Name__c,Provider_Name__r.DEL_Provider_Full_Name__c FROM DEL_IL_Services__c Where IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND Service_Type__c =&apos;Transitional Living&apos; AND Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND Start_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND ( (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )</id>
+                <category>SObjectMetadataCategory</category>
+                <metaDataKeyPropertiesManager>
+                  <properties>
+                    <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+                  </properties>
+                </metaDataKeyPropertiesManager>
+              </metaDataKey>
+              <derivedStructure>false</derivedStructure>
+              <generatedStructure>false</generatedStructure>
+            </org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+          </properties>
+        </metaDataModelPropertiesManager>
+        <fields>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Id</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.String</implementationClass>
+              <dataType>STRING</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators>
+                    <org.mule.common.query.expression.LessOperator/>
+                    <org.mule.common.query.expression.LessOrEqualsOperator/>
+                    <org.mule.common.query.expression.EqualsOperator/>
+                    <org.mule.common.query.expression.GreaterOperator/>
+                    <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                    <org.mule.common.query.expression.NotEqualsOperator/>
+                    <org.mule.common.query.expression.LikeOperator/>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>IL_Referral_ID__r</name>
+            <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+              <dataType>MAP</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+              <fields>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>Worker_Name__c</name>
+                  <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                    <implementationClass>java.lang.String</implementationClass>
+                    <dataType>STRING</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties/>
+                    </metaDataModelPropertiesManager>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <supportedOperators>
+                          <org.mule.common.query.expression.LessOperator/>
+                          <org.mule.common.query.expression.LessOrEqualsOperator/>
+                          <org.mule.common.query.expression.EqualsOperator/>
+                          <org.mule.common.query.expression.GreaterOperator/>
+                          <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                          <org.mule.common.query.expression.NotEqualsOperator/>
+                          <org.mule.common.query.expression.LikeOperator/>
+                        </supportedOperators>
+                      </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+              </fields>
+              <name>IL_Referral_ID__r</name>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators/>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Provider_Name__r</name>
+            <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+              <dataType>MAP</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+              <fields>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>DEL_Provider_Full_Name__c</name>
+                  <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                    <implementationClass>java.lang.String</implementationClass>
+                    <dataType>STRING</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties/>
+                    </metaDataModelPropertiesManager>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <supportedOperators>
+                          <org.mule.common.query.expression.LessOperator/>
+                          <org.mule.common.query.expression.LessOrEqualsOperator/>
+                          <org.mule.common.query.expression.EqualsOperator/>
+                          <org.mule.common.query.expression.GreaterOperator/>
+                          <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                          <org.mule.common.query.expression.NotEqualsOperator/>
+                          <org.mule.common.query.expression.LikeOperator/>
+                        </supportedOperators>
+                      </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+              </fields>
+              <name>Provider_Name__r</name>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators/>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Service_Taxonomy__r</name>
+            <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+              <dataType>MAP</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+              <fields>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>Level_Three_Subservices__c</name>
+                  <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                    <implementationClass>java.lang.String</implementationClass>
+                    <dataType>STRING</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties/>
+                    </metaDataModelPropertiesManager>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <supportedOperators>
+                          <org.mule.common.query.expression.LessOperator/>
+                          <org.mule.common.query.expression.LessOrEqualsOperator/>
+                          <org.mule.common.query.expression.EqualsOperator/>
+                          <org.mule.common.query.expression.GreaterOperator/>
+                          <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                          <org.mule.common.query.expression.NotEqualsOperator/>
+                          <org.mule.common.query.expression.LikeOperator/>
+                        </supportedOperators>
+                      </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+              </fields>
+              <name>Service_Taxonomy__r</name>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators/>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Start_Date__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.util.Date</implementationClass>
+              <dataType>DATE</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators>
+                    <org.mule.common.query.expression.LessOperator/>
+                    <org.mule.common.query.expression.LessOrEqualsOperator/>
+                    <org.mule.common.query.expression.EqualsOperator/>
+                    <org.mule.common.query.expression.GreaterOperator/>
+                    <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                    <org.mule.common.query.expression.NotEqualsOperator/>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Support_Services__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.Enum</implementationClass>
+              <dataType>ENUM</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators class="java.util.Arrays$ArrayList">
+                    <a class="org.mule.common.query.expression.Operator-array">
+                      <org.mule.common.query.expression.EqualsOperator/>
+                      <org.mule.common.query.expression.NotEqualsOperator/>
+                    </a>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                  <validStrings>
+                    <string>Administrative Services</string>
+                    <string>Assessment</string>
+                    <string>Career Planning</string>
+                    <string>Communication</string>
+                    <string>Daily Living</string>
+                    <string>Education-Academic Support</string>
+                    <string>Education-Post Secondary Educational Support</string>
+                    <string>Employment Program</string>
+                    <string>Exit Interview</string>
+                    <string>Home Life</string>
+                    <string>Housing Education</string>
+                    <string>Mentoring</string>
+                    <string>Money Management</string>
+                    <string>Plan Review</string>
+                    <string>Plan for Independence</string>
+                    <string>Self Care</string>
+                    <string>Social Relationships</string>
+                    <string>Vocational Training</string>
+                    <string>Family Support and Health Marriage</string>
+                  </validStrings>
+                </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+        </fields>
+        <name>DEL_IL_Services__c</name>
+      </org.mule.common.metadata.DefaultDefinedMapMetaDataModel>
+    </entry>
+    <entry>
+      <org.mule.common.metadata.DefaultMetaDataKey>
+        <id>Select Id,Service_Taxonomy__r.Level_Three_Subservices__c,Support_Services__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,Start_Date__c,IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Referral_ID__r.Worker_Name__c,Provider_Name__r.DEL_Provider_Full_Name__c FROM DEL_IL_Services__c Where IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND Start_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND ( (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )</id>
+        <category>SObjectMetadataCategory</category>
+        <metaDataKeyPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+          </properties>
+        </metaDataKeyPropertiesManager>
+      </org.mule.common.metadata.DefaultMetaDataKey>
+      <org.mule.common.metadata.DefaultDefinedMapMetaDataModel>
+        <dataType>MAP</dataType>
+        <metaDataModelPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+              <metaDataKey class="org.mule.common.metadata.DefaultMetaDataKey" reference="../../../../../org.mule.common.metadata.DefaultMetaDataKey"/>
+              <derivedStructure>false</derivedStructure>
+              <generatedStructure>false</generatedStructure>
+            </org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+          </properties>
+        </metaDataModelPropertiesManager>
+        <fields>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Id</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.String</implementationClass>
+              <dataType>STRING</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators>
+                    <org.mule.common.query.expression.LessOperator/>
+                    <org.mule.common.query.expression.LessOrEqualsOperator/>
+                    <org.mule.common.query.expression.EqualsOperator/>
+                    <org.mule.common.query.expression.GreaterOperator/>
+                    <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                    <org.mule.common.query.expression.NotEqualsOperator/>
+                    <org.mule.common.query.expression.LikeOperator/>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>IL_Referral_ID__r</name>
+            <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+              <dataType>MAP</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+              <fields>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>Worker_Name__c</name>
+                  <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                    <implementationClass>java.lang.String</implementationClass>
+                    <dataType>STRING</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties/>
+                    </metaDataModelPropertiesManager>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <supportedOperators>
+                          <org.mule.common.query.expression.LessOperator/>
+                          <org.mule.common.query.expression.LessOrEqualsOperator/>
+                          <org.mule.common.query.expression.EqualsOperator/>
+                          <org.mule.common.query.expression.GreaterOperator/>
+                          <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                          <org.mule.common.query.expression.NotEqualsOperator/>
+                          <org.mule.common.query.expression.LikeOperator/>
+                        </supportedOperators>
+                      </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+              </fields>
+              <name>IL_Referral_ID__r</name>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators/>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Provider_Name__r</name>
+            <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+              <dataType>MAP</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+              <fields>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>DEL_Provider_Full_Name__c</name>
+                  <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                    <implementationClass>java.lang.String</implementationClass>
+                    <dataType>STRING</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties/>
+                    </metaDataModelPropertiesManager>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <supportedOperators>
+                          <org.mule.common.query.expression.LessOperator/>
+                          <org.mule.common.query.expression.LessOrEqualsOperator/>
+                          <org.mule.common.query.expression.EqualsOperator/>
+                          <org.mule.common.query.expression.GreaterOperator/>
+                          <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                          <org.mule.common.query.expression.NotEqualsOperator/>
+                          <org.mule.common.query.expression.LikeOperator/>
+                        </supportedOperators>
+                      </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+              </fields>
+              <name>Provider_Name__r</name>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators/>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Service_Taxonomy__r</name>
+            <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+              <dataType>MAP</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+              <fields>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>Level_Three_Subservices__c</name>
+                  <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                    <implementationClass>java.lang.String</implementationClass>
+                    <dataType>STRING</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties/>
+                    </metaDataModelPropertiesManager>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <supportedOperators>
+                          <org.mule.common.query.expression.LessOperator/>
+                          <org.mule.common.query.expression.LessOrEqualsOperator/>
+                          <org.mule.common.query.expression.EqualsOperator/>
+                          <org.mule.common.query.expression.GreaterOperator/>
+                          <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                          <org.mule.common.query.expression.NotEqualsOperator/>
+                          <org.mule.common.query.expression.LikeOperator/>
+                        </supportedOperators>
+                      </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+              </fields>
+              <name>Service_Taxonomy__r</name>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators/>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Start_Date__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.util.Date</implementationClass>
+              <dataType>DATE</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators>
+                    <org.mule.common.query.expression.LessOperator/>
+                    <org.mule.common.query.expression.LessOrEqualsOperator/>
+                    <org.mule.common.query.expression.EqualsOperator/>
+                    <org.mule.common.query.expression.GreaterOperator/>
+                    <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                    <org.mule.common.query.expression.NotEqualsOperator/>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Support_Services__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.Enum</implementationClass>
+              <dataType>ENUM</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators class="java.util.Arrays$ArrayList">
+                    <a class="org.mule.common.query.expression.Operator-array">
+                      <org.mule.common.query.expression.EqualsOperator/>
+                      <org.mule.common.query.expression.NotEqualsOperator/>
+                    </a>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                  <validStrings>
+                    <string>Administrative Services</string>
+                    <string>Assessment</string>
+                    <string>Career Planning</string>
+                    <string>Communication</string>
+                    <string>Daily Living</string>
+                    <string>Education-Academic Support</string>
+                    <string>Education-Post Secondary Educational Support</string>
+                    <string>Employment Program</string>
+                    <string>Exit Interview</string>
+                    <string>Home Life</string>
+                    <string>Housing Education</string>
+                    <string>Mentoring</string>
+                    <string>Money Management</string>
+                    <string>Plan Review</string>
+                    <string>Plan for Independence</string>
+                    <string>Self Care</string>
+                    <string>Social Relationships</string>
+                    <string>Vocational Training</string>
+                    <string>Family Support and Health Marriage</string>
+                  </validStrings>
+                </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+        </fields>
+        <name>DEL_IL_Services__c</name>
+      </org.mule.common.metadata.DefaultDefinedMapMetaDataModel>
+    </entry>
+    <entry>
+      <org.mule.common.metadata.DefaultMetaDataKey>
+        <id>Select Id,Support_Service__c,IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,IL_Service__r.Contact_Date__c,IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate,IL_Service__r.IL_Referral_ID__r.Worker_Name__c,IL_Service__r.Provider_Name__r.DEL_Provider_Full_Name__c from DEL_Support_Service__c  Where IL_Service__r.IL_Referral_ID__r.Status__c =&apos;Completed&apos; AND ( IL_Service__r.Contact_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  AND IL_Service__r.Contact_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate]  ) AND ( (IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Service__r.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) ) AND Support_Service__c != &apos;Administrative Services&apos; </id>
+        <category>SObjectMetadataCategory</category>
+        <metaDataKeyPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+          </properties>
+        </metaDataKeyPropertiesManager>
+      </org.mule.common.metadata.DefaultMetaDataKey>
+      <org.mule.common.metadata.DefaultDefinedMapMetaDataModel>
+        <dataType>MAP</dataType>
+        <metaDataModelPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+              <metaDataKey class="org.mule.common.metadata.DefaultMetaDataKey" reference="../../../../../org.mule.common.metadata.DefaultMetaDataKey"/>
+              <derivedStructure>false</derivedStructure>
+              <generatedStructure>false</generatedStructure>
+            </org.mule.common.metadata.property.StructureIdentifierMetaDataModelProperty>
+          </properties>
+        </metaDataModelPropertiesManager>
+        <fields>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Id</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.String</implementationClass>
+              <dataType>STRING</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators>
+                    <org.mule.common.query.expression.LessOperator/>
+                    <org.mule.common.query.expression.LessOrEqualsOperator/>
+                    <org.mule.common.query.expression.EqualsOperator/>
+                    <org.mule.common.query.expression.GreaterOperator/>
+                    <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                    <org.mule.common.query.expression.NotEqualsOperator/>
+                    <org.mule.common.query.expression.LikeOperator/>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>IL_Service__r</name>
+            <model class="org.mule.common.metadata.DefaultDefinedMapMetaDataModel">
+              <dataType>MAP</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+              <fields>
+                <org.mule.common.metadata.DefaultMetaDataField>
+                  <name>Contact_Date__c</name>
+                  <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+                    <implementationClass>java.util.Date</implementationClass>
+                    <dataType>DATE</dataType>
+                    <metaDataModelPropertiesManager>
+                      <properties/>
+                    </metaDataModelPropertiesManager>
+                  </model>
+                  <accessType>READ_WRITE</accessType>
+                  <metaDataFieldPropertyManager>
+                    <properties>
+                      <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                      <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                        <supportedOperators>
+                          <org.mule.common.query.expression.LessOperator/>
+                          <org.mule.common.query.expression.LessOrEqualsOperator/>
+                          <org.mule.common.query.expression.EqualsOperator/>
+                          <org.mule.common.query.expression.GreaterOperator/>
+                          <org.mule.common.query.expression.GreaterOrEqualsOperator/>
+                          <org.mule.common.query.expression.NotEqualsOperator/>
+                        </supportedOperators>
+                      </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                    </properties>
+                  </metaDataFieldPropertyManager>
+                </org.mule.common.metadata.DefaultMetaDataField>
+              </fields>
+              <name>IL_Service__r</name>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators/>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+          <org.mule.common.metadata.DefaultMetaDataField>
+            <name>Support_Service__c</name>
+            <model class="org.mule.common.metadata.DefaultSimpleMetaDataModel">
+              <implementationClass>java.lang.Enum</implementationClass>
+              <dataType>ENUM</dataType>
+              <metaDataModelPropertiesManager>
+                <properties/>
+              </metaDataModelPropertiesManager>
+            </model>
+            <accessType>READ_WRITE</accessType>
+            <metaDataFieldPropertyManager>
+              <properties>
+                <org.mule.common.metadata.field.property.dsql.DsqlSelectMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlWhereMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlOrderMetaDataFieldProperty/>
+                <org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                  <supportedOperators class="java.util.Arrays$ArrayList">
+                    <a class="org.mule.common.query.expression.Operator-array">
+                      <org.mule.common.query.expression.EqualsOperator/>
+                      <org.mule.common.query.expression.NotEqualsOperator/>
+                    </a>
+                  </supportedOperators>
+                </org.mule.common.metadata.field.property.dsql.DsqlQueryOperatorsMetaDataFieldProperty>
+                <org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+                  <validStrings>
+                    <string>None</string>
+                    <string>Administrative Services</string>
+                    <string>Assessment</string>
+                    <string>Career Planning</string>
+                    <string>Daily Living</string>
+                    <string>Education-Academic Support</string>
+                    <string>Education-Post Secondary Educational Support</string>
+                    <string>Employment Program</string>
+                    <string>Exit Interview</string>
+                    <string>Home Life</string>
+                    <string>Housing Education</string>
+                    <string>Mentoring</string>
+                    <string>Money Management</string>
+                    <string>Plan Review</string>
+                    <string>Plan for Independence</string>
+                    <string>Self Care</string>
+                    <string>Social Relationships</string>
+                    <string>Vocational Training</string>
+                    <string>Family Support and Healthy Marriage Education</string>
+                  </validStrings>
+                </org.mule.common.metadata.field.property.ValidStringValuesFieldProperty>
+              </properties>
+            </metaDataFieldPropertyManager>
+          </org.mule.common.metadata.DefaultMetaDataField>
+        </fields>
+        <name>DEL_Support_Service__c</name>
+      </org.mule.common.metadata.DefaultDefinedMapMetaDataModel>
+    </entry>
+  </types>
+  <connectorName>Salesforce__Basic_Authentication_dev</connectorName>
+</metadata__catalog__entry>

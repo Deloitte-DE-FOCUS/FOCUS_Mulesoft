@@ -1,0 +1,1098 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+
+    <!-- <spring:beans>
+         <spring:import resource="classpath:/loggingframework.xml" />   
+   	</spring:beans>
+   	 <spring:beans> 
+         <spring:import resource="classpath:/errorhandling.xml" />   
+   	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/queryframework.xml" />
+	</spring:beans> -->   	
+    <spring:beans>
+         <spring:bean id="TPL_Client_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean> 
+         <spring:bean id="TPL_Client_Error_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean>
+         <spring:bean name="SFTPController" class="gov.delaware.util.SFTPController" id="Bean"/>
+   	</spring:beans>   	
+<!--     <objectstore:config name="ObjectStore__Connector" doc:name="ObjectStore: Connector"/> -->
+	<objectstore:config name="TPL_Client_ObjectStore__Connector" doc:name="ObjectStore: Connector" objectStore-ref="TPL_Client_Object_Store"/>    
+	<objectstore:config name="TPL_Client_Error_ObjectStore__Connector" doc:name="ObjectStore: Connector" objectStore-ref="TPL_Client_Error_Object_Store"/>
+	<mulerequester:config name="Mule_Requester" doc:name="Mule Requester"/>
+    
+    <flow name="inf052-TPLClientInfoLoad" processingStrategy="synchronous">
+        <poll doc:name="Poll" doc:description="Poller triggers the interface at the specified time
+Poller runs in US/Eastern Timezone
+Also this takes care of the Business Rule 
+&quot;The TPL Client Information Load interface only runs after the MMIS Eligibility Request Extract and TPL Carrier Insurance interface runs&quot; since the Poll is scheduled after the mentioned interfaces">
+            <schedulers:cron-scheduler expression="0 0 13 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF052" doc:name="Set Payload to Interface ID" doc:description="Interface ID is set in payload, this is required to by the Logging and Exception Hnadling framework"/>
+        </poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV : Set Interface ID" doc:description="Interface ID is set in flow variable, this is required to by the Logging and Exception Hnadling framework, using this the status of the Interface can be tracked"/>
+		<until-successful maxRetries="5" millisBetweenRetries="10000"  synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
+        <mulerequester:request resource="sftp://${sftp.tplclient.transaction.username}:${sftp.tplclient.transaction.password}@${sftp.tplclient.transaction.host}:${sftp.tplclient.transaction.port}${sftp.tplclient.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.tplclient.transaction.filename}&amp;isContainsCheckEnabled=true" doc:name="MR:Read File from SFTP" doc:description="Retrieve File from the configured SFTP location with a spefic name
+The Requestor URI is used to confifure a specific SFTP endpoint" timeout="10000" config-ref="Mule_Requester"/>
+		</until-successful>
+        <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown" config-ref="Validation_Configuration1"/>
+        <object-to-string-transformer mimeType="text/plain" doc:name="OtoS: convert to Plain Text" doc:description="Consuming the Payload.
+Converting the Input Stream from the File into a textual form.
+Mime type of text/plain is set as the File format is Fixed width"/>
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPFilenameMatchConnector" outputPattern="${sftp.tplclient.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].dat" host="${sftp.tplclient.archive.host}" port="${sftp.tplclient.archive.port}" path="${sftp.tplclient.archive.path}" user="${sftp.tplclient.archive.username}" password="${sftp.tplclient.archive.password}" responseTimeout="10000"  doc:name="SFTP" doc:description="Archive File in the specified SFDC directory">
+        </sftp:outbound-endpoint>
+        <enricher doc:name="Message Enricher" doc:description="Invokes the flow which will invoke the Logging Framework and therefore initiate logging for this Interfcae. Using Enricher will not alter the payload
+Transaction ID and Transaction Name is retrieved from the Logging Framework">
+            <flow-ref name="LogInProgressTransaction" doc:name="LogInProgressTransaction"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+			<enrich source="#[flowVars.InterfaceLastProcessedDate]" target="#[flowVars.InterfaceLastProcessedDate]"/>
+			<enrich source="#[flowVars.InterfaceSalesforceId]" target="#[flowVars.InterfaceSalesforceId]"/>            
+        </enricher>
+        <set-payload value="#[System.getProperty(&quot;tplclient.lineseparator&quot;).equals(&quot;CRLF&quot;) ? payload.split(&quot;\r\n&quot;) : payload.split(&quot;\n&quot;)]" doc:name="SP: Convert to Array" doc:description="Splitting Payload with the configured Line terminator character"/>
+         <set-variable variableName="headerData" value="#[payload[0]]" doc:name="Variable : Store Header Data" doc:description="Store Header Data"/>
+        <validation:is-true config-ref="Validation_Configuration1" message="Invalid Header #[flowVars.headerData] or Invalid Header Date" exceptionClass="java.lang.Exception" expression="#[((flowVars.headerData.length() &gt;= 10) &amp;&amp; (!isInvalidDate((flowVars.headerData.substring(2,10)),&quot;yyyyMMdd&quot;)) )]" doc:name="Validation : Check for Valid Header Date" doc:description="Check for Valid Header Date
+Stop Processing and throw Exception if Header Date is Invalid"/>
+        <enricher source="#[flowVars.interfaceHeaderDate]" target="#[flowVars.interfaceHeaderDate]" doc:name="Message Enricher" doc:description="Message Enricher is used so that the payload is not modified while invoking the Logging Framework
+Flow Variable interfaceHeaderDate is retrieved back from the framework">
+            <processor-chain doc:name="Processor Chain" doc:description="Processor Chain is used since we need more than 1 Mule components within the Enricher.">
+        <dw:transform-message doc:name="Transform Message Prepare Payload for Framework" doc:description="Passing Header date and Interface Id to the framework">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+ "headerDate" : flowVars.headerData[2..9] as :date {format : "yyyyMMdd"} as :string {format : "yyyy-MM-dd"} //Result in yyyy-MM-dd format
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+                <flow-ref name="CheckForExistingLoadUsingHeaderDateSub_Flow" doc:name="CheckForExistingLoadUsingHeaderDateSub_Flow" doc:description="Invoke Flow to check whether the File has been already processed or not"/>
+            </processor-chain>
+        </enricher>
+        <logger message="#['Converted Fixed Width to Array List']" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="TotalRecords" value="#[payload.length - 2]" doc:name="FV: Total Rec Count" doc:description="Store the Total records"/>
+        <dw:transform-message metadata:id="b21f2b31-b48e-4a3e-8233-d4e46ac416cc" doc:name="TM:Remove Header and Trailer" doc:description="This transformation removes Header and Trailer records from the payload">
+            <dw:input-payload/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[1..-2]]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#['Header and Trailer Records Removed...']" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice : Check whether any Detail Level records exist" doc:description="Check whether any Detail Level records exist">
+            <when expression="#[flowVars.TotalRecords &gt; 0]">
+                
+        <enricher source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]" doc:name="Message Enricher : Retrieve LOV values" doc:description="Invoke flow in Message Enricher so that the payload is not modified">
+            <flow-ref name="inf052-tpl-client-load-retrieve-LOV-Sub_Flow" doc:name="inf035-fsf-transaction-detail-load-retrieve-LOV-Sub_Flow" doc:description="Invoke Flow to retrieve the LOV values"/>
+        </enricher>
+                <logger message="#['LOVs Gathered...']" level="INFO" doc:name="Logger"/>
+		<logger message="#['Batch Job is Starting...']" level="INFO" doc:name="Logger"/>
+        <batch:execute name="BatchLoad" doc:name="BatchLoad" doc:description="Executing the Batch Jo which does rest of the processing required for this load"/>
+
+            </when>
+            <otherwise>
+                
+            				<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Count and status" doc:description="Update variables to be used in Logging Framework">
+				
+				<add-message-property key="totalSuccCount"
+					value="#[0]" />
+				<add-message-property key="totalErrorCount"
+					value="#[0]" />
+                    <add-message-property key="recStatus" value="#['Success']"/>
+                    <add-message-property key="totalRecCount" value="#[0]"/>
+
+			</message-properties-transformer>
+
+            	<set-payload value="{&quot;InterfaceID&quot;: &quot;INF052&quot;, &quot;InterfaceName&quot;: &quot;TPL Client Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TPLClientInformationLoad&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;No Detail Records Found in the File&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP: JSON for completed job." doc:description="Set JSON payload for transaction completion in Dashboard with Business Exception"/>
+            	<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Log Transaction SubFlow of the Logging Framework and raise Business Exception in dashboard"/>
+      <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+			<delete-message-property key="headerData"/>
+			<delete-message-property key="TotalRecords"/>
+			<delete-message-property key="LOVReturned"/>
+			<delete-message-property key="DetailRecord"/>
+			<delete-message-property key="ErrorUpdate"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			
+</message-properties-transformer>
+
+<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+			
+			<delete-message-property key="totalSuccCount"/>
+			<delete-message-property key="totalErrorCount"/>
+			<delete-message-property key="recStatus"/>
+			<delete-message-property key="TID"/>
+			
+</message-properties-transformer>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+
+    </flow>
+    <sub-flow name="LogInProgressTransaction">
+        <set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="SV: Set TransactionAttachment" doc:description="Creating Transaction Attachment for the Logging framework"/>
+        <set-payload doc:name="SP: Set JSON attributes to Log Transaction" value="{&quot;InterfaceID&quot;: &quot;INF052&quot;, &quot;InterfaceName&quot;: &quot;TPL Client Information Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_${sftp.tplclient.transaction.filename}&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:description="Creating JSON payload for Logging framework for starting Transaction"/>
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework for starting Transaction
+Also it stores the Transaction attachment as a file in dashboard"/>
+    </sub-flow>
+    <sub-flow name="QueryforPersonswithMCI">
+        <logger message="#['Start: Query for Persons with MCI Sub Flow']" level="INFO" doc:name="Logger"/>
+        <foreach doc:name="For Each" batchSize="200" collection="#[flowVars.DistinctMCI]" doc:description="This Transformation creates a Command Separated List of unique MCI to be used in Salesforce Query">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.MCINumber ++ "'")) joinBy "," ]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Person__r.LastName, Person__r.FirstName, Person__r.DEL_MCI__c, Person__r.DEL_SSN_Text__c, Person__r.Birthdate, Person__c, Id, Is_Person_Validated__c, Is_DFS_Client__c, Is_DMSS_Client__c, Is_DPBHS_Client__c, Is_DYRS_Client__c FROM DEL_Person_Type__c where RecordType.Name = 'Client' and Person__r.DEL_MCI__c in (#[payload])" doc:name="Salesforce Query Person Type" doc:description="Query Person Type details by passing MCI"/>
+            <choice doc:name="Choice : Check FOCUS for records" doc:description="Check whether any records was found in FOCUS">
+                <when expression="#[payload.size() != 0]">
+                    <dw:transform-message doc:name="TM: Convert SFDC Person Query output to JAVA" doc:description="Convert SFDC Person Query output to JAVA this will be used later">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map 
+{
+	MCI: $.Person__r.DEL_MCI__c,
+	ClientPersonalDetails:
+	{
+		PersonTypeId: $.Id,
+		PersonId: $.Person__c,
+		LastName: $.Person__r.LastName,
+		FirstName: $.Person__r.FirstName,
+		SSN: $.Person__r.DEL_SSN_Text__c,
+		DOB: ($.Person__r.Birthdate as :date as :date {format: "YYYYMMdd"} as :string {format: "YYYYMMdd"}) when $.Person__r.Birthdate != null and $.Person__r.Birthdate != "" otherwise "",
+		IsPersonValidated : $.Is_Person_Validated__c,
+		IsDFSClient : $.Is_DFS_Client__c,
+		IsDMSSClient : $.Is_DMSS_Client__c,
+		IsDPBHSClient : $.Is_DPBHS_Client__c,
+		IsDYRSClient : $.Is_DYRS_Client__c
+	}
+}	]]></dw:set-payload>
+                    </dw:transform-message>
+                    <set-variable variableName="FOCUSPersonDetails" value="#[(flowVars.FOCUSPersonDetails != null and flowVars.FOCUSPersonDetails != &quot;&quot; ? flowVars.FOCUSPersonDetails + payload : payload)]" doc:name="FV: Store the Person Details" doc:description="Store the Person Details"/>
+                </when>
+                <otherwise>
+                    <logger message="#['No MCI found in FOCUS']" level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+        </foreach>
+        <logger message="#['End: Query for Persons with MCI']" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="QueryonInsuranceObject">
+        <logger message="#['Start: Query for Insurance with ExternalId Sub Flow']" level="INFO" doc:name="Logger"/>
+        <foreach doc:name="For Each" batchSize="200">
+            <dw:transform-message doc:name="Transform Message Create External ID Comma separated List" doc:description="This Transformation creates a Command Separated List of External ID to be used in Salesforce Query">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $.ExternalId ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, TPL_Insurance_External_Id__c from DEL_Medical_Insurance__c where TPL_Insurance_External_Id__c in (#[payload])" doc:name="Salesforce Query Medical Insurance" doc:description="Query Medical Insurace data by passing External ID in the where clause of query"/>
+            <choice doc:name="Choice" doc:description="Check if any Insurance records matched with External Id">
+                <when expression="#[payload.size() != 0]">
+                    <dw:transform-message doc:name="Transform Message Add External ID" doc:description="Add External ID and salesforce ID to List">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	Id: $.Id default "",
+	ExternalId: $.TPL_Insurance_External_Id__c default ""
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <set-variable variableName="InsuranceQueryOutput" value="#[(flowVars.InsuranceQueryOutput != null and flowVars.InsuranceQueryOutput != &quot;&quot; ? flowVars.InsuranceQueryOutput + payload : payload)]" doc:name="Variable" doc:description="Store Insurance Query output"/>
+                </when>
+                <otherwise>
+                    <logger message="#['No Insurance records matched with External Id']" level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+        </foreach>
+        <logger message="#['End: Query for Insurance with ExternalId Sub Flow']" level="INFO" doc:name="Logger"/>
+
+    </sub-flow>
+    <batch:job name="BatchLoad" max-failed-records="-1" block-size="10000">
+        <batch:process-records>
+            <batch:step name="Batch_Step" accept-policy="ALL">
+                <batch:commit size="5000" doc:name="Batch Commit">
+                    <logger message="#['Inside Batch...Executing Batch']" level="INFO" doc:name="Logger"/>
+
+
+<set-variable variableName="totalRecordCount" value="#[payload.size()]" doc:name="Variable : Total Record Count" doc:description="Get Total record Count of the current Batch records"/>
+        <dw:transform-message metadata:id="6f2237c3-7cc5-4b0d-acc9-be2c5e4b2af2" doc:name="TM: Separate Valid and Invalid Recs" doc:description="Filter valid Length records and create Fixed width payload
+        Also separate Invalid length records and create a error report for them">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) == "350")) joinBy "\n"]]></dw:set-payload>
+            <dw:set-variable variableName="LenMisMatchRecs"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) != "350")) map ($ ++ ",Length of the record is invalid Expected 350 but is " ++ (sizeOf $)) joinBy "\n"]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="#['Separated Valid and Invalid Records...']" level="INFO" doc:name="Logger"/>
+        <!-- <set-variable variableName="InvalidLenRecCount" value="#[flowVars.LenMisMatchRecs != null and flowVars.LenMisMatchRecs != &quot;&quot; ? flowVars.LenMisMatchRecs.split(&quot;\n&quot;).length : 0]" doc:name="FV: InvaildLenRecCount"/> -->
+        <set-variable variableName="validRecsCount" value="#[flowVars.LenMisMatchRecs.equals(&quot;&quot;) ? flowVars.totalRecordCount :  (flowVars.totalRecordCount - flowVars.LenMisMatchRecs.split(&quot;\n&quot;).length)]" doc:name="Variable: Get Valid records Count" doc:description="Get Valid Records Count (Valid Length Records count)"/>
+        <choice doc:name="Choice : Check for Valid Records" doc:description="Check if there any Valid Records">
+            <when expression="#[(flowVars.validRecsCount) == 0]">
+                <logger message="No valid Records are present in this Set" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+           <dw:transform-message doc:name="Convert Fixed Width to Java List" doc:description="Fixed Width Transformation to convert to JAVA Payload of List of Maps">
+            <dw:input-payload mimeType="text/plain" doc:sample="C:\Users\bakonakalla\Documents\Subbu\Delaware\Integration\Sample Files\TPL\INF052_TPL_Client_Load_Sample_File - thin.txt">
+                <dw:reader-property name="schemaPath" value="CSV.ffd"/>
+            </dw:input-payload>
+                                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+                            </dw:transform-message>	
+<logger message="Fixed Width Transformation done, Started Filtering of Invalid Records" level="INFO" doc:name="Logger"/>
+                            <dw:transform-message doc:name="Filter Missing field Record" doc:description="This Transformation creates a Error Report for all Invalid records which have Missing Field or Incorrect Format of data
+This will be added to the overall Error report">
+                                <dw:set-variable variableName="RequiredFieldsMissing"><![CDATA[%dw 1.0
+%output application/csv header=false, quoteValues=true
+---		
+payload filter ($.RecordType == null or $.RecordType == "") or 
+($.MedicalCaseId == null or $.MedicalCaseId == "") or 
+($.InsuredMCINumber == null or $.InsuredMCINumber == "") or 
+($.InsuredSSN == null or $.InsuredSSN == "") or 
+($.InsuredDOB == null or $.InsuredDOB == "") or  
+($.InsuredLastName == null or $.InsuredLastName == "") or 
+($.InsuredFirstName == null or $.InsuredFirstName == "") or 
+($.InsuranceCarrierCode == null or $.InsuranceCarrierCode == "") or 
+ 
+($.PolicyNumber == null or $.PolicyNumber == "") or 
+($.CoverageType == null or $.CoverageType == "") or 
+($.PolicyVerification == null or $.PolicyVerification == "") or 
+($.PolicyStartDate == null or $.PolicyStartDate == "") or 
+($.PolicyEndDate == null or $.PolicyEndDate == "") or 
+($.Relationship == null or $.Relationship == "") or 
+($.PolicyInfoAddedDate == null or $.PolicyInfoAddedDate == "") or 
+($.PolicyInfoModDate == null or $.PolicyInfoModDate == "")  map {
+		"Record Type": $.RecordType default "",
+		"Medicaid Case ID": $.MedicalCaseId default "",				
+		"Insured MCI Number": $.InsuredMCINumber default "",
+		"Insured SSN": $.InsuredSSN default "",
+		"Insured DOB": $.InsuredDOB default "",
+		"Insured Last Name": $.InsuredLastName default "",
+		"Insured First Name": $.InsuredFirstName default "",
+		"Insurance Carrier Code": $.InsuranceCarrierCode default "",
+		"Insurance Carrier Location": $.InsuranceCarrierLocation default "",
+		"Holder Name": $.PolicyHolderName default "",
+		"Holder SSN": $.PolicyHolderSSN default "",
+		"Holder DOB": $.PolicyHolderDOB default "",
+		"Holder MCI Number": $.PolicyHolderMCINumber default "",
+		"Policy Number": $.PolicyNumber default "",
+		"Group Number": $.GroupNumber default "",
+		"Policy Coverage Type":$.CoverageType default "",
+		"Policy Status": $.PolicyStatus default "",
+		"Policy Verification": $.PolicyVerification default "",
+		"Begin Date": $.PolicyStartDate default "",
+		"End Date": $.PolicyEndDate default "",
+		"Holder Relation": $.Relationship default "",
+		"Holder Employer Name": $.EmployerName default "",
+		"Holder Employer Address 1": $.EmployerAddr1 default "",
+		"Holder Employer Address 2": $.EmployerAddr2 default "",
+		"Holder Employer City": $.EmployerCity default "",
+		"Holder Employer State": $.EmployerState default "",
+		"Holder Employer Zip": $.EmployerZip default "",
+		"Policy Add Date": $.PolicyInfoAddedDate default "",
+		"Policy Mod Date": $.PolicyInfoModDate default "",
+		"Error" : (  ": Record Type is Missing" when ($.RecordType == '' or $.RecordType == null ) otherwise "") ++
+		(": Medicaid Case ID is missing " when ($.MedicalCaseId == '' or $.MedicalCaseId == null ) otherwise "") ++
+		(": Insured MCI Number is Missing " when ($.InsuredMCINumber == '' or $.InsuredMCINumber == null) otherwise "" ) ++
+		(": Insured SSN is Missing " when ($.InsuredSSN == '' or $.InsuredSSN == null ) otherwise "" ) ++
+		(": Insured DOB is Missing " when ($.InsuredDOB == '' or $.InsuredDOB == null) otherwise "" ) ++
+		(": Insured Last Name is Missing " when ($.InsuredLastName == '' or $.InsuredLastName == null) otherwise "" ) ++				
+		(": Insured First Name is Missing " when ($.InsuredFirstName == '' or $.InsuredFirstName == null ) otherwise "" ) ++
+		(": Insurance Carrier Code is Missing " when ($.InsuranceCarrierCode == '' or $.InsuranceCarrierCode == null ) otherwise "") ++		
+		(": Policy Number is Missing " when ($.PolicyNumber == '' or $.PolicyNumber == null ) otherwise "" ) ++
+		(": Policy Coverage Type is Missing " when (($.CoverageType) == '' or (($.CoverageType) == null) ) otherwise "" ) ++ 
+		(": Policy Verification is Missing "  when ($.PolicyVerification == '' or $.PolicyVerification == null ) otherwise "" ) ++
+		(": Policy Start Date is Missing " when ($.PolicyStartDate == '' or $.PolicyStartDate == null ) otherwise "" ) ++
+		(": Policy End Date is Missing "  when ($.PolicyEndDate == '' or $.PolicyEndDate == null ) otherwise "" ) ++
+		(": Holder Relationship is Missing "  when ($.Relationship == '' or $.Relationship == null) otherwise "" ) ++
+		(": Policy Added Date is Missing " when ($.PolicyInfoAddedDate == '' or $.PolicyInfoAddedDate == null ) otherwise "" ) ++
+		(": Policy Modified Date is Missing " when ($.PolicyInfoModDate == '' or $.PolicyInfoModDate == null ) otherwise "" )	
+} ]]></dw:set-variable>
+<!--             <dw:input-payload mimeType="text/plain" doc:sample="C:\Users\bakonakalla\Documents\Subbu\Delaware\Integration\Sample Files\TPL\INF052_TPL_Client_Load_Sample_File - thin.txt">
+                <dw:reader-property name="schemaPath" value="CSV.ffd"/>
+            </dw:input-payload> -->
+                            </dw:transform-message>
+<logger message="Filtering of InValid Records done, Started Filtering of Valid Records" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="16cb02f8-453a-4612-9501-5adcfeee8c9c" doc:name="TM: Filter Valid Records" doc:description="This transform step filters out Valid data not having Missing Fields or Incorrect form of data">
+<!--             <dw:input-payload mimeType="text/plain" doc:sample="C:\Users\bakonakalla\Documents\Subbu\Delaware\Integration\Sample Files\TPL\INF052_TPL_Client_Load_Sample_File - thin.txt">
+                <dw:reader-property name="schemaPath" value="CSV.ffd"/>
+            </dw:input-payload> -->
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ( $.RecordType != null and $.RecordType != "" and 
+		$.MedicalCaseId != null and $.MedicalCaseId != "" and 
+		$.InsuredMCINumber != null and $.InsuredMCINumber != "" and 
+		$.InsuredSSN != null and $.InsuredSSN != "" and 
+		$.InsuredDOB != null and $.InsuredDOB != "" and 
+		$.InsuredLastName != null and $.InsuredLastName != "" and 
+		$.InsuredFirstName != null and $.InsuredFirstName != "" and 
+		$.InsuranceCarrierCode != null and $.InsuranceCarrierCode != "" and 
+		 
+		 
+		$.PolicyNumber != null and $.PolicyNumber != "" and 
+		$.CoverageType != null and $.CoverageType != "" and 
+		$.PolicyVerification != null and $.PolicyVerification != "" and $.PolicyVerification != "I" and $.PolicyVerification != "N" and
+		$.PolicyStartDate != null and $.PolicyStartDate != "" and 
+		$.PolicyEndDate != null and $.PolicyEndDate != "" and 
+		$.Relationship != null and $.Relationship != "" and 
+		$.PolicyInfoAddedDate != null and $.PolicyInfoAddedDate != "" and 
+		$.PolicyInfoModDate != null and $.PolicyInfoModDate != "" )  map {
+		MedicaidCaseId: $.MedicalCaseId default "",				
+		MCINumber: $.InsuredMCINumber as :number default "",
+		SSN: $.InsuredSSN default "",
+		DOB: $.InsuredDOB default "",
+		LastName: $.InsuredLastName default "",
+		FirstName: $.InsuredFirstName default "",
+		CompanyCarrierCode: $.InsuranceCarrierCode default "",
+		LocationCode: $.InsuranceCarrierLocation default "",
+		PolicyHolderName: $.PolicyHolderName default "",
+		PolicyHolderSSN: $.PolicyHolderSSN default "",
+		PolicyHolderDOB: $.PolicyHolderDOB default "",
+		PolicyHolderMCI: $.PolicyHolderMCINumber as :number default "",
+		PolicyNumber: $.PolicyNumber default "",
+		GroupNumber: $.GroupNumber default "",
+		CoverageType:$.CoverageType default "",
+		PolicyStatus: $.PolicyStatus default "",
+		PolicyVerification: $.PolicyVerification default "",
+		StartDate:("4000" ++ $.PolicyStartDate[4..7] as :string) when ($.PolicyStartDate[0..3] as :number) > 4000  otherwise $.PolicyStartDate,
+		EndDate:  ("4000" ++ $.PolicyEndDate[4..7] as :string) when ($.PolicyEndDate[0..3] as :number) > 4000  otherwise $.PolicyEndDate,
+		Relationship: $.Relationship default "",
+		EmployerName: $.EmployerName default "",
+		EmployerAddress1: $.EmployerAddr1 default "",
+		EmployerAddress2: $.EmployerAddr2 default "",
+		EmployerCity: $.EmployerCity default "",
+		EmployerState: $.EmployerState default "",
+		EmployerZip: $.EmployerZip default "",
+		PolicyInfoAddedDate: ("4000" ++ $.PolicyInfoAddedDate[4..7] as :string) when ($.PolicyInfoAddedDate[0..3] as :number) > 4000  otherwise $.PolicyInfoAddedDate,
+		PolicyInfoModDate: ("4000" ++ $.PolicyInfoModDate[4..7] as :string) when ($.PolicyInfoModDate[0..3] as :number) > 4000  otherwise $.PolicyInfoModDate			
+} ]]></dw:set-payload>
+        </dw:transform-message>
+<logger message="Filtering of Valid Records done" level="INFO" doc:name="Logger"/>
+        <expression-component doc:name="Expression : Calculate Valid Record Count" doc:description="Get Missing Records as String , this is required since Dataweave gives output as Stream
+Calculate Valid Records count after removing Missing Field records"><![CDATA[flowVars.RequiredFieldsMissing = flowVars.RequiredFieldsMissing:java.lang.String;
+flowVars.validRecsCount = flowVars.RequiredFieldsMissing.equals("") ? flowVars.validRecsCount : (flowVars.validRecsCount - flowVars.RequiredFieldsMissing.split("\n").length ) ]]></expression-component>
+
+       <choice doc:name="Choice : Check for Valid Records" doc:description="Check if valid records are present">
+            <when expression="#[(flowVars.validRecsCount) == 0]">
+                <logger message="No valid Records are present in this Set" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+      <logger message="#['Converted Fixed Width to Map format...']" level="INFO" doc:name="Logger"/>
+        <!-- <set-variable variableName="ReqFieldsMissingCount" value="#[flowVars.RequiredFieldsMissing != null and flowVars.RequiredFieldsMissing != &quot;&quot; ? (flowVars.RequiredFieldsMissing.split(&quot;\n&quot;).length -1) : 0]" doc:name="FV: Required Fields Missing"/> -->
+        <dw:transform-message metadata:id="7945f0c1-fd47-4f9e-952f-43c792d1aa6d" doc:name="TM: Add ExternalId to the payload" doc:description="
+Adding External ID to every record which is combination of MCINumber,PolicyNumber,GroupNumber,StartDate,EndDate and CompanyCarrierCode
+Also get the Distinct MCI in a variable
+If the External ID is changed then also update corresponding logic in Process Flow Update_TPL_Insurance_External_ID-2">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	($),
+	ExternalId: $.MCINumber default "" as :string ++ "-" ++ 
+	        	$.PolicyNumber default "" as :string ++ "-" ++ 
+	        	$.GroupNumber default "" as :string ++ "-" ++ 
+	        	($.StartDate as :string as :date {format: "yyyyMMdd"} as :string {format: "yyyy-MM-dd"}) as :string default "" as :string ++ "-" ++ 				            
+	        	($.EndDate as :string as :date {format: "yyyyMMdd"} as :string {format: "yyyy-MM-dd"}) as :string default "" as :string ++ "-" ++				            
+	        	((flowVars.LOVReturned[("POLICY_COV_TYPE-" ++ (((trim $.CoverageType)) default ""))] default [""])[0]) as :string ++ "-" ++ 
+	        	$.CompanyCarrierCode default "" as :string	++ "-" ++ $.PolicyHolderName default "" as :string replace /(?:\')/ with " "		        	
+}]]></dw:set-payload>
+                    <dw:set-variable variableName="DistinctMCI"><![CDATA[%dw 1.0
+%output application/java
+---
+payload distinctBy $.MCINumber
+]]></dw:set-variable>
+        </dw:transform-message>
+                <logger message="#['External Id Added to the Payload...']" level="INFO" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher" doc:description="Invoking the flow in Message Enricher so that the payload is not modified">
+            <flow-ref name="QueryforPersonswithMCI" doc:name="QueryforPersonswithMCI" doc:description="Invoke flow to retrieve Person Type data"/>
+            <enrich source="#[flowVars.FOCUSPersonDetails]" target="#[flowVars.FOCUSPersonDetails]"/>
+        </enricher>
+                <dw:transform-message doc:name="TM:  Link Query Output with Original payload" doc:description=" Link Query Output with Original payload
+This is done by  creating a internal Dataweave map with MCI as key and Person Type Details as value
+The Person Type ID is added to every records
+
+Also the Mismatch Warning report is created in a separate variable
+Also this takes care of the 
+Business rule &quot;If a policy holders MCI number does not exists in Focus, update the Name, MCI number, SSN, and DOB fields in the Medical Insurance table &quot; by adding the required fields in the Medical Insurance data
+This step also takes care of the Busines Rule
+&quot;If the data (Last Name, First Name, SSN and DOB) in FOCUS matches with the data coming in File, then ignore it otherwise log an exception and still create or update the Medical Insurance records of the client Here is the exception message should be: Either Last Name, First Name, SSN or DOB does not match with FOCUS &quot; by creating a report for the Mismatched values which will be added to Interface dashboard">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var PersonDetails = {(flowVars.FOCUSPersonDetails default [] map 
+	{
+		($.MCI as :string) : $.ClientPersonalDetails
+	}	
+)}
+---
+payload map using (Clientdetails = PersonDetails [$.MCINumber as :string] )
+{
+	($),
+	PersonTypeId: Clientdetails[0],
+	IsPersonValidated : Clientdetails[6],
+	IsDFSClient : Clientdetails[7],
+	IsDMSSClient : Clientdetails[8],
+	IsDPBHSClient : Clientdetails[9],
+	IsDYRSClient : Clientdetails[10]	
+}]]></dw:set-payload>
+                    <dw:set-variable variableName="PDMismatchWarning"><![CDATA[%dw 1.0
+%output application/csv header=false, quoteValues=true
+%var data = {(flowVars.FOCUSPersonDetails default [] map 
+	{
+		($.MCI as :string) : $.ClientPersonalDetails     
+     }
+ )}
+---
+payload  map using (Clientdetails = data [$.MCINumber as :string])
+{
+	MCI: $.MCINumber,
+	"Last Name in File": $.LastName,
+	"First Name in File": $.FirstName,
+	"SSN in File": $.SSN,
+	"DOB in File": $.DOB,
+	"Last Name in FOCUS": Clientdetails[2],
+	"First Name in FOCUS": Clientdetails[3],
+	"SSN in FOCUS": Clientdetails[4],
+	"DOB in FOCUS": Clientdetails[5],
+	PersonTypeId: Clientdetails[0] default "",
+	"Last Name does not Match with FOCUS": "Y" when (upper $.LastName) != (upper Clientdetails[2] default "") otherwise "",	
+	"First Name does not Match with FOCUS": "Y" when (upper $.FirstName) != (upper Clientdetails[3] default "") otherwise "",
+	"SSN does not Match with FOCUS": "Y" when $.SSN != (Clientdetails[4] default "") otherwise "",	
+	"DOB does not Match with FOCUS": "Y" when $.DOB != (Clientdetails[5] default "") otherwise ""	 	
+} filter ($.PersonTypeId != "" and 
+(($."Last Name does not Match with FOCUS" != null and $."Last Name does not Match with FOCUS" != "") or 
+($."First Name does not Match with FOCUS" != null and $."First Name does not Match with FOCUS" != "") or
+($."SSN does not Match with FOCUS" != null and $."SSN does not Match with FOCUS" != "") or
+($."DOB does not Match with FOCUS" != null and $."DOB does not Match with FOCUS" != "")
+)) distinctBy ($.PersonTypeId)]]></dw:set-variable>
+                </dw:transform-message>
+
+
+                <logger message="#['Linked Person Query Output with Payload...']" level="INFO" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="TM:  Filter MCI match and do match Recs" doc:description="This transform step filters out Valid data not having Missing Fields or Incorrect form of data and stores it in Payload
+
+Also it creates a Exception report for records not having MCI number in FOCUS and stores it in separate variable
+This will be added to the overall Exception report
+Thus this also takes care of the Business Rule
+ &quot;For each record in the file, check if the client exists in Focus by matching the MCI Number  
+    a. If the client MCI Number is not found, then log  MCI Number not found in the interface log 
+    b. If the clients MCI Number exists, check to see if a medical insurance record already exists by matching on the following fields in the Insurance tables (MCI No, Insurance Company Carrier Code, Insurance Company Location Code, Policy No, Group No, Begin Date and End Date) If a medical insurance record matches, then update the record If there is no match, create a new insurance record 
+ &quot; by adding those records in the Exception eport and removing them for further processing">
+            <dw:input-payload doc:sample="listofmcinumbers.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.PersonTypeId != "" and $.PersonTypeId != null) map (data1, Index) ->
+{
+	(data1)		 
+}]]></dw:set-payload>
+            <dw:set-variable variableName="PersonNotFound"><![CDATA[%dw 1.0
+%output application/csv header=false,quoteValues=true
+---
+payload filter ($.PersonTypeId == "" or $.PersonTypeId == null) map
+{	 
+		"Record Type": "DT",
+		"Medicaid Case ID": $.MedicaidCaseId,
+		"Insured MCI Number": $.MCINumber,
+		"Insured SSN": $.SSN,
+		"Insured DOB": $.DOB,
+		"Insured Last Name": $.LastName,
+		"Insured First Name": $.FirstName,
+		"Insurance Carrier Code": $.CompanyCarrierCode,
+		"Insurance Carrier Location": $.LocationCode,
+		"Holder Name": $.PolicyHolderName,
+		"Holder SSN": $.PolicyHolderSSN,
+		"Holder DOB": $.PolicyHolderDOB,
+		"Holder MCI Number": $.PolicyHolderMCI,
+		"Policy Number": $.PolicyNumber,
+		"Group Number": $.GroupNumber,
+		"Policy Coverage Type": $.CoverageType,
+		"Policy Status": $.PolicyStatus,
+		"Policy Verification": $.PolicyVerification,
+		"Begin Date": $.StartDate,
+		"End Date": $.EndDate,
+		"Holder Relation": $.Relationship,
+		"Holder Employer Name": $.EmployerName,
+		"Holder Employer Address 1": $.EmployerAddress1,
+		"Holder Employer Address 2": $.EmployerAddress2,
+		"Holder Employer City": $.EmployerCity,
+		"Holder Employer State": $.EmployerState,
+		"Holder Employer Zip": $.EmployerZip,
+		"Policy Add Date": $.PolicyInfoAddedDate,
+		"Policy Mod Date": $.PolicyInfoModDate,
+		ErrorDescription: "No Person Type Client exists for this Person"
+}]]></dw:set-variable>
+        </dw:transform-message>
+
+        <expression-component doc:name="Expression : Calculate Valid Record Count" doc:description="Get Missing Records as String , this is required since Dataweave gives output as Stream
+Calculate Valid Records count after removing Missing Field records"><![CDATA[flowVars.PersonNotFound = flowVars.PersonNotFound:java.lang.String;
+flowVars.validRecsCount = flowVars.PersonNotFound.equals("") ? flowVars.validRecsCount : (flowVars.validRecsCount - flowVars.PersonNotFound.split("\n").length ) ]]></expression-component>
+
+                <logger message="#['Filtered MCI match and do not Match records...']" level="INFO" doc:name="Logger"/>
+               <choice doc:name="Choice : Check for Valid Records" doc:description="Check if valid records are present">
+                    <when expression="#[(flowVars.validRecsCount) == 0]">
+                          <logger message="No valid Records are present in this Set" level="INFO" doc:name="Logger"/>
+                    </when>
+                    <otherwise>
+        <!-- <set-variable variableName="PersonNotFoundCount" value="#[(flowVars.PersonNotFound != null and flowVars.PersonNotFound != &quot;&quot; ? (flowVars.PersonNotFound.split(&quot;\n&quot;).length - 1) : 0)]" doc:name="FV: PersonNotFoundCount"/> -->
+        <enricher doc:name="Message Enricher" doc:description="Invoking flow in Message Enricher so that the payload is not modified">
+            <flow-ref name="QueryonInsuranceObject" doc:name="QueryonInsuranceObject" doc:description="Invoke Flow which will Query for Insurance data"/>
+            <enrich source="#[flowVars.InsuranceQueryOutput]" target="#[flowVars.InsuranceQueryOutput]" />
+        </enricher>
+
+<!--         <choice doc:name="Choice">
+            <when expression="#[flowVars.InsuranceQueryOutput != null &amp;&amp; flowVars.InsuranceQueryOutput != &quot;&quot;]">
+  -->                       <dw:transform-message doc:name="Transform Message : Add Medicaid Insurance ID to Payload" doc:description="Add Medicaid Insurance ID to each record in Payload">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var InsQueryOutput = {(
+	flowVars.InsuranceQueryOutput default [] map
+	{
+		($.ExternalId as :string) : $.Id
+	}
+)}
+---
+payload map
+{
+	($),
+	MedicalInsuranceId: InsQueryOutput [$.ExternalId as :string] default "" 
+}]]></dw:set-payload>
+                        </dw:transform-message>
+                        <logger message="#['Linked Insurance Query Output with Original Payload...']" level="INFO" doc:name="Logger"/>
+
+
+                <dw:transform-message metadata:id="54373cc8-a98c-4e2b-bc8e-396d6500d10c" doc:name="Transform Message : Filter valid and Invalid data" doc:description="Filter Valid data and store it in a separate variable the valid records must have Medical Insurace ID or if Medical Insurance ID is not there then Policy Status should be E
+Similarly it separates the invalid data and creates a Exception report for them and stores in a separate variable
+
+This Step also takes care of the Business Rule &quot;For new Insurance Records If the Policy Status is E then do not process the record For existing insurance records if the Policy Status is E in the file then update the Insurance record policy status in FOCUS with E (Error) &quot; by separating these records
+ The New Insurance records with Policy Status as E is added to Exception report and is not processed further
+ whereas the old records with Policy status as E is updated as E in FOCUS">
+                    <dw:input-payload doc:sample="listofmcinumbers.xml"/>
+
+                    <dw:set-variable variableName="NewErrorRecords"><![CDATA[%dw 1.0
+%output application/csv header=false,quoteValues=true
+---
+payload filter (($.MedicalInsuranceId == null or $.MedicalInsuranceId == "") and $.PolicyStatus == "E") map
+{	
+	"Record Type": "DT",
+	"Medicaid Case ID": $.MedicaidCaseId,
+	"Insured MCI Number": $.MCINumber,
+	"Insured SSN": $.SSN,
+	"Insured DOB": $.DOB,
+	"Insured Last Name": $.LastName,
+	"Insured First Name": $.FirstName,
+	"Insurance Carrier Code": $.CompanyCarrierCode,
+	"Insurance Carrier Location": $.LocationCode,
+	"Holder Name": $.PolicyHolderName,
+	"Holder SSN": $.PolicyHolderSSN,
+	"Holder DOB": $.PolicyHolderDOB,
+	"Holder MCI Number": $.PolicyHolderMCI,
+	"Policy Number": $.PolicyNumber,
+	"Group Number": $.GroupNumber,
+	"Policy Coverage Type": $.CoverageType,
+	"Policy Status": $.PolicyStatus,
+	"Policy Verification": $.PolicyVerification,
+	"Begin Date": $.StartDate,
+	"End Date": $.EndDate,
+	"Holder Relation": $.Relationship,
+	"Holder Employer Name": $.EmployerName,
+	"Holder Employer Address 1": $.EmployerAddress1,
+	"Holder Employer Address 2": $.EmployerAddress2,
+	"Holder Employer City": $.EmployerCity,
+	"Holder Employer State": $.EmployerState,
+	"Holder Employer Zip": $.EmployerZip,
+	"Policy Add Date": $.PolicyInfoAddedDate,
+	"Policy Mod Date": $.PolicyInfoModDate,
+	ErrorDescription : "New Policy Record found in the File with Policy Status Error(E)."
+}]]></dw:set-variable>
+                                                        <dw:set-variable variableName="validPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter (($.MedicalInsuranceId != null and $.MedicalInsuranceId != "") or (($.MedicalInsuranceId == null or $.MedicalInsuranceId == "") and $.PolicyStatus != "E"))  ]]></dw:set-variable>
+                </dw:transform-message>
+<!--             </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Message : Valid and Invalid Records" metadata:id="fe2e20bc-8d98-4464-ad45-fca5af8e325a">
+                   
+                    <dw:set-variable variableName="validPayload"><![CDATA[%dw 1.0
+%output application/java
+-
+payload filter ($.PolicyStatus != "E")]]></dw:set-variable>
+                    <dw:set-variable variableName="NewErrorRecords"><![CDATA[%dw 1.0
+%output application/csv header=false,quoteValues=true
+-
+payload filter $.PolicyStatus == "E" map
+{	
+	"Record Type": "DT",
+	"Medicaid Case ID": $.MedicaidCaseId,
+	"Insured MCI Number": $.MCINumber,
+	"Insured SSN": $.SSN,
+	"Insured DOB": $.DOB,
+	"Insured Last Name": $.LastName,
+	"Insured First Name": $.FirstName,
+	"Insurance Carrier Code": $.CompanyCarrierCode,
+	"Insurance Carrier Location": $.LocationCode,
+	"Holder Name": $.PolicyHolderName,
+	"Holder SSN": $.PolicyHolderSSN,
+	"Holder DOB": $.PolicyHolderDOB,
+	"Holder MCI Number": $.PolicyHolderMCI,
+	"Policy Number": $.PolicyNumber,
+	"Group Number": $.GroupNumber,
+	"Policy Coverage Type": $.CoverageType,
+	"Policy Status": $.PolicyStatus,
+	"Policy Verification": $.PolicyVerification,
+	"Begin Date": $.StartDate,
+	"End Date": $.EndDate,
+	"Holder Relation": $.Relationship,
+	"Holder Employer Name": $.EmployerName,
+	"Holder Employer Address 1": $.EmployerAddress1,
+	"Holder Employer Address 2": $.EmployerAddress2,
+	"Holder Employer City": $.EmployerCity,
+	"Holder Employer State": $.EmployerState,
+	"Holder Employer Zip": $.EmployerZip,
+	"Policy Add Date": $.PolicyInfoAddedDate,
+	"Policy Mod Date": $.PolicyInfoModDate,
+	ErrorDescription : ("New Policy Record found in the File with Policy Status Error(E).")
+} ]]></dw:set-variable>
+                </dw:transform-message>
+                        <logger message="#['Removed new E records from the Payload...']" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice> -->
+        <set-variable variableName="NewErrorRecCount" value="#[flowVars.NewErrorRecords != null and flowVars.NewErrorRecords != &quot;&quot; ? (flowVars.NewErrorRecords.split(&quot;\n&quot;).length ) : 0]" doc:name="FV: NewErrorRecCount" doc:description="Store count of records for which New Policy records were found"/>
+
+
+        <logger message="#['Job Completed: ']" level="INFO" doc:name="Logger"/>
+        <expression-component doc:name="Expression : Calculate Valid Record Count" doc:description="Get Policy Error Records Records as String , this is required since Dataweave gives output as Stream
+Calculate Valid Records count after removing Missing Field records"><![CDATA[flowVars.NewErrorRecords = flowVars.NewErrorRecords:java.lang.String;
+flowVars.validRecsCount = flowVars.NewErrorRecords.equals("") ? flowVars.validRecsCount : (flowVars.validRecsCount - flowVars.NewErrorRecords.split("\n").length ) ]]></expression-component>
+<choice doc:name="Choice : Check for Valid Records" doc:description="Check if valid records are present">
+         <when expression="#[flowVars.validPayload.size() == 0]">
+               <logger message="No valid Records are present in this Set" level="INFO" doc:name="Logger"/>
+         </when>
+         <otherwise>
+              <dw:transform-message doc:name="Transform Message : Prepare data for Upsert" doc:description="This Transformation prepares data for Upsert and maps data as per field of the Corresponding Object in Salesforce">
+                   <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.validPayload map
+{
+	Medicaid_Case_Number__c: $.MedicaidCaseId,
+	CompanyCarrierCode : ($.CompanyCarrierCode as :string ) as :string,
+	Policy_Holder__c: $.PolicyHolderName,
+	Policy_Holder_SSN__c: $.PolicyHolderSSN,
+	Policy_Holder_DOB__c: ($.PolicyHolderDOB as :string as :date {format: "yyyyMMdd"} as :date {format: "MM-dd-yyyy"}) when ($.PolicyHolderDOB != null and $.PolicyHolderDOB != "" and $.PolicyHolderDOB != "00000000") otherwise null,
+	Dependent_MCI_Number__c: $.PolicyHolderMCI,
+	Policy_Number__c: $.PolicyNumber,
+	Group_Number__c: $.GroupNumber,
+	//Policy_Status__c: (flowVars.LOVReturned[("POLICY_STATUS-" ++ ($.PolicyStatus default ""))] default [""])[0],
+	Policy_Verification__c: $.PolicyVerification,
+	Effective_Date__c: ($.StartDate as :string as :date {format: "yyyyMMdd"} as :date {format: "MM-dd-yyyy"}) when $.StartDate != null and $.StartDate != "" otherwise "",
+	End_Date__c: ($.EndDate as :string as :date {format: "yyyyMMdd"} as :date {format: "MM-dd-yyyy"}) when $.EndDate != null and $.EndDate != "" otherwise "",
+	Relationship__c: (flowVars.LOVReturned[("POLICY_HOL_REL-" ++ ($.Relationship default ""))] default [""])[0],
+	Type__c: (flowVars.LOVReturned[("POLICY_COV_TYPE-" ++ (((trim $.CoverageType)) default ""))] default [""])[0],
+	Policy_Holder_Employer__c: $.EmployerName,
+	Employer_Address__c: $.EmployerAddress1 as :string ++ "\n" ++
+						 $.EmployerAddress2 as :string ++ "\n" ++ 
+						 $.EmployerCity as :string ++ "\n" ++ 
+						 $.EmployerState as :string ++ "\n" ++
+						 $.EmployerZip[0..4] as :number when $.EmployerZip != null and (sizeOf $.EmployerZip) > 4 and $.EmployerZip[0..4] != "00000" otherwise "" ++ 
+						 $.EmployerZip[5..8] as :number when $.EmployerZip != null and (sizeOf $.EmployerZip) > 8 and $.EmployerZip[5..8] != "0000" otherwise "",
+	Policy_Info_Added_Date__c: ($.PolicyInfoAddedDate as :string as :date {format: "yyyyMMdd"} as :date {format: "MM-dd-yyyy"}) when $.PolicyInfoAddedDate != null and $.PolicyInfoAddedDate != "" otherwise "",
+	Policy_Info_Modified_Date__c: ($.PolicyInfoModDate as :string as :date {format: "yyyyMMdd"} as :date {format: "MM-dd-yyyy"}) when $.PolicyInfoModDate != null and $.PolicyInfoModDate != "" otherwise "",
+	Person_Type__c: $.PersonTypeId,
+	//Person_Type__c: "qwerty", Uncomment To force SFDC Errors used for testing only
+	TPL_Insurance_External_Id__c: $.ExternalId,
+	Is_Person_Validated__c : true,
+	//IsPersonValidated : $.Is_Person_Validated__c,
+	Is_DFS_Client__c : $.IsDFSClient,
+	Is_DMSS_Client__c : $.IsDMSSClient,
+	Is_DPBHS_Client__c : $.IsDPBHSClient,
+	Is_DYRS_Client__c : $.IsDYRSClient	
+} 
+)]]></dw:set-payload>
+                                                    </dw:transform-message>
+                                                    <dw:transform-message doc:name="Transform Message">
+                                                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	($ - "CompanyCarrierCode"),
+	Insurance_Company_Name__r:
+	{		
+		Insurance_Carrier_External_Id__c: ($.CompanyCarrierCode as :string ) as :string
+	},
+	Policy_Status__c : "Active" when ($.Effective_Date__c as :date {format: "yyyy-MM-dd"} <=  (now as :date {format: "yyyy-MM-dd"}) and $.End_Date__c as :date {format: "yyyy-MM-dd"} >= (now as :date {format: "yyyy-MM-dd"})) otherwise "Inactive"
+}]]></dw:set-payload>
+                                                    </dw:transform-message>
+
+<!--                     <message-properties-transformer scope="invocation" doc:name="MP: Store Payload in a Variable">
+                        <add-message-property key="BatchArray" value="#[payload]"/>
+                    </message-properties-transformer> -->
+                    <sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Medical_Insurance__c" externalIdFieldName="TPL_Insurance_External_Id__c" doc:name="SF: Insert Insurance Records" doc:description="Load Insurance records in FOCUS in Bulk
+This takes care of the Business rule &quot;Once a record is inserted or updated in the Medical Insurance table, send an email notification to the assigned worker of the cases that the client belongs to&quot; by loading the records in the Medical Insurance Table
+The other part of the Rule is taken care by FOCUS Application">
+
+                    </sfdc:upsert-bulk>
+                    <message-properties-transformer overwrite="true" scope="session" doc:name="MP: store Salesforce Job Id and Response" doc:description="Store Job response and job id this will be used later to close the Job">
+                        <add-message-property key="JobId" value="#[payload.jobId]"/>
+                        <add-message-property key="JobResponse" value="#[payload]"/>
+                    </message-properties-transformer>
+                    <until-successful maxRetries="100" millisBetweenRetries="30000" failureExpression="#[payload.state== 'Queued' || payload.state == 'InProgress' ]" synchronous="true" doc:name="Until Successful" doc:description="Invoke the Batch Result stream in Until Successfull so as to ensure we get the job result when job is completed in salesforce">
+                        <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Job Status" doc:description="Retrieve batch result stream of the Bulk Job">
+                            <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
+                        </sfdc:batch-result-stream>
+                    </until-successful>
+                    <object-to-string-transformer mimeType="application/xml" doc:name="OS: ObjectStream to XML" doc:description="Consume Stream and make it Serializable and also adding the required mime type for XML"/>
+                    <dw:transform-message metadata:id="fd78efa0-33ac-4093-a779-6f39b4c55729" doc:name="TM: Final Response in CSV" doc:description="This Transformation creates a Error Report for all the records which failed in Salesforce
+This will be added to the overall Error report
+">
+                        <dw:input-payload doc:sample="sample_data\string.dwl" mimeType="application/xml"/>
+                        <dw:set-payload><![CDATA[%dw 1.0 
+%output application/csv header=false , quoteValues=true
+---
+payload.results.*result map  
+{
+	"Record Type": "DT",
+	"Medicaid Case ID": flowVars.validPayload[$$].MedicaidCaseId,
+	"Insured MCI Number": flowVars.validPayload[$$].MCINumber,
+	"Insured SSN": flowVars.validPayload[$$].SSN,
+	"Insured DOB": flowVars.validPayload[$$].DOB,
+	"Insured Last Name": flowVars.validPayload[$$].LastName,
+	"Insured First Name": flowVars.validPayload[$$].FirstName,
+	"Insurance Carrier Code": flowVars.validPayload[$$].CompanyCarrierCode,
+	"Insurance Carrier Location": flowVars.validPayload[$$].LocationCode,
+	"Holder Name": flowVars.validPayload[$$].PolicyHolderName,
+	"Holder SSN": flowVars.validPayload[$$].PolicyHolderSSN,
+	"Holder DOB": flowVars.validPayload[$$].PolicyHolderDOB,
+	"Holder MCI Number": flowVars.validPayload[$$].PolicyHolderMCI,
+	"Policy Number": flowVars.validPayload[$$].PolicyNumber,
+	"Group Number": flowVars.validPayload[$$].GroupNumber,
+	"Policy Coverage Type": flowVars.validPayload[$$].CoverageType,
+	"Policy Status": flowVars.validPayload[$$].PolicyStatus,
+	"Policy Verification": flowVars.validPayload[$$].PolicyVerification,
+	"Begin Date": flowVars.validPayload[$$].StartDate,
+	"End Date": flowVars.validPayload[$$].EndDate,
+	"Holder Relation": flowVars.validPayload[$$].Relationship,
+	"Holder Employer Name": flowVars.validPayload[$$].EmployerName,
+	"Holder Employer Address 1": flowVars.validPayload[$$].EmployerAddress1,
+	"Holder Employer Address 2": flowVars.validPayload[$$].EmployerAddress2,
+	"Holder Employer City": flowVars.validPayload[$$].EmployerCity,
+	"Holder Employer State": flowVars.validPayload[$$].EmployerState,
+	"Holder Employer Zip": flowVars.validPayload[$$].EmployerZip,
+	"Policy Add Date": flowVars.validPayload[$$].PolicyInfoAddedDate,
+	"Policy Mod Date": flowVars.validPayload[$$].PolicyInfoModDate,
+	'SFDC Error': $.errors.message
+} filter $."SFDC Error" != null and $."SFDC Error" != ""]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer mimeType="application/csv" doc:name="Object to String" doc:description="Consuming Stream and converting it to String"/>
+<expression-component doc:name="Expression : Calculate Valid Record Count" doc:description="Get SFDC Error Records Records as String , this is required since Dataweave gives output as Stream
+Calculate SFDC Error Records count after removing Missing Field records"><![CDATA[flowVars.validRecsCount = payload.equals("") ? flowVars.validRecsCount : (flowVars.validRecsCount - payload.split("\n").length) ]]></expression-component>
+<enricher source="#[payload]" target="#[flowVars.closeJobResult]" doc:name="Message Enricher" doc:description="Invoking Salesforce Close Job Operation in Message Enricher so that the payload is not modified">
+                    <sfdc:close-job config-ref="Salesforce__Basic_Authentication" jobId="#[sessionVars.JobId]" doc:name="Salesforce"/>
+</enricher>
+
+
+         </otherwise>
+</choice>
+
+                    </otherwise>
+               </choice>   
+
+            
+            </otherwise>
+        </choice>    
+        
+                  
+            </otherwise>
+        </choice>
+
+               <objectstore:store config-ref="TPL_Client_ObjectStore__Connector" key="recordChildSuccCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.validRecsCount]" doc:name="ObjectStore: Store Count of Valid Records in the current set" doc:description="ObjectStore: Store Count of Valid Records in the current set
+Store Sthe count with unique key so that the Object store entry is not overwritten in other invocations
+Storing in Object Store so that it can be retrieved after Batch Process"/>
+               <objectstore:store config-ref="TPL_Client_ObjectStore__Connector" key="recordChildTotalCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.totalRecordCount]" doc:name="ObjectStore: Store Count of All Records  in the current set" doc:description="ObjectStore: Store Count of All Records  in the current set
+Store Sthe count with unique key so that the Object store entry is not overwritten in other invocations
+Storing in Object Store so that it can be retrieved after Batch Process"/>
+<!--                     <expression-filter expression="#[( ((flowVars.totalRecordCount - flowVars.validRecsCount ) &gt; 0) || ((flowVars.PDMismatchWarning != null) &amp;&amp; (!flowVars.PDMismatchWarning.equals(&quot;&quot;)) ) )]" doc:name="Expression : Check for InValid Records" doc:description="Check for InValid Records If Invalid Records are found then they will be stored in Object Store in next subsequent steps
+Also checking for existense of PD Mismatch Warnings, these warnings will be not added to the success or failure count"/> -->
+<choice doc:name="Choice : Check for Record Errors" doc:description="Check if Record Errors are present">
+         <when expression="#[((flowVars.totalRecordCount - flowVars.validRecsCount ) &gt; 0)]">
+               <objectstore:store config-ref="TPL_Client_ObjectStore__Connector" key="recordErrors#[java.util.UUID.randomUUID().toString()]" value-ref="#[((flowVars.RequiredFieldsMissing == null ? &quot;&quot; : flowVars.RequiredFieldsMissing) + (flowVars.PersonNotFound == null ? &quot;&quot; : flowVars.PersonNotFound) + (flowVars.NewErrorRecords == null ? &quot;&quot; : flowVars.NewErrorRecords) + ((payload == null || (payload instanceof java.util.List) || payload.equals(&quot;&quot;)) ? &quot;&quot; : (payload)) )]" doc:name="ObjectStore: Store Record Errors" doc:description="Store Record Errors for records of this Set
+Storing the count with unique key so that the Object store entry is not overwritten in other invocations
+Storing in Object Store so that it can be retrieved after Batch Process"/>               
+         </when>
+         <otherwise>
+         	<logger message="No Errors were found during the executing of this Batch" level="INFO" doc:name="Logger"/>
+         </otherwise>
+</choice>
+                    <choice doc:name="Choice : Check for Length Mismatch Records" doc:description="Check for Invalid Length Records">
+                        <when expression="#[(flowVars.LenMisMatchRecs != null &amp;&amp; !flowVars.LenMisMatchRecs.equals(&quot;&quot;))]">
+                            <objectstore:store config-ref="TPL_Client_ObjectStore__Connector" key="recordErrorsLenMismatch#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.LenMisMatchRecs + System.lineSeparator()]" doc:name="ObjectStore: Store Invalid Length Records" doc:description="Store Invalid Length Records exception report in Object Store
+Storing the count with unique key so that the Object store entry is not overwritten in other invocations
+Storing in Object Store so that it can be retrieved after Batch Process"/>
+                        </when>
+                        <otherwise>
+                            <logger message="No Length Mismatch Records For this Batch" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>         
+                    <expression-filter expression="#[  ((flowVars.PDMismatchWarning != null) &amp;&amp; (!flowVars.PDMismatchWarning.equals(&quot;&quot;)) ) ]" doc:name="Expression : Check for Warning Records" doc:description="Check for Warning Records
+Checking for existense of PD Mismatch Warnings, these warnings will be not added to the success or failure count"/>
+                    <objectstore:store config-ref="TPL_Client_ObjectStore__Connector" key="recordWarnings#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.PDMismatchWarning]" doc:name="ObjectStore: Store Record Warnings" doc:description="Store Record Warnings for records of this Set
+Storing the count with unique key so that the Object store entry is not overwritten in other invocations
+Storing in Object Store so that it can be retrieved after Batch Process"/>
+                    <message-properties-transformer doc:name="MP : Remove stored values" scope="invocation">
+                        <delete-message-property key="RequiredFieldsMissing"/>
+                        <delete-message-property key="PersonNotFound"/>
+                        <delete-message-property key="NewErrorRecords"/>
+                        <delete-message-property key="LenMisMatchRecs"/>
+                        <delete-message-property key="PDMismatchWarning"/>
+                        <delete-message-property key="validPayload"/>
+                    </message-properties-transformer>
+                    <set-payload value="#[[]]" doc:name="Set Payload" doc:description="The output of Batch should &quot;List&quot;. However, we are preparing the CSV as the output of the batch. Hence, we are setting blank array by using this step. "/>
+                </batch:commit>
+            </batch:step>
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>                    
+                    <objectstore:store config-ref="TPL_Client_Error_ObjectStore__Connector" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="TPL_Client_Error_ObjectStore__Connector" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+                </batch:commit>
+            </batch:step>
+           
+        </batch:process-records>
+        <batch:on-complete>
+
+           <objectstore:retrieve-all-keys config-ref="TPL_Client_Error_ObjectStore__Connector" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Get all Exception Keys for this Load"/>
+           <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Store count of Exception Records"/>
+            <foreach doc:name="For Each : Iterate over Exception Keys" doc:description="Iterate over Exception Keys">
+                <choice doc:name="Choice" doc:description="Check if there was any SFDC Connection Exception">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="TPL_Client_Error_ObjectStore__Connector" key="#[payload]" doc:name="Exception ObjectStore : Retrieve and Remove a record having SFDC Connection Exception Count" doc:description="Retrieve and Remove a record having SFDC Connection Exception Count
+Store the value of the entry in Payload
+Removes Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:description="Update Total SFDC Connection Error Count" doc:name="Update Total SFDC Connection Error Count">
+	                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+	                    </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="TPL_Client_Error_ObjectStore__Connector" key="#[payload]" doc:name="Exception ObjectStore : Retrieve and Remove a record having Exception Details" doc:description="Retrieve and Remove a record having Exception Details
+Store the value of the entry in Payload
+Removes Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+		                <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Aggregate Exception Details">
+		                      <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+		                </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </foreach>
+            
+   
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if Exceptions occured" doc:description="Choice : Route to process Further if Exceptions occured
+If Exceptions occured flow is passed to a different branch which will handle clean up">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="TPL_Client_ObjectStore__Connector" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="For Each : Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="TPL_Client_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Removes all the enteries and Clean Object Store"/>
+
+                    </foreach>
+                    <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow" doc:description="Invoke flow which will raise Business Exception since errors were found in the Batch Job"/>
+              </when>
+              <otherwise>
+
+            <objectstore:retrieve-all-keys config-ref="TPL_Client_ObjectStore__Connector" doc:name="ObjectStore: Retrieve all Keys" doc:description="Retrieve all Keys of the Object Store enteries for this Load"/>
+
+            <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Initialize variables" doc:description="Initialize variables these will be used in the Interface dashboard">
+	              <add-message-property key="totalRecCount" value="#[0]"/>
+	              <add-message-property key="totalErrorCount" value="#[0]"/>
+	              <add-message-property key="totalSuccCount" value="#[0]"/>
+	        </message-properties-transformer>
+
+            <foreach doc:name="For Each" doc:description="Iterate over each key">
+
+
+                        <choice doc:name="Choice : Route all Counting and Error entries stored in Object Store " doc:description="Route all Counting and Error entries stored in Object Store ">
+                            <when expression="#[ payload.contains('Count') ]">
+                                <choice doc:name="Route Total Count and Succes Count enteries" doc:description="Route Total Count and Succes Count enteries">
+                                    <when expression="#[ payload.contains('TotalCount') ]">
+                                        <objectstore:remove config-ref="TPL_Client_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove and get Count Value in Payload" doc:description="Remove and get Value of the total count in Payload
+Store the value of the entry in Payload
+Removes Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                                        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update Total Count" doc:description="Update Total Count">
+                                            <add-message-property key="totalRecCount" value="#[ sessionVars.totalRecCount + (new java.lang.Integer(payload))]"/>
+                                        </message-properties-transformer>
+                                    </when>
+                                    <otherwise>
+                                        <objectstore:remove config-ref="TPL_Client_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove and get in Payload" doc:description="Remove and get Value of valid count in Payload
+Store the value of the entry in Payload
+Removes Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                                        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update Valid Record Count" doc:description="Update Valid Record Count">
+                                            <add-message-property key="totalSuccCount" value="#[ sessionVars.totalSuccCount + (new java.lang.Integer(payload))]"/>
+                                        </message-properties-transformer>
+                                    </otherwise>
+                                </choice>
+                            </when>
+                            <otherwise>
+
+                                <choice doc:name="Choice : Route all Error and Warnings" doc:description="Route all Error and Warnings">
+                                    <when expression="#[ payload.contains('recordErrors') ]">
+                                        <choice doc:name="Choice" doc:description="Distinguish Invalid Length Records with Other Records">
+                                            <when expression="#[payload.contains(&quot;recordErrorsLenMismatch&quot;)]">
+                                                <objectstore:remove config-ref="TPL_Client_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove and Get" doc:description="This Operation removes the key and value from Object Store and stores the value in Payload at the same time
+Removes Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                                                <message-properties-transformer scope="invocation" doc:name="Message Properties : Update Length Mismatch Recs" doc:description="Create and Update Length Mismatch Records, these records will be added as a separate Attachment">
+                                                    <add-message-property key="LenMisMatchRecs" value="#[flowVars.LenMisMatchRecs == null ? ( '******** INVALID LENGTH RECORDS ********' + System.lineSeparator() + (payload)) : (flowVars.LenMisMatchRecs + (payload))]"/>
+                                                </message-properties-transformer>
+                                            </when>
+                                            <otherwise>
+                                                <objectstore:remove config-ref="TPL_Client_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove and get"/>
+                                                <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update Error Attachement" doc:description="Create and Update Error Attachement
+Also header is added if not already there">
+                                                    <add-message-property key="ErrorAttachment" value="#[ sessionVars.ErrorAttachment == null ? ( 'Record Type,Medicaid Case ID,Insured MCI Number,Insured SSN,Insured DOB,Insured Last Name,Insured First Name,Insurance Carrier Code,Insurance Carrier Location,Holder Name,Holder SSN,Holder DOB,Holder MCI Number,Policy Number,Group Number,Policy Coverage Type,Policy Status,Policy Verification,Begin Date,End Date,Holder Relation,Holder Employer Name,Holder Employer Address 1,Holder Employer Address 2,Holder Employer City,Holder Employer State,Holder Employer Zip,Policy Add Date,Policy Mod Date,ErrorDescription' + System.lineSeparator() + (payload)) : (sessionVars.ErrorAttachment + (payload))]"/>
+                                                </message-properties-transformer>
+                                            </otherwise>
+                                        </choice>
+
+                                    </when>
+                                    <otherwise>
+                                        <objectstore:remove config-ref="TPL_Client_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Remove and get error Details" doc:description="Remove and get error Details
+Store the value of the entry in Payload
+Removes Each Entry from Object Store so that that these enteries does not appear in the next Run"/>
+                                        <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update Warning" doc:description="Create and Update Warning in Trans Attachment
+Also header is added if not already there">
+                                            <add-message-property key="TransAttachment" value="#[ sessionVars.TransAttachment == null ? ( 'MCI,Last Name in File,First Name in File,SSN in File,DOB in File,Last Name in FOCUS,First Name in FOCUS,SSN in FOCUS,DOB in FOCUS,PersonTypeId,Last Name does not Match with FOCUS,First Name does not Match with FOCUS,SSN does not Match with FOCUS,DOB does not Match with FOCUS' + System.lineSeparator() + (payload)) : (sessionVars.TransAttachment + (payload))]"/>
+                                        </message-properties-transformer>
+                                    </otherwise>
+                                </choice>
+                                <!-- <message-properties-transformer overwrite="true" scope="session" doc:name="Message Properties: Update totalErrorCount, ErrorAttachment"> -->
+                                <!-- </message-properties-transformer> -->
+                            </otherwise>
+                        </choice>
+            </foreach>
+                    <invoke object-ref="SFTPController" method="removeFile" doc:name="Invoke Java class to delete the file"/>
+			<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Error count" doc:description="Update Error count to be used in Logging framework">
+				<add-message-property key="totalErrorCount"
+					value="#[sessionVars.totalRecCount -  sessionVars.totalSuccCount]" />
+			</message-properties-transformer>
+			<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Record Status" doc:description="Update Record Status to be used in Logging framework">
+				<add-message-property key="recStatus"
+					value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+				<!-- <add-message-property key="ErrorAttachment" value="#[sessionVars.totalErrorCount==0  ? null : ('PID,MCI,Eligibility Start  Date,Eligibility End Date,Aid Category,MCO Start Date,MCO End Date,MCO ID,Taxonomy, DateofDeath,Physician Last Name,Physician First Name,Physician PhoneNumber,Error' + System.lineSeparator() + sessionVars.errorDetails.toString() )]"/> --> 
+			</message-properties-transformer>
+            <flow-ref name="CompleteTransactionSubflow" doc:name="CompleteTransactionSubflow" doc:description="Invoke flow to Complete Transaction"/>
+              
+              </otherwise>
+             </choice>
+
+
+            <!-- <logger message="#[payload]" level="INFO" doc:name="Logger"/> -->
+        </batch:on-complete>
+    </batch:job>
+    <sub-flow name="CompleteTransactionSubflow">
+        <choice doc:name="Choice " doc:description="Check If Trans Attachment is present">
+            <when expression="#[((sessionVars.TransAttachment != null) &amp;&amp; (!sessionVars.TransAttachment.equals(&quot;&quot;)))]">
+
+        		<set-payload value="{&quot;InterfaceID&quot;: &quot;INF052&quot;, &quot;InterfaceName&quot;: &quot;TPL Client Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TPLClientInformationLoad&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Warning_Client_Details_MisMatch&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.totalSuccCount==0?'Error':sessionVars.totalErrorCount==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.FSFValues != null?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP: JSON for completed job" doc:description="Sets JSON for logging framework
+Adds details for Warning File also along with error Attachment details"/>
+            </when>
+            <otherwise>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF052&quot;, &quot;InterfaceName&quot;: &quot;TPL Client Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TPLClientInformationLoad&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.totalSuccCount==0?'Error':sessionVars.totalErrorCount==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.FSFValues != null?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP: JSON for completed job." doc:description="Sets JSON for logging framework
+Adds details only for error Attachment details"/>
+            </otherwise>
+        </choice>
+
+        <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework to complete Transaction"/>
+        <choice doc:name="Choice" doc:description="Check if ant Length Mismatch Records are present">
+            <when expression="#[flowVars.LenMisMatchRecs != null]">
+                <message-properties-transformer overwrite="true" scope="session" doc:name="Create New Error Attachment" doc:description="Create New Error Attachment with Length Mismatch Records">
+                    <add-message-property key="ErrorAttachment" value="#[flowVars.LenMisMatchRecs]"/>
+                    <delete-message-property key="TransAttachment"/>
+                </message-properties-transformer>
+                <set-payload value="{&quot;InterfaceID&quot;: &quot;INF052&quot;, &quot;InterfaceName&quot;: &quot;TPL Client Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error_LengthMismatch&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.totalSuccCount==0?'Error':sessionVars.totalErrorCount==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.FSFValues != null?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP: JSON for completed job" doc:description="Create JSON for Logging framework to complete Transaction
+Also adds details for the Length Mismatch Exception File"/>
+                <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Looging framework for Transaction completion"/>
+            </when>
+            <otherwise>
+                <logger message="No Length MismatchRecords found for this Transaction" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="inf052-tpl-client-load-retrieve-LOV-Sub_Flow">
+        <dw:transform-message doc:name="Transform Message : Prepare Payload for Query Framework" doc:description="Prepare Payload for Query Framework
+The LOV names are specified">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Direction" : "Inbound",
+	"LOVNames" : "'POLICY_COV_TYPE','POLICY_STATUS','POLICY_STATUS','POLICY_HOL_REL'"
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow" doc:description="Invoke LOV Query Framework to retrieve LOV values for the LOV Names which were provided"/>
+    </sub-flow>      
+</mule>

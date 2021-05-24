@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd">
+
+    <sftp:connector name="SFTPConnector" validateConnections="true" doc:name="SFTP" >
+        <reconnect count="5"/>
+    </sftp:connector>
+    <sftp:connector name="SFTPFilenameMatchConnector" validateConnections="true" doc:name="SFTP" duplicateHandling="overwrite">
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+    </sftp:connector>
+	<sftp:connector name="SFTPFilenameMatchNoDeleteConnector" validateConnections="true" autoDelete="false" doc:name="SFTP" >
+		<spring:property name="serviceOverrides">
+			<spring:map>
+				<spring:entry key="requester.factory"
+					value="gov.delaware.requester.CustomSftpMessageRequesterFactory" />
+			</spring:map>
+		</spring:property>
+		<reconnect count="5" />
+	</sftp:connector>
+	<mulerequester:config name="Mule_Requester" doc:name="Mule Requester"/>    
+    <!-- <sfdc:config name="Salesforce__Basic_Authentication_Config"
+		username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}"
+		url="${sfdc.url}" disableSessionInvalidation="true"
+		doc:name="Salesforce: Basic Authentication">
+		<reconnect count="5" frequency="5000"/>
+	</sfdc:config> -->
+	<spring:beans>
+		<spring:import resource="classpath:/loggingframework.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/errorhandling.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/queryframework.xml" />
+	</spring:beans> 
+	    
+</mule>

@@ -66,29 +66,26 @@ payload map
 }]]]></dw:set-payload>
         </dw:transform-message>
         <logger message="Before Update::#[payload]" level="INFO" doc:name="Logger"/>
-        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_CPA_Document__c" doc:name="Salesforce">
+        <sfdc:update config-ref="Salesforce__Basic_Authentication_dev" type="DEL_CPA_Document__c" doc:name="Salesforce">
             <sfdc:objects ref="#[payload]"/>
-        
         </sfdc:update>
+		<message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="LOVReturned"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="reportParams"/>
+			<delete-message-property key="InterfaceName"/>
+			<delete-message-property key="InitialPayload"/>
+			<delete-message-property key="providerIdList"/>
+			<delete-message-property key="AddressDetailsMap"/>
+			<delete-message-property key="FileAttachment"/>
+			<delete-message-property key="FileBody"/>
+		</message-properties-transformer>
         <logger level="INFO" doc:name="Logger"/>
-    <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
-
-				<delete-message-property key="InterfaceID"/>
-				<delete-message-property key="interfaceTransactionStatus"/>
-				<delete-message-property key="TransactionID"/>
-				<delete-message-property key="LOVReturned"/>
-				<delete-message-property key="SubPayload"/>
-				<delete-message-property key="Tname"/>
-				<delete-message-property key="Time"/>
-				
-				<delete-message-property key="reportParams"/>
-				<delete-message-property key="InterfaceName"/>
-				<delete-message-property key="InitialPayload"/>
-				<delete-message-property key="providerIdList"/>
-				<delete-message-property key="AddressDetailsMap"/>
-				<delete-message-property key="FileAttachment"/>
-				<delete-message-property key="FileBody"/>
-			</message-properties-transformer>
     </sub-flow>
     <sub-flow name="stpv_warrant_file">
         <dw:transform-message doc:name="TW: GroupBy ProviderId">
@@ -107,7 +104,7 @@ payload groupBy $.ProviderId]]></dw:set-payload>
                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-( payload.*payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-payload>
+( payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-payload>
             </dw:transform-message>
             <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Id, Provider__c, Street_1__c, Street_2__c, City__c, State__c, ZIP__c FROM DEL_Provider_Address__c WHERE Address_Type__c= 'Remittance' AND Status__c = 'Active' AND Provider__c in (#[payload])" doc:name="Salesforce : Get Provider Address" doc:description="Get Provider Address from List of Provider Ids"/>
             <dw:transform-message doc:name="Transform Message : Get Address Details">
