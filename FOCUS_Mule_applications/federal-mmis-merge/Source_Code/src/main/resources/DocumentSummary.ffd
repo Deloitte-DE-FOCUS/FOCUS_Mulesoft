@@ -1,0 +1,6 @@
+form: FIXEDWIDTH
+name: 'DocumentSummary'
+values: 
+- { name: 'DSCYFTIN', usage: M, type: String, length: 11}
+- { name: 'Filler', usage: M, type: String, length: 6 }
+- { name: 'Amount', usage: M, type: String, length: 10 }

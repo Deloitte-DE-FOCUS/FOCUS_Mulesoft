@@ -1,0 +1,13 @@
+{
+	"attributes": {
+		"type": "DEL_Extract__c",
+		"url": "/services/data/v47.0/sobjects/DEL_Extract__c/a2S350000006xssEAA"
+	},
+	"Id": "a2S350000006xssEAA",
+	"Name": "0000000058",
+	"Encrypt_PID__c": true,
+	"Start_Date__c": "2020-01-21",
+	"End_Date__c": "2020-01-23",
+	"Attachment_Generated__c": false,
+	"File_Type__c": "Kids in DFS custody without an active placement"
+}
