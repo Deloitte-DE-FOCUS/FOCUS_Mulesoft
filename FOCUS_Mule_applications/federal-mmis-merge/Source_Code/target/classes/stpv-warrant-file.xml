@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+    <sub-flow name="stpv_warrant_file_generate_subflow">
+        <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Id,Electronic_Pay__c,Transaction_Amount__c,Client_Name__c,FSF_TIN__c,  Document__r.Doc_Total_AMT__c, Provider_Name__c,Provider_Last_Name_Organization_Name__c, Provider_Last_Name_Organization_Name__r.Name,  Provider_Last_Name_Organization_Name__r.DEL_First_Name__c, Provider_Last_Name_Organization_Name__r.DEL_OIS_Vendor_Id__c,  Document__c,Document__r.Payment_Date__c,Document__r.Document_Type__c    FROM DEL_Transaction__c where Document__r.Document_Type__c='SP' and Electronic_Pay__c='N' and Document__c = #[flowVars.DocId] " doc:name="Salesforce : Query Transactions" doc:description="Query Transactions Using Document ID"/>
+        <choice doc:name="Choice : Check Size of the Transactions Retrieved">
+            <when expression="#[payload.size() == 0]">
+                <logger message="#[&quot;No Transactions Found for the given document Id: &quot; + flowVars.DocId]" level="INFO" doc:name="Logger"/>
+                <dw:transform-message doc:name="Transform Message : Set Failure Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": false,
+	"FailureReason": "There are no valid Transactions found for the given Document"
+}]]></dw:set-payload>
+                </dw:transform-message>
+
+                <logger message="Failure Message: #[payload]" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="TW: Convert Query Output into Canonical Java format">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	Id : $.Id,
+	Electronic_Pay__c : $.Electronic_Pay__c,
+	FSFTIN: $.FSF_TIN__c,
+	DocumentId : $.Document__c,
+	ClientId: $.Client_Name__c default "",
+	ProviderId: $.Provider_Last_Name_Organization_Name__c default "",
+	OISVendorId: $.Provider_Last_Name_Organization_Name__r.DEL_OIS_Vendor_Id__c default "",
+	ProviderLastName: $.Provider_Last_Name_Organization_Name__r.Name default "",
+	ProviderFirstName: $.Provider_Last_Name_Organization_Name__r.DEL_First_Name__c default "",
+	PaymentDate: $.Document__r.Payment_Date__c default "",
+	DocumentType : $.Document__r.Document_Type__c,
+	DocTotalAmount: $.Document__r.Doc_Total_AMT__c as :number {format: "#######.##"},
+	Amount: $.Transaction_Amount__c	as :number {format: "#######.##"}
+}
+]]></dw:set-payload>
+                </dw:transform-message>
+                <flow-ref name="stpv_warrant_file" doc:name="stpv_warrant_file"/>
+
+            </otherwise>
+        </choice>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.reportParams.ReportParameters.DocId,
+		"Attachment_Generated__c": payload."Success" as :boolean default false,
+		"Failure_Reason__c": payload."FailureReason" 
+
+}]]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Before Update::#[payload]" level="INFO" doc:name="Logger"/>
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_CPA_Document__c" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+        <logger level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="stpv_warrant_file">
+        <dw:transform-message doc:name="TW: GroupBy ProviderId">
+            <dw:input-payload doc:sample="sample_data\list_string.dwl"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload groupBy $.ProviderId]]></dw:set-payload>
+        </dw:transform-message>
+
+        <set-variable variableName="InitialPayload" value="#[payload]" mimeType="application/java" doc:name="FV: Store Initial Payload"/>
+        <set-variable variableName="providerIdList" value="#[dw('payload pluck ($$ as :string)')]" doc:name="Variable : Provider Id List" doc:description="Provider Id List"/>
+        <foreach batchSize="150" doc:name="For Each" collection="#[flowVars.providerIdList]">
+            <dw:transform-message doc:name="TW: DistinctBy ClientId and ListOfProviderIds">
+                <dw:input-payload doc:sample="sample_data\map_2.dwl"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+( payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Id, Provider__c, Street_1__c, Street_2__c, City__c, State__c, ZIP__c FROM DEL_Provider_Address__c WHERE Address_Type__c= 'Remittance' AND Status__c = 'Active' AND Provider__c in (#[payload])" doc:name="Salesforce : Get Provider Address" doc:description="Get Provider Address from List of Provider Ids"/>
+            <dw:transform-message doc:name="Transform Message : Get Address Details">
+                <dw:set-variable variableName="AddressDetailsMap"><![CDATA[%dw 1.0
+%output application/java
+---
+payload reduce ((val, acc = (flowVars.AddressDetailsMap default {})) -> acc ++ (( { (val.Provider__c as :string) : { StreetLine1: val.Street_1__c, StreetLine2: val.Street_2__c, City: val.City__c, State: val.State__c, ZipCode: val.ZIP__c } } )))]]></dw:set-variable>
+
+            </dw:transform-message>
+
+        </foreach>
+        <enricher doc:name="Message Enricher Get LOV Mappings">
+            <flow-ref name="STPV_callLOVflow" doc:name="STPV_callLOVflow"/>
+            <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+        </enricher>
+
+
+        <dw:transform-message doc:name="TW: Convert Java List of Map to FixedWidth">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output text/plain schemaPath="STPVWarrantData.ffd",recordTerminator = "lf"
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+	OISVendorId : $[0].OISVendorId default "",
+	Filler1 : "",
+	VendorName : (($[0].ProviderLastName ++ ", " ++ $[0].ProviderFirstName)[0..25]) when ($[0].ProviderFirstName != null and $[0].ProviderFirstName != "" and $[0].ProviderLastName !=null and ((sizeOf (($[0].ProviderLastName ++ ", " ++ $[0].ProviderFirstName)) ) >= 26)) otherwise (( $[0].ProviderLastName ++ ", " ++ $[0].ProviderFirstName ) when ($[0].ProviderFirstName != null and $[0].ProviderFirstName != "" and $[0].ProviderLastName !=null ) otherwise ($[0].ProviderLastName[0..25] when ((sizeOf ($[0].ProviderLastName)) >= 26) otherwise $[0].ProviderLastName default "")),
+	Street1 : (flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine1)[0..24] when ((sizeOf (flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine1 default "")) >= 25) otherwise flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine1 default "",
+	Street2 : ((flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine2)[0..26]) when ( flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine2 != null and ((sizeOf ((flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine2))) >= 27)) otherwise ((flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine2) when ( flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine2 != null ) otherwise ( ((flowVars.AddressDetailsMap[$[0].ProviderId].City default "") ++ " " ++ ( (flowVars.LOVReturned[("STATE_CODE-" ++ (flowVars.AddressDetailsMap[$[0].ProviderId].State default "") )][0]) default "" ) ++ " " ++ (flowVars.AddressDetailsMap[$[0].ProviderId].ZipCode default "")) when ((sizeOf ((flowVars.AddressDetailsMap[$[0].ProviderId].City default "") ++ " " ++ ( (flowVars.LOVReturned[("STATE_CODE-" ++ (flowVars.AddressDetailsMap[$[0].ProviderId].State default "") )][0]) default "" ) ++ " " ++ (flowVars.AddressDetailsMap[$[0].ProviderId].ZipCode default ""))) <= 27 ) otherwise ( ( (flowVars.AddressDetailsMap[$[0].ProviderId].City default "") ++ " " ++ ( (flowVars.LOVReturned[("STATE_CODE-" ++ (flowVars.AddressDetailsMap[$[0].ProviderId].State default "") )][0]) default "" ) ++ " " ++ (flowVars.AddressDetailsMap[$[0].ProviderId].ZipCode default ""))[0..26] ) )),	
+	Street3 : ( ((flowVars.AddressDetailsMap[$[0].ProviderId].City default "") ++ " " ++ ( (flowVars.LOVReturned[("STATE_CODE-" ++ (flowVars.AddressDetailsMap[$[0].ProviderId].State default "") )][0]) default "" ) ++ " " ++ (flowVars.AddressDetailsMap[$[0].ProviderId].ZipCode default "")) when ((sizeOf ((flowVars.AddressDetailsMap[$[0].ProviderId].City default "") ++ " " ++ ( (flowVars.LOVReturned[("STATE_CODE-" ++ (flowVars.AddressDetailsMap[$[0].ProviderId].State default "") )][0]) default "" ) ++ " " ++ (flowVars.AddressDetailsMap[$[0].ProviderId].ZipCode default ""))) <= 22 ) otherwise ( ( (flowVars.AddressDetailsMap[$[0].ProviderId].City default "") ++ " " ++ ( (flowVars.LOVReturned[("STATE_CODE-" ++ (flowVars.AddressDetailsMap[$[0].ProviderId].State default "") )][0]) default "" ) ++ " " ++ (flowVars.AddressDetailsMap[$[0].ProviderId].ZipCode default ""))[0..21] ) ) when (flowVars.AddressDetailsMap[$[0].ProviderId].StreetLine2 != null) otherwise "",
+	ECCode : pad("0",2 - (sizeOf ((sizeOf (($ filter ($.ClientId != null and $.ClientId != "")) distinctBy $.ClientId)) as :string))) ++ (sizeOf (($ filter ($.ClientId != null and $.ClientId != "")) distinctBy $.ClientId)),
+	Filler2 : "",
+	Amount : pad(" ",9 - (sizeOf (((sum $.Amount) * -1) as :string {format : "#.00"}))) ++ (((sum $.Amount) * -1) as :string {format : "#.00"}),
+	Filler3 : "",
+	Activity : "", // Always Blank 
+	Filler4 : "",
+	EffectiveDate : ($[0].PaymentDate as :date {format : "yyyy-MM-dd"} as :string {format : "MM/dd/yyyy"}) when ($[0].PaymentDate != null) otherwise ""	
+	
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <object-to-string-transformer doc:name="Object to String : Consume Payload" doc:description="Consume Payload"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties : Prepare File Details">
+            <add-message-property key="FileAttachment" value="#[payload]"/>
+            <add-message-property key="FileName" value="#[dw('( &quot;WarrantFile_&quot; ++ (now &gt;&gt; &quot;America/New_York&quot;) as :string {format : &quot;MMddyyyy&quot;})')]"/>
+            <add-message-property key="FileExtn" value="prn"/>
+            <add-message-property key="FileDescription" value="&quot;STPV Warrant File&quot;"/>
+        </message-properties-transformer>
+        <enricher doc:name="Message Enricher">
+            <flow-ref name="stpv_add_attachment" doc:name="stpv_add_attachment"/>
+            <enrich source="#[payload]" target="#[payload]"/>
+            <enrich source="#[payload]" target="#[flowVars.MainFile]"/>
+        </enricher>
+    </sub-flow>
+
+    <sub-flow name="STPV_callLOVflow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'STATE_CODE'&quot;}" mimeType="application/json" doc:name="Set Payload" doc:description="Set Payload With Required LOV Attributes"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow> 
+</mule>
