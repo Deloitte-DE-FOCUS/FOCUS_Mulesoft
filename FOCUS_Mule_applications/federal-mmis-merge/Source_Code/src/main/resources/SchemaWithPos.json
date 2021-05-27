@@ -1,0 +1,74 @@
+form: FIXEDWIDTH
+name: 'afcarsFosterFFD'
+values: 
+- { name: 'State', usage: M, type: String, length: 2 } 2
+- { name: 'ReportEndingDate', usage: M, type: String, length: 6 } 8
+- { name: 'LocalFIPSCode', usage: M, type: String, length: 5 } 13
+- { name: 'RecordNumber', usage: M, type: String, length: 12 } 25
+- { name: 'MostRecentPeriodicReview', usage: M, type: String, length: 8 } 33
+- { name: 'DOB', usage: M, type: String, length: 8 } 41
+- { name: 'Sex', usage: M, type: String, length: 1 } 42
+- { name: 'Race_American', usage: M, type: String, length: 1 } 43
+- { name: 'Race_Asian', usage: M, type: String, length: 1 } 44
+- { name: 'Race_Black', usage: M, type: String, length: 1 } 45
+- { name: 'Race_Native', usage: M, type: String, length: 1 } 46
+- { name: 'Race_White', usage: M, type: String, length: 1 } 47
+- { name: 'Race_Unable', usage: M, type: String, length: 1 } 48
+- { name: 'Hispanic', usage: M, type: String, length: 1 } 49
+- { name: 'Disability', usage: M, type: String, length: 1 } 50
+- { name: 'MentalRetardation', usage: M, type: String, length: 1 } 51
+- { name: 'Visually_HearingImpaired', usage: M, type: String, length: 1 } 52
+- { name: 'PhysicallyDisabled', usage: M, type: String, length: 1 } 53
+- { name: 'EmotionallyDisturbed', usage: M, type: String, length: 1 } 54
+- { name: 'OtherMedicallyDiagnoses', usage: M, type: String, length: 1 } 55
+- { name: 'ChildEverAdopted', usage: M, type: String, length: 1 } 56
+- { name: 'AgeofAdoption', usage: M, type: String, length: 1 } 57
+- { name: 'FirstRemoval', usage: M, type: String, length: 8 } 65
+- { name: 'TotalNumberRemovalsfromHome', usage: M, type: String, length: 2 } 66-67
+- { name: 'LastDischarged', usage: M, type: String, length: 8 } 75
+- { name: 'LatestRemoval', usage: M, type: String, length: 8 } 83
+- { name: 'RemovalTransactionDate', usage: M, type: String, length: 8 } 91
+- { name: 'PlacementCurrentFosterCare', usage: M, type: String, length: 8 } 99
+- { name: 'PreviousPlacementRemovalEpisode', usage: M, type: String, length: 2 } 101
+- { name: 'RemovalforCurrentPlacementEpisode', usage: M, type: String, length: 1 } 102
+- { name: 'Placement_Physical_Abuse', usage: M, type: String, length: 1 } 103
+- { name: 'Placement_Sexual_Abuse', usage: M, type: String, length: 1 } 104
+- { name: 'Placement_Neglect', usage: M, type: String, length: 1 } 105
+- { name: 'Placement_Alcohol_Abuse', usage: M, type: String, length: 1 } 106
+- { name: 'Placement_Drug_Abuse', usage: M, type: String, length: 1 } 107
+- { name: 'Placement_Alcohol_AbuseC', usage: M, type: String, length: 1 } 108
+- { name: 'Placement_Drug_AbuseC', usage: M, type: String, length: 1 } 109
+- { name: 'Placement_ChildDisability', usage: M, type: String, length: 1 } 110
+- { name: 'Placement_ChildBehaviorProblem', usage: M, type: String, length: 1 } 111
+- { name: 'Placement_DeathofParent', usage: M, type: String, length: 1 } 112
+- { name: 'Placement_IncarcerationofParent', usage: M, type: String, length: 1 } 113
+- { name: 'Placement_CaretakersInability', usage: M, type: String, length: 1 } 114
+- { name: 'Placement_Abandonment', usage: M, type: String, length: 1 } 115
+- { name: 'Placement_Relinquishment', usage: M, type: String, length: 1 } 116
+- { name: 'Placement_InadequateHousing', usage: M, type: String, length: 1 } 117
+- { name: 'CurrentPlacementSetting', usage: M, type: String, length: 1 } 118
+- { name: 'CurrentPlacementOutofState', usage: M, type: String, length: 1 } 119
+- { name: 'CasePlanGoal', usage: M, type: String, length: 1 } 120
+- { name: 'PrincipalCaretakerFamilyStructure', usage: M, type: String, length: 1 } 121
+- { name: 'PrincipalCaretaker1', usage: M, type: String, length: 4 } 125
+- { name: 'PrincipalCaretaker2', usage: M, type: String, length: 4 } 129
+- { name: 'MotherTPR', usage: M, type: String, length: 8 } 137
+- { name: 'FathersTPR', usage: M, type: String, length: 8 } 145
+- { name: 'FosterFamilyStructure', usage: M, type: String, length: 1 } 146
+- { name: 'YOBFosterCaretaker1', usage: M, type: String, length: 4 }
+- { name: 'YOBFosterCaretaker2', usage: M, type: String, length: 4 }
+- { name: 'RaceFosterCaretaker1', usage: M, type: String, length: 6 }
+- { name: 'HispanicOriginFosterCaretaker1', usage: M, type: String, length: 1 }
+- { name: 'RaceFosterCaretaker2', usage: M, type: String, length: 6 }
+- { name: 'HispanicOriginFosterCaretaker2', usage: M, type: String, length: 1 }
+- { name: 'DateDischargeFosterCare', usage: M, type: String, length: 8 }
+- { name: 'DischargeTransactionDate', usage: M, type: String, length: 8 }
+- { name: 'ReasonDischarge', usage: M, type: String, length: 1 }
+- { name: 'TitleIV_EFoster', usage: M, type: String, length: 1 }
+- { name: 'TitleIV_EAdoption', usage: M, type: String, length: 1 }
+- { name: 'IV_A', usage: M, type: String, length: 1 }
+- { name: 'TitleIV_D', usage: M, type: String, length: 1 }
+- { name: 'TitleXIX', usage: M, type: String, length: 1 }
+- { name: 'SSI', usage: M, type: String, length: 1 }
+- { name: 'NoneoftheAbove', usage: M, type: String, length: 1 }
+- { name: 'Amount', usage: M, type: String, length: 5 }

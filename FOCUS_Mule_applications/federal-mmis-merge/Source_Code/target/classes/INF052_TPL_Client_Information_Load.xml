@@ -394,7 +394,8 @@ payload map
 	ExternalId: $.MCINumber default "" as :string ++ "-" ++ 
 	        	$.PolicyNumber default "" as :string ++ "-" ++ 
 	        	$.GroupNumber default "" as :string ++ "-" ++ 
-	        	($.StartDate as :string as :date {format: "yyyyMMdd"} as :string {format: "yyyy-MM-dd"}) as :string default "" as :string ++ "-" ++ 				            				            
+	        	($.StartDate as :string as :date {format: "yyyyMMdd"} as :string {format: "yyyy-MM-dd"}) as :string default "" as :string ++ "-" ++ 				            
+	        	($.EndDate as :string as :date {format: "yyyyMMdd"} as :string {format: "yyyy-MM-dd"}) as :string default "" as :string ++ "-" ++				            
 	        	((flowVars.LOVReturned[("POLICY_COV_TYPE-" ++ (((trim $.CoverageType)) default ""))] default [""])[0]) as :string ++ "-" ++ 
 	        	$.CompanyCarrierCode default "" as :string	++ "-" ++ $.PolicyHolderName default "" as :string replace /(?:\')/ with " "		        	
 }]]></dw:set-payload>
