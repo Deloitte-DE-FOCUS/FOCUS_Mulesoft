@@ -1015,10 +1015,7 @@ payload map {
 %output application/java
 ---
 (payload orderBy ($.ServiceTypeAtDischargePriority) groupBy ($.PIDAtAdmission))]]></dw:set-payload>
-						<dw:set-variable variableName="teugs"><![CDATA[%dw 1.0
-%output application/json
----
-(payload orderBy ($.ServiceTypeAtDischargePriority) groupBy ($.PIDAtAdmission))]]></dw:set-variable>
+
 					</dw:transform-message>
 					<dw:transform-message doc:name="TM: Prepare Java output SA Discharge - Step4">
 						<dw:set-payload><![CDATA[%dw 1.0
@@ -1233,10 +1230,7 @@ payload map {
 %output application/java
 ---
 (payload orderBy ($.ServiceTypeAtDischargePriority) groupBy ($.PIDAtAdmission))]]></dw:set-payload>
-						<dw:set-variable variableName="kmskls"><![CDATA[%dw 1.0
-%output application/json
----
-payload orderBy ($.ServiceTypeAtDischargePriority) groupBy ($.PIDAtAdmission)]]></dw:set-variable>
+
 					</dw:transform-message>
 					<dw:transform-message doc:name="TM: Prepare Java output MH Discharge Order by Priority  - Step 4">
 						<dw:set-payload><![CDATA[%dw 1.0
@@ -1895,8 +1889,8 @@ payload map {
             <add-message-property key="Direction" value="#[json:/Direction]"/>
             <add-message-property key="LOVNames" value="#[json:/LOVNames]"/>
         </message-properties-transformer>
-		<logger message="SELECT Name, Partner_Code__c, FOCUS_Code__c,Priority__c From DEL_Interface_Picklist_Mapping__c where Name in (#[flowVars.LOVNames]) and Active__c = true" level="INFO" doc:name="Logger"/>
-		<sfdc:query config-ref="Salesforce__Basic_Authentication1" query="SELECT Name, Partner_Code__c, FOCUS_Code__c,Priority__c From DEL_Interface_Picklist_Mapping__c where Name in (#[flowVars.LOVNames]) and Active__c = true" doc:name="Salesforce"/>
+
+		<sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Name, Partner_Code__c, FOCUS_Code__c,Priority__c From DEL_Interface_Picklist_Mapping__c where Name in (#[flowVars.LOVNames]) and Active__c = true" doc:name="Salesforce"/>
 
         <choice doc:name="Choice">
             <when expression="#[flowVars.Direction == 'Inbound']">
@@ -1920,24 +1914,9 @@ payload map
 	($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c ,
 	($.Name ++ "-Priority-" ++ $.FOCUS_Code__c) : $.Priority__c 
 }]]></dw:set-variable>
-					<dw:set-variable variableName="LOVPriorityReturned"><![CDATA[%dw 1.0
-%output application/java
----
-payload map
-{
-	($.Name ++ "-" ++ $.FOCUS_Code__c ) : ($.Partner_Code__c ++ "-" ++ $.Priority__c)  
-}]]></dw:set-variable>
+
 				</dw:transform-message>
-				<dw:transform-message doc:name="Transform Message">
-					<dw:set-variable variableName="lov"><![CDATA[%dw 1.0
-%output application/json
----
-payload map
-{
-	($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c,
-	($.Name ++ "-Priority-" ++ $.FOCUS_Code__c) : $.Priority__c 
-}]]></dw:set-variable>
-				</dw:transform-message>
+
 
             </when>
             <otherwise>
