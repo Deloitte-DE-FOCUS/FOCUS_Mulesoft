@@ -3351,7 +3351,7 @@ payload map {
                 <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-payload filter ( (  ( $.Placement != null ) or ($.Runaway != null ) ) and ( ( sizeOf ( ($.Placement default []) filter ( ($.ServiceFosterCareSettingType == "Foster Care") or (($.HomePlacement default "") == "Trial Reunification") ) ) ) > 0 ) )]]></dw:set-payload>
+payload filter ( (  ( $.Placement != null ) and ( ( sizeOf ( ($.Placement default []) filter ( ($.ServiceFosterCareSettingType == "Foster Care") or (($.HomePlacement default "") == "Trial Reunification") ) ) ) > 0 ) ) or ($.Runaway != null ) )]]></dw:set-payload>
             </dw:transform-message>
             <dw:transform-message doc:name="Transform Message : Add Records to List">
                 <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="AllEpisodeRecords"><![CDATA[%dw 1.0
