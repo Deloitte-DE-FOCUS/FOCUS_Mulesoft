@@ -688,7 +688,7 @@ payload map {
 	
 } ]]></dw:set-payload>
                     </dw:transform-message>
-                    <logger message="'After MH Admission Step1'#[payload]" level="INFO" doc:name="Logger"/>
+                   
                     <dw:transform-message doc:name="TM: Prepare Java output MH Admission - Step2">
                         <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
@@ -798,7 +798,7 @@ payload map {
 	"Error Description" :   (( 'State Provider Identifier (ISAT ID) is Missing' )  when  ($.StateProviderIdentifier=="" or $.StateProviderIdentifier==null)  otherwise "")  default "" 
 } filter ($."Error Description" != null and  $."Error Description" != "")]]></dw:set-session-variable>
                     </dw:transform-message>
-                    <logger message="'After MH Admission Step 2'#[payload]" level="INFO" doc:name="Logger"/>
+                    
                     <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Attributes">
                         <add-message-property key="FilePrefixName" value="${tedsExtract.MHAdmission.filename}"/>
                         <add-message-property key="FileExtension" value=".txtMH"/>
