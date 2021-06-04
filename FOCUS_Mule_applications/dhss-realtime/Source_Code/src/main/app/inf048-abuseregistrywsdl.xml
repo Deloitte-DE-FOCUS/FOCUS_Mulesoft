@@ -608,14 +608,15 @@ payload map
 	}
 }]]></dw:set-variable>
             </dw:transform-message>
+			<logger message="Notify Request #[payload]" level="INFO" doc:name="Logger"/>
+			<enricher doc:name="Message Enricher">
+				<flow-ref name="NotifyResult_LogTransaction_In_Progress" doc:name="NotifyResult_LogTransaction_In_Progress"/>
+				<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+			</enricher>
 
-            <logger message="Notify Request #[payload]" level="INFO" doc:name="Logger"/>
 
             <ws:consumer config-ref="DHSS_Abuse_Registry_Notify_Results" operation="NotifyResultReady" doc:name="Web Service Consumer"/>
-            <enricher doc:name="Message Enricher">
-                <flow-ref name="NotifyResult_LogTransaction_In_Progress" doc:name="NotifyResult_LogTransaction_In_Progress"/>
-                <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
-            </enricher>
+
             <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
             <logger message="Notify Result:: #[payload]" level="INFO" doc:name="Logger"/>
 
