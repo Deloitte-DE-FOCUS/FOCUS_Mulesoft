@@ -2380,7 +2380,7 @@ payload filter ( not
 %function checkPriority(placement) (0 when ((placement.PlacementID != null) and (placement.HomePlacement == "")) otherwise (1 when ((placement.HomePlacement default "") == "Trial Reunification") otherwise (2 when (placement.RunawayID != null) otherwise 3) ) )
 %var latestEndDate2 = ((flowVars.LatestPlacementOrTRU23 orderBy $.EndDate2)[-1..0])[0].EndDate2
 ---
-( ( (flowVars.LatestPlacementOrTRU23 filter ($.EndDate2 == latestEndDate2 ) ) orderBy $.StartDate)[-1..0] ) orderBy checkPriority($)[0..-1] ]]></dw:set-variable>
+( ( (flowVars.LatestPlacementOrTRU23 filter ($.EndDate2 == latestEndDate2 ) ) orderBy $.StartDate)[-1..0] ) orderBy checkPriority($)[0..-1] default {}]]></dw:set-variable>
             </dw:transform-message>			
 			
             <dw:transform-message doc:name="Transform Message : Calculate First Placement and Runaways">
