@@ -470,6 +470,77 @@ payload map {
 	Flag:true
 }]]></dw:set-variable>
         </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="extractInfo"/>
+				<delete-message-property key="InterfaceName"/>
+				<delete-message-property key="RecordCount"/>
+				<delete-message-property key="MedicaidApplicable"/>
+				<delete-message-property key="AdoptiveParent2"/>
+				<delete-message-property key="AdoptiveParent1"/>
+				<delete-message-property key="FormerAdoptiveParent1"/>
+				<delete-message-property key="FormerAdoptiveParent2"/>
+				<delete-message-property key="BioParent1"/>
+				<delete-message-property key="BioParent2"/>
+				<delete-message-property key="PostChild"/>
+				<delete-message-property key="PreChild"/>
+				<delete-message-property key="CourtOrderRecords"/>
+				<delete-message-property key="PreAdoptiveRecords"/>
+				<delete-message-property key="LessOne"/>
+				<delete-message-property key="AgeOne"/>
+				
+				<delete-message-property key="AgeTwo"/>
+				<delete-message-property key="AgeThree"/>
+				<delete-message-property key="AgeFour"/>
+				<delete-message-property key="AgeFive"/>
+				<delete-message-property key="AgeSix"/>
+				<delete-message-property key="AgeSeven"/>
+				<delete-message-property key="AgeEight"/>
+				
+				<delete-message-property key="AgeNine"/>
+				<delete-message-property key="AgeTen"/>
+				<delete-message-property key="AgeEleven"/>
+				<delete-message-property key="AgeTwelve"/>
+				<delete-message-property key="AgeThirteen"/>
+				<delete-message-property key="AgeFourteen"/>
+				<delete-message-property key="AgeFifteen"/>
+				
+				<delete-message-property key="AgeSixteen"/>
+				<delete-message-property key="AgeSeventeen"/>
+				<delete-message-property key="AgeEighteen"/>
+				<delete-message-property key="AgeAbove"/>
+				<delete-message-property key="AFCARSMainFile"/>
+				<delete-message-property key="Exceptions"/>
+				<delete-message-property key="Header"/>	
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+			
+			<delete-message-property key="AdoptiveParent2"/>
+				<delete-message-property key="AdoptiveParent1"/>
+				<delete-message-property key="FormerAdoptiveParent1"/>
+				<delete-message-property key="FormerAdoptiveParent2"/>
+				<delete-message-property key="BioParent1"/>
+				<delete-message-property key="BioParent2"/>
+				<delete-message-property key="PostChild"/>
+				<delete-message-property key="PreChild"/>
+				<delete-message-property key="uniqueRecCount"/>
+				<delete-message-property key="totalRecCount"/>
+				<delete-message-property key="totalErrorCount"/>
+				<delete-message-property key="totalSuccCount"/>
+				<delete-message-property key="errorDetails"/>
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="recStatus"/>
+				<delete-message-property key="totalSkipCount"/>
+				<delete-message-property key="TransAttachment"/>	
+			</message-properties-transformer>
         <exception-strategy ref="Federal-Exception-Strategy" doc:name="Reference Exception Strategy"/>
 
 
@@ -538,6 +609,9 @@ payload map {
 }]]></dw:set-payload>
                 </dw:transform-message>
         <object-to-string-transformer mimeType="text/plain" doc:name="Object to String : Consume Stream"/>
+        <enricher source="#[payload]" target="#[flowVars.Header]" doc:name="Message Enricher">
+            <flow-ref name="afcars-extractSub_Flow" doc:name="afcars-extractSub_Flow"/>
+        </enricher>
         <set-payload value="#[('$' + '\n' + flowVars.Header + '\n' + payload)]" doc:name="Set Payload with File content"/>
         <choice doc:name="Choice">
             <when expression="#[flowVars.extractInfo.RunForPID != 'No' and  flowVars.extractInfo.RunForPID != '']">
@@ -559,10 +633,10 @@ payload map {
             <add-message-property key="FileData" value="#[payload]"/>
         </message-properties-transformer>
 
-                <dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
----
+
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: "AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".txt" ,
@@ -573,7 +647,52 @@ payload map {
                 </dw:transform-message>
          <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach Main File">
               <sfdc:objects ref="#[payload]"/>
-         </sfdc:create>
+         </sfdc:create>-->
+		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : "AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".txt",
+             Title : "AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".txt",
+             VersionData : flowVars.FileData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.extractInfo.ParentId
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
+
         <dw:transform-message doc:name="Transform Message : Create Payload for SFDC Update">
             <dw:set-variable variableName="AFCARSMainFile"><![CDATA[%dw 1.0
 %output application/java
@@ -585,6 +704,10 @@ payload map {
         </dw:transform-message>
         <logger message="After Attachment FFD : #[payload]" level="INFO" doc:name="Logger"/>
             
+    </sub-flow>
+    <sub-flow name="afcars-extractSub_Flow">
+        <set-payload value="#[flowVars.Header]" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
     </sub-flow>
     <sub-flow name="afcars-extract-exeption-Sub_Flow">
         <logger level="INFO" doc:name="Logger"/>
@@ -611,10 +734,10 @@ payload map {
             <add-message-property key="Exceptions" value="#[payload]"/>
         </message-properties-transformer>
         <logger message="#[flowVars.Exceptions]" level="INFO" doc:name="Logger"/>
-        <dw:transform-message doc:name="Transform Message : Create Attachment Data">
+        <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
----
+
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: "ExceptionLog_AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,	
@@ -625,7 +748,51 @@ payload map {
         </dw:transform-message>
         <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach CSV">
             <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>-->
+		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : "ExceptionLog_AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,
+             Title : "ExceptionLog_AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,
+             VersionData : flowVars.Exceptions
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
         </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.extractInfo.ParentId 
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
         <dw:transform-message doc:name="Transform Message : Create Payload for SFDC update">
             <dw:set-variable variableName="AFCARSExceptionFile"><![CDATA[%dw 1.0
 %output application/java
