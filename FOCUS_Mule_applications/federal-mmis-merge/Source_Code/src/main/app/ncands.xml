@@ -1039,7 +1039,7 @@ payload map {
 	"InvestigationStartTime" : $."InvestigationStartTime" default "",
 	"DateofDeath" : ($."DateofDeath") when ($.MaltreatmentDeath == "1") otherwise "",
 	"DateofDeathError" : "No Date of Death found" when (($.MaltreatmentDeath == "1") and ($.DateofDeath == "") ) otherwise null,
-	"FosterCareDischargeDate" : ($.FosterCareServicesPlacement.Placement_Episode__r.Episode_End_Date__c as :date as :string {format : "MMddyyyy"} ) when (($.FosterCareServicesPlacement != null) and ($.FosterCareServicesPlacement.Placement_Episode__r.Episode_End_Date__c != null)) otherwise "",
+	"FosterCareDischargeDate" : ($.FosterCareServicesPlacement.Placement_Episode__r.Episode_End_Date__c as :date as :string {format : "MMddyyyy"} ) when (($.FosterCareServicesPlacement != null) and ($.PostResponseServices == "1") and ($.FosterCareServicesPlacement.Placement_Episode__r.Episode_End_Date__c != null)) otherwise "",
 	"CustodyEndDate": $."CustodyEndDate",
 	"HasAPlanofSafeCare" : $."HasAPlanofSafeCare" default "",
 	"CARA-RelatedServices" : $."CARA-RelatedServices" default ""
