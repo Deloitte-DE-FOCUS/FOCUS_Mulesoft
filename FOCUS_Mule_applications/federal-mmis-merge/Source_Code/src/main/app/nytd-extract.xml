@@ -44,7 +44,7 @@ http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/
 		<reconnect frequency="10000" count="6" />
 	</sfdc:config>
 	
-	<spring:beans>
+	<!-- <spring:beans>
 		<spring:import resource="classpath:/loggingframework.xml" />
 	</spring:beans>
 	<spring:beans>
@@ -52,7 +52,7 @@ http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/
 	</spring:beans>
 	<spring:beans>
 		<spring:import resource="classpath:/queryframework.xml" />
-	</spring:beans>
+	</spring:beans> -->
 	
 <!-- 	<configuration doc:name="Configuration">
     	<expression-language>

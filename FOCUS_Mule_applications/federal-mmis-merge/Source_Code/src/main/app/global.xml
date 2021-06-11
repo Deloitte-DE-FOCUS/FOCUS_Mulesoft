@@ -42,7 +42,7 @@ http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema
 		url="${sfdc.url}" disableSessionInvalidation="true"
 		doc:name="Salesforce: Basic Authentication">
 		<reconnect count="5" frequency="5000"/>
-	</sfdc:config> 
+	</sfdc:config> --> 
 	<spring:beans>
 		<spring:import resource="classpath:/loggingframework.xml" />
 	</spring:beans>
@@ -52,7 +52,7 @@ http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema
 	<spring:beans>
 		<spring:import resource="classpath:/queryframework.xml" />
 	</spring:beans> 
-	<spring:beans>
+	<!-- <spring:beans>
 		<spring:import resource="classpath:/test-framework.xml" />
 	</spring:beans>  -->     
 </mule>
