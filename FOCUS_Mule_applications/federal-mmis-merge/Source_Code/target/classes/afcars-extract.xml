@@ -470,6 +470,7 @@ payload map {
 	Flag:true
 }]]></dw:set-variable>
         </dw:transform-message>
+
         <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
 
 				<delete-message-property key="InterfaceID"/>
@@ -541,6 +542,7 @@ payload map {
 				<delete-message-property key="totalSkipCount"/>
 				<delete-message-property key="TransAttachment"/>	
 			</message-properties-transformer>
+
         <exception-strategy ref="Federal-Exception-Strategy" doc:name="Reference Exception Strategy"/>
 
 
@@ -632,7 +634,6 @@ payload map {
         <message-properties-transformer doc:name="Message Properties : Store File Data" overwrite="true" scope="invocation">
             <add-message-property key="FileData" value="#[payload]"/>
         </message-properties-transformer>
-
                 <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
@@ -692,7 +693,6 @@ payload map $]]></dw:set-payload>
             <sfdc:objects ref="#[payload]"/>
         </sfdc:create>
 
-
         <dw:transform-message doc:name="Transform Message : Create Payload for SFDC Update">
             <dw:set-variable variableName="AFCARSMainFile"><![CDATA[%dw 1.0
 %output application/java
@@ -705,10 +705,12 @@ payload map {
         <logger message="After Attachment FFD : #[payload]" level="INFO" doc:name="Logger"/>
             
     </sub-flow>
+
     <sub-flow name="afcars-extractSub_Flow">
         <set-payload value="#[flowVars.Header]" doc:name="Set Payload"/>
         <object-to-string-transformer doc:name="Object to String"/>
     </sub-flow>
+
     <sub-flow name="afcars-extract-exeption-Sub_Flow">
         <logger level="INFO" doc:name="Logger"/>
         <set-variable variableName="Exceptions" value="#[&quot;Pre-Adoptive Client PID,Permanency Case ID,Error Message\n&quot; + flowVars.Exceptions]" doc:name="Variable : Store Exception details"/>
@@ -734,10 +736,10 @@ payload map {
             <add-message-property key="Exceptions" value="#[payload]"/>
         </message-properties-transformer>
         <logger message="#[flowVars.Exceptions]" level="INFO" doc:name="Logger"/>
+
         <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
-
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: "ExceptionLog_AFCARSADOPTION_" ++ (now >> "America/New_York") as :string {format:"yyyyMMddHHmmss"} ++ ".csv" ,	
@@ -792,7 +794,6 @@ payload map $]]></dw:set-payload>
         <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
             <sfdc:objects ref="#[payload]"/>
         </sfdc:create>
-
         <dw:transform-message doc:name="Transform Message : Create Payload for SFDC update">
             <dw:set-variable variableName="AFCARSExceptionFile"><![CDATA[%dw 1.0
 %output application/java

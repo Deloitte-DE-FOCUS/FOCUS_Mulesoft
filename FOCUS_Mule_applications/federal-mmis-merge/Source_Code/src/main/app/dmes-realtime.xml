@@ -64,6 +64,49 @@ payload.OnDemandRequest.attrList reduce ((val, acc = {interfaceName : payload.On
 	}
 }]]></dw:set-payload>
         </dw:transform-message>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				
+				<delete-message-property key="claimConfigurations"/>
+				<delete-message-property key="componentSeparator"/>
+				<delete-message-property key="elementSeparator"/>
+				<delete-message-property key="environment"/>
+				<delete-message-property key="interfaceName"/>
+				<delete-message-property key="segmentSeparator"/>
+				<delete-message-property key="claimsFilename"/>
+				<delete-message-property key="claimsFilenameDashBoard"/>
+				<delete-message-property key="preUpdatePayload"/>
+				<delete-message-property key="updateList"/>
+				
+				<delete-message-property key="transactionSetControlNumber"/>
+				<delete-message-property key="uniqueGroupControlNumber"/>
+				<delete-message-property key="uniqueId"/>
+				<delete-message-property key="RecordCount"/>
+				<delete-message-property key="RecordError"/>
+				<delete-message-property key="RecordSuccess"/>
+				<delete-message-property key="uniqueIdGs06"/>
+				<delete-message-property key="uniqueIdSt02"/>
+				<delete-message-property key="voidICNList"/>
+				
+				
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="Message Properties">
+				<delete-message-property key="interfaceName"/>
+				<delete-message-property key="RecordCount"/>
+				<delete-message-property key="RecordError"/>
+				<delete-message-property key="RecordSuccess"/>
+				<delete-message-property key="TID"/>
+				<delete-message-property key="transAttachment"/>
+				<delete-message-property key="Update"/>
+			</message-properties-transformer>
         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
 
     </flow>

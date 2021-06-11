@@ -80,6 +80,22 @@ Contains parent Id, boolean for Attcahment generation and Failure Reason if any"
 This is essential for asynchronous processing of the Request.">
             <sfdc:objects ref="#[payload]"/>
         </sfdc:update>
+		<message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="LOVReturned"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="reportParams"/>
+			<delete-message-property key="InterfaceName"/>
+			<delete-message-property key="InitialPayload"/>
+			<delete-message-property key="providerIdList"/>
+			<delete-message-property key="AddressDetailsMap"/>
+			<delete-message-property key="FileAttachment"/>
+			<delete-message-property key="FileBody"/>
+		</message-properties-transformer>
         <logger message="After Update #[payload]" level="INFO" doc:name="Logger"/>
     </sub-flow>
     <sub-flow name="stpv_pnc_ach_Transaction_Summary_File">
