@@ -711,7 +711,7 @@ payload map ((payload01 , indexOfPayload01) -> {
       TotalNumberRemovalsfromHome: payload01.TotalNumberRemovalsfromHome,
       LastDischarged: payload01.LastDischarged,
       LatestRemoval: (payload01.FirstRemoval) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (payload01.LatestRemoval),
-      RemovalTransactionDate: ((payload01.RemovalTransactionDate) when (payload01.LatestRemoval == payload01.FirstRemoval) otherwise ((payload01.RemovalTransactionDate2) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (payload01.RemovalTransactionDate))), 
+      RemovalTransactionDate: ((payload01.RemovalTransactionDate) when (payload01.LatestRemoval == payload01.FirstRemoval) otherwise ((payload01.RemovalTransactionDate2) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (payload01.RemovalTransactionDate))),
       PlacementCurrentFosterCare: payload01.PlacementCurrentFosterCare,
       PreviousPlacementRemovalEpisode: payload01.PreviousPlacementRemovalEpisode,
       RemovalforCurrentPlacementEpisode: payload01.RemovalforCurrentPlacementEpisode,
@@ -1352,9 +1352,11 @@ payload map {
                 <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
+
 //payload filter ( ( ( $.Placement != null ) or ($.Runaway != null ) ) and ( ( sizeOf ( ($.Placement default []) filter (($.ServiceFosterCareSettingType default "") == "Foster Care") ) ) > 0 ) ) 
 payload filter ( (  ( $.Placement != null ) and ( ( sizeOf ( ($.Placement default []) filter (($.ServiceFosterCareSettingType default "") == "Foster Care") ) ) > 0 ) ) or ($.Runaway != null ) )
 ]]></dw:set-payload>
+
             </dw:transform-message>
             <dw:transform-message doc:name="Transform Message : EpisodeRecords">
                 <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="EpisodeRecords"><![CDATA[%dw 1.0
@@ -3353,6 +3355,7 @@ payload map {
                 <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
+
 //payload filter ( (  ( $.Placement != null ) or ($.Runaway != null ) ) and ( ( sizeOf ( ($.Placement default []) filter ( ($.ServiceFosterCareSettingType == "Foster Care") or (($.HomePlacement default "") == "Trial Reunification") ) ) ) > 0 ) )
 payload filter ( (  ( $.Placement != null ) and ( ( sizeOf ( ($.Placement default []) filter ( ($.ServiceFosterCareSettingType == "Foster Care") or (($.HomePlacement default "") == "Trial Reunification") ) ) ) > 0 ) ) or ($.Runaway != null ) )
 ]]></dw:set-payload>
