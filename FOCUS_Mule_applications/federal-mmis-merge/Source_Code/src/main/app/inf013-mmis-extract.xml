@@ -147,6 +147,27 @@ sessionVars.ErrorAttachment map {
 
        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF013&quot;, &quot;InterfaceName&quot;: &quot;MMIS Extract&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_MMISExtract_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Backup_rexx447_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;dat&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Weekly Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="This Set Payload is used to set the Payload to a JSON for the Logging Framework"/>
         <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="This Sub flow call the Logging frmaework to create the comlete/success transaction in SFTP for the MMIS Extract interface."/>
+        <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+	<delete-message-property key="Last26Years"/>
+	<delete-message-property key="Last5Years"/>
+	<delete-message-property key="RecordCount"/>
+	<delete-message-property key="RecordError"/>
+	<delete-message-property key="RecordSuccess"/>	
+	<delete-message-property key="InterfaceID"/>
+	<delete-message-property key="interfaceTransactionStatus"/>
+	<delete-message-property key="TransactionID"/>
+	<delete-message-property key="LOVReturned"/>
+	<delete-message-property key="SubPayload"/>
+	<delete-message-property key="Tname"/>
+	<delete-message-property key="Time"/>
+	<delete-message-property key="exceptionRecordCount"/>
+</message-properties-transformer>
+
+<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+	<delete-message-property key="TransAttachment"/>
+	<delete-message-property key="TID"/>
+	<delete-message-property key="ErrorAttachment"/>
+</message-properties-transformer>
         <logger message="#[payload]" level="INFO" doc:name="Logger" doc:description="This logger displays the result of the Logging framework transaction"/>
         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
         

@@ -76,6 +76,14 @@ The connector used for this request will not Delete the File once its read
        
         <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown" config-ref="Validation_Configuration1"/>        
         <!-- <set-variable variableName="fileSize" value="#[message.inboundProperties['fileSize']]" doc:name="Variable : Get File Size" doc:description="Variable : Get File Size"/> -->
+        <object-to-string-transformer mimeType="text/plain" doc:name="OtoS: convert to Plain Text" doc:description="Consuming the Payload.
+Converting the Input Stream from the File into a textual form.
+Mime type of text/plain is set as the File format is Fixed width"/>
+        <enricher doc:name="Message Enricher : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
+            <flow-ref name="MMIS_Eligibility_Load_LogInProgressTransaction_Sub_Flow" doc:name="MMIS_Eligibility_Load_LogInProgressTransaction_Sub_Flow"/>
+            <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+            <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+        </enricher>
         <sftp:outbound-endpoint exchange-pattern="request-response"
 			connector-ref="SFTPFilenameMatchConnector"
 			outputPattern="${sftp.MMISEligibilityLoad.archive.filename}_#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].${sftp.MMISEligibilityLoad.archive.fileextension}"
@@ -84,16 +92,10 @@ The connector used for this request will not Delete the File once its read
 			responseTimeout="180000" doc:name="SFTP : Archive File "
 			duplicateHandling="overwrite" doc:description="SFTP Archive in Request-Response to ensure that the next component is not invoked until the File Write is complete
 Also Timeout is set sufficiently to allow writing of the file till that time"/>
-  		<enricher doc:name="Message Enricher : Invoke Logging Framework" doc:description="Invoking the Logging Framework in Message enricher, so that the orignal payload is not disturbed. Transaction Name and ID is retrieved back from the enricher.">
-			<flow-ref name="MMIS_Eligibility_Load_LogInProgressTransaction_Sub_Flow" doc:name="MMIS_Eligibility_Load_LogInProgressTransaction_Sub_Flow" />
-			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
-			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
-		</enricher>	 	
+	 	
 
                     <until-successful maxRetries="5" millisBetweenRetries="10000"  synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
-        <mulerequester:request resource="sftp://${sftp.MMISEligibilityLoad.transaction.username}:${sftp.MMISEligibilityLoad.transaction.password}@${sftp.MMISEligibilityLoad.transaction.host}:${sftp.MMISEligibilityLoad.transaction.port}${sftp.MMISEligibilityLoad.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.MMISEligibilityLoad.transaction.filename}" timeout="180000" doc:name="Mule Requester: Retrieve File Again" doc:description="Retrives the Load file again, this time the file content is to be used for Inteface business Rules
-Also the Connector used this time will delete the File once it is completely read
-Also this takes care of the Business Rule &quot;DMMA Places two files in DTI SFP folder. One is 450 response file with all Eligibility details and 450b with exception report where given MCI does not exists on their end or given MCI do not hold any Eligibility records&quot; by getting the 450 load file" config-ref="Mule_Requester"/>
+			<mulerequester:request resource="sftp://${sftp.MMISEligibilityLoad.transaction.username}:${sftp.MMISEligibilityLoad.transaction.password}@${sftp.MMISEligibilityLoad.transaction.host}:${sftp.MMISEligibilityLoad.transaction.port}${sftp.MMISEligibilityLoad.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.MMISEligibilityLoad.transaction.filename}" timeout="180000" doc:name="Mule Requester: Retrieve File Again" doc:description="Retrives the Load file again, this time the file content is to be used for Inteface business Rules Also the Connector used this time will delete the File once it is completely read Also this takes care of the Business Rule &quot;DMMA Places two files in DTI SFP folder. One is 450 response file with all Eligibility details and 450b with exception report where given MCI does not exists on their end or given MCI do not hold any Eligibility records&quot; by getting the 450 load file" config-ref="Mule_Requester"/>
                     </until-successful>        
         
         <transformer ref="MMISCustomTransformer" doc:name="Transformer Reference : Get Split Iterator from input Stream, of records grouped with PID" doc:description="Refrence to a Global transformer.
@@ -538,7 +540,7 @@ flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && paylo
         <batch:on-complete>
         <set-session-variable variableName="uniqueRecCount" value="#[payload.loadedRecords]" doc:name="Session Variable : Get Unique Record Count from Batch Job Result" doc:description="Session Variable : Get Unique Record Count from Batch Job Result"/>
             <choice doc:name="Choice">
-                <when expression="#[(flowVars.validRecsCount) == 0]">
+                <when expression="#[(sessionVars.uniqueRecCount) == 0]">
                     <logger message="No valid Records are present in this Set, Hence won't delete the records" level="INFO" doc:name="Logger"/>
                 </when>
                 <otherwise>
@@ -732,7 +734,7 @@ Also this step takes care of the Business Rule &quot;The DMMA Eligibility Load i
     <sub-flow name="MMIS_Eligibility_Load_LogInProgressTransaction_Sub_Flow">
     	<set-session-variable variableName="TransAttachment" value="#[payload]" doc:name="SV: Set TransactionAttachment" doc:description="Creating Transaction Attachment for the Logging framework"/>
 		<set-payload
-			value="{&quot;InterfaceID&quot;: &quot;INF014&quot;, &quot;InterfaceName&quot;: &quot;MMIS Eligibility Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_${sftp.MMISEligibilityLoad.transaction.filename}&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
+			value="{&quot;InterfaceID&quot;: &quot;INF014&quot;, &quot;InterfaceName&quot;: &quot;MMIS Eligibility Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_rexx450&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Weekly Batch Load&quot;, &quot;RecordSkipped&quot;:&quot;&quot;}"
 			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework In Progress Transaction" />
 		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" />
 		

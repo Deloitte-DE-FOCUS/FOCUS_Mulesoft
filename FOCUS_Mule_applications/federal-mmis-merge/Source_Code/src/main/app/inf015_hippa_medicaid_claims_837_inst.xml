@@ -19,11 +19,11 @@ http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sft
     <!-- <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8087" doc:name="HTTP Listener Configuration"/> -->
     
     <flow name="inf015_hippa_medicaid_claims_837_institutional_Flow">
-         <!-- <enricher doc:name="Message Enricher" doc:description="Invokes the flow which will invoke the Logging Framework and therefore initiate logging for this Interfcae. Using Enricher will not alter the payload">
+         <enricher doc:name="Message Enricher" doc:description="Invokes the flow which will invoke the Logging Framework and therefore initiate logging for this Interfcae. Using Enricher will not alter the payload">
             <flow-ref name="inf015_LogInProgressTransaction_Sub_Flow" doc:name="inf015_LogInProgressTransaction_Sub_Flow"/>
             <enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
             <enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
-        </enricher>   -->
+        </enricher>  
 <!--         <set-variable variableName="interfaceName" value="#['HIPPA Medicaid Claims 837 Institutional Extract']" doc:name="Variable : Set Interface Name" doc:description="Set the Interface Name, This will be used by the generic On Demand Interface"/>
         <set-variable variableName="uniqueId" value="#[org.apache.commons.lang.RandomStringUtils.randomNumeric(9)]" doc:name="Variable : Set Unique ID of length 9 to be passed in the X12 File" doc:description="Set Unique ID to be passed in the X12 File,
 Unique ID created using Apache RandomStringUtils utility class
@@ -57,7 +57,7 @@ Business Rule &quot;All other segment fields are separated with *&quot; by addin
             <add-message-property key="componentSeparator" value="#[flowVars.claimConfigurations[&quot;Component Separator&quot;] != null ? flowVars.claimConfigurations[&quot;Component Separator&quot;] : &quot;:&quot; ]"/>
             <add-message-property key="segmentSeparator" value="#[flowVars.claimConfigurations[&quot;Segment Separator&quot;] != null ? flowVars.claimConfigurations[&quot;Segment Separator&quot;] : System.lineSeparator() ]"/>
         </message-properties-transformer>
-       <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id,ICN_Number__c,National_Healthcare_Procedure_Code_Calc__c,Patient_Type_Calc__c,Attending_Physician_NPI__c,Claim_Note__c,Number_of_Units__c,Provider_EIN__c,Provider_SSN_Formula__c,Client_ID__c,Comments__c,Attending_Physician_Healthcare_Taxonomy__c,Void_Claim_ICN__c,Service_Admission_Date__c,Service_Discharge_Date__c,Service_Start_Date__c,Service_End_Date__c,Batch_Key__c,Provider_First_Name__c,Client_Last_Name__c,Client_First_Name__c,Client_Middle_Name__c,Client_Suffix__c,Client_MCI__c,Client_DOB__c,Client_Sex__c,Provider_ID_Formula__c,Provider_Name_Formula__c, Claim_Type__c,Claim_Number__c,Medicaid_Bill_Amount__c,Primary_Diagnosis_Code__c,Staff_Last_Name__c, Staff_First_Name__c,Provider_NPI__c,Healthcare_Provider_Taxonomy__c,Revenue_Code__c,Service_Rate__c,Amount_Paid__c,Remittance_Advice_Date__c,Claim_Record_Status__c,Place_of_Service_Code_Calc__c from DEL_Medicaid_Billing__c where Claim_Type__c = 'Institutional' and (Claim_Record_Status__c = 'Claim - Submitted') and  Claim_Batch__c = 'a0kt0000001dycPAAQ' ORDER BY Provider_ID_Formula__c " doc:name="Salesforce : Query Claim Information" doc:description="Query to retrieve Claim information from Salesforce Also this takes care of the Business Rule  &quot;Only claims with the Claim Type as Institutional will be selected for this file&quot; by adding the where clause for getting Institutional Claims only Also this takes care of the Business Rule &quot;When executed by the user the 837 file generation execution will take all claims records in Pending Claims status and must have the Claims Frequency Type Code based on the criteria below a. 1 When Admission and Discharge Dates match exactly dates of service b. 2 When Admission Date equals From Date of Service and To Date of Service is Lesser Than Discharge Date (or no Discharge Date)  c. 3 When From Date of Service Greater Than Admission Date and To Date of Service is Lesser Than Discharge Date (or no Discharge Date)  d. 4 When From Date of Service is Greater Than Admission Date and To Date of Service equals Discharge Date e. System will date stamp the Initial Submission Date field on the claim record&quot; by "/>
+       <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select Id,ICN_Number__c,National_Healthcare_Procedure_Code_Calc__c,Patient_Type_Calc__c,Attending_Physician_NPI__c,Claim_Note__c,Number_of_Units__c,Provider_EIN__c,Provider_SSN_Formula__c,Client_ID__c,Comments__c,Attending_Physician_Healthcare_Taxonomy__c,Void_Claim_ICN__c,Service_Admission_Date__c,Service_Discharge_Date__c,Service_Start_Date__c,Service_End_Date__c,Batch_Key__c,Provider_First_Name__c,Client_Last_Name__c,Client_First_Name__c,Client_Middle_Name__c,Client_Suffix__c,Client_MCI__c,Client_DOB__c,Client_Sex__c,Provider_ID_Formula__c,Provider_Name_Formula__c, Claim_Type__c,Claim_Number__c,Medicaid_Bill_Amount__c,Primary_Diagnosis_Code__c,Staff_Last_Name__c, Staff_First_Name__c,Provider_NPI__c,Healthcare_Provider_Taxonomy__c,Revenue_Code__c,Service_Rate__c,Amount_Paid__c,Remittance_Advice_Date__c,Claim_Record_Status__c,Place_of_Service_Code_Calc__c from DEL_Medicaid_Billing__c where Claim_Type__c = 'Institutional' and ((Claim_Record_Status__c = 'Claim - Pending' and Initial_Submission_Date__c = null) or (Claim_Record_Status__c = 'Claim - Void' and Void_Submission_Date__c = null)) ORDER BY Provider_ID_Formula__c" doc:name="Salesforce : Query Claim Information" doc:description="Query to retrieve Claim information from Salesforce Also this takes care of the Business Rule  &quot;Only claims with the Claim Type as Institutional will be selected for this file&quot; by adding the where clause for getting Institutional Claims only Also this takes care of the Business Rule &quot;When executed by the user the 837 file generation execution will take all claims records in Pending Claims status and must have the Claims Frequency Type Code based on the criteria below a. 1 When Admission and Discharge Dates match exactly dates of service b. 2 When Admission Date equals From Date of Service and To Date of Service is Lesser Than Discharge Date (or no Discharge Date)  c. 3 When From Date of Service Greater Than Admission Date and To Date of Service is Lesser Than Discharge Date (or no Discharge Date)  d. 4 When From Date of Service is Greater Than Admission Date and To Date of Service equals Discharge Date e. System will date stamp the Initial Submission Date field on the claim record&quot; by "/>
         <dw:transform-message doc:name="Transform Message to List of Maps" doc:description="Transform payload to List of Maps">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
@@ -510,7 +510,7 @@ This also takes care of the Business Rule &quot;File can be downloaded from Inte
                 <dw:set-variable variableName="updatePayload"><![CDATA[%dw 1.0
 %output application/java
 ---
-payload.*payload]]></dw:set-variable>
+payload]]></dw:set-variable>
             </dw:transform-message>
             <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Medicaid_Billing__c" doc:name="Salesforce : Update Required Claim Records" doc:description="Updates 10000 records at a time Updating Required Claim Records for Buisness rules 4 to 9">
                 <sfdc:objects ref="#[updatePayload]"/>
@@ -564,7 +564,7 @@ payload filter ($.Void_Claim_ICN__c != null) map ("'" ++ $.Void_Claim_ICN__c ++ 
                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-payload.*payload map ( $ ) joinBy ","]]></dw:set-payload>
+payload map ( $ ) joinBy ","]]></dw:set-payload>
             </dw:transform-message>
         
 

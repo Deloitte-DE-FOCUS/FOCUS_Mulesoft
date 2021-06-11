@@ -572,7 +572,45 @@ This operation removes Entry from Object Store and store the value of entry in P
 				mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework for Transaction completion"/>
 
 			<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework to complete Transaction and store the count And error attachment if any in the interface dashboard"/>
-              
+               <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				
+				<delete-message-property key="headerData"/>
+				<delete-message-property key="carrierInvalidRecordsSet1"/>
+				<delete-message-property key="totalCarrierInvalidRecordsSet1"/>
+				<delete-message-property key="carrierInvalidRecordsSet2"/>
+				<delete-message-property key="totalCarrierInvalidRecordsSet2"/>
+				<delete-message-property key="preUpsertValidPayload"/>
+				<delete-message-property key="SFDCConErrorCount"/>
+				<delete-message-property key="exceptionMessage"/>
+				<delete-message-property key="totalErrorCount"/>
+				<delete-message-property key="previousExceptionMessages"/>
+				<delete-message-property key="currentExceptionMessage"/>
+				<delete-message-property key="exceptionRecordCount"/>
+				<delete-message-property key="AggregatedErrorDetails"/>
+				
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="recStatus"/>
+				<delete-message-property key="totalSuccCount"/>
+				<delete-message-property key="totalErrorCount"/>
+				<delete-message-property key="totalRecCount"/>
+				<delete-message-property key="TransAttachment"/>
+				<delete-message-property key="ErrorDetails"/>
+				
+				
+				
+				
+			</message-properties-transformer>
 			  </otherwise>
 </choice>
 

@@ -102,10 +102,10 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
 					},
 					AdditionalInformation : 
 					'IVE Eligible - ' ++ ($.IV_E_Eligible__c when $.IV_E_Eligible__c != null otherwise  "") ++ '\n' ++
-					'IVE Eligible Effective date -' ++ ($.IV_E_Date_Eligible__c when $.IV_E_Date_Eligible__c != null otherwise  "") ++ '\n' ++
-					'Retro - ' ++ ($.Retro__c when $.Retro__c != null otherwise  "") ++ '\n' ++
-					'Financial Information during Retro Period - ' ++  ($.Is_retro_financial_info_reflected__c when $.Is_retro_financial_info_reflected__c != null otherwise  "") ++ '\n' ++ 
-					'Past bills in the last 3 months - ' ++  ($.Unpaid_bills_from_the_last_three_months__c when $.Unpaid_bills_from_the_last_three_months__c != null otherwise  "")	
+					'IVE Eligible Effective date -' ++ ($.IV_E_Date_Eligible__c when $.IV_E_Date_Eligible__c != null otherwise  "") //++ '\n' ++
+					//'Retro - ' ++ ($.Retro__c when $.Retro__c != null otherwise  "") ++ '\n' ++
+					//'Financial Information during Retro Period - ' ++  ($.Is_retro_financial_info_reflected__c when //$.Is_retro_financial_info_reflected__c != null otherwise  "") ++ '\n' ++ 
+					//'Past bills in the last 3 months - ' ++  ($.Unpaid_bills_from_the_last_three_months__c when $.Unpaid_bills_from_the_last_three_months__c != null otherwise  "")	
 				},
 				HouseholdInformation: {
 					IndividualInformation: {
@@ -160,6 +160,7 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
 							HighestSchoolGradeStatusCompleted @(Code: $.High_School_Graduation_Status__c): ''
 						},
 						IsthisIndividualApplying @(Code: 'Y'): '',
+						IsthisIndividualApplyingForRetroMA @(Code : ($.Retro__c[0] when $.Retro__c != null otherwise  "")) : '',
 						MCINumber: $.MCI__c
 					}
 				},
@@ -307,7 +308,7 @@ payload map
 										(AddressLine1: individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1[0..29]  when (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1) > 30 otherwise individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1) when (individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != '' and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != null) ,
 										(AddressLine2: individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2[0..29]  when (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2) > 30 otherwise individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2) when (individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != '' and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != null),
 										(City: individualInformation.CitizenshipInformation.SponsorAddress.City[0..14]  when (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.City) > 15 otherwise individualInformation.CitizenshipInformation.SponsorAddress.City) when (individualInformation.CitizenshipInformation.SponsorAddress.City != '' and individualInformation.CitizenshipInformation.SponsorAddress.City != null),
-										(State @(Code: flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State.@Code)][0] ): '') when flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State.@Code)][0] != null and flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State.@Code)][0] != '',
+										(State @(Code: flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State)][0] ): '') when flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State)][0] != null and flowVars.LOVReturned[("STATECODE-" ++ individualInformation.CitizenshipInformation.SponsorAddress.State)][0] != '',
 										(ZIP: individualInformation.CitizenshipInformation.SponsorAddress.ZIP[0..4]) when individualInformation.CitizenshipInformation.SponsorAddress.ZIP != null and individualInformation.CitizenshipInformation.SponsorAddress.ZIP != '' and (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.ZIP) > 4,
 										(ZIPExtension: individualInformation.CitizenshipInformation.SponsorAddress.ZIPExtension[6..9]) when individualInformation.CitizenshipInformation.SponsorAddress.ZIP != null and individualInformation.CitizenshipInformation.SponsorAddress.ZIP != '' and (sizeOf individualInformation.CitizenshipInformation.SponsorAddress.ZIP) > 9
 									}) when ((individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != null and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine1 != '') or (individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != null and individualInformation.CitizenshipInformation.SponsorAddress.AddressLine2 != '') or 
@@ -337,6 +338,7 @@ payload map
 								(HighestSchoolGradeStatusCompleted @(Code: flowVars.LOVReturned[("HIGHESTSCHOOLGRAD-" ++ individualInformation.StudentInformation.HighestSchoolGradeStatusCompleted.@Code)][0] ): '') when flowVars.LOVReturned[("HIGHESTSCHOOLGRAD-" ++ individualInformation.StudentInformation.HighestSchoolGradeStatusCompleted.@Code)][0] != null and flowVars.LOVReturned[("HIGHESTSCHOOLGRAD-" ++ individualInformation.StudentInformation.HighestSchoolGradeStatusCompleted.@Code)][0] != ''
 							},
 							IsthisIndividualApplying @(Code: individualInformation.IsthisIndividualApplying.@Code): '',
+							IsthisIndividualApplyingForRetroMA @(Code: individualInformation.IsthisIndividualApplyingForRetroMA.@Code): '',
 							(MCINumber: pad('0',10 - (sizeOf individualInformation.MCINumber)  ) ++ individualInformation.MCINumber) when individualInformation.MCINumber != null and individualInformation.MCINumber != ''
 						}
 					}))
@@ -371,6 +373,30 @@ payload map
         <flow-ref name="WriteToSFTP_SubFlow" doc:name="WriteToSFTP_SubFlow"/>
         <set-payload value="{&quot;InterfaceID&quot;: &quot;INF004&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Submission Extract&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_SFTP_DSS_ASSIST_DSCYF_MAappsInput_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;xml&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[flowVars.RecordError == 0?'Success':(flowVars.Success==0?'Error':'Completed with Error(s)')]&quot;,&quot;RecordCount&quot;:&quot;#[flowVars.RecordCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[flowVars.RecordSuccess]&quot;,&quot;RecordError&quot;:&quot;#[flowVars.RecordError]&quot;,&quot;ErrorDescription&quot;:&quot;#[flowVars.RecordError!=0?'See Attached File for Details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[flowVars.RecordError!=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Job&quot;} " mimeType="application/json" doc:name="Set Payload to JSON Payload for Logging Framework" doc:description="This Set Payload is used to set the Payload to a JSON for the Logging Framework"/>
         <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Create the completed transaction"/>
+        <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+	<delete-message-property key="isKeyRequired"/>
+	<delete-message-property key="Last14Days"/>
+	<delete-message-property key="personTypeIds"/>
+	<delete-message-property key="RecordError"/>
+	<delete-message-property key="RecordCount"/>
+	<delete-message-property key="TANFEligibleMap"/>
+	<delete-message-property key="todayDate"/>
+	<delete-message-property key="RecordSuccess"/>	
+	<delete-message-property key="InterfaceID"/>
+	<delete-message-property key="interfaceTransactionStatus"/>
+	<delete-message-property key="TransactionID"/>
+	<delete-message-property key="LOVReturned"/>
+	<delete-message-property key="SubPayload"/>
+	<delete-message-property key="Tname"/>
+	<delete-message-property key="Time"/>
+	<delete-message-property key="exceptionRecordCount"/>
+</message-properties-transformer>
+
+<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+	<delete-message-property key="InitialPayload"/>
+	<delete-message-property key="TID"/>
+	<delete-message-property key="TransAttachment"/>
+</message-properties-transformer>
         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
 
 
@@ -465,7 +491,7 @@ payload filter $.Income_Type__c == 'Employment' map {
 }]]></dw:set-payload>
                 </dw:transform-message>
                 <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
-                <!-- <flow-ref name="WriteMedicaildSFTP" doc:name="WriteMedicaildSFTP"/> -->
+                <flow-ref name="WriteMedicaildSFTP" doc:name="WriteMedicaildSFTP"/>
                 <set-payload value="{&quot;InterfaceID&quot;: &quot;INF004&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Submission Extract&quot;, &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;, &quot;Status&quot;:&quot;Success&quot;,&quot;RecordCount&quot;:&quot;0&quot;,&quot;RecordSuccess&quot;:&quot;0&quot;,&quot;RecordError&quot;:&quot;0&quot;,&quot;ErrorDescription&quot;:&quot;No Records Extracted&quot;, &quot;ErrorFilename&quot;: &quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_SFTP_DSS_ASSIST_DSCYF_MAappsInput_#[server.dateTime.format(&quot;MM/dd/yyyy&quot;)]&quot;,&quot;CompletedExtension&quot;:&quot;xml&quot;, &quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="Set Payload: to No Records Found for Logging Framework"/>
                 <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
             </when>

@@ -31,6 +31,7 @@ http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule
     <spring:beans>
          <spring:bean id="TPL_Client_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean> 
          <spring:bean id="TPL_Client_Error_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean>
+        <spring:bean name="SFTPController" class="gov.delaware.util.SFTPController" id="Bean"/>
    	</spring:beans>   	
 <!--     <objectstore:config name="ObjectStore__Connector" doc:name="ObjectStore: Connector"/> -->
 	<objectstore:config name="TPL_Client_ObjectStore__Connector" doc:name="ObjectStore: Connector" objectStore-ref="TPL_Client_Object_Store"/>    
@@ -45,14 +46,16 @@ Also this takes care of the Business Rule
             <set-payload value="INF052" doc:name="Set Payload to Interface ID" doc:description="Interface ID is set in payload, this is required to by the Logging and Exception Hnadling framework"/>
         </poll>
         <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV : Set Interface ID" doc:description="Interface ID is set in flow variable, this is required to by the Logging and Exception Hnadling framework, using this the status of the Interface can be tracked"/>
+		<until-successful maxRetries="5" millisBetweenRetries="10000"  synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
         <mulerequester:request resource="sftp://${sftp.tplclient.transaction.username}:${sftp.tplclient.transaction.password}@${sftp.tplclient.transaction.host}:${sftp.tplclient.transaction.port}${sftp.tplclient.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.tplclient.transaction.filename}&amp;isContainsCheckEnabled=true" doc:name="MR:Read File from SFTP" doc:description="Retrieve File from the configured SFTP location with a spefic name
-The Requestor URI is used to confifure a specific SFTP endpoint" config-ref="Mule_Requester"/>
+The Requestor URI is used to confifure a specific SFTP endpoint" timeout="10000" config-ref="Mule_Requester"/>
+		</until-successful>
         <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown" config-ref="Validation_Configuration1"/>
         <object-to-string-transformer mimeType="text/plain" doc:name="OtoS: convert to Plain Text" doc:description="Consuming the Payload.
 Converting the Input Stream from the File into a textual form.
 Mime type of text/plain is set as the File format is Fixed width"/>
-        <!-- <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPFilenameMatchConnector" outputPattern="${sftp.tplclient.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].dat" host="${sftp.tplclient.archive.host}" port="${sftp.tplclient.archive.port}" path="${sftp.tplclient.archive.path}" user="${sftp.tplclient.archive.username}" password="${sftp.tplclient.archive.password}" responseTimeout="10000"  doc:name="SFTP" doc:description="Archive File in the specified SFDC directory">
-        </sftp:outbound-endpoint>-->
+        <sftp:outbound-endpoint exchange-pattern="one-way" connector-ref="SFTPFilenameMatchConnector" outputPattern="${sftp.tplclient.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].dat" host="${sftp.tplclient.archive.host}" port="${sftp.tplclient.archive.port}" path="${sftp.tplclient.archive.path}" user="${sftp.tplclient.archive.username}" password="${sftp.tplclient.archive.password}" responseTimeout="10000"  doc:name="SFTP" doc:description="Archive File in the specified SFDC directory">
+        </sftp:outbound-endpoint>
         <enricher doc:name="Message Enricher" doc:description="Invokes the flow which will invoke the Logging Framework and therefore initiate logging for this Interfcae. Using Enricher will not alter the payload
 Transaction ID and Transaction Name is retrieved from the Logging Framework">
             <flow-ref name="LogInProgressTransaction" doc:name="LogInProgressTransaction"/>
@@ -90,7 +93,7 @@ payload[1..-2]]]></dw:set-payload>
         </dw:transform-message>
         <logger message="#['Header and Trailer Records Removed...']" level="INFO" doc:name="Logger"/>
         <choice doc:name="Choice : Check whether any Detail Level records exist" doc:description="Check whether any Detail Level records exist">
-            <when expression="#[payload.size() &gt; 0]">
+            <when expression="#[flowVars.TotalRecords &gt; 0]">
                 
         <enricher source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]" doc:name="Message Enricher : Retrieve LOV values" doc:description="Invoke flow in Message Enricher so that the payload is not modified">
             <flow-ref name="inf052-tpl-client-load-retrieve-LOV-Sub_Flow" doc:name="inf035-fsf-transaction-detail-load-retrieve-LOV-Sub_Flow" doc:description="Invoke Flow to retrieve the LOV values"/>
@@ -111,11 +114,35 @@ payload[1..-2]]]></dw:set-payload>
 				<add-message-property key="totalErrorCount"
 					value="#[0]" />
                     <add-message-property key="recStatus" value="#['Success']"/>
+                    <add-message-property key="totalRecCount" value="#[0]"/>
 
 			</message-properties-transformer>
 
-            	<set-payload value="{&quot;InterfaceID&quot;: &quot;INF052&quot;, &quot;InterfaceName&quot;: &quot;TPL Client Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TPLClientInformationLoad&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;Error&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;No Detail Records Found in the File&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP: JSON for completed job." doc:description="Set JSON payload for transaction completion in Dashboard with Business Exception"/>
+            	<set-payload value="{&quot;InterfaceID&quot;: &quot;INF052&quot;, &quot;InterfaceName&quot;: &quot;TPL Client Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TPLClientInformationLoad&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;No Detail Records Found in the File&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="application/json" doc:name="SP: JSON for completed job." doc:description="Set JSON payload for transaction completion in Dashboard with Business Exception"/>
             	<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Log Transaction SubFlow of the Logging Framework and raise Business Exception in dashboard"/>
+      <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+			<delete-message-property key="headerData"/>
+			<delete-message-property key="TotalRecords"/>
+			<delete-message-property key="LOVReturned"/>
+			<delete-message-property key="DetailRecord"/>
+			<delete-message-property key="ErrorUpdate"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			
+</message-properties-transformer>
+
+<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+			
+			<delete-message-property key="totalSuccCount"/>
+			<delete-message-property key="totalErrorCount"/>
+			<delete-message-property key="recStatus"/>
+			<delete-message-property key="TID"/>
+			
+</message-properties-transformer>
             </otherwise>
         </choice>
         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
@@ -135,7 +162,7 @@ Also it stores the Transaction attachment as a file in dashboard"/>
                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-(payload.*payload map ("'" ++ $.MCINumber ++ "'")) joinBy "," ]]></dw:set-payload>
+(payload map ("'" ++ $.MCINumber ++ "'")) joinBy "," ]]></dw:set-payload>
             </dw:transform-message>
             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Person__r.LastName, Person__r.FirstName, Person__r.DEL_MCI__c, Person__r.DEL_SSN_Text__c, Person__r.Birthdate, Person__c, Id, Is_Person_Validated__c, Is_DFS_Client__c, Is_DMSS_Client__c, Is_DPBHS_Client__c, Is_DYRS_Client__c FROM DEL_Person_Type__c where RecordType.Name = 'Client' and Person__r.DEL_MCI__c in (#[payload])" doc:name="Salesforce Query Person Type" doc:description="Query Person Type details by passing MCI"/>
             <choice doc:name="Choice : Check FOCUS for records" doc:description="Check whether any records was found in FOCUS">
@@ -676,7 +703,7 @@ flowVars.validRecsCount = flowVars.NewErrorRecords.equals("") ? flowVars.validRe
                    <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-flowVars.validPayload map
+(flowVars.validPayload map
 {
 	Medicaid_Case_Number__c: $.MedicaidCaseId,
 	CompanyCarrierCode : ($.CompanyCarrierCode as :string ) as :string,
@@ -710,7 +737,8 @@ flowVars.validPayload map
 	Is_DMSS_Client__c : $.IsDMSSClient,
 	Is_DPBHS_Client__c : $.IsDPBHSClient,
 	Is_DYRS_Client__c : $.IsDYRSClient	
-}]]></dw:set-payload>
+} 
+)]]></dw:set-payload>
                                                     </dw:transform-message>
                                                     <dw:transform-message doc:name="Transform Message">
                                                         <dw:set-payload><![CDATA[%dw 1.0
@@ -738,7 +766,7 @@ The other part of the Rule is taken care by FOCUS Application">
                         <add-message-property key="JobId" value="#[payload.jobId]"/>
                         <add-message-property key="JobResponse" value="#[payload]"/>
                     </message-properties-transformer>
-                    <until-successful maxRetries="100" millisBetweenRetries="10000" failureExpression="#[payload.state== 'Queued' || payload.state == 'InProgress' ]" synchronous="true" doc:name="Until Successful" doc:description="Invoke the Batch Result stream in Until Successfull so as to ensure we get the job result when job is completed in salesforce">
+                    <until-successful maxRetries="100" millisBetweenRetries="30000" failureExpression="#[payload.state== 'Queued' || payload.state == 'InProgress' ]" synchronous="true" doc:name="Until Successful" doc:description="Invoke the Batch Result stream in Until Successfull so as to ensure we get the job result when job is completed in salesforce">
                         <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Job Status" doc:description="Retrieve batch result stream of the Bulk Job">
                             <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
                         </sfdc:batch-result-stream>

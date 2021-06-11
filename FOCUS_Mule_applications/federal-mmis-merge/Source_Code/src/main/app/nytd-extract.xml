@@ -160,6 +160,11 @@ http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/
             <enrich source="#[dw('(flowVars.ExtraNYTDMonthlyOutcomeSurveyRecords default []) ++ ( flowVars.NYTDMonthlyOutcomeSurveyRecords default [])')]" target="#[flowVars.CombinedNYTDMonthlyOutcomeSurveyRecords]"/>
             <enrich source="#[dw('(flowVars.PersonIDList default []) ++ ((payload pluck ($$ as :string)) default [])')]" target="#[flowVars.PersonIDList]"/>
             </enricher>
+			<enricher doc:name="Message Enricher">
+				<flow-ref name="nytd-extract-get-NYTDMonthlyILServiceOutcomeRecords-Sub_Flow" doc:name="nytd-extract-get-NYTDMonthlyILServiceOutcomeRecords-Sub_Flow"/>
+				<enrich source="#[payload]" target="#[flowVars.monthlyILServiceOutcome]"/>
+				<enrich source="#[dw('(flowVars.PersonIDList default []) ++ ((payload pluck ($$ as :string)) default [])')]" target="#[flowVars.PersonIDList]"/>
+			</enricher>
             
         <dw:transform-message doc:name="Transform Message : Get Unique Person ID List">
             <dw:set-payload><![CDATA[%dw 1.0
@@ -261,20 +266,27 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 				E17_adjudicated_delinquent: ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "Yes")][0] default "" when (((flowVars.NYTDServicesRecords[$.Person__c] != null) and ( (sizeOf (flowVars.NYTDServicesRecords[$.Person__c] default [] filter ( ($.Adjudicated_Delinquent__c default "") == "Yes")  )  ) > 0) ) 
 																	or ( (flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] != null) and ( ( sizeOf ( (flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] default [] filter ( ($.Has_the_child_been_adjudicated__c default "") == "Yes") ) ) ) > 0))
 																	or (((sizeOf ((flowVars.ILReferralServicesRecords1[$.Person__c] default [] filter $.Has_Youth_been_Adjudicated_Delinquent__c == "Yes") )) > 0))
+																	or (((sizeOf ((flowVars.monthlyILServiceOutcome[$.Person__c] default [] filter $.Response_Q1__c == "Yes") )) > 0))
 															) otherwise ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "No")][0] default "" when 
 																(( (flowVars.NYTDServicesRecords[$.Person__c] != null) and ( (sizeOf (flowVars.NYTDServicesRecords[$.Person__c] default [] filter ( ($.Adjudicated_Delinquent__c default "") == "No")  ) ) > 0 )) 
 																		or ( (flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] != null) and ( ( sizeOf ( (flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] default [] filter ( ($.Has_the_child_been_adjudicated__c default "") == "No") ) default [] ) ) > 0 ))
 																		or (((sizeOf ((flowVars.ILReferralServicesRecords1[$.Person__c] default [] filter $.Has_Youth_been_Adjudicated_Delinquent__c == "No") )) > 0))
+																		or (((sizeOf ((flowVars.monthlyILServiceOutcome[$.Person__c] default [] filter $.Response_Q1__c == "No") )) > 0))
 																) otherwise ""
 															) ) when ($.isInServedPopulation == true) otherwise "",
-				E18_educational_level:  (flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED_PRIORITY_VALUE-" ++ ( max ( (flowVars.NYTDServicesRecords[$.Person__c] default [] map (flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED-" ++ ($.Education_Level_Completed__c default "Blank"))][0] as :number)) ++ (flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] default [] map (flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED-" ++ ($.What_was_the_last_level_of_education__c default "Blank"))][0] as :number)) ++ ((flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED-" ++ (flowVars.ILReferralServicesRecords1[$.Person__c][0].Last_Grade_Completed__c default "Blank"))] ) )) ))][0] default "" ) when ($.isInServedPopulation == true) otherwise "",
+				E18_educational_level:  (flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED_PRIORITY_VALUE-" ++ ( max ( (flowVars.NYTDServicesRecords[$.Person__c] default [] map (flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED-" ++ ($.Education_Level_Completed__c default "Blank"))][0] as :number)) ++ (flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] default [] map (flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED-" ++ ($.What_was_the_last_level_of_education__c default "Blank"))][0] as :number)) ++ ((flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED-" ++ (flowVars.ILReferralServicesRecords1[$.Person__c][0].Last_Grade_Completed__c default "Blank"))] ) )
+				++ ((flowVars.LOVReturned[("EDUCATION_LEVEL_COMPLETED-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q2__c default "Blank"))] ) )
+				) ))][0] default "" ) when ($.isInServedPopulation == true) otherwise "",
 				
 				E19_special_education: ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "Yes")][0] default "" when (( (flowVars.NYTDServicesRecords[$.Person__c] != null) and ( (sizeOf ((flowVars.NYTDServicesRecords[$.Person__c] default [{}] filter ( ($.Special_Education__c default "") == "Yes") )  default [] ) ) > 0 )) 
 																	or ( (flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] != null) and ( (sizeOf ((flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] default [{}]  filter ( $.Has_the_youth_received_any_special_ed__c == "Yes")) )  ) > 0))
+																	or
+																	( (flowVars.monthlyILServiceOutcome[$.Person__c] != null) and ( (sizeOf ((flowVars.monthlyILServiceOutcome[$.Person__c] default [{}]  filter ( $.Response_Q3__c == "Yes")) )  ) > 0))
 																	or ((flowVars.ILReferralServicesRecords2[$.Person__c] != null) and (((sizeOf ((flowVars.ILReferralServicesRecords2[$.Person__c] default []) filter ($.Does_Youth_Have_an_IEP__c == "Yes") and (( ($.Last_IEP_Date__c <= flowVars.extractInfo.ReportEndDate) and ($.Last_IEP_Date__c >= flowVars.extractInfo.ReportStartDate) ) or ( ($.Last_IEP_Date__c + |P1Y|) >= flowVars.extractInfo.ReportStartDate) ) )) > 0)))
 															) otherwise ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "No")][0] default "" when 
 																(((flowVars.NYTDServicesRecords[$.Person__c] != null) and ( ( sizeOf ((flowVars.NYTDServicesRecords[$.Person__c] default [{}] filter ( ($.Special_Education__c default "") == "No") )  default [] ) ) > 0 )) 
 																	or ( (flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] != null) and ( ( sizeOf ((flowVars.NYTDOrMonthlyOutcomeSurveyRecords[$.Person__c] default [{}] filter ( ($.Has_the_youth_received_any_special_ed__c default "") == "No") )  default [] ) ) > 0 ))
+																	or ( (flowVars.monthlyILServiceOutcome[$.Person__c] != null) and ( (sizeOf ((flowVars.monthlyILServiceOutcome[$.Person__c] default [{}]  filter ( $.Response_Q3__c == "No")) )  ) > 0))
 																	or ((flowVars.ILReferralServicesRecords2[$.Person__c] != null) and (((sizeOf ((flowVars.ILReferralServicesRecords2[$.Person__c] default []) filter ($.Does_Youth_Have_an_IEP__c == "No")  )) > 0)))
 																) otherwise ""
 															) ) when ($.isInServedPopulation == true) otherwise "",
@@ -393,8 +405,27 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 
 				E36_foster_care_status_outcomes: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Was_the_youth_in_Foster_Care__c default ""))][0] default "",
 				baseline_followup_outcome_survey: {
-					E37_current_full_time_employment: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_currently_employed_fulltime__c default ""))][0] default "",
-					E38_current_part_time_employment: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_youth_currently_employed_part_time__c default ""))][0] default "",
+					E37_current_full_time_employment: ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "Yes")][0] default "" when (
+																	 (((sizeOf ((flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c] default [] filter $.Is_the_youth_currently_employed_fulltime__c == "Yes") )) > 0))
+																	or ((sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c] default [] filter $.Response_Q4__c == "Yes-Full Time") ) > 0)
+															) otherwise ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "No")][0] default "" when 
+																(
+																		 (((sizeOf ((flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c] default [] filter $.Is_the_youth_currently_employed_fulltime__c == "No") )) > 0))
+																		or (((sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c] default [] filter $.Response_Q4__c == "No") ) > 0))
+																) otherwise ""
+															) ),
+															
+															
+					E38_current_part_time_employment: ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "Yes")][0] default "" when (
+																	 (((sizeOf ((flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c] default [] filter $.Is_youth_currently_employed_part_time__c == "Yes") )) > 0))
+																	or ((sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c] default [] filter $.Response_Q4__c == "Yes-Part Time") ) > 0)
+															) otherwise ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "No")][0] default "" when 
+																(
+																		 (((sizeOf ((flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c] default [] filter $.Is_youth_currently_employed_part_time__c == "No") )) > 0))
+																		or (((sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c] default [] filter $.Response_Q4__c == "No") ) > 0))
+																) otherwise ""
+															) ),
+					
 					E39_employment_related_skills: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Has_youth_obtained_employment_skills__c default ""))][0] default "",
 					E40_social_security: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_youth_receiving_Social_Security__c default ""))][0] default "",
 					
@@ -402,15 +433,18 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 					
 					E42_public_financial_assist : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_youth_receiving_Public_Financial__c default ""))][0] default "",
 					
-					E43_public_food_assist : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_receiving_Public_Food__c default ""))][0] default "",
+					E43_public_food_assist : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_receiving_Public_Food__c default ""))][0] default "" when ( (sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Is_the_youth_receiving_Public_Food__c default [] )) > 0) 
+					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q7__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q7__c default [])) > 0) otherwise "")  , 
 					
 					E44_public_housing_assist : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_youth_receiving_Public_Housing__c default ""))][0] default "",
 					
 					E45_other_financial_support : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_receiving_other_financial__c default ""))][0] default "",
 					
-					E46_highest_educ_certification : flowVars.LOVReturned[("HIGHEST_EDUCATION_CERT_RECEIVED-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Has_youth_received_education_certificate__c default ""))][0] default "",
+					E46_highest_educ_certification : flowVars.LOVReturned[("HIGHEST_EDUCATION_CERT_RECEIVED-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Has_youth_received_education_certificate__c default ""))][0] default "" when ( (sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Has_youth_received_education_certificate__c default [] )) > 0) 
+					otherwise (flowVars.LOVReturned[("HIGHEST_EDUCATION_CERT_RECEIVED-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q5__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q5__c default [])) > 0) otherwise "")  ,
 					
-					E47_current_enrollment_attendance : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_currently_enrolled__c default ""))][0] default "",
+					E47_current_enrollment_attendance : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_currently_enrolled__c default ""))][0] default "" when ( (sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Is_the_youth_currently_enrolled__c default [] )) > 0) 
+					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q6__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q6__c default [])) > 0) otherwise "")  , 
 					
 					E48_connection_adult : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Does_the_youth_have_a_connection__c default ""))][0] default "",
 					
@@ -420,7 +454,8 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 					
 					E51_incarceration: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Has_the_youth_ever_been_incarcerated__c default ""))][0] default "",
 					
-					E52_children : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Does_the_youth_have_any_children__c default ""))][0] default "",
+					E52_children : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Does_the_youth_have_any_children__c default ""))][0] default "" when ( (sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Does_the_youth_have_any_children__c default [] )) > 0) 
+					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q11__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q11__c default [])) > 0) otherwise "")  , 
 					
 					E53_marriage_at_childs_birth: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Was_the_youth_married__c default ""))][0] default "",
 					
@@ -435,7 +470,7 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 					E58_health_insurance_type_prescription_drugs : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Does_insurance_cover_prescription_servic__c default ""))][0] default ""
 					
 				}
-			}) when ( ($.isPersonWithinReport == "true") and (  (sizeOf ( (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c] default []) ) ) > 0) and (  ((getAge((flowVars.extractInfo.ReportStartDate as :date {format : "yyyy-MM-dd"}),$.Person__r.Birthdate)) == 19) or  ((getAge((flowVars.extractInfo.ReportStartDate as :date {format : "yyyy-MM-dd"}),$.Person__r.Birthdate)) == 21) or  ((getAge((flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}),$.Person__r.Birthdate)) == 19) or  ((getAge((flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}),$.Person__r.Birthdate)) == 21) ) ) 
+			}) when ( ($.isPersonWithinReport == "true") and (((  (sizeOf ( (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c] default []) ) ) > 0) and (  ((getAge((flowVars.extractInfo.ReportStartDate as :date {format : "yyyy-MM-dd"}),$.Person__r.Birthdate)) == 19) or  ((getAge((flowVars.extractInfo.ReportStartDate as :date {format : "yyyy-MM-dd"}),$.Person__r.Birthdate)) == 21) or  ((getAge((flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}),$.Person__r.Birthdate)) == 19) or  ((getAge((flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}),$.Person__r.Birthdate)) == 21) )) or (  (sizeOf ( (flowVars.monthlyILServiceOutcome[$.Person__c] default []) ) ) > 0)) )
 			   otherwise ( (
 			   		{
 			   		
@@ -628,6 +663,30 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 	Flag:true
 }]]></dw:set-variable>
         </dw:transform-message>
+		<message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="LOVReturned"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="extractInfo"/>
+			<delete-message-property key="InterfaceName"/>
+			<delete-message-property key="PersonIDList"/>
+			<delete-message-property key="xmlData"/>
+			<delete-message-property key="NYTDMainFile"/>
+			<delete-message-property key="NYTDExceptionFile"/>
+			<delete-message-property key="personRecords"/>
+			<delete-message-property key="placementRecords"/>
+			<delete-message-property key="custodyRecords"/>
+			<delete-message-property key="ILReferralServicesRecords1"/>
+			<delete-message-property key="ILReferralServicesRecords2"/>
+			<delete-message-property key="ILReferralServicesRecords3"/>
+			<delete-message-property key="NYTDMonthlyOutcomeSurveyRecords"/>
+			<delete-message-property key="ExtraNYTDMonthlyOutcomeSurveyRecords"/>
+			<delete-message-property key="CaseCountyDetails"/>
+		</message-properties-transformer>
         <exception-strategy ref="Federal-Exception-Strategy" doc:name="Reference Exception Strategy"/>
 
 
@@ -670,10 +729,10 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
                 <object-to-string-transformer mimeType="application/xml" doc:name="Object to String : Consume XML Stream" doc:description="Consume XML Stream"/>
                 <string-to-byte-array-transformer doc:name="String to Byte Array"/>
                 <set-variable variableName="xmlData" value="#[payload]" doc:name="Store XML Data" doc:description="Store XML Data"/>
-                <dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
----
+
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: flowVars.filename ++ ".xml" ,
@@ -684,7 +743,51 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
                 </dw:transform-message>
          <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach XML" doc:description="Attach XML file to Extract record">
               <sfdc:objects ref="#[payload]"/>
-         </sfdc:create>
+         </sfdc:create>-->
+		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.filename ++ ".xml",
+             Title : flowVars.filename ++ ".xml",
+             VersionData : flowVars.xmlData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.extractInfo.ParentId
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
         <dw:transform-message doc:name="Transform Message">
             <dw:set-variable variableName="NYTDMainFile"><![CDATA[%dw 1.0
 %output application/java
@@ -796,10 +899,10 @@ payload.nytd_data_file.record map {
                 <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Consume CSV Input Stream" doc:description="Consume CSV Input Stream"/>
                 <string-to-byte-array-transformer doc:name="String to Byte Array"/>
                 <set-variable variableName="csvData" value="#[payload]" doc:name="Variable : CSV"/>
-                <dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
----
+
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: flowVars.filename ++ ".csv" ,
@@ -810,7 +913,50 @@ payload.nytd_data_file.record map {
                 </dw:transform-message>
          <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach CSV">
               <sfdc:objects ref="#[payload]"/>
-         </sfdc:create>
+         </sfdc:create>-->
+		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.filename ++ ".csv",
+             Title : flowVars.filename ++ ".csv",
+             VersionData : flowVars.csvData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.extractInfo.ParentId
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create> 
         <dw:transform-message doc:name="Prepare Exception Message if applicable">
             <dw:set-variable variableName="NYTDExceptionFile"><![CDATA[%dw 1.0
 %output application/java
@@ -864,6 +1010,7 @@ flowVars.personRecords map {
 		(flowVars.groupSessionRecords[$.Person__c] default []) ++
 		(flowVars.ILReferralServicesRecords1[$.Person__c] default []) ++
 		(flowVars.ILReferralServicesRecords2[$.Person__c] default []) ++
+		(flowVars.monthlyILServiceOutcome[$.Person__c] default []) ++
 		(flowVars.ILReferralServicesRecords3[$.Person__c] default []) 
 	)) > 0 )
 }]]></dw:set-variable>
@@ -1106,6 +1253,29 @@ payload map {
             </dw:transform-message>	
 			
     </sub-flow>
+	<sub-flow name="nytd-extract-get-NYTDMonthlyILServiceOutcomeRecords-Sub_Flow">
+		<logger message="Select Id, Person_to_Contact__c, Age__c, Case_ID__c, Client_Name__c, Date_of_Birth__c, Due_Date__c,IL_Referral_ID__c, PID__c, Response_Q3__c, Response_Q4__c, Response_Q5__c, Response_Q6__c, Response_Q7__c, Response_Q8__c, Response_Q9__c, Response_Q10__c, Response_Q11__c, Response_Q1__c, Response_Q2__c, Status__c, Year__c, Youth_was_served_that_month__c, Month__c from DEL_Monthly_IL_Service_Outcomes__c Where  ( ( Date_of_Birth__c &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND Date_of_Birth__c &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR ( Date_of_Birth__c &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND Date_of_Birth__c &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )" level="INFO" doc:name="Logger for Query Monthly IL Outcome"/>
+		<sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Id, Person_to_Contact__c, Age__c, Case_ID__c, Client_Name__c, Date_of_Birth__c, Due_Date__c,IL_Referral_ID__c, PID__c, Response_Q3__c, Response_Q4__c, Response_Q5__c, Response_Q6__c, Response_Q7__c, Response_Q8__c, Response_Q9__c, Response_Q10__c, Response_Q11__c, Response_Q1__c, Response_Q2__c, Status__c, Year__c, Youth_was_served_that_month__c, Month__c from DEL_Monthly_IL_Service_Outcomes__c Where  ( ( Date_of_Birth__c &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND Date_of_Birth__c &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR ( Date_of_Birth__c &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND Date_of_Birth__c &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) )" doc:name="Salesforce : Query Monthly IL Records"/>
+		<dw:transform-message doc:name="Transform Message : Consume Consumer Iterator">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="Transform Message : Get Monthly IL Outcome Records">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload default []) filter ((($.Year__c ++ ($.Month__c as :number as :string {format: "00" })) >= ((flowVars.extractInfo.ReportStartDate  replace /-/ with (""))[0 to 5])) and (($.Year__c ++ ($.Month__c as :number as :string {format: "00" })) <= ((flowVars.extractInfo.ReportEndDate  replace /-/ with (""))[0 to 5])))]]></dw:set-payload>
+		</dw:transform-message>
+		<dw:transform-message doc:name="Transform Message : Get Monthly IL Outcome Records">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload groupBy $.Person_to_Contact__c]]></dw:set-payload>
+		</dw:transform-message>
+
+	</sub-flow>
 
     <sub-flow name="NYTD_callLOVflow">
         <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'TYPE_OF_FILE','AFCARS_FOSTER_COUNTY','NYTD_MAPPINGS','REASON_YOUTH_DID_NOT_PARTICIPATE','HIGHEST_EDUCATION_CERT_RECEIVED','EDUCATION_LEVEL_COMPLETED','EDUCATION_LEVEL_COMPLETED_PRIORITY_VALUE','ENCRYPTION_MAPPING'&quot;}" mimeType="application/json" doc:name="Set Payload" doc:description="Set Payload With Required LOV Attributes"/>

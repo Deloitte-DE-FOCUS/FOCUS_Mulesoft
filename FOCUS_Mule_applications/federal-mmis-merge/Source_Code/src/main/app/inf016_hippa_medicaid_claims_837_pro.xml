@@ -419,7 +419,7 @@ sessionVars.Update filter ($.Void_Claim_ICN__c != null) map ("'" ++ $.Void_Claim
                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-payload.*payload map ( $ ) joinBy ","]]></dw:set-payload>
+payload map ( $ ) joinBy ","]]></dw:set-payload>
             </dw:transform-message>
  
 
