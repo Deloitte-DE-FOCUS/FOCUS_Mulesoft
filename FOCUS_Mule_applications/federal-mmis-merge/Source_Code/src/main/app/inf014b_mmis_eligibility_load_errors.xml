@@ -138,6 +138,45 @@ These variables will be used by the Logging framework">
 			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework, for Completing the Transaction"/>
 
 		 <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke the Logging framework for Transaction completion"/> 
+		 <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="totalRecordCount"/>
+				<delete-message-property key="InvalidLengthErrors"/>
+				<delete-message-property key="validRecsCount"/>
+				<delete-message-property key="MCIList"/>
+				<delete-message-property key="PersonTypeIDMap"/>
+				<delete-message-property key="missingFieldRecords"/>
+				<delete-message-property key="validPayload"/>
+				<delete-message-property key="preUpsertData"/>
+				<delete-message-property key="SFDCUpsertErrors"/>
+				<delete-message-property key="preUpdateData"/>
+				<delete-message-property key="updateResult"/>
+				<delete-message-property key="SFDCConErrorCount"/>
+				<delete-message-property key="exceptionMessage"/>
+				<delete-message-property key="totalErrorCount"/>
+				<delete-message-property key="previousExceptionMessages"/>
+				<delete-message-property key="currentExceptionMessage"/>
+				
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+				<delete-message-property key="uniqueRecCount"/>
+				<delete-message-property key="totalRecCount"/>
+				<delete-message-property key="totalErrorCount"/>
+				<delete-message-property key="totalSuccCount"/>
+				<delete-message-property key="errorDetails"/>
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="recStatus"/>
+				<delete-message-property key="totalSkipCount"/>
+				<delete-message-property key="TransAttachment"/>	
+			</message-properties-transformer>
 		 <exception-strategy ref="Interface-Exception-Strategy"
 			doc:name="Reference Exception Strategy" /> 
 	</flow>
