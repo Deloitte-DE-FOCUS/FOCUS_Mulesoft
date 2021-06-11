@@ -44,7 +44,7 @@ http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/
 		<reconnect frequency="10000" count="6" />
 	</sfdc:config>
 	
-	<spring:beans>
+	<!-- <spring:beans>
 		<spring:import resource="classpath:/loggingframework.xml" />
 	</spring:beans>
 	<spring:beans>
@@ -52,7 +52,7 @@ http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/
 	</spring:beans>
 	<spring:beans>
 		<spring:import resource="classpath:/queryframework.xml" />
-	</spring:beans>
+	</spring:beans> -->
 	
 <!-- 	<configuration doc:name="Configuration">
     	<expression-language>
@@ -279,8 +279,8 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 																) otherwise ""
 															) ) when ($.isInServedPopulation == true) otherwise "",
 				E20_independent_living_needs_assess: ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "Yes")][0] default "" when ( ( (sizeOf ((flowVars.NYTDServicesRecords[$.Person__c] default []) filter $.Assessment__c == "Yes")) > 0) 
-															or ( (sizeOf ((flowVars.independentServiceRecords[$.Person__c] default []) filter ($.Support_Service__c == "Assessment") or ($.Support_Service__c == "Exit Interview") or ($.Support_Service__c == "Plan Review") or ($.Support_Service__c == "Plan for Independence"))) > 0)
-															or ( (sizeOf ((flowVars.transitionalLivingServicesRecords[$.Person__c] default []) filter ( ((($.Support_Services__c default "") splitBy ";" ) contains "Assessment") or ((($.Support_Services__c default "") splitBy ";" ) contains "Plan Review") or ((($.Support_Services__c default "") splitBy ";" ) contains "Plan for Independence") or ((($.Support_Services__c default "") splitBy ";" ) contains "Exit Interview")) )) > 0)
+															or ( (sizeOf ((flowVars.independentServiceRecords[$.Person__c] default []) filter $.Support_Service__c == "Assessment")) > 0)
+															or ( (sizeOf ((flowVars.transitionalLivingServicesRecords[$.Person__c] default []) filter ( (($.Support_Services__c default "") splitBy ";" ) contains "Assessment") )) > 0)
 															or ( (sizeOf ((flowVars.supportServicesRecords[$.Person__c] default []) filter $.Service_Taxonomy__r.Level_Three_Subservices__c == "Assessment")) > 0)
 															or ((flowVars.ILReferralServicesRecords3[$.Person__c] != null) and ((sizeOf ((flowVars.ILReferralServicesRecords3[$.Person__c] default []) )) > 0))
 															) otherwise ( flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ "No")][0] default "" 
@@ -628,30 +628,6 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 	Flag:true
 }]]></dw:set-variable>
         </dw:transform-message>
-		<message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
-			<delete-message-property key="InterfaceID"/>
-			<delete-message-property key="interfaceTransactionStatus"/>
-			<delete-message-property key="TransactionID"/>
-			<delete-message-property key="LOVReturned"/>
-			<delete-message-property key="SubPayload"/>
-			<delete-message-property key="Tname"/>
-			<delete-message-property key="Time"/>
-			<delete-message-property key="extractInfo"/>
-			<delete-message-property key="InterfaceName"/>
-			<delete-message-property key="PersonIDList"/>
-			<delete-message-property key="xmlData"/>
-			<delete-message-property key="NYTDMainFile"/>
-			<delete-message-property key="NYTDExceptionFile"/>
-			<delete-message-property key="personRecords"/>
-			<delete-message-property key="placementRecords"/>
-			<delete-message-property key="custodyRecords"/>
-			<delete-message-property key="ILReferralServicesRecords1"/>
-			<delete-message-property key="ILReferralServicesRecords2"/>
-			<delete-message-property key="ILReferralServicesRecords3"/>
-			<delete-message-property key="NYTDMonthlyOutcomeSurveyRecords"/>
-			<delete-message-property key="ExtraNYTDMonthlyOutcomeSurveyRecords"/>
-			<delete-message-property key="CaseCountyDetails"/>
-		</message-properties-transformer>
         <exception-strategy ref="Federal-Exception-Strategy" doc:name="Reference Exception Strategy"/>
 
 
@@ -694,10 +670,10 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
                 <object-to-string-transformer mimeType="application/xml" doc:name="Object to String : Consume XML Stream" doc:description="Consume XML Stream"/>
                 <string-to-byte-array-transformer doc:name="String to Byte Array"/>
                 <set-variable variableName="xmlData" value="#[payload]" doc:name="Store XML Data" doc:description="Store XML Data"/>
-                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                <dw:transform-message doc:name="Transform Message : Create Attachment Data">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
-
+---
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: flowVars.filename ++ ".xml" ,
@@ -708,51 +684,7 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
                 </dw:transform-message>
          <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach XML" doc:description="Attach XML file to Extract record">
               <sfdc:objects ref="#[payload]"/>
-         </sfdc:create>-->
-		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
-<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
-            <dw:set-payload><![CDATA[%dw 1.0
-%output application/java
----
-[
-       {
-             ContentLocation: "S", 
-             Origin : "C",
-             OwnerId : "",
-             PathOnClient : flowVars.filename ++ ".xml",
-             Title : flowVars.filename ++ ".xml",
-             VersionData : flowVars.xmlData
-       }
-] ]]></dw:set-payload>
-        </dw:transform-message>
-        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
-            <sfdc:objects ref="#[payload]"/>
-        </sfdc:create>
-             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
-             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
-             <dw:transform-message doc:name="Transform Message">
-                    <dw:set-payload><![CDATA[%dw 1.0
-%output application/java
----
-payload map $]]></dw:set-payload>
-             </dw:transform-message>
-             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
-            <dw:set-payload><![CDATA[%dw 1.0
-%output application/java
----
-[
-       {
-             ShareType: "V", 
-             Visibility : "InternalUsers",
-             ContentDocumentId : payload[0].ContentDocumentId,
-             LinkedEntityId : flowVars.extractInfo.ParentId
-       }
-] ]]></dw:set-payload>
-        </dw:transform-message>
-        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
-            <sfdc:objects ref="#[payload]"/>
-        </sfdc:create>
-
+         </sfdc:create>
         <dw:transform-message doc:name="Transform Message">
             <dw:set-variable variableName="NYTDMainFile"><![CDATA[%dw 1.0
 %output application/java
@@ -864,10 +796,10 @@ payload.nytd_data_file.record map {
                 <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Consume CSV Input Stream" doc:description="Consume CSV Input Stream"/>
                 <string-to-byte-array-transformer doc:name="String to Byte Array"/>
                 <set-variable variableName="csvData" value="#[payload]" doc:name="Variable : CSV"/>
-                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                <dw:transform-message doc:name="Transform Message : Create Attachment Data">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
-
+---
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: flowVars.filename ++ ".csv" ,
@@ -878,50 +810,7 @@ payload.nytd_data_file.record map {
                 </dw:transform-message>
          <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach CSV">
               <sfdc:objects ref="#[payload]"/>
-         </sfdc:create>-->
-		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
-<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
-            <dw:set-payload><![CDATA[%dw 1.0
-%output application/java
----
-[
-       {
-             ContentLocation: "S", 
-             Origin : "C",
-             OwnerId : "",
-             PathOnClient : flowVars.filename ++ ".csv",
-             Title : flowVars.filename ++ ".csv",
-             VersionData : flowVars.csvData
-       }
-] ]]></dw:set-payload>
-        </dw:transform-message>
-        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
-            <sfdc:objects ref="#[payload]"/>
-        </sfdc:create>
-             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
-             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
-             <dw:transform-message doc:name="Transform Message">
-                    <dw:set-payload><![CDATA[%dw 1.0
-%output application/java
----
-payload map $]]></dw:set-payload>
-             </dw:transform-message>
-             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
-            <dw:set-payload><![CDATA[%dw 1.0
-%output application/java
----
-[
-       {
-             ShareType: "V", 
-             Visibility : "InternalUsers",
-             ContentDocumentId : payload[0].ContentDocumentId,
-             LinkedEntityId : flowVars.extractInfo.ParentId
-       }
-] ]]></dw:set-payload>
-        </dw:transform-message>
-        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
-            <sfdc:objects ref="#[payload]"/>
-        </sfdc:create> 
+         </sfdc:create>
         <dw:transform-message doc:name="Prepare Exception Message if applicable">
             <dw:set-variable variableName="NYTDExceptionFile"><![CDATA[%dw 1.0
 %output application/java
@@ -1037,7 +926,6 @@ payload groupBy $.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c]]></dw:set-vari
 ---
 payload groupBy $.IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c]]></dw:set-payload>
         </dw:transform-message>
-        
     </sub-flow>
     <sub-flow name="nytd-extract-get-supportServicesRecords-Sub_Flow">
         <logger message="Select Id, Service_Date__c, Service_Taxonomy__c, IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__c,IL_Referral_ID__r.Worker_Name__c,Service_Taxonomy__r.Level_One__c,Service_Taxonomy__r.Level_Two_Services__c,Service_Taxonomy__r.Level_Three_Subservices__c,Provider_Name__r.DEL_Provider_Full_Name__c From DEL_IL_Services__c Where ( Service_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  AND Service_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) AND IL_Referral_ID__r.Status__c ='Completed' AND Service_Taxonomy__r.Level_1__c ='Independent living Service' AND Service_Taxonomy__r.Level_2_Services__c = 'Support Service' AND ( (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportStartDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportStartDateUpperLimit] ) OR (IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &gt;= #[flowVars.extractInfo.AdjustedReportEndDateLowerLimit] AND IL_Referral_ID__r.Case_ID__r.Client_Name_Lk__r.Birthdate &lt;= #[flowVars.extractInfo.AdjustedReportEndDateUpperLimit] ) ) " level="INFO" doc:name="Logger : Query Support Services"/>
