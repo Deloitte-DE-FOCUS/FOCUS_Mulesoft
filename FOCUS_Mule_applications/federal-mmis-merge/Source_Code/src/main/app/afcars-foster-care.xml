@@ -518,7 +518,10 @@ Placement_InadequateHousing : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFoster
       CurrentPlacementOutofState: "1" when ((flowVars.LatestPlacementfor23[$][0].OutofState == "true") and (flowVars.LatestPlacementfor23[$][0].Division != "DPBHS")) otherwise ( "1" when ( (flowVars.LatestPlacementfor23[$][0].Division == "DPBHS") and ( (flowVars.YRS[$][0].State default "") != "DELAWARE") ) otherwise "2" ) default "",	 	
       
       
-      CasePlanGoal:( ( flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")) )][0] default "" ) when (flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")))][0] != null) otherwise ("7" when ( (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval != null) and ((( ( (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| ) ) >= (flowVars.extractInfo.ReportEndDate as :date)) when ((flowVars.extractInfo.ReportEndDate as :date) >= (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} )) otherwise (( ( (flowVars.extractInfo.ReportEndDate as :date) + |P60D| ) ) >= (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ))) ) otherwise "")),      
+      //CasePlanGoal:( ( flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")) )][0] default "" ) when (flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")))][0] != null) otherwise ("7" when ( (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval != null) and ((( ( (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| ) ) >= (flowVars.extractInfo.ReportEndDate as :date)) when ((flowVars.extractInfo.ReportEndDate as :date) >= (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} )) otherwise (( ( (flowVars.extractInfo.ReportEndDate as :date) + |P60D| ) ) >= (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ))) ) otherwise "")),
+      
+      CasePlanGoal: ( ( flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")) )][0] default "" ) when (flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")))][0] != null) 
+			otherwise ("7" when ((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval != null) and (((((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| ) ) <= (flowVars.DateDischargeFosterCare[$][0].DateDischargeFosterCare as :date {format : "yyyyMMdd"}) when (flowVars.DateDischargeFosterCare[$][0].DateDischargeFosterCare != null) otherwise ((((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| ) ) <= (flowVars.extractInfo.ReportEndDate as :date))))) otherwise "")),
       
       PrincipalCaretakerFamilyStructure : ( flowVars.LOVReturned[("AFCARS_FOSTER_FAMILYSTRUCTURE-" ++ (flowVars.GroupFirstDFSFosterCarePlacementforE[$][0].FamilyStructure default ""))][0] default "" ),
       PrincipalCaretaker1:flowVars.GroupFirstDFSFosterCarePlacementforE[$][0].Caregiver1Birthdate as :date as :string {format:"yyyy"} default "",
@@ -569,7 +572,6 @@ Placement_InadequateHousing : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFoster
       HispanicOriginFosterCaretaker2 : ((flowVars.FosterCarePerson[$]) default [])[1].Ethnicity default 0,
 
       DateDischargeFosterCare: (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd as :date as :string {format:"yyyyMMdd"} ) when ( (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != null) and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != "") and ((flowVars.GroupAfcarsCustody[$][-1].CustodyEnd) < (flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}) ) ) otherwise "",
-      
       
       DischargeTransactionDate:((flowVars.Custodian[$][0].CourtOrderCompletedDate as :date as :string {format:"yyyyMMdd"}) when ((flowVars.Custodian[$][0].CourtOrderCompletedDate != null) and (flowVars.Custodian[$][0].CourtOrderCompletedDate != "") and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != null) and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != "") and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != flowVars.GroupLatestAfcars[$][0].EpisodeEndDate) and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd == flowVars.Custodian[$][0].EndDate)) otherwise ""),
       
@@ -2643,6 +2645,13 @@ flowVars.ClientIDList filter ((flowVars.GroupAfcarsCustody[$][-1].CustodyStart !
       PersonID:$,
       //LatestHomeRemoval: ((flowVars.FirstPRforE[$][0].StartDate when (flowVars.FirstPRforE[$][0].StartDate >= flowVars.GroupLatestAfcars[$][0].FirstCustodyStartDate) otherwise flowVars.GroupLatestAfcars[$][0].FirstCustodyStartDate ) as :date as :string {format:"yyyyMMdd"} ) default ""
       LatestHomeRemoval: ((flowVars.FirstPRforE[$][0].StartDate when (flowVars.FirstPRforE[$][0].StartDate >= flowVars.GroupAfcarsCustody[$][-1].CustodyStart) otherwise flowVars.GroupAfcarsCustody[$][-1].CustodyStart ) as :date as :string {format:"yyyyMMdd"} ) default ""
+} groupBy $.PersonID]]></dw:set-variable>
+			<dw:set-variable variableName="DateDischargeFosterCare"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.ClientIDList filter ((flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != null) and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != "")) map {
+      PersonID:$,
+      DateDischargeFosterCare: (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd as :date as :string {format:"yyyyMMdd"} ) when ( ((flowVars.GroupAfcarsCustody[$][-1].CustodyEnd) < (flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}))) otherwise ""
 } groupBy $.PersonID]]></dw:set-variable>
         </dw:transform-message>
 
