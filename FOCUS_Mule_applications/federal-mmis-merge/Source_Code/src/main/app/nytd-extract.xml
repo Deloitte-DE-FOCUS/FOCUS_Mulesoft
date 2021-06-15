@@ -663,6 +663,30 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 	Flag:true
 }]]></dw:set-variable>
         </dw:transform-message>
+		<message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+			<delete-message-property key="InterfaceID"/>
+			<delete-message-property key="interfaceTransactionStatus"/>
+			<delete-message-property key="TransactionID"/>
+			<delete-message-property key="LOVReturned"/>
+			<delete-message-property key="SubPayload"/>
+			<delete-message-property key="Tname"/>
+			<delete-message-property key="Time"/>
+			<delete-message-property key="extractInfo"/>
+			<delete-message-property key="InterfaceName"/>
+			<delete-message-property key="PersonIDList"/>
+			<delete-message-property key="xmlData"/>
+			<delete-message-property key="NYTDMainFile"/>
+			<delete-message-property key="NYTDExceptionFile"/>
+			<delete-message-property key="personRecords"/>
+			<delete-message-property key="placementRecords"/>
+			<delete-message-property key="custodyRecords"/>
+			<delete-message-property key="ILReferralServicesRecords1"/>
+			<delete-message-property key="ILReferralServicesRecords2"/>
+			<delete-message-property key="ILReferralServicesRecords3"/>
+			<delete-message-property key="NYTDMonthlyOutcomeSurveyRecords"/>
+			<delete-message-property key="ExtraNYTDMonthlyOutcomeSurveyRecords"/>
+			<delete-message-property key="CaseCountyDetails"/>
+		</message-properties-transformer>
         <exception-strategy ref="Federal-Exception-Strategy" doc:name="Reference Exception Strategy"/>
 
 
@@ -705,10 +729,10 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
                 <object-to-string-transformer mimeType="application/xml" doc:name="Object to String : Consume XML Stream" doc:description="Consume XML Stream"/>
                 <string-to-byte-array-transformer doc:name="String to Byte Array"/>
                 <set-variable variableName="xmlData" value="#[payload]" doc:name="Store XML Data" doc:description="Store XML Data"/>
-                <dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
----
+
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: flowVars.filename ++ ".xml" ,
@@ -719,7 +743,51 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
                 </dw:transform-message>
          <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach XML" doc:description="Attach XML file to Extract record">
               <sfdc:objects ref="#[payload]"/>
-         </sfdc:create>
+         </sfdc:create>-->
+		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.filename ++ ".xml",
+             Title : flowVars.filename ++ ".xml",
+             VersionData : flowVars.xmlData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.extractInfo.ParentId
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+
         <dw:transform-message doc:name="Transform Message">
             <dw:set-variable variableName="NYTDMainFile"><![CDATA[%dw 1.0
 %output application/java
@@ -831,10 +899,10 @@ payload.nytd_data_file.record map {
                 <object-to-string-transformer mimeType="application/csv" doc:name="Object to String : Consume CSV Input Stream" doc:description="Consume CSV Input Stream"/>
                 <string-to-byte-array-transformer doc:name="String to Byte Array"/>
                 <set-variable variableName="csvData" value="#[payload]" doc:name="Variable : CSV"/>
-                <dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                <!--<dw:transform-message doc:name="Transform Message : Create Attachment Data">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
----
+
 [{
 	ParentId: flowVars.extractInfo.ParentId, 
 	Name: flowVars.filename ++ ".csv" ,
@@ -845,7 +913,50 @@ payload.nytd_data_file.record map {
                 </dw:transform-message>
          <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce Attach CSV">
               <sfdc:objects ref="#[payload]"/>
-         </sfdc:create>
+         </sfdc:create>-->
+		<logger message="Uploading the attachment" level="INFO" doc:name="Logger"/>
+<dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ContentLocation: "S", 
+             Origin : "C",
+             OwnerId : "",
+             PathOnClient : flowVars.filename ++ ".csv",
+             Title : flowVars.filename ++ ".csv",
+             VersionData : flowVars.csvData
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentVersion" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+             <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,ContentDocumentId,VersionData FROM ContentVersion WHERE Id = '#[payload[0].Id]'" doc:name="Salesforce"/>
+             <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map $]]></dw:set-payload>
+             </dw:transform-message>
+             <dw:transform-message doc:name="Transform Message : Prepare Attachment payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+       {
+             ShareType: "V", 
+             Visibility : "InternalUsers",
+             ContentDocumentId : payload[0].ContentDocumentId,
+             LinkedEntityId : flowVars.extractInfo.ParentId
+       }
+] ]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="ContentDocumentLink" doc:name="Salesforce : Create Standard Attachment" doc:description="Create Standard Attachment">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create> 
         <dw:transform-message doc:name="Prepare Exception Message if applicable">
             <dw:set-variable variableName="NYTDExceptionFile"><![CDATA[%dw 1.0
 %output application/java
