@@ -159,11 +159,11 @@ payload.clientIds[0] pluck $$ as :string default []]]></dw:set-variable>
             <flow-ref name="afcars-fostercare-Placementoverlap-report-records-Sub_Flow" doc:name="afcars-fostercare-Placementoverlap-report-records-Sub_Flow"/>
             <enrich source="#[payload]" target="#[flowVars.reportCustodyPersonIDList1]"/>
         </enricher>
+		<enricher doc:name="Message Enricher">
+			<flow-ref name="afcars-fostercare-Runawayoverlap-report-records-Sub_Flow" doc:name="afcars-fostercare-Runawayoverlap-report-records-Sub_Flow"/>
+			<enrich source="#[payload]" target="#[flowVars.reportCustodyPersonIDList2]"/>
+		</enricher>
 
-        <enricher doc:name="Message Enricher">
-            <flow-ref name="afcars-fostercare-Runawayoverlap-report-records-Sub_Flow" doc:name="afcars-fostercare-Runawayoverlap-report-records-Sub_Flow"/>
-            <enrich source="#[payload]" target="#[flowVars.reportCustodyPersonIDList2]"/>
-        </enricher>
         <dw:transform-message doc:name="Transform Message : Add Overlaps for Person ID List">
             <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="reportCustodyPersonIDList"><![CDATA[%dw 1.0
 %output application/java
@@ -299,23 +299,24 @@ payload.clientIds[0] pluck $$ as :string default []]]></dw:set-variable>
                     <enrich source="#[flowVars.GroupLatestAfcars]" target="#[flowVars.GroupLatestAfcars]"/>
                     <enrich source="#[flowVars.GroupAfcarsCustody]" target="#[flowVars.GroupAfcarsCustody]"/>
                 </enricher>
-                <enricher doc:name="Message Enricher">
-                    <flow-ref name="afcars-PlacementRunawayTrial--Sub_Flow" doc:name="afcars-PlacementRunawayTrial--Sub_Flow"/>
-                    <enrich source="#[flowVars.FirstPlacementforE]" target="#[flowVars.FirstPlacementforE]"/>
-                    <enrich source="#[flowVars.FirstRunaway]" target="#[flowVars.FirstRunaway]"/>
-                    <enrich source="#[flowVars.LatestRunaway]" target="#[flowVars.LatestRunaway]"/>
-                    <enrich source="#[flowVars.FirstPlacement]" target="#[flowVars.FirstPlacement]"/>
-                    <enrich source="#[flowVars.LatestPlacement]" target="#[flowVars.LatestPlacement]"/>
-                    <enrich source="#[flowVars.GroupFirstPlacementforE]" target="#[flowVars.GroupFirstPlacementforE]"/>
-                    <enrich source="#[flowVars.GroupFirstDFSFosterCarePlacementforE]" target="#[flowVars.GroupFirstDFSFosterCarePlacementforE]"/>
-                    <enrich source="#[flowVars.GroupFirstFosterCarePlacementforE]" target="#[flowVars.GroupFirstFosterCarePlacementforE]"/>                                        
-                    <enrich source="#[flowVars.GroupFirstRunawayforE]" target="#[flowVars.GroupFirstRunawayforE]"/>
-                    <enrich source="#[flowVars.FirstRunawayforE]" target="#[flowVars.FirstRunawayforE]"/>
-                    <enrich source="#[flowVars.FirstPRforE]" target="#[flowVars.FirstPRforE]"/>
-                    <enrich source="#[flowVars.LatestPlacementArray]" target="#[flowVars.LatestPlacementArray]"/>
-                    <enrich source="#[flowVars.LatestPlacementfor23]" target="#[flowVars.LatestPlacementfor23]"/>
-                    <enrich source="#[flowVars.LatestPlacementOrTRUfor23]" target="#[flowVars.LatestPlacementOrTRUfor23]"/>
-                </enricher>
+				<enricher doc:name="Message Enricher">
+					<flow-ref name="afcars-PlacementRunawayTrial--Sub_Flow" doc:name="afcars-PlacementRunawayTrial--Sub_Flow"/>
+					<enrich source="#[flowVars.FirstPlacementforE]" target="#[flowVars.FirstPlacementforE]"/>
+					<enrich source="#[flowVars.FirstRunaway]" target="#[flowVars.FirstRunaway]"/>
+					<enrich source="#[flowVars.LatestRunaway]" target="#[flowVars.LatestRunaway]"/>
+					<enrich source="#[flowVars.FirstPlacement]" target="#[flowVars.FirstPlacement]"/>
+					<enrich source="#[flowVars.LatestPlacement]" target="#[flowVars.LatestPlacement]"/>
+					<enrich source="#[flowVars.GroupFirstPlacementforE]" target="#[flowVars.GroupFirstPlacementforE]"/>
+					<enrich source="#[flowVars.GroupFirstDFSFosterCarePlacementforE]" target="#[flowVars.GroupFirstDFSFosterCarePlacementforE]"/>
+					<enrich source="#[flowVars.GroupFirstFosterCarePlacementforE]" target="#[flowVars.GroupFirstFosterCarePlacementforE]"/>
+					<enrich source="#[flowVars.GroupFirstRunawayforE]" target="#[flowVars.GroupFirstRunawayforE]"/>
+					<enrich source="#[flowVars.FirstRunawayforE]" target="#[flowVars.FirstRunawayforE]"/>
+					<enrich source="#[flowVars.FirstPRforE]" target="#[flowVars.FirstPRforE]"/>
+					<enrich source="#[flowVars.LatestPlacementArray]" target="#[flowVars.LatestPlacementArray]"/>
+					<enrich source="#[flowVars.LatestPlacementfor23]" target="#[flowVars.LatestPlacementfor23]"/>
+					<enrich source="#[flowVars.LatestPlacementOrTRUfor23]" target="#[flowVars.LatestPlacementOrTRUfor23]"/>
+				</enricher>
+
 				<flow-ref name="afcars-Element24-Sub_Flow" doc:name="afcars-Element24-Sub_Flow"/>
                 <flow-ref name="afcars-CareGiverDetails-from-petition-Sub_Flow" doc:name="afcars-CareGiverDetails-from-petition-Sub_Flow"/>
                 <flow-ref name="afcars-Element58-Sub_Flow" doc:name="afcars-Element58-Sub_Flow"/>
@@ -326,6 +327,7 @@ payload.clientIds[0] pluck $$ as :string default []]]></dw:set-variable>
                 <flow-ref name="afcars-fostercare-adoption-person-involved-records-Sub_Flow" doc:name="afcars-fostercare-adoption-person-involved-records-Sub_Flow"/>
                 <flow-ref name="afcars-fostercare-get-firstPlacement-Sub_Flow" doc:name="afcars-fostercare-get-firstPlacement-Sub_Flow"/>
                 <flow-ref name="afcars-foster-care-LatestHomeRemoval" doc:name="afcars-foster-care-LatestHomeRemoval"/>
+                <flow-ref name="afcars-foster-care-DateDischargeFosterCare" doc:name="afcars-foster-care-DateDischargeFosterCare"/>
                 <flow-ref name="afcars-fostercare-casePlan-records-Sub_Flow" doc:name="afcars-fostercare-casePlan-records-Sub_Flow"/>
                 <flow-ref name="afcars-fostercare-TPR-records-Sub_Flow" doc:name="afcars-fostercare-TPR-records-Sub_Flow"/>
                 <flow-ref name="afcars-DYRS-records-Sub_Flow" doc:name="afcars-DYRS-records-Sub_Flow"/>
@@ -486,27 +488,27 @@ flowVars.ClientIDList filter ( flowVars.Client[$][0].PID != null ) map {
       
       Placement_Sexual_Abuse : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason   default "") splitBy ";") filter ( SexualAbuseList contains $ )  ) ) > 0 ) ) otherwise "0",
       
-Placement_Neglect : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( NeglectList contains $ )  ) ) > 0 ) ) otherwise "0",
-Placement_Alcohol_Abuse : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( AlcoholAbuseParentList contains $ )  ) ) > 0 ) ) otherwise "0",
-Placement_Drug_Abuse : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( DrugAbuseParentList contains $ )  ) ) > 0 ) ) otherwise "0",
-Placement_Alcohol_AbuseC : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( AlcoholAbuseChildList contains $ )  ) ) > 0 ) ) otherwise "0",
-Placement_Drug_AbuseC : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( DrugAbuseChildList contains $ )  ) ) > 0 ) ) otherwise "0",
-
-Placement_ChildDisability : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( ChildDisabilityList contains $ )  ) ) > 0 ) ) otherwise "0",
-
-Placement_ChildBehaviorProblem : "1" when ( ( ( flowVars.GroupFirstFosterCarePlacementforE[$][0].Division == "DFS" ) and ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( ChildBehaviorProblemList contains $ )  ) ) > 0 ) ) or ( ( flowVars.GroupFirstFosterCarePlacementforE[$][0].Division == "DYRS" ) or ( flowVars.GroupFirstFosterCarePlacementforE[$][0].Division == "DPBHS" ) ) ) otherwise "0",
-
-Placement_DeathofParent : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( DeathOfParentList contains $ )  ) ) > 0 ) ) otherwise "0",
-
-Placement_IncarcerationofParent : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( IncarcerationofParentList contains $ )  ) ) > 0 ) ) otherwise "0",
-
-Placement_CaretakersInability : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( CaretakersInabilityList contains $ )  ) ) > 0 ) ) otherwise "0",
-
-Placement_Abandonment : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( AbandonmentList contains $ )  ) ) > 0 ) ) otherwise "0",
-
-Placement_Relinquishment : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( RelinquishmentList contains $ )  ) ) > 0 ) ) otherwise "0",	 
- 
-Placement_InadequateHousing : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( InadequateHousingList contains $ )  ) ) > 0 ) ) otherwise "0",
+	Placement_Neglect : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( NeglectList contains $ )  ) ) > 0 ) ) otherwise "0",
+	Placement_Alcohol_Abuse : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( AlcoholAbuseParentList contains $ )  ) ) > 0 ) ) otherwise "0",
+	Placement_Drug_Abuse : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( DrugAbuseParentList contains $ )  ) ) > 0 ) ) otherwise "0",
+	Placement_Alcohol_AbuseC : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( AlcoholAbuseChildList contains $ )  ) ) > 0 ) ) otherwise "0",
+	Placement_Drug_AbuseC : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( DrugAbuseChildList contains $ )  ) ) > 0 ) ) otherwise "0",
+	
+	Placement_ChildDisability : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( ChildDisabilityList contains $ )  ) ) > 0 ) ) otherwise "0",
+	
+	Placement_ChildBehaviorProblem : "1" when ( ( ( flowVars.GroupFirstFosterCarePlacementforE[$][0].Division == "DFS" ) and ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( ChildBehaviorProblemList contains $ )  ) ) > 0 ) ) or ( ( flowVars.GroupFirstFosterCarePlacementforE[$][0].Division == "DYRS" ) or ( flowVars.GroupFirstFosterCarePlacementforE[$][0].Division == "DPBHS" ) ) ) otherwise "0",
+	
+	Placement_DeathofParent : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( DeathOfParentList contains $ )  ) ) > 0 ) ) otherwise "0",
+	
+	Placement_IncarcerationofParent : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( IncarcerationofParentList contains $ )  ) ) > 0 ) ) otherwise "0",
+	
+	Placement_CaretakersInability : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( CaretakersInabilityList contains $ )  ) ) > 0 ) ) otherwise "0",
+	
+	Placement_Abandonment : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( AbandonmentList contains $ )  ) ) > 0 ) ) otherwise "0",
+	
+	Placement_Relinquishment : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( RelinquishmentList contains $ )  ) ) > 0 ) ) otherwise "0",	 
+	 
+	Placement_InadequateHousing : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFosterCarePlacementforE[$][0].InitialPlacementReason default "") splitBy ";") filter ( InadequateHousingList contains $ )  ) ) > 0 ) ) otherwise "0",
                   
 	  CurrentPlacementSetting: "7" when ( (flowVars.LatestPlacementOrTRUfor23[$][0].RunawayID != null) or ( (flowVars.LatestPlacementfor23[$][0].EndDate != "") and (flowVars.LatestRunaway[$][0].EndDate == "" ) ) ) 
             otherwise ( "8" when ((flowVars.LatestPlacementOrTRUfor23[$][0].HomePlacement == "Temporary Home Visit" or flowVars.LatestPlacementOrTRUfor23[$][0].HomePlacement == "Trial Reunification")) otherwise ( (flowVars.LatestPlacementfor23[$][0].CurrentPlacementSettingfor41FocusCode) when (flowVars.LatestPlacementfor23[$][0].CurrentPlacementSettingfor41FocusCode != null) otherwise 
@@ -518,18 +520,18 @@ Placement_InadequateHousing : "1" when ( ( (sizeOf ( ((flowVars.GroupFirstFoster
       CurrentPlacementOutofState: "1" when ((flowVars.LatestPlacementfor23[$][0].OutofState == "true") and (flowVars.LatestPlacementfor23[$][0].Division != "DPBHS")) otherwise ( "1" when ( (flowVars.LatestPlacementfor23[$][0].Division == "DPBHS") and ( (flowVars.YRS[$][0].State default "") != "DELAWARE") ) otherwise "2" ) default "",	 	
       
       
-      //CasePlanGoal:( ( flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")) )][0] default "" ) when (flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")))][0] != null) otherwise ("7" when ( (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval != null) and ((( ( (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| ) ) >= (flowVars.extractInfo.ReportEndDate as :date)) when ((flowVars.extractInfo.ReportEndDate as :date) >= (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} )) otherwise (( ( (flowVars.extractInfo.ReportEndDate as :date) + |P60D| ) ) >= (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ))) ) otherwise "")),
+      CasePlanGoal:( ( flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")) )][0] default "" ) when (flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")))][0] != null) otherwise ("7" when ( (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval != null) and ((( ( (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| ) ) <= (flowVars.extractInfo.ReportEndDate as :date)) when ((flowVars.extractInfo.ReportEndDate as :date) >= (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} )) otherwise (( ( (flowVars.extractInfo.ReportEndDate as :date) + |P60D| ) ) >= (flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ))) ) otherwise "")),
       
-      CasePlanGoal: ( ( flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")) )][0] default "" ) when (flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")))][0] != null) 
-          otherwise ("7" when ((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval != null) and (flowVars.DateDischargeFosterCare[$][0].DateDischargeFosterCare != null) and (((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| )  <= (flowVars.DateDischargeFosterCare[$][0].DateDischargeFosterCare as :date {format : "yyyyMMdd"}))) otherwise ("7" when ((((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| ) ) <= (flowVars.extractInfo.ReportEndDate as :date)) otherwise "") )),      
+      //CasePlanGoal: ( ( flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")) )][0] default "" ) when (flowVars.LOVReturned[("AFCARS_FOSTER_CASEPLAN-" ++ ( lower (flowVars.Element43[$][0].PrimaryGoal default "")))][0] != null) 
+          //otherwise ("7" when ((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval != null) and (flowVars.DateDischargeFosterCare[$][0].DateDischargeFosterCare != "") and (((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| )  <= ((flowVars.DateDischargeFosterCare[$][0].DateDischargeFosterCare) as :date {format : "yyyyMMdd"}))) otherwise ("7" when ((((flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval as :date {format : "yyyyMMdd"} ) + |P60D| ) ) <= (flowVars.extractInfo.ReportEndDate as :date)) otherwise "") )),
       
       PrincipalCaretakerFamilyStructure : ( flowVars.LOVReturned[("AFCARS_FOSTER_FAMILYSTRUCTURE-" ++ (flowVars.GroupFirstDFSFosterCarePlacementforE[$][0].FamilyStructure default ""))][0] default "" ),
       PrincipalCaretaker1:flowVars.GroupFirstDFSFosterCarePlacementforE[$][0].Caregiver1Birthdate as :date as :string {format:"yyyy"} default "",
       PrincipalCaretaker2:flowVars.GroupFirstDFSFosterCarePlacementforE[$][0].Caregiver2Birthdate as :date as :string {format:"yyyy"} default "",
       
-      PetitionPrincipalCaretakerFamilyStructure : (flowVars.CareGiverDetails[$][-1].FamilyStructure default ""),	  
-	    PetitionPrincipalCaretaker1: (flowVars.CareGiverDetails[$][-1].BirthDate1 default ""),	  
-	    PetitionPrincipalCaretaker2: (flowVars.CareGiverDetails[$][-1].BirthDate2 default ""),       
+      PetitionPrincipalCaretakerFamilyStructure : (flowVars.CareGiverDetails[$][-1].FamilyStructure default ""),
+      PetitionPrincipalCaretaker1: (flowVars.CareGiverDetails[$][-1].BirthDate1 default ""),
+      PetitionPrincipalCaretaker2: (flowVars.CareGiverDetails[$][-1].BirthDate2 default ""),
       
       MotherTPR:( flowVars.FormerAdoptiveParent1[$][0].TPR when (flowVars.FormerAdoptiveParent1[$][0].Gender == "Female") 
                                     otherwise ( flowVars.BioParent1[$][0].TPR when (flowVars.BioParent1[$][0].Gender == "Female") 
@@ -1184,12 +1186,12 @@ payload map {
     </sub-flow>
     <sub-flow name="afcars-fostercare-get-AfcarsEpisodes-Sub_Flow" doc:description="Flow to get AFCARS Episodes for the reporting period">
         <logger message="Get AFCARS Episodes details" level="INFO" doc:name="Logger : AFCARS Episodes details"/>
-        <foreach collection="#[flowVars.CustodyList]" batchSize="150" doc:name="For Each">
+        <foreach collection="#[flowVars.reportCustodyPersonIDList]" batchSize="150" doc:name="For Each">
             <dw:transform-message doc:name="Transform Message : Get Comma Separated Person Id List">
                 <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-((payload map ("'" ++ $.PersonID ++ "'")) distinctBy $) joinBy ","]]></dw:set-payload>
+((payload map ("'" ++ $ ++ "'")) distinctBy $) joinBy ","]]></dw:set-payload>
             </dw:transform-message>
             <!-- <logger message="Select Id,Client__c,Client__r.DEL_PID__c,Removal_Reason__c,Episode_Start_Date__c ,Episode_End_Date__c, (  Select Id,Contact__c,Placement_Start_Date__c, Relative_Non_relative_Placement__c,Placement_End_date__c,Placement_Discharge_Date__c,Placement_End_Date_Division_Wide__c,Placement_Reasons__c,Case_Number__c,Case_Number__r.County__c,Service_taxanomy__c,Service_taxanomy__r.Level_One__c,Service_taxanomy__r.Level_Two_Services__c,Service_taxanomy__r.Level_Three_Subservices__c,Last_Name_Organization_Name__c,Initial_Placement_Reason_s__c,Family_Structure__c, Case_Number__r.Division__c,Caregiver1_Name__c,Caregiver1_Name__r.DEL_Race_Primary__c,Caregiver1_Name__r.DEL_Race_Secondary__c,Caregiver1_Name__r.DEL_Ethnicity__c,Caregiver1_Name__r.Birthdate,Caregiver2_Name__c,Caregiver2_Name__r.Birthdate,Caregiver2_Name__r.DEL_Race_Primary__c,Caregiver2_Name__r.DEL_Race_Secondary__c,Caregiver2_Name__r.DEL_Ethnicity__c,End_Reason__c,Runaway_Status__c,Home_Placement_Type__c,Out_of_State__c,Foster_Care_Setting_Type__c,LastModifiedDate  from Placements__r where (Latest_Version_Placement__c = true) and Case_Number__r.Expungement_Flag__c = false and (Placement_Status__c in ('Admitted','Discharged')) and (Placement_Start_Date__c != null) order by Placement_Start_date__c), ( Select Id,Client_Name__c,Runaway_End_Date_Time__c, Runaway_Start_Date_Time__c from Runaway__r where Runaway_Status__c !='' and Runaway_Start_Date_Time__c != null order by LastModifiedDate) from DEL_Placement_Episode__c where Client__c In (#[payload]) and ((Episode_Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Episode_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or (Episode_Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Episode_End_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] ) or (Episode_Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  and Episode_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or (Episode_Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  and Episode_End_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) or  ( Episode_Start_Date__c  &lt;= #[flowVars.extractInfo.ReportEndDate] and Episode_End_Date__c  = null) )" level="INFO" doc:name="Logger"/> -->
             <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Client__c,Client__r.DEL_PID__c,Removal_Reason__c,Episode_Start_Date__c ,Episode_End_Date__c, (  Select Id,Contact__c,Placement_Start_Date__c, Relative_Non_relative_Placement__c,Placement_End_date__c,Placement_Discharge_Date__c,Placement_End_Date_Division_Wide__c,Placement_End_Completed_Date__c,Placement_Reasons__c,Case_Number__c,Case_Number__r.County__c,Service_taxanomy__c,Service_taxanomy__r.Level_One__c, Service_taxanomy__r.Level_One_Code__c, Service_taxanomy__r.Level_Two_Code__c, Service_taxanomy__r.Level_Three_Code__c, Service_taxanomy__r.FACTS_I_Service_Desc__c,Service_taxanomy__r.Foster_Care_Setting_Type__c, Last_Name_Organization_Name__c,Initial_Placement_Reason_s__c,Family_Structure__c, Case_Number__r.Division__c, Caregiver1_Name__c,Caregiver1_Name__r.DEL_Race_Primary__c, Caregiver1_Name__r.DEL_Race_Secondary__c, Caregiver1_Name__r.DEL_Ethnicity__c, Caregiver1_Name__r.Birthdate,Caregiver2_Name__c, Caregiver2_Name__r.Birthdate,Caregiver2_Name__r.DEL_Race_Primary__c, Caregiver2_Name__r.DEL_Race_Secondary__c, Caregiver2_Name__r.DEL_Ethnicity__c, End_Reason__c,Runaway_Status__c, Home_Placement_Type__c,Out_of_State__c, Foster_Care_Setting_Type__c, Completed_Date__c, Facility_Type_Formula__c, Case_Type__c, Is_this_Placement_less_than_24_hours__c  from Placements__r where (Latest_Version_Placement__c = true) and Case_Number__r.Expungement_Flag__c = false and (Placement_Status__c in ('Admitted','Discharged')) and (Placement_Start_Date__c != null) and Service_taxanomy__r.Foster_Care_Setting_Type__c = 'Foster Care' and ( not (Service_taxanomy__r.Level_One__c = 'Foster Care' and Service_taxanomy__r.Level_Two_Services__c = 'Foster Care - DFS Supervision' )) and Placement_Start_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] order by Placement_Start_date__c), ( Select Id,Client_Name__c,Runaway_End_Date_Time__c, Runaway_Start_Date_Time__c, Completed_Date__c from Runaway__r where Runaway_Status__c !='' and Runaway_Start_Date_Time__c != null and Runaway_Start_Date_Time__c &lt;= #[flowVars.extractInfo.ReportEndDate]T00:00:00Z order by Runaway_Start_Date_Time__c) from DEL_Placement_Episode__c where Client__c In (#[payload]) and ((Episode_Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Episode_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or (Episode_Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Episode_End_Date__c &gt; #[flowVars.extractInfo.ReportStartDate] ) or (Episode_Start_Date__c &lt; #[flowVars.extractInfo.ReportEndDate]  and Episode_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or (Episode_Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  and Episode_End_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) or  ( Episode_Start_Date__c  &lt;= #[flowVars.extractInfo.ReportEndDate] and Episode_End_Date__c  = null) or  ( Episode_End_Date__c  &lt;= #[flowVars.extractInfo.ReportEndDate] ) )" doc:name="Salesforce : Get Records" doc:description="Get Episodes before Report Period and associated Placement and Runaway before Report Period"/>
@@ -1380,22 +1382,25 @@ payload filter ( (  ( $.Placement != null ) and ( ( sizeOf ( ($.Placement defaul
 
     <sub-flow name="afcars-fostercare-get-TRU-and-TMV-Sub_Flow" doc:description="Flow to get TRU and TMV related information">
         <logger message="Get TRU and TMV Details" level="INFO" doc:name="Logger : TRU and TMV Details"/>
-       <foreach collection="#[flowVars.CustodyList]" batchSize="150" doc:name="For Each Item">
-            <dw:transform-message doc:name="Transform Message : Get Comma Separated Person Id List">
-                <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
+		<foreach collection="#[flowVars.reportCustodyPersonIDList]" batchSize="150" doc:name="For Each Item">
+			<dw:transform-message doc:name="Transform Message : Get Comma Separated Person Id List">
+				<dw:input-payload mimeType="application/java"/>
+				<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-((payload map ("'" ++ $.PersonID ++ "'")) distinctBy $) joinBy ","]]></dw:set-payload>
-            </dw:transform-message>
-            <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Contact__c,Placement_Start_Date_Division_Wide__c ,Placement_End_Date_Division_Wide__c,Placement_End_Completed_Date__c, Case_Number__c,Case_Number__r.Division__c, Home_Placement_Type__c  from DEL_Placement__c where (Latest_Version_Placement__c = true) and Placement_Status__c in ('Admitted','Discharged') and (Placement_Start_Date_Division_Wide__c != null) and Home_Placement_Type__c!=null and ( not (Service_taxanomy__r.Level_One__c = 'Foster Care' and Service_taxanomy__r.Level_Two_Services__c = 'Foster Care - DFS Supervision' )) and Placement_Start_Date_Division_Wide__c &lt;= #[flowVars.extractInfo.ReportEndDate] and Contact__c In (#[payload]) order by Placement_Start_Date_Division_Wide__c desc" doc:name="Salesforce : Get TRU and TMV" doc:description="Query to Get Trial ReUnifications and Temporary Home Visit for a Person"/>
-        <dw:transform-message doc:name="Transform Message : Get List from Iterator">
-            <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
+((payload map ("'" ++ $ ++ "'")) distinctBy $) joinBy ","]]></dw:set-payload>
+			</dw:transform-message>
+			<sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Contact__c,Placement_Start_Date_Division_Wide__c ,Placement_End_Date_Division_Wide__c,Placement_End_Completed_Date__c, Case_Number__c,Case_Number__r.Division__c, Home_Placement_Type__c  from DEL_Placement__c where (Latest_Version_Placement__c = true) and Placement_Status__c in ('Admitted','Discharged') and (Placement_Start_Date_Division_Wide__c != null) and Home_Placement_Type__c!=null and ( not (Service_taxanomy__r.Level_One__c = 'Foster Care' and Service_taxanomy__r.Level_Two_Services__c = 'Foster Care - DFS Supervision' )) and Placement_Start_Date_Division_Wide__c &lt;= #[flowVars.extractInfo.ReportEndDate] and Contact__c In (#[payload]) order by Placement_Start_Date_Division_Wide__c desc" doc:name="Salesforce : Get TRU and TMV" doc:description="Query to Get Trial ReUnifications and Temporary Home Visit for a Person"/>
+			<dw:transform-message doc:name="Transform Message : Get List from Iterator">
+				<dw:input-payload mimeType="application/java"/>
+				<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 payload map $]]></dw:set-payload>
-        </dw:transform-message>
-            <dw:transform-message doc:name="Transform Message : Map Records">
-                <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
+			</dw:transform-message>
+			<dw:transform-message doc:name="Transform Message : Map Records">
+				<dw:input-payload mimeType="application/java"/>
+				<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 payload map {
@@ -1408,33 +1413,33 @@ payload map {
 			Division:$.Case_Number__r.Division__c default "",
             HomePlacement:$.Home_Placement_Type__c default ""
       } distinctBy $.PersonID]]></dw:set-payload>
-
-            </dw:transform-message>
-
-            <dw:transform-message doc:name="Transform Message">
-                <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
+			</dw:transform-message>
+			<dw:transform-message doc:name="Transform Message">
+				<dw:input-payload mimeType="application/java"/>
+				<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 ( (payload default []) filter ((sizeOf $) > 0) map {
       ($)
       } orderBy $.EndDate2 ) distinctBy $.PersonID]]></dw:set-payload>
-            </dw:transform-message>
-
-             <dw:transform-message doc:name="Transform Message">
-                <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="GroupedTRUandTMVPlacements"><![CDATA[%dw 1.0
+			</dw:transform-message>
+			<dw:transform-message doc:name="Transform Message">
+				<dw:input-payload mimeType="application/java"/>
+				<dw:set-variable variableName="GroupedTRUandTMVPlacements"><![CDATA[%dw 1.0
 %output application/java
 ---
 (flowVars.GroupedTRUandTMVPlacements default {}) ++ ((payload groupBy $.PersonID) default {})]]></dw:set-variable>
-                <dw:set-variable variableName="GroupedTRUPlacements"><![CDATA[%dw 1.0
+				<dw:set-variable variableName="GroupedTRUPlacements"><![CDATA[%dw 1.0
 %output application/java
 ---
 (flowVars.GroupedTRUPlacements default {}) ++ (( (payload default [] filter ($.HomePlacement == "Trial Reunification") ) groupBy $.PersonID) default {})]]></dw:set-variable>
-                <dw:set-variable variableName="GroupedTMVPlacements"><![CDATA[%dw 1.0
+				<dw:set-variable variableName="GroupedTMVPlacements"><![CDATA[%dw 1.0
 %output application/java
 ---
 (flowVars.GroupedTMVPlacements default {}) ++ (( (payload default [] filter ($.HomePlacement == "Temporary Home Visit") ) groupBy $.PersonID) default {})]]></dw:set-variable>
-            </dw:transform-message>
-        </foreach>
+			</dw:transform-message>
+		</foreach>
+
     </sub-flow>
 
 
@@ -1609,7 +1614,7 @@ payload map $]]></dw:set-payload>
 
     <sub-flow name="afcars-fostercare-Custody-report-records-Sub_Flow">
         <logger message="Getting Custody Details for Report" level="INFO" doc:name="Logger : Log Custody Details Report Details"/>
-		<sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c,Court_Order_ID__r.Completed_Date__c,Court_Order_ID__r.Petition_ID__c,Court_Order_ID__r.Initial_Completion_Date__c from DEL_Custody__c where Client_Name__c != nul and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Original_Custody__c= true)) and Custodian__c ='DSCYF/DFS' and ((Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or  (Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &gt; #[flowVars.extractInfo.ReportStartDate] ) or (Start_Date__c &lt; #[flowVars.extractInfo.ReportEndDate]  and Actual_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or (Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) or  ( Start_Date__c  &lt;= #[flowVars.extractInfo.ReportEndDate] and Actual_End_Date__c  = null) ) Order By  Start_Date__c asc" doc:name="Salesforce : Get Custody Details for Report" doc:description="Get Custody Details applicable for Report Clients"/>
+		    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c,Court_Order_ID__r.Completed_Date__c,Court_Order_ID__r.Petition_ID__c,Court_Order_ID__r.Initial_Completion_Date__c from DEL_Custody__c where Client_Name__c != null and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Original_Custody__c= true)) and Custodian__c ='DSCYF/DFS' and ((Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or  (Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &gt; #[flowVars.extractInfo.ReportStartDate] ) or (Start_Date__c &lt; #[flowVars.extractInfo.ReportEndDate]  and Actual_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or (Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) or  ( Start_Date__c  &lt;= #[flowVars.extractInfo.ReportEndDate] and Actual_End_Date__c  = null) ) Order By Start_Date__c asc" doc:name="Salesforce : Get Custody Details for Report" doc:description="Get Custody Details applicable for Report Clients"/>
 
         <!-- <logger message="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c,Court_Order_ID__r.Petition_ID__c from DEL_Custody__c where Client_Name__c !=  null and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Original_Custody__c= true)) and Custodian__c ='DSCYF/DFS' and ((Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or  (Start_Date__c &lt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &gt; #[flowVars.extractInfo.ReportStartDate] ) or (Start_Date__c &lt; #[flowVars.extractInfo.ReportEndDate]  and Actual_End_Date__c &gt;= #[flowVars.extractInfo.ReportEndDate]) or (Start_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]  and Actual_End_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] ) or  ( Start_Date__c  &lt;= #[flowVars.extractInfo.ReportEndDate] and Actual_End_Date__c  = null) ) Order By  Start_Date__c asc " level="INFO" doc:name="Logger"/> -->
 
@@ -1657,22 +1662,26 @@ payload map $.PersonID filter ($ != null) distinctBy $]]></dw:set-payload>
     
     <sub-flow name="afcars-fostercare-Custody-records-Sub_Flow" doc:description="Flow to get Custody details for the report">
         <logger message="Getting Custody records" level="INFO" doc:name="Logger : Custody records"/>
-        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c, CreatedDate, Court_Order_ID__r.Completed_Date__c,Court_Order_ID__r.Petition_ID__c,Court_Order_ID__r.Initial_Completion_Date__c from DEL_Custody__c where Client_Name__c != null and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Original_Custody__c= true)) and Custodian__c ='DSCYF/DFS' and Start_Date__c &lt; #[flowVars.extractInfo.ReportEndDate] Order By  Start_Date__c asc" doc:name="Salesforce : Get Custody Details" doc:description="Get Custody Details"/>
+		<foreach collection="#[flowVars.reportCustodyPersonIDList]" batchSize="150" doc:name="For Each">
+			<dw:transform-message doc:name="Transform Message : Get Comma Separated Person Id List">
+                <dw:input-payload mimeType="application/java"/>
+				<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload map ("'" ++ $ ++ "'")) joinBy ","]]></dw:set-payload>
 
-
-        <!-- <logger message="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c,Court_Order_ID__r.Petition_ID__c from DEL_Custody__c where Client_Name__c !=  null and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Original_Custody__c= true)) and Custodian__c ='DSCYF/DFS' and Client_Name__c != '003r0000007QnstAAC' Order By  Start_Date__c desc" level="INFO" doc:name="Logger : Query"/> -->
-        <!-- <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Client_Name__c,Client_Name__r.DEL_PID__c,End_Date__c,Start_Date__c,Actual_End_Date__c,Court_Order_ID__r.Petition_ID__c from DEL_Custody__c where Client_Name__c !=  null and Start_Date__c != null and ( Court_Order_ID__r.Petition_ID__c != '' or Court_Order_ID__r.Petition_ID__c != null )  Order By  Start_Date__c " doc:name="Salesforce : Get Custody Details" doc:description="Get Custody Details"/> -->
-        <!-- <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c,Court_Order_ID__r.Petition_ID__c from DEL_Custody__c where Client_Name__c !=  null and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Order_Type__c = 'Ex Parte' and Converted_Data__c= true)) and Custodian__c ='DSCYF/DFS'  Order By  Start_Date__c" doc:name="Salesforce : Get Custody Details" doc:description="Get Custody Details"/> -->
-
-        <dw:transform-message doc:name="Transform Message">
-            <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
+            </dw:transform-message>
+			<sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c, CreatedDate, Court_Order_ID__r.Completed_Date__c,Court_Order_ID__r.Petition_ID__c,Court_Order_ID__r.Initial_Completion_Date__c from DEL_Custody__c where Client_Name__c in (#[payload]) and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Original_Custody__c= true)) and Custodian__c ='DSCYF/DFS' and Start_Date__c &lt; #[flowVars.extractInfo.ReportEndDate] Order By Start_Date__c asc" doc:name="Salesforce : Get Custody Details" doc:description="Get Custody Details"/>
+			<dw:transform-message doc:name="Transform Message">
+				<dw:input-payload mimeType="application/java"/>
+				<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 payload map $]]></dw:set-payload>
-        </dw:transform-message>
-        <!-- <logger message="All Custody Data Size #[payload.size()]" level="INFO" doc:name="Logger"/> -->
-        <dw:transform-message doc:name="Transform Message : Check Duration">
-            <dw:input-payload mimeType="application/java"/><dw:set-payload><![CDATA[%dw 1.0
+			</dw:transform-message>
+			<dw:transform-message doc:name="Transform Message : Check Duration">
+				<dw:input-payload mimeType="application/java"/>
+				<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 payload map {
@@ -1691,56 +1700,79 @@ payload map {
       //Change during MOCK ENV Test checking Actual_End_Date__c for Duration before it was End_Date__c
       Duration: ((  (($.Actual_End_Date__c as :date) - |P1D|) > ($.Start_Date__c as :date)  )) when ($.Actual_End_Date__c != null) otherwise true
       } filter ($.Duration == true) ]]></dw:set-payload>
-        </dw:transform-message>
-        
-        <choice doc:name="Choice : Route Report Run for Single PID">
-            <when expression="#[flowVars.extractInfo.RunForPID != 'No' and  flowVars.extractInfo.RunForPID != '']">
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="FinalCustody"><![CDATA[%dw 1.0
+			</dw:transform-message>
+			<dw:transform-message doc:name="Transform Message">
+				<dw:input-payload mimeType="application/java"/>
+				<dw:set-variable variableName="FinalCustody"><![CDATA[%dw 1.0
 %output application/java
 ---
-payload groupBy $.PersonID
+(flowVars.FinalCustody default []) ++ (payload default [])
 ]]></dw:set-variable>
-                    <dw:set-variable variableName="CustodyList"><![CDATA[%dw 1.0
+				<dw:set-variable variableName="CustodyList"><![CDATA[%dw 1.0
 %output application/java
 ---
-payload filter ($.PersonID == flowVars.extractInfo.RunForPID) map {
+(flowVars.CustodyList default []) ++ (payload default [])
+]]></dw:set-variable>
+				<dw:set-variable variableName="FirstEverCustody"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.FirstEverCustody default []) ++ (payload default [])]]></dw:set-variable>
+			</dw:transform-message>
+
+		</foreach>
+		<choice doc:name="Choice : Route Report Run for Single PID">
+			<when expression="#[flowVars.extractInfo.RunForPID != 'No' and  flowVars.extractInfo.RunForPID != '']">
+				<dw:transform-message doc:name="Transform Message">
+					<dw:input-payload mimeType="application/java"/>
+					<dw:set-variable variableName="FinalCustody"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.FinalCustody default []) groupBy $.PersonID
+]]></dw:set-variable>
+					<dw:set-variable variableName="CustodyList"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.CustodyList default []) filter ($.PersonID == flowVars.extractInfo.RunForPID) map {
       ($)
 }
 ]]></dw:set-variable>
-                    <dw:set-variable variableName="FirstEverCustody"><![CDATA[%dw 1.0
+					<dw:set-variable variableName="FirstEverCustody"><![CDATA[%dw 1.0
 %output application/java
 ---
-((payload distinctBy $.PersonID) default [] ) groupBy $.PersonID]]></dw:set-variable>
-                </dw:transform-message>
-            </when>
-            <otherwise>
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="FinalCustody"><![CDATA[%dw 1.0
+((flowVars.FirstEverCustody distinctBy $.PersonID) default [] ) groupBy $.PersonID]]></dw:set-variable>
+				</dw:transform-message>
+			</when>
+			<otherwise>
+				<dw:transform-message doc:name="Transform Message">
+					<dw:input-payload mimeType="application/java"/>
+					<dw:set-variable variableName="FinalCustody"><![CDATA[%dw 1.0
 %output application/java
 ---
-payload groupBy $.PersonID
+(flowVars.FinalCustody default []) groupBy $.PersonID
 ]]></dw:set-variable>
-                    <dw:set-variable variableName="CustodyList"><![CDATA[%dw 1.0
+					<dw:set-variable variableName="FirstEverCustody"><![CDATA[%dw 1.0
 %output application/java
 ---
-payload
-]]></dw:set-variable>
-                    <dw:set-variable variableName="FirstEverCustody"><![CDATA[%dw 1.0
-%output application/java
----
-payload distinctBy $.PersonID]]></dw:set-variable>
-                    
-                </dw:transform-message>
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="FirstEverCustody"><![CDATA[%dw 1.0
+(flowVars.FirstEverCustody default []) distinctBy $.PersonID]]></dw:set-variable>
+				</dw:transform-message>
+				<dw:transform-message doc:name="Transform Message">
+					<dw:input-payload mimeType="application/java"/>
+					<dw:set-variable variableName="FirstEverCustody"><![CDATA[%dw 1.0
 %output application/java
 ---
 flowVars.FirstEverCustody groupBy $.PersonID]]></dw:set-variable>
-                </dw:transform-message>
-                
-            </otherwise>
-        </choice>
+				</dw:transform-message>
+			</otherwise>
+		</choice>
+
+
+
+        <!-- <logger message="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c,Court_Order_ID__r.Petition_ID__c from DEL_Custody__c where Client_Name__c !=  null and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Original_Custody__c= true)) and Custodian__c ='DSCYF/DFS' and Client_Name__c != '003r0000007QnstAAC' Order By  Start_Date__c desc" level="INFO" doc:name="Logger : Query"/> -->
+        <!-- <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id,Client_Name__c,Client_Name__r.DEL_PID__c,End_Date__c,Start_Date__c,Actual_End_Date__c,Court_Order_ID__r.Petition_ID__c from DEL_Custody__c where Client_Name__c !=  null and Start_Date__c != null and ( Court_Order_ID__r.Petition_ID__c != '' or Court_Order_ID__r.Petition_ID__c != null )  Order By  Start_Date__c " doc:name="Salesforce : Get Custody Details" doc:description="Get Custody Details"/> -->
+        <!-- <sfdc:query config-ref="Salesforce__Basic_Authentication" query="Select Id, Client_Name__c, Client_Name__r.DEL_PID__c, Start_Date__c, Actual_End_Date__c,Court_Order_ID__r.Petition_ID__c from DEL_Custody__c where Client_Name__c !=  null and Start_Date__c != null and (( Court_Order_ID__r.Petition_ID__c != '' and Converted_Data__c= false) or (Order_Type__c = 'Ex Parte' and Converted_Data__c= true)) and Custodian__c ='DSCYF/DFS'  Order By  Start_Date__c" doc:name="Salesforce : Get Custody Details" doc:description="Get Custody Details"/> -->
+
+        <!-- <logger message="All Custody Data Size #[payload.size()]" level="INFO" doc:name="Logger"/> -->
+
 
         <!-- <logger level="INFO" doc:name="Logger" message="Custody Done : Report Client size after Duration check #[payload.size()]"/> -->
 
@@ -2649,12 +2681,23 @@ flowVars.ClientIDList filter ((flowVars.GroupAfcarsCustody[$][-1].CustodyStart !
 			<dw:set-variable variableName="DateDischargeFosterCare"><![CDATA[%dw 1.0
 %output application/java
 ---
-flowVars.ClientIDList filter ((flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != null) and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != "")) map {
+flowVars.ClientIDList map {
       PersonID:$,
-      DateDischargeFosterCare: (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd as :date as :string {format:"yyyyMMdd"} ) when ( ((flowVars.GroupAfcarsCustody[$][-1].CustodyEnd) < (flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}))) otherwise ""
+      DateDischargeFosterCare: (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd as :date as :string {format:"yyyyMMdd"} ) when ( (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != null) and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != "") and ((flowVars.GroupAfcarsCustody[$][-1].CustodyEnd) < (flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}) ) ) otherwise ""
 } groupBy $.PersonID]]></dw:set-variable>
         </dw:transform-message>
 
+    </sub-flow>
+    <sub-flow name="afcars-foster-care-DateDischargeFosterCare">
+    	<dw:transform-message doc:name="TM:Date Discharge Foster Care">
+            <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="DateDischargeFosterCare"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.ClientIDList map {
+      PersonID:$,
+      DateDischargeFosterCare: (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd as :date as :string {format:"yyyyMMdd"} ) when ( (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != null) and (flowVars.GroupAfcarsCustody[$][-1].CustodyEnd != "") and ((flowVars.GroupAfcarsCustody[$][-1].CustodyEnd) < (flowVars.extractInfo.ReportEndDate as :date {format : "yyyy-MM-dd"}) ) ) otherwise ""
+} groupBy $.PersonID]]></dw:set-variable>
+        </dw:transform-message>
     </sub-flow>
     <sub-flow name="afcars-fostercare-casePlan-records-Sub_Flow" doc:description="Flow to get Case Plan and Permanency Comitee Review related information for Element 43">
         <logger message="Get Plan details" level="INFO" doc:name="Logger : Plan Details"/>
