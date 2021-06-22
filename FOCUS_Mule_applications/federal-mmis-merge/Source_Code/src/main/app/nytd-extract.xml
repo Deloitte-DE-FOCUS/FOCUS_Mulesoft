@@ -433,8 +433,9 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 					
 					E42_public_financial_assist : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_youth_receiving_Public_Financial__c default ""))][0] default "",
 					
-					E43_public_food_assist : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_receiving_Public_Food__c default ""))][0] default "" when ( (sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Is_the_youth_receiving_Public_Food__c default [] )) > 0) 
-					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q7__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q7__c default [])) > 0) otherwise "")  , 
+					E43_public_food_assist : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_receiving_Public_Food__c default ""))][0] default "" when ( ((sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Is_the_youth_receiving_Public_Food__c default [] )) > 0) and (  ((flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q7__c)[0] == "Yes") == false)) 
+					
+					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q7__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q7__c default [])) > 0) otherwise "") ,
 					
 					E44_public_housing_assist : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_youth_receiving_Public_Housing__c default ""))][0] default "",
 					
@@ -443,9 +444,8 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 					E46_highest_educ_certification : flowVars.LOVReturned[("HIGHEST_EDUCATION_CERT_RECEIVED-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Has_youth_received_education_certificate__c default ""))][0] default "" when ( (sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Has_youth_received_education_certificate__c default [] )) > 0) 
 					otherwise (flowVars.LOVReturned[("HIGHEST_EDUCATION_CERT_RECEIVED-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q5__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q5__c default [])) > 0) otherwise "")  ,
 					
-					E47_current_enrollment_attendance : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_currently_enrolled__c default ""))][0] default "" when ( (sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Is_the_youth_currently_enrolled__c default [] )) > 0) 
-					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q6__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q6__c default [])) > 0) otherwise "")  , 
-					
+					E47_current_enrollment_attendance : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Is_the_youth_currently_enrolled__c default ""))][0] default "" when ( ((sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Is_the_youth_currently_enrolled__c default [] )) > 0) and (  ((flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q6__c)[0] == "Yes") == false) )
+					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q6__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q6__c default [])) > 0) otherwise ""),
 					E48_connection_adult : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Does_the_youth_have_a_connection__c default ""))][0] default "",
 					
 					E49_homelessness : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Has_the_youth_experienced_homelessness__c default ""))][0] default "",
@@ -454,8 +454,8 @@ flowVars.PersonIDList distinctBy $]]></dw:set-variable>
 					
 					E51_incarceration: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Has_the_youth_ever_been_incarcerated__c default ""))][0] default "",
 					
-					E52_children : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Does_the_youth_have_any_children__c default ""))][0] default "" when ( (sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Does_the_youth_have_any_children__c default [] )) > 0) 
-					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q11__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q11__c default [])) > 0) otherwise "")  , 
+					E52_children : flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Does_the_youth_have_any_children__c default ""))][0] default "" when ( ((sizeOf (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c].Does_the_youth_have_any_children__c default [] )) > 0) and (  ((flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q11__c)[0] == "Yes") == false)) 
+					otherwise (flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.monthlyILServiceOutcome[$.Person__c][0].Response_Q11__c default ""))][0] default "" when ( (sizeOf (flowVars.monthlyILServiceOutcome[$.Person__c].Response_Q11__c default [])) > 0) otherwise ""),
 					
 					E53_marriage_at_childs_birth: flowVars.LOVReturned[("NYTD_MAPPINGS-" ++ (flowVars.NYTDMonthlyOutcomeSurveyRecords[$.Person__c][0].Was_the_youth_married__c default ""))][0] default "",
 					
@@ -1131,8 +1131,8 @@ payload groupBy $.Person_Type__r.Person__c]]></dw:set-payload>
  ---
  payload groupBy $.Person_to_Contact__c]]></dw:set-variable>
     	</dw:transform-message>
-    	<logger message="Select ID,Case_Client_PID__c,Person_to_Contact__c, Status__c,Active_Status__c,Referral_Status__c,Approval_Status__c, Does_Youth_Have_an_IEP__c,Last_IEP_Date__c,IL_Services_Start__c,Has_Youth_been_Adjudicated_Delinquent__c,Last_Grade_Completed__c from DEL_Referral_For_Service__c where Status__c = 'Completed' and (Active_Status__c = 'Active' or Active_Status__c = 'Inactive') and Referral_Status__c = 'Approved' and Approval_Status__c = 'Completed' and Last_IEP_Date__c != null and Does_Youth_Have_an_IEP__c = 'Yes'" level="INFO" doc:description="Query for Element 19" doc:name="Query for Element 19"/>
-        <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select ID,Case_Client_PID__c,Person_to_Contact__c, Status__c,Active_Status__c,Referral_Status__c,Approval_Status__c, Does_Youth_Have_an_IEP__c,Last_IEP_Date__c,IL_Services_Start__c,Has_Youth_been_Adjudicated_Delinquent__c,Last_Grade_Completed__c from DEL_Referral_For_Service__c where Status__c = 'Completed' and (Active_Status__c = 'Active' or Active_Status__c = 'Inactive') and Referral_Status__c = 'Approved' and Approval_Status__c = 'Completed' and Last_IEP_Date__c != null and Does_Youth_Have_an_IEP__c = 'Yes'" doc:name="Salesforce Query for Element 19"/>
+    	<logger message="Select ID,Case_Client_PID__c,Person_to_Contact__c, Status__c,Active_Status__c,Referral_Status__c,Approval_Status__c,  Date__c, Does_Youth_Have_an_IEP__c,Last_IEP_Date__c,IL_Services_Start__c,Has_Youth_been_Adjudicated_Delinquent__c,Last_Grade_Completed__c from DEL_Referral_For_Service__c where Status__c = 'Completed' and (Active_Status__c = 'Active' or Active_Status__c = 'Inactive') and Referral_Status__c = 'Approved' and Approval_Status__c = 'Completed' and  Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] and  Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]" level="INFO" doc:description="Query for Element 19" doc:name="Query for Element 19"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select ID,Case_Client_PID__c,Person_to_Contact__c, Status__c,Active_Status__c,Referral_Status__c,Approval_Status__c,  Date__c, Does_Youth_Have_an_IEP__c,Last_IEP_Date__c,IL_Services_Start__c,Has_Youth_been_Adjudicated_Delinquent__c,Last_Grade_Completed__c from DEL_Referral_For_Service__c where Status__c = 'Completed' and (Active_Status__c = 'Active' or Active_Status__c = 'Inactive') and Referral_Status__c = 'Approved' and Approval_Status__c = 'Completed' and  Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] and  Date__c &gt;= #[flowVars.extractInfo.ReportStartDate]" doc:name="Salesforce Query for Element 19"/>
     	
     	<dw:transform-message doc:name="Transaform Message : Get Records">
     		<dw:set-variable variableName="ILReferralServicesRecords2"><![CDATA[%dw 1.0
