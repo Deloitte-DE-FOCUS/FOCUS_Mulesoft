@@ -340,21 +340,7 @@ flatten (flowVars.RE_Tag map $.SP.SC)]]></dw:set-variable>
 %output application/java
 ---
 flatten (flowVars.FA_Tag map $.SP.SC)]]></dw:set-variable>
-            <dw:set-variable variableName="OpensAt"><![CDATA[//Convert OpensAt and ClosesAt time format.
-%dw 1.0
-%output application/java
-%function suffix(name) name splitBy " "
-%function hours(name) name splitBy ":"
----
-payload filter ($.OpensAt != null and $.ClosesAt != null) map {
-	OSuffix: suffix($.OpensAt)[1],
-	OHours:(hours($.OpensAt)[0] as :number) when $.OpensAt != null otherwise (''),
-	OMinutes: suffix(hours($.OpensAt)[1])[0],
-	CSuffix: suffix($.ClosesAt)[1],
-	CHours: (hours($.ClosesAt)[0] as :number) when $.ClosesAt != null otherwise (''),
-	CMinutes: suffix(hours($.ClosesAt)[1])[0],
-	ID:$.ID default ""
-} groupBy $.ID]]></dw:set-variable>
+
 
         </dw:transform-message>
         <dw:transform-message doc:name="TM:Create NC">
@@ -387,8 +373,8 @@ flowVars.NonCompliance]]></dw:set-variable>
 	Age_Range: ("From" ++ " " ++ $.LowerAgeRange ++ " " ++ "to" ++ " " ++ $.UpperAgeRange) when ($.LowerAgeRange != "" and $.UpperAgeRange != "") otherwise "",
 	Capacity: $.Capacity,
 	Enrollment: $.Enrollment,
-	Open_Time:(flowVars.OpensAt[$.ID][0].OHours + 12 ++ flowVars.OpensAt[$.ID][0].OMinutes) 	when (flowVars.OpensAt[$.ID][0].OHours != null and flowVars.OpensAt[$.ID][0].OSuffix =="PM") otherwise (( "0" ++ flowVars.OpensAt[$.ID][0].OHours ++ flowVars.OpensAt[$.ID][0].OMinutes) 	when (flowVars.OpensAt[$.ID][0].OHours != null and flowVars.OpensAt[$.ID][0].OSuffix =="AM" and (flowVars.OpensAt[$.ID][0].OHours < 10) ) otherwise ((flowVars.OpensAt[$.ID][0].OHours ++ flowVars.OpensAt[$.ID][0].OMinutes) when (flowVars.OpensAt[$.ID][0].OHours != null and flowVars.OpensAt[$.ID][0].OSuffix =="AM" and flowVars.OpensAt[$.ID][0].OHours > 10) otherwise ""  )  ) ,
-	Close_Time:(flowVars.OpensAt[$.ID][0].CHours + 12 ++ flowVars.OpensAt[$.ID][0].CMinutes) when (flowVars.OpensAt[$.ID][0].CHours != null and flowVars.OpensAt[$.ID][0].CSuffix =="PM") otherwise (("0" ++ flowVars.OpensAt[$.ID][0].CHours ++ flowVars.OpensAt[$.ID][0].CMinutes) when (flowVars.OpensAt[$.ID][0].CHours != null and flowVars.OpensAt[$.ID][0].CSuffix =="AM" and (flowVars.OpensAt[$.ID][0].CHours < 10) ) otherwise ((flowVars.OpensAt[$.ID][0].CHours ++ flowVars.OpensAt[$.ID][0].CMinutes) when (flowVars.OpensAt[$.ID][0].CHours != null and flowVars.OpensAt[$.ID][0].CSuffix =="AM" and flowVars.OpensAt[$.ID][0].CHours > 10) otherwise ""  ) ) ,
+	Open_Time: (($.OpensAt as :localtime {format: "h:mm a"} as :string)[0 to 4] replace ':' with "" ) when ($.OpensAt != null) otherwise "",
+	Close_Time:(($.ClosesAt as :localtime {format: "h:mm a"} as :string)[0 to 4] replace ':' with "" ) when ($.ClosesAt != null) otherwise "",
 	Registration_Date: $.CreatedDate,
 	License_Status:$.Status,
 	License_Start_Date: $.IssuanceDate,
