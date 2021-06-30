@@ -1,0 +1,6 @@
+form: FIXEDWIDTH
+name: 'MMISEligibilityErrorData'
+values: 
+- { name: 'UniqueID', usage: M, type: String, length: 10 }
+- { name: 'MCI', usage: M, type: String, length: 10 }
+- { name: 'ErrorDescription', usage: M, type: String, length: 48 }

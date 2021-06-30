@@ -1,0 +1,692 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:nytd="http://nytd.acf.hhs.gov" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" attributeFormDefault="unqualified" elementFormDefault="unqualified" targetNamespace="http://nytd.acf.hhs.gov" xsi:noNamespaceSchemaLocation="http://www.w3.org/2001/XMLSchema.xsd">
+   <xs:element name="nytd_data_file">
+      <xs:complexType>
+         <xs:sequence>
+            <xs:element name="file_id">
+               <xs:simpleType>
+                  <xs:restriction base="xs:NMTOKEN">
+                     <xs:whiteSpace value="collapse" />
+                     <xs:minLength value="1" />
+                     <xs:maxLength value="255" />
+                  </xs:restriction>
+               </xs:simpleType>
+            </xs:element>
+            <xs:element name="E1_state" type="nytd:stateFipsCodeType" />
+            <xs:element name="file_generation_date" type="nytd:recentDateType" />
+            <xs:element name="file_note" minOccurs="0" maxOccurs="512" type="nytd:varcharStringType" />
+            <xs:element name="field_note" minOccurs="0" maxOccurs="512">
+               <xs:complexType>
+                  <xs:simpleContent>
+                     <xs:extension base="nytd:varcharStringType">
+                        <xs:attribute name="element_id" type="xs:string" use="required">
+                           <xs:annotation>
+                              <xs:documentation>This element_id must correspond to the element number (1-58) that the note corresponds to.</xs:documentation>
+                           </xs:annotation>
+                        </xs:attribute>
+                     </xs:extension>
+                  </xs:simpleContent>
+               </xs:complexType>
+            </xs:element>
+            <xs:element name="file_category" type="nytd:fileCategoryType" />
+            <xs:element name="E2_report_date" type="nytd:reportDateType">
+               <xs:annotation>
+                  <xs:documentation>corresponds with the end of the reporting period</xs:documentation>
+               </xs:annotation>
+            </xs:element>
+            <xs:element name="record" minOccurs="1" maxOccurs="999999">
+               <xs:complexType>
+                  <xs:sequence>
+                     <xs:element name="E3_record_number" type="nytd:recordNumberWithNoteType" />
+                     <xs:element name="record_note" minOccurs="0" type="nytd:varcharStringType" />
+                     <xs:element name="E4_date_of_birth" type="nytd:filteredDateWithNoteType" />
+                     <xs:element name="E5_sex" type="nytd:sexWithNoteType" />
+                     <xs:element name="E6_race_american_indian_alaska_native" type="nytd:noYesWithNoteType" />
+                     <xs:element name="E7_race_asian" type="nytd:noYesWithNoteType" />
+                     <xs:element name="E8_race_black_african_american" type="nytd:noYesWithNoteType" />
+                     <xs:element name="E9_race_hawaiian_pacific_islander" type="nytd:noYesWithNoteType" />
+                     <xs:element name="E10_race_white" type="nytd:noYesWithNoteType" />
+                     <xs:element name="E11_race_unknown" type="nytd:noYesWithNoteType" />
+                     <xs:element name="E12_race_declined" type="nytd:noYesWithNoteType" />
+                     <xs:element name="E13_hispanic_latino" type="nytd:noYesUnknownDeclinedWithNoteType" />
+                     <xs:element name="served_population" minOccurs="1" maxOccurs="1">
+                        <xs:annotation>
+                           <xs:documentation>This element may not be omitted.</xs:documentation>
+                        </xs:annotation>
+                        <xs:complexType>
+                           <xs:sequence>
+                              <xs:element name="E14_foster_care_status_services" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E15_local_agency" type="nytd:localAgencyWithNoteType" />
+                              <xs:element name="E16_federally_recognized_tribe" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E17_adjudicated_delinquent" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E18_educational_level" type="nytd:educationLevelWithNoteType" />
+                              <xs:element name="E19_special_education" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E20_independent_living_needs_assess" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E21_academic_support" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E22_post_secondary_educ_support" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E23_career_preparation" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E24_employment_programs" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E25_budget_financial_mgmt" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E26_housing_educ_home_mgmt_training" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E27_health_educ_risk_prevention" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E28_family_support_healthy_marriage_educ" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E29_mentoring" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E30_supervised_independent_living" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E31_room_board_financial_assist" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E32_educ_financial_assist" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="E33_other_financial_assist" type="nytd:noYesBlankWithNoteType" />
+                           </xs:sequence>
+                        </xs:complexType>
+                     </xs:element>
+                     <xs:element name="baseline_followup_populations" minOccurs="1" maxOccurs="1">
+                        <xs:annotation>
+                           <xs:documentation>This element may not be omitted.</xs:documentation>
+                        </xs:annotation>
+                        <xs:complexType>
+                           <xs:sequence>
+                              <xs:element name="E34_outcomes_reporting_status" type="nytd:outcomesReportingStatusWithNoteType" />
+                              <xs:element name="E35_date_outcome_data_collection" type="nytd:recentDateBlankWithNoteType" />
+                              <xs:element name="E36_foster_care_status_outcomes" type="nytd:noYesBlankWithNoteType" />
+                              <xs:element name="baseline_followup_outcome_survey" minOccurs="1" maxOccurs="1">
+                                 <xs:annotation>
+                                    <xs:documentation>This element may not be omitted.</xs:documentation>
+                                 </xs:annotation>
+                                 <xs:complexType>
+                                    <xs:sequence>
+                                       <xs:element name="E37_current_full_time_employment" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E38_current_part_time_employment" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E39_employment_related_skills" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E40_social_security" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E41_educ_aid" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E42_public_financial_assist" type="nytd:noYesDeclinedNABlankWithNoteType" />
+                                       <xs:element name="E43_public_food_assist" type="nytd:noYesDeclinedNABlankWithNoteType" />
+                                       <xs:element name="E44_public_housing_assist" type="nytd:noYesDeclinedNABlankWithNoteType" />
+                                       <xs:element name="E45_other_financial_support" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E46_highest_educ_certification" type="nytd:highestEducationCertificationWithNoteType" />
+                                       <xs:element name="E47_current_enrollment_attendance" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E48_connection_adult" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E49_homelessness" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E50_substance_abuse_referral" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E51_incarceration" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E52_children" type="nytd:noYesDeclinedBlankWithNoteType" />
+                                       <xs:element name="E53_marriage_at_childs_birth" type="nytd:noYesDeclinedNABlankWithNoteType" />
+                                       <xs:element name="E54_medicaid" type="nytd:noYesDeclinedDKBlankWithNoteType" />
+                                       <xs:element name="E55_other_health_insurance" type="nytd:noYesDeclinedNADKBlankWithNoteType" />
+                                       <xs:element name="E56_health_insurance_type_medical" type="nytd:noYesDeclinedNADKBlankWithNoteType" />
+                                       <xs:element name="E57_health_insurance_type_mental_health" type="nytd:noYesDeclinedNADKBlankWithNoteType" />
+                                       <xs:element name="E58_health_insurance_type_prescription_drugs" type="nytd:noYesDeclinedNADKBlankWithNoteType" />
+                                    </xs:sequence>
+                                 </xs:complexType>
+                              </xs:element>
+                           </xs:sequence>
+                        </xs:complexType>
+                     </xs:element>
+                  </xs:sequence>
+               </xs:complexType>
+            </xs:element>
+         </xs:sequence>
+      </xs:complexType>
+   </xs:element>
+   <xs:simpleType name="noYesType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="no">
+            <xs:annotation>
+               <xs:documentation>No</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="yes">
+            <xs:annotation>
+               <xs:documentation>Yes</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="noYesDeclinedType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="no">
+            <xs:annotation>
+               <xs:documentation>No</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="yes">
+            <xs:annotation>
+               <xs:documentation>Yes</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="declined">
+            <xs:annotation>
+               <xs:documentation>Declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="noYesUnknownDeclinedType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="no">
+            <xs:annotation>
+               <xs:documentation>No</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="yes">
+            <xs:annotation>
+               <xs:documentation>Yes</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="unknown">
+            <xs:annotation>
+               <xs:documentation>Unknown</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="declined">
+            <xs:annotation>
+               <xs:documentation>Declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="educationLevelType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="under 6">
+            <xs:annotation>
+               <xs:documentation>Less than 6th grade</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="6">
+            <xs:annotation>
+               <xs:documentation>6th grade</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="7">
+            <xs:annotation>
+               <xs:documentation>7th grade</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="8">
+            <xs:annotation>
+               <xs:documentation>8th grade</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="9">
+            <xs:annotation>
+               <xs:documentation>9th grade</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="10">
+            <xs:annotation>
+               <xs:documentation>10th grade</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="11">
+            <xs:annotation>
+               <xs:documentation>11th grade</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="12">
+            <xs:annotation>
+               <xs:documentation>12th grade</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="post secondary">
+            <xs:annotation>
+               <xs:documentation>Post secondary education or training</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="college">
+            <xs:annotation>
+               <xs:documentation>College</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="">
+            <xs:annotation>
+               <xs:documentation>Blank</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="highestEducationCertificationType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="high school ged">
+            <xs:annotation>
+               <xs:documentation>High school diploma/GED</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="vocational certificate">
+            <xs:annotation>
+               <xs:documentation>Vocational certificate</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="declined">
+            <xs:annotation>
+               <xs:documentation>Declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="vocational license">
+            <xs:annotation>
+               <xs:documentation>Vocational license</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="associate">
+            <xs:annotation>
+               <xs:documentation>Associate’s degree</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="bachelor">
+            <xs:annotation>
+               <xs:documentation>Bachelor's degree</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="higher degree">
+            <xs:annotation>
+               <xs:documentation>Higher degree</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="none of the above">
+            <xs:annotation>
+               <xs:documentation>None of the above</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="">
+            <xs:annotation>
+               <xs:documentation>Blank</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="outcomesReportingStatusType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="participated">
+            <xs:annotation>
+               <xs:documentation>Youth participated</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="declined">
+            <xs:annotation>
+               <xs:documentation>Youth declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="parent declined">
+            <xs:annotation>
+               <xs:documentation>Parent declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="incapacitated">
+            <xs:annotation>
+               <xs:documentation>Youth incapacitated</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="incarcerated">
+            <xs:annotation>
+               <xs:documentation>Incarcerated</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="runaway missing">
+            <xs:annotation>
+               <xs:documentation>Runaway/missing</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="unable to locate">
+            <xs:annotation>
+               <xs:documentation>Unable to locate/invite</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="death">
+            <xs:annotation>
+               <xs:documentation>Death</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="not in sample">
+            <xs:annotation>
+               <xs:documentation>Not in sample</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="">
+            <xs:annotation>
+               <xs:documentation>Blank</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="blankType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:maxLength value="0">
+            <xs:annotation>
+               <xs:documentation>Blank</xs:documentation>
+            </xs:annotation>
+         </xs:maxLength>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="noYesBlankType">
+      <xs:union memberTypes="nytd:noYesType nytd:blankType" />
+   </xs:simpleType>
+   <xs:simpleType name="noYesDeclinedBlankType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="no">
+            <xs:annotation>
+               <xs:documentation>No</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="yes">
+            <xs:annotation>
+               <xs:documentation>Yes</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="declined">
+            <xs:annotation>
+               <xs:documentation>Declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="">
+            <xs:annotation>
+               <xs:documentation>Blank</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="noYesDeclinedNABlankType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="no">
+            <xs:annotation>
+               <xs:documentation>No</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="yes">
+            <xs:annotation>
+               <xs:documentation>Yes</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="declined">
+            <xs:annotation>
+               <xs:documentation>Declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="not applicable">
+            <xs:annotation>
+               <xs:documentation>Not applicable</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="">
+            <xs:annotation>
+               <xs:documentation>Blank</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="noYesDeclinedDKBlankType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="no">
+            <xs:annotation>
+               <xs:documentation>No</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="yes">
+            <xs:annotation>
+               <xs:documentation>Yes</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="declined">
+            <xs:annotation>
+               <xs:documentation>Declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="do not know">
+            <xs:annotation>
+               <xs:documentation>Don’t know</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="">
+            <xs:annotation>
+               <xs:documentation>Blank</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="noYesDeclinedNADKBlankType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="no">
+            <xs:annotation>
+               <xs:documentation>No</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="yes">
+            <xs:annotation>
+               <xs:documentation>Yes</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="declined">
+            <xs:annotation>
+               <xs:documentation>Declined</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="not applicable">
+            <xs:annotation>
+               <xs:documentation>Not applicable</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="do not know">
+            <xs:annotation>
+               <xs:documentation>Don’t know</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="">
+            <xs:annotation>
+               <xs:documentation>Blank</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="charStringType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:minLength value="0" />
+         <xs:maxLength value="255" />
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="stateFipsCodeType">
+      <xs:restriction base="xs:NMTOKEN">
+         <xs:whiteSpace value="collapse" />
+         <xs:pattern value="((0[1-9])|([1-4][0-9])|(5[0-6])|(72))" />
+         <xs:minLength value="2" />
+         <xs:maxLength value="2" />
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="localAgencyType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:pattern value="\d{5}|centralized unit|" />
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="recordNumberType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:maxLength value="255" />
+         <xs:minLength value="5" />
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="filteredDateType">
+      <xs:restriction base="xs:date">
+         <xs:whiteSpace value="collapse" />
+         <xs:minInclusive value="1900-01-01" />
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="recentDateType">
+      <xs:restriction base="xs:date">
+         <xs:whiteSpace value="collapse" />
+         <xs:minInclusive value="2009-01-01" />
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="recentDateBlankType">
+      <xs:union memberTypes="nytd:recentDateType nytd:blankType" />
+   </xs:simpleType>
+   <xs:simpleType name="sexType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="male">
+            <xs:annotation>
+               <xs:documentation>Male</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="female">
+            <xs:annotation>
+               <xs:documentation>Female</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="fileCategoryType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:enumeration value="test">
+            <xs:annotation>
+               <xs:documentation>Test</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="regular">
+            <xs:annotation>
+               <xs:documentation>Regular</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="corrected">
+            <xs:annotation>
+               <xs:documentation />
+            </xs:annotation>
+         </xs:enumeration>
+         <xs:enumeration value="subsequent">
+            <xs:annotation>
+               <xs:documentation>Subsequent</xs:documentation>
+            </xs:annotation>
+         </xs:enumeration>
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="varcharStringType">
+      <xs:restriction base="xs:string">
+         <xs:whiteSpace value="collapse" />
+         <xs:minLength value="0" />
+         <xs:maxLength value="2000" />
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:simpleType name="reportDateType">
+      <xs:annotation>
+         <xs:documentation>A year-month date string between 2010 and 2099, formatted as "yyyymm" E.g. 201103</xs:documentation>
+      </xs:annotation>
+      <xs:restriction base="xs:token">
+         <xs:whiteSpace value="collapse" />
+         <xs:pattern value="(20[1-9][0-9])(0[39])" />
+      </xs:restriction>
+   </xs:simpleType>
+   <xs:complexType name="recordNumberWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:recordNumberType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="filteredDateWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:filteredDateType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="sexWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:sexType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="noYesBlankWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:noYesBlankType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="noYesWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:noYesType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="noYesUnknownDeclinedWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:noYesUnknownDeclinedType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="localAgencyWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:localAgencyType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="educationLevelWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:educationLevelType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="outcomesReportingStatusWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:outcomesReportingStatusType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="recentDateBlankWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:recentDateBlankType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="noYesDeclinedBlankWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:noYesDeclinedBlankType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="noYesDeclinedNABlankWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:noYesDeclinedNABlankType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="highestEducationCertificationWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:highestEducationCertificationType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="noYesDeclinedDKBlankWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:noYesDeclinedDKBlankType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+   <xs:complexType name="noYesDeclinedNADKBlankWithNoteType">
+      <xs:simpleContent>
+         <xs:extension base="nytd:noYesDeclinedNADKBlankType">
+            <xs:attribute name="note" type="nytd:charStringType" />
+         </xs:extension>
+      </xs:simpleContent>
+   </xs:complexType>
+</xs:schema>

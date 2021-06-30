@@ -1,0 +1,25 @@
+form: FIXEDWIDTH
+name: 'HeaderFFD'
+values: 
+- { name: 'RecordCount', usage: M, type: String, length: 8 }
+- { name: 'ReportingEndDate', usage: M, type: String, length: 6 }
+- { name: 'LessOne', usage: M, type: String, length: 8 }
+- { name: 'AgeOne', usage: M, type: String, length: 8 }
+- { name: 'AgeTwo', usage: M, type: String, length: 8 }
+- { name: 'AgeThree', usage: M, type: String, length: 8 }
+- { name: 'AgeFour', usage: M, type: String, length: 8 }
+- { name: 'AgeFive', usage: M, type: String, length: 8 }
+- { name: 'AgeSix', usage: M, type: String, length: 8 }
+- { name: 'AgeSeven', usage: M, type: String, length: 8 }
+- { name: 'AgeEight', usage: M, type: String, length: 8 }
+- { name: 'AgeNine', usage: M, type: String, length: 8 }
+- { name: 'AgeTen', usage: M, type: String, length: 8 }
+- { name: 'AgeEleven', usage: M, type: String, length: 8 }
+- { name: 'AgeTwelve', usage: M, type: String, length: 8 }
+- { name: 'AgeThirteen', usage: M, type: String, length: 8 }
+- { name: 'AgeFourteen', usage: M, type: String, length: 8 }
+- { name: 'AgeFifteen', usage: M, type: String, length: 8 }
+- { name: 'AgeSixteen', usage: M, type: String, length: 8 }
+- { name: 'AgeSeventeen', usage: M, type: String, length: 8 }
+- { name: 'AgeEighteen', usage: M, type: String, length: 8 }
+- { name: 'AgeAbove', usage: M, type: String, length: 8 }

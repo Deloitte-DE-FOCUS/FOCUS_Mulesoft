@@ -316,10 +316,10 @@ payload.clientIds[0] pluck $$ as :string default []]]></dw:set-variable>
                     <enrich source="#[flowVars.LatestPlacementfor23]" target="#[flowVars.LatestPlacementfor23]"/>
                     <enrich source="#[flowVars.LatestPlacementOrTRUfor23]" target="#[flowVars.LatestPlacementOrTRUfor23]"/>
                 </enricher>
-				<flow-ref name="afcars-Element24-Sub_Flow" doc:name="afcars-Element24-Sub_Flow"/>
+
+				        <flow-ref name="afcars-Element24-Sub_Flow" doc:name="afcars-Element24-Sub_Flow"/>
                 <flow-ref name="afcars-CareGiverDetails-from-petition-Sub_Flow" doc:name="afcars-CareGiverDetails-from-petition-Sub_Flow"/>
                 <flow-ref name="afcars-Element58-Sub_Flow" doc:name="afcars-Element58-Sub_Flow"/>
-
                 <flow-ref name="afcars-Element62-records-Sub_Flow" doc:name="afcars-Element62-records-Sub_Flow"/>
                 <flow-ref name="afcars-Element66-records-Sub_Flow" doc:name="afcars-Element66-records-Sub_Flow"/>
                 <flow-ref name="afcars-casecounty-Sub_Flow" doc:name="afcars-casecounty-Sub_Flow"/>
@@ -475,8 +475,8 @@ flowVars.ClientIDList filter ( flowVars.Client[$][0].PID != null ) map {
       
       LatestRemoval:flowVars.LatestHomeRemoval[$][0].LatestHomeRemoval default "",
       
-      RemovalTransactionDate: (((flowVars.FirstPRforE[$][0].CompletedDate when ((flowVars.FirstPRforE[$][0].StartDate != null) and (flowVars.FirstPRforE[$][0].StartDate >= flowVars.GroupAfcarsCustody[$][-1].CustodyStart)) otherwise flowVars.GroupAfcarsCustody[$][-1].InitialCompletionDate ) as :date as :string {format:"yyyyMMdd"} ) default ""),
-	  
+
+    RemovalTransactionDate: (((flowVars.FirstPRforE[$][0].CompletedDate when ((flowVars.FirstPRforE[$][0].StartDate != null) and (flowVars.FirstPRforE[$][0].StartDate >= flowVars.GroupAfcarsCustody[$][-1].CustodyStart)) otherwise flowVars.GroupAfcarsCustody[$][-1].InitialCompletionDate ) as :date as :string {format:"yyyyMMdd"} ) default ""),
 	  RemovalTransactionDate2 : (flowVars.GroupAfcarsCustody[$][-1].InitialCompletionDate ) as :date as :string {format:"yyyyMMdd"} default "",
 
 	  PlacementCurrentFosterCare:((( flowVars.LatestPlacementOrTRUfor23[$][0].StartDate ) when ((flowVars.GroupAfcarsCustody[$][-1].CustodyStart as :date) <= (flowVars.LatestPlacementOrTRUfor23[$][0].StartDate as :date)) otherwise (flowVars.GroupAfcarsCustody[$][-1].CustodyStart )) as :date as :string {format:"yyyyMMdd"}) default "",
@@ -714,7 +714,7 @@ payload map ((payload01 , indexOfPayload01) -> {
       TotalNumberRemovalsfromHome: payload01.TotalNumberRemovalsfromHome,
       LastDischarged: payload01.LastDischarged,
       LatestRemoval: (payload01.FirstRemoval) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (payload01.LatestRemoval),
-      RemovalTransactionDate: (payload01.RemovalTransactionDate2) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (payload01.RemovalTransactionDate), 
+      RemovalTransactionDate: (payload01.RemovalTransactionDate2) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (payload01.RemovalTransactionDate),
       PlacementCurrentFosterCare: payload01.PlacementCurrentFosterCare,
       PreviousPlacementRemovalEpisode: payload01.PreviousPlacementRemovalEpisode,
       RemovalforCurrentPlacementEpisode: payload01.RemovalforCurrentPlacementEpisode,

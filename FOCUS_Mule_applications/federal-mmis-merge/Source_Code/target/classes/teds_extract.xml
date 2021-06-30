@@ -1,0 +1,1861 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+   <!--  <http:listener-config name="HTTP_Listener_Configuration" host="${http.host}" port="${http.port}" doc:name="HTTP Listener Configuration"/>
+    <sftp:connector name="SFTP" validateConnections="true" doc:name="SFTP"/>
+    <sftp:connector name="SFTP-1" validateConnections="true"
+		doc:name="SFTP">
+		<reconnect count="5" />
+	</sftp:connector>
+    <sfdc:config name="Salesforce__Basic_Authentication_dev"
+		username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}"
+		url="${sfdc.url}" disableSessionInvalidation="true"
+		doc:name="Salesforce: Basic Authentication">
+		<reconnect frequency="10000" count="6" />
+	</sfdc:config>
+	
+	<spring:beans>
+		<spring:import resource="classpath:/loggingframework.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/errorhandling.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/queryframework.xml" />
+	</spring:beans>  -->
+	
+<!-- 	<configuration doc:name="Configuration">
+    	<expression-language>
+     	   <global-functions file = "GlobalUtilityFunctions.mvel">
+				def isValidNumber(textNumber) { org.mule.util.NumberUtils.isNumber(textNumber) }
+           </global-functions> 
+    	</expression-language>
+    </configuration>  -->
+	
+	<!-- <validation:config name="Validation_Configuration" doc:name="Validation Configuration">
+        <validation:exception-factory class="gov.delaware.validation.DelawareValidationExceptionFactory"/>
+    </validation:config>
+    <validation:config name="Validation_Configuration1" doc:name="Validation Configuration"/>
+    -->
+    
+    <flow name="teds-extractFlow" processingStrategy="synchronous">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/tedsextract" doc:name="HTTP"/>
+        <http:basic-security-filter realm="mule-realm"/> 
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String : Consume Stream"/>
+        <logger message="Extract Invoked !! #[payload]" level="INFO" doc:name="Logger"/>
+        <async doc:name="Async">
+            <set-variable variableName="CurrentMonth" value="#[(server.dateTime.month &lt; 10) ? (&quot;0&quot; + server.dateTime.month) : (server.dateTime.month)]" doc:name="Variable : Set Current Month"/>
+            <set-variable variableName="InterfaceName" value="TEDS" doc:name="Variable"/>
+            <dw:transform-message doc:name="Transform Message : Get Input Parameters" metadata:id="c5927482-7097-43eb-909f-eb5231f44c33">
+                <dw:input-payload doc:sample="nytd_request.json" mimeType="application/json"/>
+                <dw:set-variable variableName="extractInfo"><![CDATA[%dw 1.0
+%output application/java
+%var TypeOfFile = {
+	"Corrected" : "C",
+	"Regular" : "R",
+	"Subsequent" : "S",
+	"Test" : "T"
+}
+---
+{
+	"ParentId" : payload.Id,
+	"DateRun" : payload.Date_Run__c,
+	"FileType" : payload.File_Type__c,
+	"RunMode" : payload.Type_of_File__c,
+	"encryptPID" : payload.Encrypt_PID__c,
+	//"FederalFiscalYear": payload.Federal_Fiscal_Year__c as :number,
+	//nextDate: |2016-12-31| + |P3M|,
+    // nextMonth: (|2016-12-31| + |P3M|).month
+    //"testDate" :((now.year as :string) ++ "-" ++ (flowVars.CurrentMonth as :string) ++ "-" ++ "01") as :date {format : "yyyy-MM-dd"},
+	"ReportStartDate": (( (((now.year as :string) ++ "-" ++ (flowVars.CurrentMonth as :string) ++ "-" ++ "01") as :date {format : "yyyy-MM-dd"}) - |P18M|) as :date {format : "yyyy-MM-dd"} ) as :string {format : "yyyy-MM-dd"},
+	"ReportEndDate": ( now  as :date {format : "yyyy-MM-dd"} ) as :string {format : "yyyy-MM-dd"},
+	//"ReportLastMonthYear": ( payload.Service_End_Date__c as :date {format : "yyyy-MM-dd"} ) as :string {format : "yyyyMM"}, //E2
+	//"AdjustedReportStartDateLowerLimit" : (( payload.Service_Start_Date__c as :date {format : "yyyy-MM-dd"} ) - |P21Y|) as :string {format : "yyyy-MM-dd"},
+	//"AdjustedReportStartDateUpperLimit" : (( payload.Service_Start_Date__c as :date {format : "yyyy-MM-dd"} ) - |P14Y|) as :string {format : "yyyy-MM-dd"},	
+	//"AdjustedReportEndDateLowerLimit" : (( payload.Service_End_Date__c as :date {format : "yyyy-MM-dd"} ) - |P21Y|) as :string {format : "yyyy-MM-dd"},
+	//"AdjustedReportEndDateUpperLimit" : (( payload.Service_End_Date__c as :date {format : "yyyy-MM-dd"} ) - |P14Y|) as :string {format : "yyyy-MM-dd"},
+	//"ReportPeriod" : "A" when (payload.Reporting_Period__c == "Oct 1 - Mar 31") otherwise ("B" when (payload.Reporting_Period__c == "Apr 1 - Sep 30") otherwise ""),
+	//"TypeOfSubmission" : TypeOfFile[payload.Type_of_File__c default ""] default "",
+	"ReportingDate" : (now >> "America/New_York") as :string {format : "MMyyyy"},
+	"SubmissionDate" : (now >> "America/New_York") as :string {format : "MMddyyyy"},
+	"SubmissionTime" : (now >> "America/New_York") as :string {format : "HHmm"} 	
+}]]></dw:set-variable>
+            </dw:transform-message>
+            <flow-ref name="teds_GetSupportRecords_Subflow" doc:name="teds_GetSupportRecords_Subflow"/>
+            <choice doc:name="Choice : If there are any records">
+                <when expression="#[payload.size() != 0]">
+                    <logger message="Records Extracted Successfully" level="INFO" doc:name="Logger : Records Extracted"/>
+                </when>
+                <otherwise>
+                    <logger message="No records to be extracted" level="INFO" doc:name="Logger : No Records Extracted"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.extractInfo.ParentId,
+		"Attachment_Generated__c": (false as :boolean) ,
+		"Failure_Reason__c": "No records extracted"
+
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Extract__c" doc:name="Salesforce : Update Extract record">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": "false",
+	"FailureReason": "No Records Extracted"
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <logger message="Response back to SF -&gt; #[payload]" level="INFO" doc:name="Logger"/>
+                    <expression-filter expression="#[false]" doc:name="Expression"/>
+                </otherwise>
+            </choice>
+            <expression-filter expression="#[payload.size() != 0]" doc:name="Expression"/>
+            <enricher doc:name="Message Enricher">
+                <flow-ref name="teds_callLOVflow" doc:name="teds_callLOVflow"/>
+                <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
+            </enricher>
+            <enricher doc:name="Message Enricher">
+                <flow-ref name="teds_GetPersonTypeDetails" doc:name="teds_GetPersonTypeDetails"/>
+                <enrich source="#[flowVars.EducationPersonDetails]" target="#[flowVars.EducationPersonDetails]"/>
+            </enricher>
+            <enricher doc:name="Message Enricher">
+                <flow-ref name="teds_GetEducationCaseDetails" doc:name="teds_GetEducationCaseDetails"/>
+                <enrich source="#[flowVars.OpenEducationCaseDetails]" target="#[flowVars.OpenEducationCaseDetails]"/>
+                <enrich source="#[flowVars.ClosedEducationCaseDetails]" target="#[flowVars.ClosedEducationCaseDetails]"/>
+            </enricher>
+            <enricher doc:name="Message Enricher">
+                <flow-ref name="teds_GetDiagnosisDetails_Subflow" doc:name="teds_GetDiagnosisDetails_Subflow"/>
+                <enrich source="#[flowVars.DiagnosisDetails]" target="#[flowVars.DiagnosisDetails]"/>
+            </enricher>
+            <enricher doc:name="Message Enricher">
+                <flow-ref name="teds_GetExistingTEDSLogRecords" doc:name="teds_GetExistingTEDSLogRecords"/>
+                <enrich source="#[flowVars.ExistingLogRecords]" target="#[flowVars.ExistingLogRecords]"/>
+            </enricher>
+            <choice doc:name="Choice : Check for correct File Type">
+                <when expression="#[flowVars.extractInfo.FileType == &quot;SA Admission&quot;]">
+                    <dw:transform-message doc:name="TM: Prepare Java output SA Admission - Step1">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var CaseEducationLevel = {	
+	"00" : "00",
+	"01" : "01",
+	"02" : "02",
+	"03" : "03",
+	"04" : "04",
+	"05" : "05",
+	"06" : "06",
+	"07" : "07",
+	"08" : "08",
+	"09" : "09",
+	"10" : "10",
+	"11" : "11",
+	"12" : "12",
+	"Adult Education" : "13",
+	"Kindergarten" : "00",
+	"No Grade" : "00",
+	"Ungraded" : "00",
+	"Graduated" : "12",
+	"Blank" : "0"
+}
+%var PersonEducationLevel = {	
+	"Pre-Kindergarten" : "00",
+	"Kindergarten" : "00",
+	"First" : "01",
+	"Second" : "02",
+	"Third" : "03",
+	"Fourth" : "04",
+	"Fifth" : "05",
+	"Sixth" : "06",
+	"Seventh" : "07",
+	"Eighth" : "08",
+	"Ninth" : "09",
+	"Tenth" : "10",
+	"Eleventh" : "11",
+	"Twelfth" : "12",
+	"High School Graduate" : "12",
+	"College- 1st Year" : "13",
+	"College- 2nd Year" : "14",
+	"College- 3rd Year" : "15",
+	"College- 4th Year" : "16",
+	"Blank" : "0"
+}
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%function getAge(date1,date2)  ( abs (date1 - date2).years)
+%function getDiagnosis(diagnosisList,admissionDate,row) (diagnosisList filter $.CreatedDate <= admissionDate)[row].Diagnosis
+---
+payload map {
+	"SupportNumber": $.SupportName,
+	"SystemTransactionType": "A", // Change it by doing comparison
+	"StateCode": "DE",
+	"ReportingDate": flowVars.extractInfo.ReportingDate default " ",
+	"StateProviderIdentifier": $.ProviderIdentifierSA when flowVars.extractInfo.FileType == "SA Admission" otherwise $.ProviderIdentifierMH default "",
+	"ClientIdentifier": $.ClientPID default "A",
+	"CoDependentCollateral": "2",
+	"ClientTransactionType": $.ClientTransactionTypeSA when $.ClientTransactionTypeSA != null and $.ClientTransactionTypeSA != "" otherwise "A" default "A",
+	"DateOfAdmission": ($.AdmissionDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
+	"TypeOfTreatmentServiceSetting": "05" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "06",	
+	"PreviousSATreatmentEpisodes": ($.PreviousTretmentEpisodes as :number) when ($.PreviousTretmentEpisodes != null and $.PreviousTretmentEpisodes !="" and 
+			($.PreviousTretmentEpisodes as :number) < 5) otherwise "5"	default "0",
+	"ReferralSource": flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] when flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] != null
+			and flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] != "" otherwise "97" default "97",
+	"DateOfBirth": ($.ClientDateOfBirth as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"} default "01010008",
+	"Gender": flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] when  $.ClientGender != null and  $.ClientGender != "" and flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] != null
+			and flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] != "" otherwise "7" default "7",
+	"Race": "21" when $.ClientRace != null and  $.ClientRace != "" and $.ClientRaceSecondary != null and $.ClientRaceSecondary != ""  otherwise (flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] when  $.ClientRace != null and  $.ClientRace != "" and flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] != null
+			and flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] != "" otherwise "97") default "97",
+	"Ethnicity": flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0]  when  $.ClientEthnicity != null and  $.ClientEthnicity != "" and flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0] != null
+			and flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0] != "" otherwise "97" default "97",
+		 
+	"Education": (max  (flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseGradeLevel != null and $.CaseGradeLevel != ""  map
+			(CaseEducationLevel[$.CaseGradeLevel default "Blank"] as :number) when CaseEducationLevel[$.CaseGradeLevel default "Blank"] != null and
+			 CaseEducationLevel[$.CaseGradeLevel default "Blank"] != "" otherwise 0)) when flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" otherwise 
+		( max ( (flowVars.closedEducationCaseDetails[$.ClientPID] default [] filter $.CaseGradeLevel != null and $.CaseGradeLevel != ""  map
+			(CaseEducationLevel[$.CaseGradeLevel default "Blank"] as :number) when CaseEducationLevel[$.CaseGradeLevel default "Blank"] != null and 
+				CaseEducationLevel[$.CaseGradeLevel default "Blank"] != "" otherwise 0) ++ 
+			(flowVars.EducationPersonDetails[$.ClientPID] default [] filter $.PersonGradeLevel != null and $.PersonGradeLevel != "" map
+			(PersonEducationLevel[$.PersonGradeLevel default "Blank"] as :number) when PersonEducationLevel[$.PersonGradeLevel default "Blank"] != null
+			and PersonEducationLevel[$.PersonGradeLevel default "Blank"] != "" otherwise 0) ) ) default "97",
+	"EmploymentStatus": "04",
+	 
+	"SubstanceAbuseProblemPrimary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != ""
+				and	$.SubstanceAbuseList[0].Substance__c != null and $.SubstanceAbuseList[0].Substance__c != "" otherwise "97" default "97",
+	"RouteOfAdministrationPrimary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("ROUTE_OF_ADMINISTRATION_TEDS-" ++ $.SubstanceAbuseList[0].Route_of_Administration__c)][0] when $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and	$.SubstanceAbuseList[0].Route_of_Administration__c != null and $.SubstanceAbuseList[0].Route_of_Administration__c != "" otherwise "97" ) default "97",
+	"FrequencyOfUsePrimary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[0].Frequency_of_Use__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != ""
+				and	$.SubstanceAbuseList[0].Frequency_of_Use__c != null and $.SubstanceAbuseList[0].Frequency_of_Use__c != "" otherwise "97" ) default "97",
+	"AgeOfFirstUsePrimary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("AGE_AT_FIRST_USE_TEDS-" ++ $.SubstanceAbuseList[0].Age_of_First_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and	$.SubstanceAbuseList[0].Age_of_First_Use__c != null and $.SubstanceAbuseList[0].Age_of_First_Use__c != "" otherwise "97") default "97",
+	
+	"SubstanceAbuseProblemSecondary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				and	$.SubstanceAbuseList[1].Substance__c != null and $.SubstanceAbuseList[1].Route_of_Administration__c != "" otherwise "01" default "01",
+	"RouteOfAdministrationSecondary": "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[1] == null or $.SubstanceAbuseList[1] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("ROUTE_OF_ADMINISTRATION_TEDS-" ++ $.SubstanceAbuseList[1].Route_of_Administration__c)][0] when $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and	$.SubstanceAbuseList[0].Route_of_Administration__c != null and $.SubstanceAbuseList[0].Route_of_Administration__c != "" otherwise "97" ) default "97",
+	"FrequencyOfUseSecondary": "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[1] == null or $.SubstanceAbuseList[1] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[1].Frequency_of_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				and	$.SubstanceAbuseList[1].Frequency_of_Use__c != null and $.SubstanceAbuseList[1].Frequency_of_Use__c != "" otherwise "97") default "97",
+	"AgeOfFirstUseSecondary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[1] == null or $.SubstanceAbuseList[1] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("AGE_AT_FIRST_USE_TEDS-" ++ $.SubstanceAbuseList[1].Age_of_First_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != "" 
+				and	$.SubstanceAbuseList[1].Age_of_First_Use__c != null and $.SubstanceAbuseList[1].Age_of_First_Use__c != "" otherwise "97") default "97",
+	
+	"SubstanceAbuseProblemTertiary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Substance__c != null and $.SubstanceAbuseList[2].Route_of_Administration__c != "" otherwise "01" default "01",
+	"RouteOfAdministrationTertiary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[2] == null or $.SubstanceAbuseList[2] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("ROUTE_OF_ADMINISTRATION_TEDS-" ++ $.SubstanceAbuseList[2].Route_of_Administration__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Route_of_Administration__c != null and $.SubstanceAbuseList[2].Route_of_Administration__c != "" otherwise "97"),
+	"FrequencyOfUseTertiary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[2] == null or $.SubstanceAbuseList[2] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[2].Frequency_of_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Frequency_of_Use__c != null and $.SubstanceAbuseList[2].Frequency_of_Use__c != "" otherwise "97") default "97",
+	"AgeOfFirstUseTertiary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[2] == null or $.SubstanceAbuseList[2] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("AGE_AT_FIRST_USE_TEDS-" ++ $.SubstanceAbuseList[2].Age_of_First_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != "" 
+				and	$.SubstanceAbuseList[2].Age_of_First_Use__c != null and $.SubstanceAbuseList[2].Age_of_First_Use__c != "" otherwise "97") default "97",
+	
+	"MedicationassistedOpioidTherapy": "8",
+	"DetailedDrugCodePrimary": "9998",
+	"DetailedDrugCodeSecondary": "9998",
+	"DetailedDrugCodeTertiary": "9998",
+	
+	"DiagnosticCode": "999.98", // Will modify once we get the logic
+	"CooccurringSAandMHProblems": $.Co_occurring_Substance_Abuse_and_Mental__c default " ", // Calculate in the next DW Step
+
+	"PregnantAtAdmission": "8",
+	"VeteranStatus": "8",
+	"LivingArrangements": "02",
+	"SourceOfIncomeSupport": "20",
+	"HealthInsurance": flowVars.LOVReturned[("HEALTH_INSURANCE_TEDS-" ++ $.HealthInsurance)][0] when $.HealthInsurance != null and $.HealthInsurance != ""
+	and flowVars.LOVReturned[("HEALTH_INSURANCE_TEDS-" ++ $.HealthInsurance)][0] != null and flowVars.LOVReturned[("HEALTH_INSURANCE_TEDS-" ++ $.HealthInsurance)][0] != ""  otherwise "21" default "21",
+	"PaymentSourcePrimary": $.Payment_Source_Primary__c default " ", // Calculate in the next DW Step
+	"DetailedNotInLaborForce": "02",
+	"DetailedCriminalJusticeReferral": $.Detailed_Criminal_Justice_Referral__c default " ", // Calculate in the next DW Step
+	"MaritalStatus": "01",
+	
+	"DaysWaitingToEnterSATreatment":  ( pad('0',(3 - (sizeOf ( floor  $.DaysWaitingToEnterSATreatment )) )) ++ ( floor  $.DaysWaitingToEnterSATreatment)) when  
+			  $.DaysWaitingToEnterSATreatment != null and $.DaysWaitingToEnterSATreatment != "" and ($.DaysWaitingToEnterSATreatment as :number ) >= 0 otherwise "997" default "997",
+	"Arrestsinpast30daysAdmission": "98",
+	"AttendanceatSASelfHelpGroupsinpast30DaysAdmission": "98",
+	"DiagnosticCodeSetIdentifier": "3",
+
+
+	"SubstanceAbuseDiagnosis": getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisOne": getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisTwo" : getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1)  when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisThree" : getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2)  when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2) != "" otherwise "999.9997" default "999.9997",
+	
+	
+	
+	
+	//"SubstanceAbuseDiagnosis": flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis when (flowVars.DiagnosisDetails != null and  flowVars.DiagnosisDetails != "" 
+	//							and flowVars.DiagnosisDetails[$.PlanofCare] != null and  flowVars.DiagnosisDetails[$.PlanofCare] != ""
+		//						and flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis != null and  flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis != ""
+			//					) otherwise "999.9997" default "999.9997",
+	//"MentalHealthDiagnosisOne": flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis when (flowVars.DiagnosisDetails != null and  flowVars.DiagnosisDetails != "" 
+		//						and flowVars.DiagnosisDetails[$.PlanofCare] != null and  flowVars.DiagnosisDetails[$.PlanofCare] != ""
+			//					and flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis != null and  flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis != ""
+				//				) otherwise "999.9997",
+	//"MentalHealthDiagnosisTwo": flowVars.DiagnosisDetails[$.PlanofCare][1].Diagnosis when (flowVars.DiagnosisDetails != null and  flowVars.DiagnosisDetails != "" 
+		//						and flowVars.DiagnosisDetails[$.PlanofCare] != null and  flowVars.DiagnosisDetails[$.PlanofCare] != ""
+			//					and flowVars.DiagnosisDetails[$.PlanofCare][1].Diagnosis != null and  flowVars.DiagnosisDetails[$.PlanofCare][1].Diagnosis != ""
+				//				) otherwise "999.9997" default "999.9997",
+	//"MentalHealthDiagnosisThree": flowVars.DiagnosisDetails[$.PlanofCare][2].Diagnosis when (flowVars.DiagnosisDetails != null and  flowVars.DiagnosisDetails != "" 
+		//						and flowVars.DiagnosisDetails[$.PlanofCare] != null and  flowVars.DiagnosisDetails[$.PlanofCare] != ""
+			//				and flowVars.DiagnosisDetails[$.PlanofCare][2].Diagnosis != null and  flowVars.DiagnosisDetails[$.PlanofCare][2].Diagnosis != ""
+				//				) otherwise "999.9997" default "999.9997", 
+					
+
+	
+	"SMISEDStatus": "2",
+	
+	"SchoolAttendanceStatus": "6"  when  ($.ClientDateOfBirth != null and ($.ClientAgeAtAdmission <= 3) and  ($.ClientAgeAtAdmission >= 18))
+		otherwise ("1" when ($.ClientPID != null and (flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null
+	and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and 
+	((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate) 
+	
+	or
+	($.ClientPID != null and (flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "" and
+		((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and
+		((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate and 
+	((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) != null and 
+	((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null and $.CaseClosedDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) >= ( $.AdmissionDate - |P30D|)))
+	
+	or
+	($.ClientPID != null and (flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "" and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended != null and
+	flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended >= ( $.AdmissionDate - |P30D|) and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended <= $.AdmissionDate  ))
+	
+	)
+		otherwise ("2" when ( $.ClientPID != null and ((flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "") or
+		(flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "") or 
+			(flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "")))
+	otherwise "7")),
+
+
+	// "SchoolAttendanceStatus" : $.School_Attendance_Status__c default " ", // Need to build the logic
+
+	"LegalStatusatAdmissiontoStateHospitals": "96",
+	"CGASGAFScore": "998",
+	"ProviderID" : $.ProviderID
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Prepare Java output SA Admission - Step2">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%function getAge(date1,date2)  ( abs (date1 - date2).years)
+---
+payload filter ($."StateProviderIdentifier" != null and  $."StateProviderIdentifier" != "") map {
+	"SupportNumber": $.SupportNumber,
+	"SystemTransactionType": "A" when flowVars.ExistingLogRecords[$.SupportNumber][0] == null or flowVars.ExistingLogRecords[$.SupportNumber][0] == "" otherwise
+		("A" when (flowVars.ExistingLogRecords[$.SupportNumber][0].StateProviderIdentifier != $.StateProviderIdentifier	or	
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ClientIdentifier != $.ClientIdentifier	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ClientTransactionType != $.ClientTransactionType	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].DateOfAdmission != $.DateOfAdmission	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].TypeOfTreatmentServiceSetting != $.TypeOfTreatmentServiceSetting)			
+			otherwise "C"
+		),	
+	"StateCode": $.StateCode,
+	"ReportingDate": $.ReportingDate,
+	"StateProviderIdentifier": $.StateProviderIdentifier,
+	"ClientIdentifier": $.ClientIdentifier,
+	"CoDependentCollateral": $.CoDependentCollateral,
+	"ClientTransactionType": $.ClientTransactionType,
+	"DateOfAdmission": $.DateOfAdmission ,
+	"TypeOfTreatmentServiceSetting": $.TypeOfTreatmentServiceSetting,	
+	"PreviousSATreatmentEpisodes": $.PreviousSATreatmentEpisodes,
+	"ReferralSource": $.ReferralSource,
+	"DateOfBirth": $.DateOfBirth,
+	"Gender": $.Gender,
+	"Race": $.Race,
+	"Ethnicity": $.Ethnicity,
+	"Education": ( pad('0',(2 - (sizeOf ( $.Education )) )) ++ ($.Education))  when $.Education != null and $.Education != "" and ( $.Education < 10) 
+		 otherwise ($.Education when  ($.Education != null and $.Education != "" ) otherwise "97" ),
+	"EmploymentStatus": $.EmploymentStatus,
+	"SubstanceAbuseProblemPrimary": $.SubstanceAbuseProblemPrimary,
+	"RouteOfAdministrationPrimary": $.RouteOfAdministrationPrimary,
+	"FrequencyOfUsePrimary": $.FrequencyOfUsePrimary,
+	"AgeOfFirstUsePrimary": $.AgeOfFirstUsePrimary,
+	"SubstanceAbuseProblemSecondary": $.SubstanceAbuseProblemSecondary,
+	"RouteOfAdministrationSecondary": $.RouteOfAdministrationSecondary,
+	"FrequencyOfUseSecondary": $.FrequencyOfUseSecondary,
+	"AgeOfFirstUseSecondary":  $.AgeOfFirstUseSecondary,
+	"SubstanceAbuseProblemTertiary": $.SubstanceAbuseProblemTertiary,
+	"RouteOfAdministrationTertiary":  $.RouteOfAdministrationTertiary,
+	"FrequencyOfUseTertiary":  $.FrequencyOfUseTertiary,
+	"AgeOfFirstUseTertiary":  $.AgeOfFirstUseTertiary,
+	
+	"MedicationassistedOpioidTherapy": $.MedicationassistedOpioidTherapy,
+	"DetailedDrugCodePrimary": $.DetailedDrugCodePrimary,
+	"DetailedDrugCodeSecondary": $.DetailedDrugCodeSecondary,
+	"DetailedDrugCodeTertiary": $.DetailedDrugCodeTertiary,
+	
+	"DiagnosticCode": $.DiagnosticCode, // Will modify once we get the logic
+	"CooccurringSAandMHProblems": "1" when $.SMISEDStatus == "1" or $.SMISEDStatus == "2" or ($.MentalHealthDiagnosisOne != "999.9997" and $.MentalHealthDiagnosisOne != "999.9998")
+		or ($.MentalHealthDiagnosisTwo != "999.9997" and $.MentalHealthDiagnosisTwo != "999.9998") or ($.MentalHealthDiagnosisThree != "999.9997" and $.MentalHealthDiagnosisThree != "999.9998")
+	otherwise "2",
+
+	"PregnantAtAdmission": $.PregnantAtAdmission,
+	"VeteranStatus": $.VeteranStatus,
+	"LivingArrangements": $.LivingArrangements,
+	"SourceOfIncomeSupport": $.SourceOfIncomeSupport,
+	"HealthInsurance": $.HealthInsurance,
+	"PaymentSourcePrimary": "97" when $.HealthInsurance == "01" or $.HealthInsurance == "02" or $.HealthInsurance == "06" or $.HealthInsurance == "20"
+		otherwise ("03" when $.HealthInsurance == "03" otherwise ("04" when $.HealthInsurance == "04" otherwise (
+			"05" when $.HealthInsurance == "21" otherwise "97"
+		))),
+	"DetailedNotInLaborForce": $.DetailedNotInLaborForce,
+	"DetailedCriminalJusticeReferral": "01" when $.ReferralSource == "07" otherwise "96",
+	"MaritalStatus": $.MaritalStatus,
+	"DaysWaitingToEnterSATreatment": $.DaysWaitingToEnterSATreatment,
+	"Arrestsinpast30daysAdmission": $.Arrestsinpast30daysAdmission,
+	"AttendanceatSASelfHelpGroupsinpast30DaysAdmission": $.AttendanceatSASelfHelpGroupsinpast30DaysAdmission,
+	"DiagnosticCodeSetIdentifier": $.DiagnosticCodeSetIdentifier,
+
+	"SubstanceAbuseDiagnosis": $.SubstanceAbuseDiagnosis , // Will modify once we get the logic
+	"MentalHealthDiagnosisOne": $.MentalHealthDiagnosisOne, // Will modify once we get the logic
+	"MentalHealthDiagnosisTwo": $.MentalHealthDiagnosisTwo, // Will modify once we get the logic
+	"MentalHealthDiagnosisThree": $.MentalHealthDiagnosisThree, // Will modify once we get the logic
+
+	"SMISEDStatus": $.SMISEDStatus,
+	"SchoolAttendanceStatus" : $.SchoolAttendanceStatus default " ", // Need to build the logic
+
+	"LegalStatusatAdmissiontoStateHospitals": $.LegalStatusatAdmissiontoStateHospitals,
+	"CGASGAFScore": $.CGASGAFScore
+} ]]></dw:set-payload>
+                        <dw:set-session-variable variableName="ErrorFile"><![CDATA[//This dataweave code prepares the error file (Required Fields Missing file)
+%dw 1.0
+%output application/csv
+---
+payload map {
+	"Field Name" : "State Provider Identifier",
+	"Field Value" : $.StateProviderIdentifier,
+	"Provider ID" : $.ProviderID,
+	"Support Number" : $.SupportNumber,
+	"Error Description" :   (( 'State Provider Identifier (ISAT ID) is Missing' )  when  ($.StateProviderIdentifier=="" or $.StateProviderIdentifier==null)  otherwise "")  default "" 
+} filter ($."Error Description" != null and  $."Error Description" != "")]]></dw:set-session-variable>
+                    </dw:transform-message>
+                    <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Attributes">
+                        <add-message-property key="FilePrefixName" value="${tedsExtract.SAAdmission.filename}"/>
+                        <add-message-property key="FileExtension" value=".txtSA"/>
+                    </message-properties-transformer>
+                </when>
+                <when expression="#[flowVars.extractInfo.FileType == &quot;MH Admission&quot;]">
+                    <dw:transform-message doc:name="TM: Prepare Java output MH Admission - Step1">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var CaseEducationLevel = {	
+	"00" : "00",
+	"01" : "01",
+	"02" : "02",
+	"03" : "03",
+	"04" : "04",
+	"05" : "05",
+	"06" : "06",
+	"07" : "07",
+	"08" : "08",
+	"09" : "09",
+	"10" : "10",
+	"11" : "11",
+	"12" : "12",
+	"Adult Education" : "13",
+	"Kindergarten" : "00",
+	"No Grade" : "00",
+	"Ungraded" : "00",
+	"Graduated" : "12",
+	"Blank" : "0"
+}
+%var PersonEducationLevel = {	
+	"Pre-Kindergarten" : "00",
+	"Kindergarten" : "00",
+	"First" : "01",
+	"Second" : "02",
+	"Third" : "03",
+	"Fourth" : "04",
+	"Fifth" : "05",
+	"Sixth" : "06",
+	"Seventh" : "07",
+	"Eighth" : "08",
+	"Ninth" : "09",
+	"Tenth" : "10",
+	"Eleventh" : "11",
+	"Twelfth" : "12",
+	"High School Graduate" : "12",
+	"College- 1st Year" : "13",
+	"College- 2nd Year" : "14",
+	"College- 3rd Year" : "15",
+	"College- 4th Year" : "16",
+	"Blank" : "0"
+}
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%function getAge(date1,date2)  ( abs (date1 - date2).years)
+%function getYearsfromPeriod(period)  (0 when (((((period) as :string ) scan /[0-9]*Y/)[0][0]) == null) otherwise (( ((((period) as :string ) scan /[0-9]*Y/)[0][0]) replace "Y" with "" ) as :number) ) 
+%function getDiagnosis(diagnosisList,admissionDate,row) (diagnosisList filter $.CreatedDate <= admissionDate)[row].Diagnosis
+---
+payload map {
+	"SupportNumber": $.SupportName,
+	"SystemTransactionType": "A", // Change it by doing comparison
+	"StateCode": "DE",
+	"ReportingDate": flowVars.extractInfo.ReportingDate default " ",
+	"StateProviderIdentifier": $.ProviderIdentifierMH default "",
+	"ClientIdentifier": $.ClientPID default " ",
+	"CoDependentCollateral": "2",
+	"ClientTransactionType": $.ClientTransactionTypeMH when $.ClientTransactionTypeMH != null and $.ClientTransactionTypeMH != "" otherwise "M" default "M",
+	"DateOfAdmission": ($.AdmissionDate  as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
+	"TypeOfTreatmentServiceSetting": "73" when $.ServiceTaxLevel2Code != null and $.ServiceTaxLevel2Code != "6017" and $.SerTaxResOrNonRes != "Residential"
+	 otherwise ("74" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "75" ) ,	
+	"PreviousSATreatmentEpisodes": ($.PreviousTretmentEpisodes as :number) when ($.PreviousTretmentEpisodes != null and $.PreviousTretmentEpisodes !="" and 
+			($.PreviousTretmentEpisodes as :number) < 5) otherwise "5"	default "0",
+	"ReferralSource": flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] when flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] != null and 
+			flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] != "" otherwise "97"  default "97",
+	"DateOfBirth": ($.ClientDateOfBirth  as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"} default "01010008",
+	"Gender": flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] when  $.ClientGender != null and  $.ClientGender != "" and flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] != null
+			and flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] != "" otherwise "7" default "7",
+	"Race": "21" when $.ClientRace != null and  $.ClientRace != "" and $.ClientRaceSecondary != null and $.ClientRaceSecondary != ""  otherwise (flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] when  $.ClientRace != null and  $.ClientRace != "" and flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] != null
+			and flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] != "" otherwise "97") default "97",
+	"Ethnicity": flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0]  when  $.ClientEthnicity != null and  $.ClientEthnicity != "" and flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0] != null
+			and flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0] != "" otherwise "97" default "97",
+		 
+	"Education": (max  (flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseGradeLevel != null and $.CaseGradeLevel != ""  map
+			(CaseEducationLevel[$.CaseGradeLevel default "Blank"] as :number) when CaseEducationLevel[$.CaseGradeLevel default "Blank"] != null and
+			 CaseEducationLevel[$.CaseGradeLevel default "Blank"] != "" otherwise 0)) when flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" otherwise 
+		( max ( (flowVars.closedEducationCaseDetails[$.ClientPID] default [] filter $.CaseGradeLevel != null and $.CaseGradeLevel != ""  map
+			(CaseEducationLevel[$.CaseGradeLevel default "Blank"] as :number) when CaseEducationLevel[$.CaseGradeLevel default "Blank"] != null and 
+				CaseEducationLevel[$.CaseGradeLevel default "Blank"] != "" otherwise 0) ++ 
+			(flowVars.EducationPersonDetails[$.ClientPID] default [] filter $.PersonGradeLevel != null and $.PersonGradeLevel != "" map
+			(PersonEducationLevel[$.PersonGradeLevel default "Blank"] as :number) when PersonEducationLevel[$.PersonGradeLevel default "Blank"] != null
+			and PersonEducationLevel[$.PersonGradeLevel default "Blank"] != "" otherwise 0) ) ) default "97",
+	"EmploymentStatus": "04",
+	"SubstanceAbuseProblemPrimary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != ""
+				and	$.SubstanceAbuseList[0].Substance__c != null and $.SubstanceAbuseList[0].Substance__c != "" otherwise "01" default "01",
+	"RouteOfAdministrationPrimary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("ROUTE_OF_ADMINISTRATION_TEDS-" ++ $.SubstanceAbuseList[0].Route_of_Administration__c)][0] when $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and	$.SubstanceAbuseList[0].Route_of_Administration__c != null and $.SubstanceAbuseList[0].Route_of_Administration__c != "" otherwise "97" ) default "97",
+	"FrequencyOfUsePrimary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[0].Frequency_of_Use__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != ""
+				and	$.SubstanceAbuseList[0].Frequency_of_Use__c != null and $.SubstanceAbuseList[0].Frequency_of_Use__c != "" otherwise "97" ) default "97",
+	"AgeOfFirstUsePrimary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("AGE_AT_FIRST_USE_TEDS-" ++ $.SubstanceAbuseList[0].Age_of_First_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and	$.SubstanceAbuseList[0].Age_of_First_Use__c != null and $.SubstanceAbuseList[0].Age_of_First_Use__c != "" otherwise "97") default "97",
+	
+	"SubstanceAbuseProblemSecondary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				and	$.SubstanceAbuseList[1].Substance__c != null and $.SubstanceAbuseList[1].Route_of_Administration__c != "" otherwise "01" default "01",
+	"RouteOfAdministrationSecondary": "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[1] == null or $.SubstanceAbuseList[1] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("ROUTE_OF_ADMINISTRATION_TEDS-" ++ $.SubstanceAbuseList[0].Route_of_Administration__c)][0] when $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and	$.SubstanceAbuseList[0].Route_of_Administration__c != null and $.SubstanceAbuseList[0].Route_of_Administration__c != "" otherwise "97" ) default "97",
+	"FrequencyOfUseSecondary": "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[1] == null or $.SubstanceAbuseList[1] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[1].Frequency_of_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				and	$.SubstanceAbuseList[1].Frequency_of_Use__c != null and $.SubstanceAbuseList[1].Frequency_of_Use__c != "" otherwise "97") default "97",
+	"AgeOfFirstUseSecondary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[1] == null or $.SubstanceAbuseList[1] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("AGE_AT_FIRST_USE_TEDS-" ++ $.SubstanceAbuseList[1].Age_of_First_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != "" 
+				and	$.SubstanceAbuseList[1].Age_of_First_Use__c != null and $.SubstanceAbuseList[1].Age_of_First_Use__c != "" otherwise "97") default "97",
+	
+	"SubstanceAbuseProblemTertiary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Substance__c != null and $.SubstanceAbuseList[2].Route_of_Administration__c != "" otherwise "01" default "01",
+	"RouteOfAdministrationTertiary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[2] == null or $.SubstanceAbuseList[2] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("ROUTE_OF_ADMINISTRATION_TEDS-" ++ $.SubstanceAbuseList[2].Route_of_Administration__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Route_of_Administration__c != null and $.SubstanceAbuseList[2].Route_of_Administration__c != "" otherwise "97") default "97",
+	"FrequencyOfUseTertiary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[2] == null or $.SubstanceAbuseList[2] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[2].Frequency_of_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Frequency_of_Use__c != null and $.SubstanceAbuseList[2].Frequency_of_Use__c != "" otherwise "97") default "97",
+	"AgeOfFirstUseTertiary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[2] == null or $.SubstanceAbuseList[2] == "" 
+				or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == "01" 
+				otherwise ( flowVars.LOVReturned[("AGE_AT_FIRST_USE_TEDS-" ++ $.SubstanceAbuseList[2].Age_of_First_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != "" 
+				and	$.SubstanceAbuseList[2].Age_of_First_Use__c != null and $.SubstanceAbuseList[2].Age_of_First_Use__c != "" otherwise "97") default "97",
+	
+	"MedicationassistedOpioidTherapy": "8",
+	"DetailedDrugCodePrimary": "9998",
+	"DetailedDrugCodeSecondary": "9998",
+	"DetailedDrugCodeTertiary": "9998",
+	
+	"DiagnosticCode": "999.98", // Will modify once we get the logic
+	"CooccurringSAandMHProblems": $.Co_occurring_Substance_Abuse_and_Mental__c default " ", // Calculate in the next DW Step
+
+	"PregnantAtAdmission": "8",
+	"VeteranStatus": "8",
+	"LivingArrangements": "02",
+	"SourceOfIncomeSupport": "20",
+	"HealthInsurance": flowVars.LOVReturned[("HEALTH_INSURANCE_TEDS-" ++ $.HealthInsurance)][0] when $.HealthInsurance != null and $.HealthInsurance != ""
+	and flowVars.LOVReturned[("HEALTH_INSURANCE_TEDS-" ++ $.HealthInsurance)][0] != null and flowVars.LOVReturned[("HEALTH_INSURANCE_TEDS-" ++ $.HealthInsurance)][0] != ""  otherwise "21" default "21",
+	"PaymentSourcePrimary": "" default " ", // Calculate in the next DW Step
+	"DetailedNotInLaborForce": "02",
+	"DetailedCriminalJusticeReferral": $.Detailed_Criminal_Justice_Referral__c default " ", // Calculate in the next DW Step
+	"MaritalStatus": "01",
+	"DaysWaitingToEnterSATreatment":  ( pad('0',(3 - (sizeOf ( floor  $.DaysWaitingToEnterSATreatment )) )) ++ ( floor  $.DaysWaitingToEnterSATreatment)) when  
+			  $.DaysWaitingToEnterSATreatment != null and $.DaysWaitingToEnterSATreatment != "" and ($.DaysWaitingToEnterSATreatment as :number ) >= 0 otherwise "997" default "997",
+	
+	"Arrestsinpast30daysAdmission": "98",
+	"AttendanceatSASelfHelpGroupsinpast30DaysAdmission": "98",
+	"DiagnosticCodeSetIdentifier": "3",
+
+	"SubstanceAbuseDiagnosis": getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisOne": getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisTwo" : getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1)  when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisThree" : getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2)  when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2) != "" otherwise "999.9997" default "999.9997",
+	
+	"SMISEDStatus": "2",
+	//"TestYearsVal" : getAge($.AdmissionDate, $.ClientDateOfBirth) when $.AdmissionDate != null and $.ClientDateOfBirth != null otherwise "200",
+	//"TestYearsValV2" : ( getYearsfromPeriod($.AdmissionDate - $.ClientDateOfBirth))
+		//when $.AdmissionDate != null and $.ClientDateOfBirth != null otherwise "200",
+	//"SchoolAttendanceStatus": "6"  when ($.ClientDateOfBirth != null and $.AdmissionDate != null)
+		//	otherwise "7" default "7",
+		
+		
+	"SchoolAttendanceStatus": "6"  when  ($.ClientDateOfBirth != null and ($.ClientAgeAtAdmission <= 3) and  ($.ClientAgeAtAdmission >= 18))
+		otherwise ("1" when ($.ClientPID != null and (flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null
+	and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and 
+	((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate) 
+	
+	or
+	($.ClientPID != null and (flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "" and
+		((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and
+		((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate and 
+	((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) != null and 
+	((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null and $.CaseClosedDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) >= ( $.AdmissionDate - |P30D|)))
+	
+	or
+	($.ClientPID != null and (flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "" and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended != null and
+	flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended >= ( $.AdmissionDate - |P30D|) and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended <= $.AdmissionDate  ))
+	
+	)
+		otherwise ("2" when ( $.ClientPID != null and ((flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "") or
+		(flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "") or 
+			(flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "")))
+	otherwise "7")),
+
+	//"SchoolAttendanceStatus": "6"  when ($.ClientDateOfBirth != null and (getAge($.AdmissionDate,$.ClientDateOfBirth)) <= 3 and  (getAge($.AdmissionDate,$.ClientDateOfBirth)) >= 18)
+		//otherwise ("1" when ($.ClientPID != null and ($.ClientPID != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null
+	//	and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate)  or
+		//(flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "" and
+	//	((flowVars.closedEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and ((flowVars.closedEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate and 
+		//((flowVars.closedEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) != null and ((flowVars.closedEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) >= ( $.AdmissionDate - |P30D|)) or
+		//(flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "" and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended != null and
+		//flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended >= ( $.AdmissionDate - |P30D|) and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended <= $.AdmissionDate  )) 
+	//	otherwise ("2" when ( $.ClientPID != null and ($.ClientPID != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "") or
+		//	($.ClientPID != null and flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "") or 
+	//		($.ClientPID != null and flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != ""))
+	//otherwise "7")),
+	
+	// "SchoolAttendanceStatus" : $.School_Attendance_Status__c default " ", // Need to build the logic
+
+	"LegalStatusatAdmissiontoStateHospitals": "96",
+	"CGASGAFScore": "998",
+	"ProviderID" : $.ProviderID
+	
+	 
+	
+} ]]></dw:set-payload>
+                    </dw:transform-message>
+                    <logger message="'After MH Admission Step1'#[payload]" level="INFO" doc:name="Logger"/>
+                    <dw:transform-message doc:name="TM: Prepare Java output MH Admission - Step2">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%function getAge(date1,date2)  ( abs (date1 - date2).years)
+
+---
+payload filter ($."StateProviderIdentifier" != null and  $."StateProviderIdentifier" != "") map {
+	"SupportNumber": $.SupportNumber,
+	"SystemTransactionType":  "A" when flowVars.ExistingLogRecords[$.SupportNumber][0] == null or flowVars.ExistingLogRecords[$.SupportNumber][0] == "" otherwise
+		("A" when flowVars.ExistingLogRecords[$.SupportNumber][0].StateProviderIdentifier != $.StateProviderIdentifier	or	
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ClientIdentifier != $.ClientIdentifier	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ClientTransactionType != $.ClientTransactionType	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].DateOfAdmission != $.DateOfAdmission	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].TypeOfTreatmentServiceSetting != $.TypeOfTreatmentServiceSetting			
+			otherwise "C"
+		),	
+	"StateCode": $.StateCode,
+	"ReportingDate": $.ReportingDate,
+	"StateProviderIdentifier": $.StateProviderIdentifier,
+	"ClientIdentifier": $.ClientIdentifier,
+	"CoDependentCollateral": $.CoDependentCollateral,
+	"ClientTransactionType": $.ClientTransactionType,
+	"DateOfAdmission": $.DateOfAdmission ,
+	"TypeOfTreatmentServiceSetting": $.TypeOfTreatmentServiceSetting,	
+	"PreviousSATreatmentEpisodes": $.PreviousSATreatmentEpisodes,
+	"ReferralSource": $.ReferralSource,
+	"DateOfBirth": $.DateOfBirth,
+	"Gender": $.Gender,
+	"Race": $.Race,
+	"Ethnicity": $.Ethnicity,
+	"Education":( pad('0',(2 - (sizeOf ( $.Education )) )) ++ ($.Education))  when $.Education != null and $.Education != "" and ( $.Education < 10) 
+		 otherwise ($.Education when  ($.Education != null and $.Education != "" ) otherwise "97" ),
+	"EmploymentStatus": $.EmploymentStatus,
+	"SubstanceAbuseProblemPrimary": $.SubstanceAbuseProblemPrimary,
+	"RouteOfAdministrationPrimary": $.RouteOfAdministrationPrimary,
+	"FrequencyOfUsePrimary": $.FrequencyOfUsePrimary,
+	"AgeOfFirstUsePrimary": $.AgeOfFirstUsePrimary,
+	"SubstanceAbuseProblemSecondary": $.SubstanceAbuseProblemSecondary,
+	"RouteOfAdministrationSecondary": $.RouteOfAdministrationSecondary,
+	"FrequencyOfUseSecondary": $.FrequencyOfUseSecondary,
+	"AgeOfFirstUseSecondary":  $.AgeOfFirstUseSecondary,
+	"SubstanceAbuseProblemTertiary": $.SubstanceAbuseProblemTertiary,
+	"RouteOfAdministrationTertiary":  $.RouteOfAdministrationTertiary,
+	"FrequencyOfUseTertiary":  $.FrequencyOfUseTertiary,
+	"AgeOfFirstUseTertiary":  $.AgeOfFirstUseTertiary,
+	
+	"MedicationassistedOpioidTherapy": $.MedicationassistedOpioidTherapy,
+	"DetailedDrugCodePrimary": $.DetailedDrugCodePrimary,
+	"DetailedDrugCodeSecondary": $.DetailedDrugCodeSecondary,
+	"DetailedDrugCodeTertiary": $.DetailedDrugCodeTertiary,
+	
+	"DiagnosticCode": $.DiagnosticCode, // Will modify once we get the logic
+    "CooccurringSAandMHProblems": "1" when ( ( ( ($.PreviousSATreatmentEpisodes as :number) == 1) or ( ($.PreviousSATreatmentEpisodes as :number) == 2) or ( ($.PreviousSATreatmentEpisodes as :number) == 3) or ( ($.PreviousSATreatmentEpisodes as :number) == 4) or ( ($.PreviousSATreatmentEpisodes as :number) == 5) )  or  
+                             (($.SubstanceAbuseProblemPrimary as :number) >= 2 and ($.SubstanceAbuseProblemPrimary as :number) <= 20) or
+                             (($.SubstanceAbuseProblemSecondary as :number) >= 2 and ($.SubstanceAbuseProblemSecondary as :number) <= 20) or
+                             (($.SubstanceAbuseProblemTertiary as :number) >= 2 and ($.SubstanceAbuseProblemTertiary as :number) <= 20) or
+                             (($.RouteOfAdministrationPrimary as :number) >= 1 and ($.RouteOfAdministrationPrimary as :number) <= 20) or
+                             (($.RouteOfAdministrationSecondary as :number) >= 1 and ($.RouteOfAdministrationSecondary as :number) <= 20) or
+                             (($.RouteOfAdministrationTertiary as :number) >= 1 and ($.RouteOfAdministrationTertiary as :number) <= 20) or
+                             (($.FrequencyOfUsePrimary as :number) >= 1 and ($.FrequencyOfUsePrimary as :number) <= 5) or
+                             (($.FrequencyOfUseSecondary as :number) >= 1 and ($.FrequencyOfUseSecondary as :number) <= 5) or
+                             (($.FrequencyOfUseTertiary as :number) >= 1 and ($.FrequencyOfUseTertiary as :number) <= 5) or
+                             (($.AgeOfFirstUsePrimary as :number) >= 0 and ($.AgeOfFirstUsePrimary as :number) <= 95) or
+                             (($.AgeOfFirstUseSecondary as :number) >= 0 and ($.AgeOfFirstUseSecondary as :number) <= 95) or
+                             (($.AgeOfFirstUseTertiary as :number) >= 0 and ($.AgeOfFirstUseTertiary as :number) <= 95) or
+                             ($.SubstanceAbuseDiagnosis != "999.9997") or ($.AttendanceatSASelfHelpGroupsinpast30DaysAdmission != "97" and $.AttendanceatSASelfHelpGroupsinpast30DaysAdmission != "98"))
+                             otherwise "2",
+
+	"PregnantAtAdmission": $.PregnantAtAdmission,
+	"VeteranStatus": $.VeteranStatus,
+	"LivingArrangements": $.LivingArrangements,
+	"SourceOfIncomeSupport": $.SourceOfIncomeSupport,
+	"HealthInsurance": $.HealthInsurance,
+	"PaymentSourcePrimary": "97" when $.HealthInsurance == "01" or $.HealthInsurance == "02" or $.HealthInsurance == "06" or $.HealthInsurance == "20"
+		otherwise ("03" when $.HealthInsurance == "03" otherwise ("04" when $.HealthInsurance == "04" otherwise (
+			"05" when $.HealthInsurance == "21" otherwise "97"
+		))),
+	"DetailedNotInLaborForce": $.DetailedNotInLaborForce,
+	"DetailedCriminalJusticeReferral": "01" when $.ReferralSource == "07" otherwise "96",
+	"MaritalStatus": $.MaritalStatus,
+	"DaysWaitingToEnterSATreatment": $.DaysWaitingToEnterSATreatment,
+	"Arrestsinpast30daysAdmission": $.Arrestsinpast30daysAdmission,
+	"AttendanceatSASelfHelpGroupsinpast30DaysAdmission": $.AttendanceatSASelfHelpGroupsinpast30DaysAdmission,
+	"DiagnosticCodeSetIdentifier": $.DiagnosticCodeSetIdentifier,
+
+	"SubstanceAbuseDiagnosis": $.SubstanceAbuseDiagnosis , 
+	"MentalHealthDiagnosisOne": $.MentalHealthDiagnosisOne, 
+	"MentalHealthDiagnosisTwo": $.MentalHealthDiagnosisTwo, 
+	"MentalHealthDiagnosisThree": $.MentalHealthDiagnosisThree,
+
+	"SMISEDStatus": $.SMISEDStatus,
+	"SchoolAttendanceStatus" : $.SchoolAttendanceStatus default " ", // Need to build the logic
+
+	"LegalStatusatAdmissiontoStateHospitals": $.LegalStatusatAdmissiontoStateHospitals,
+	"CGASGAFScore": $.CGASGAFScore
+} ]]></dw:set-payload>
+                        <dw:set-session-variable variableName="ErrorFile"><![CDATA[//This dataweave code prepares the error file (Required Fields Missing file)
+%dw 1.0
+%output application/csv
+---
+payload map {
+	"Field Name" : "State Provider Identifier",
+	"Field Value" : $.StateProviderIdentifier,
+	"Provider ID" : $.ProviderID,
+	"Support Number" : $.SupportNumber,
+	"Error Description" :   (( 'State Provider Identifier (ISAT ID) is Missing' )  when  ($.StateProviderIdentifier=="" or $.StateProviderIdentifier==null)  otherwise "")  default "" 
+} filter ($."Error Description" != null and  $."Error Description" != "")]]></dw:set-session-variable>
+                    </dw:transform-message>
+                    <logger message="'After MH Admission Step 2'#[payload]" level="INFO" doc:name="Logger"/>
+                    <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Attributes">
+                        <add-message-property key="FilePrefixName" value="${tedsExtract.MHAdmission.filename}"/>
+                        <add-message-property key="FileExtension" value=".txtMH"/>
+                    </message-properties-transformer>
+                </when>
+                <when expression="#[flowVars.extractInfo.FileType == &quot;SA Discharge&quot;]">
+                    <dw:transform-message doc:name="TM: Prepare Java output SA Discharge - Step1">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var CaseEducationLevel = {	
+	"00" : "00",
+	"01" : "01",
+	"02" : "02",
+	"03" : "03",
+	"04" : "04",
+	"05" : "05",
+	"06" : "06",
+	"07" : "07",
+	"08" : "08",
+	"09" : "09",
+	"10" : "10",
+	"11" : "11",
+	"12" : "12",
+	"Adult Education" : "13",
+	"Kindergarten" : "00",
+	"No Grade" : "00",
+	"Ungraded" : "00",
+	"Graduated" : "12",
+	"Blank" : "0"
+}
+%var PersonEducationLevel = {	
+	"Pre-Kindergarten" : "00",
+	"Kindergarten" : "00",
+	"First" : "01",
+	"Second" : "02",
+	"Third" : "03",
+	"Fourth" : "04",
+	"Fifth" : "05",
+	"Sixth" : "06",
+	"Seventh" : "07",
+	"Eighth" : "08",
+	"Ninth" : "09",
+	"Tenth" : "10",
+	"Eleventh" : "11",
+	"Twelfth" : "12",
+	"High School Graduate" : "12",
+	"College- 1st Year" : "13",
+	"College- 2nd Year" : "14",
+	"College- 3rd Year" : "15",
+	"College- 4th Year" : "16",
+	"Blank" : "0"
+}
+%var SAServiceTaxL2Code05 = ["6402","6030","6458"]
+%var SAServiceTaxL2Code06 = ["6356","6375","6014","6376","6020","6404","6023","6024","6025","6417"]
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%function getAge(date1,date2)  ( abs (date1 - date2).years)
+%function getDiagnosis(diagnosisList,admissionDate,row) (diagnosisList filter $.CreatedDate <= admissionDate)[row].Diagnosis
+
+---
+payload map {
+	"SupportNumber": $.SupportName,
+	//"SystemTransactionType": "A", // Change it by doing comparison
+	"StateCode": "DE",
+	"ReportingDate": flowVars.extractInfo.ReportingDate default " ",
+	"StateProviderIdentifier": $.ProviderIdentifierSA default "",
+	"ClientIdentifier": $.ClientPID,
+	"CoDependentCollateral": "2",
+	//"ServiceTypeAtDischarge": "05" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "06",
+	//"ServiceTypeAtDischarge": "05" when (SAServiceTaxL2Code05 contains $.ServiceTaxLevel2Code) otherwise ("06" when (SAServiceTaxL2Code06 contains $.ServiceTaxLevel2Code) otherwise ""),
+	"ServiceTypeAtDischarge": (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default ""),
+	"DateofLastContact": ($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
+	"DischargeDate": ($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
+	"DischargeReason": flowVars.LOVReturned[("DISCHARGE_REASON_TEDS-" ++ ($.DischargeReason splitBy ";")[0])][0] when  $.DischargeReason != null and  $.DischargeReason != "" and flowVars.LOVReturned[("DISCHARGE_REASON_TEDS-" ++ ($.DischargeReason splitBy ";")[0])][0] != null
+					and flowVars.LOVReturned[("DISCHARGE_REASON_TEDS-" ++ ($.DischargeReason splitBy ";")[0])][0] != "" otherwise "98" default "98",
+	"StateProviderIdentifierAtAdmission" : $.ProviderIdentifierSA default "",
+	"PIDAtAdmission" : $.ClientPID,
+	"CodependentCollateralAtAdmission" : "2",
+	"ClientTransactionTypeAtAdmission" : $.ClientTransactionTypeSA when $.ClientTransactionTypeSA != null and $.ClientTransactionTypeSA != "" otherwise "A" default "A",
+	"AdmissionDate" : ($.AdmissionDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
+	"ServiceTypeAtAdmission" : "05" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "06",	
+	"DateOfBirth": ($.ClientDateOfBirth as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"} default "01010008",
+	"Gender": flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] when  $.ClientGender != null and  $.ClientGender != "" and flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] != null 
+				and flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] != "" otherwise "7" default "7",
+	"Race": "21" when $.ClientRace != null and  $.ClientRace != "" and $.ClientRaceSecondary != null and $.ClientRaceSecondary != ""  otherwise (flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] when  $.ClientRace != null and  $.ClientRace != "" and flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] != null
+			and flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] != "" otherwise "97") default "97",
+	"Ethnicity": flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0]  when  $.ClientEthnicity != null and  $.ClientEthnicity != "" and flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0] != null
+				and flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0] != "" otherwise "97" default "97",
+	"SubstanceAbuseProblemPrimary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != ""
+				and	$.SubstanceAbuseList[0].Substance__c != null and $.SubstanceAbuseList[0].Substance__c != "" otherwise "97" default "97",
+	"SubstanceAbuseProblemSecondary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				and	$.SubstanceAbuseList[1].Substance__c != null and $.SubstanceAbuseList[1].Route_of_Administration__c != "" otherwise "97" default "97",
+	"SubstanceAbuseProblemTertiary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Substance__c != null and $.SubstanceAbuseList[2].Route_of_Administration__c != "" otherwise "97" default "97",
+	"FrequencyOfUsePrimary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[0].Frequency_of_Use__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != ""
+				and	$.SubstanceAbuseList[0].Frequency_of_Use__c != null and $.SubstanceAbuseList[0].Frequency_of_Use__c != "" otherwise "97" ) default "97",
+	//"FrequencyOfUseSecondary": "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[1] == null or $.SubstanceAbuseList[1] == "" 
+		//		or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == "01" 
+			//	otherwise ( flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[1].Frequency_of_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				//and	$.SubstanceAbuseList[1].Frequency_of_Use__c != null and $.SubstanceAbuseList[1].Frequency_of_Use__c != "" otherwise "97") default "97",
+	//"FrequencyOfUseTertiary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[2] == null or $.SubstanceAbuseList[2] == "" 
+		//		or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == "01" 
+			//	otherwise ( flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[2].Frequency_of_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				//and	$.SubstanceAbuseList[2].Frequency_of_Use__c != null and $.SubstanceAbuseList[2].Frequency_of_Use__c != "" otherwise "97") default "97",
+	"FrequencyOfUseSecondary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[1].Frequency_of_Use__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				and	$.SubstanceAbuseList[1].Frequency_of_Use__c != null and $.SubstanceAbuseList[1].Frequency_of_Use__c != "" otherwise "97" ) default "97",
+	"FrequencyOfUseTertiary":  "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[2].Frequency_of_Use__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Frequency_of_Use__c != null and $.SubstanceAbuseList[2].Frequency_of_Use__c != "" otherwise "97" ) default "97",
+	
+	"LivingArrangements": "02",
+	"EmploymentStatus": "04",
+	"DetailedNotInLaborForce": "98",
+	"Arrestsinpast30daysAdmission": "98",
+	"AttendanceatSASelfHelpGroupsinpast30DaysAdmission": "98",
+	"ClientTransactionTypeAtDischarge" : "D",
+	"DiagnosticCodeSetIdentifier": "3",
+	
+	"MentalHealthDiagnosisOne": getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisTwo" : getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1)  when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisThree" : getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2)  when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2) != "" otherwise "999.9997" default "999.9997",
+	
+	
+	
+	//"MentalHealthDiagnosisOne": flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis when (flowVars.DiagnosisDetails != null and  flowVars.DiagnosisDetails != "" 
+		//						and flowVars.DiagnosisDetails[$.PlanofCare] != null and  flowVars.DiagnosisDetails[$.PlanofCare] != ""
+			//					and flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis != null and  flowVars.DiagnosisDetails[$.PlanofCare][0].Diagnosis != ""
+				//				) otherwise "999.9997",
+	//"MentalHealthDiagnosisTwo": flowVars.DiagnosisDetails[$.PlanofCare][1].Diagnosis when (flowVars.DiagnosisDetails != null and  flowVars.DiagnosisDetails != "" 
+		//						and flowVars.DiagnosisDetails[$.PlanofCare] != null and  flowVars.DiagnosisDetails[$.PlanofCare] != ""
+			//					and flowVars.DiagnosisDetails[$.PlanofCare][1].Diagnosis != null and  flowVars.DiagnosisDetails[$.PlanofCare][1].Diagnosis != ""
+				//				) otherwise "999.9997" default "999.9997",
+	//"MentalHealthDiagnosisThree": flowVars.DiagnosisDetails[$.PlanofCare][2].Diagnosis when (flowVars.DiagnosisDetails != null and  flowVars.DiagnosisDetails != "" 
+		//						and flowVars.DiagnosisDetails[$.PlanofCare] != null and  flowVars.DiagnosisDetails[$.PlanofCare] != ""
+			//					and flowVars.DiagnosisDetails[$.PlanofCare][2].Diagnosis != null and  flowVars.DiagnosisDetails[$.PlanofCare][2].Diagnosis != ""
+				//				) otherwise "999.9997" default "999.9997",
+	"SMISEDStatus": "2",
+	
+	"SchoolAttendanceStatus": "6"  when  ($.ClientDateOfBirth != null and ($.ClientAgeAtAdmission <= 3) and  ($.ClientAgeAtAdmission >= 18))
+		otherwise ("1" when ($.ClientPID != null and (flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null
+	and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and 
+	((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate) 
+	
+	or
+	($.ClientPID != null and (flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "" and
+		((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and
+		((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate and 
+	((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) != null and 
+	((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null and $.CaseClosedDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) >= ( $.AdmissionDate - |P30D|)))
+	
+	or
+	($.ClientPID != null and (flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "" and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended != null and
+	flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended >= ( $.AdmissionDate - |P30D|) and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended <= $.AdmissionDate  ))
+	
+	)
+		otherwise ("2" when ( $.ClientPID != null and ((flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "") or
+		(flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "") or 
+			(flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "")))
+	otherwise "7")),
+
+	"Education": (max  (flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseGradeLevel != null and $.CaseGradeLevel != ""  map
+			(CaseEducationLevel[$.CaseGradeLevel default "Blank"] as :number) when CaseEducationLevel[$.CaseGradeLevel default "Blank"] != null and
+			 CaseEducationLevel[$.CaseGradeLevel default "Blank"] != "" otherwise 0)) when flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" otherwise 
+		( max ( (flowVars.closedEducationCaseDetails[$.ClientPID] default [] filter $.CaseGradeLevel != null and $.CaseGradeLevel != ""  map
+			(CaseEducationLevel[$.CaseGradeLevel default "Blank"] as :number) when CaseEducationLevel[$.CaseGradeLevel default "Blank"] != null and 
+				CaseEducationLevel[$.CaseGradeLevel default "Blank"] != "" otherwise 0) ++ 
+			(flowVars.EducationPersonDetails[$.ClientPID] default [] filter $.PersonGradeLevel != null and $.PersonGradeLevel != "" map
+			(PersonEducationLevel[$.PersonGradeLevel default "Blank"] as :number) when PersonEducationLevel[$.PersonGradeLevel default "Blank"] != null
+			and PersonEducationLevel[$.PersonGradeLevel default "Blank"] != "" otherwise 0) ) ) default "97",
+	"CGASGAFScore": "998",
+	"ProviderID" : $.ProviderID
+} ]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Prepare Java output SA Discharge - Step2">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload filter ($."StateProviderIdentifier" != null and  $."StateProviderIdentifier" != "") map {
+	($),
+	"Education" : ( pad('0',(2 - (sizeOf ( $.Education )) )) ++ ($.Education))  when $.Education != null and $.Education != "" and ( $.Education < 10) 
+		 otherwise ($.Education when  ($.Education != null and $.Education != "" ) otherwise "97" ),
+	"SystemTransactionType":  "A" when flowVars.ExistingLogRecords[$.SupportNumber][0] == null or flowVars.ExistingLogRecords[$.SupportNumber][0] == "" otherwise
+		("A" when flowVars.ExistingLogRecords[$.SupportNumber][0].StateProviderIdentifier != $.StateProviderIdentifier	or	
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ClientIdentifier != $.ClientIdentifier	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ClientTransactionTypeAtAdmission != $.ClientTransactionTypeAtAdmission	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].DischargeDate != $.DischargeDate	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ServiceTypeAtDischarge != $.ServiceTypeAtDischarge			
+			otherwise "C"
+		)
+} ]]></dw:set-payload>
+                        <dw:set-session-variable variableName="ErrorFile"><![CDATA[//This dataweave code prepares the error file (Required Fields Missing file)
+%dw 1.0
+%output application/csv
+---
+payload map {
+	"Field Name" : "State Provider Identifier",
+	"Field Value" : $.StateProviderIdentifier,
+	"Provider ID" : $.ProviderID,
+	"Support Number" : $.SupportNumber,
+	"Error Description" :   (( 'State Provider Identifier (ISAT ID) is Missing' )  when  ($.StateProviderIdentifier=="" or $.StateProviderIdentifier==null)  otherwise "")  default "" 
+} filter ($."Error Description" != null and  $."Error Description" != "")]]></dw:set-session-variable>
+                    </dw:transform-message>
+                    <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Attributes">
+                        <add-message-property key="FilePrefixName" value="${tedsExtract.SADischarge.filename}"/>
+                        <add-message-property key="FileExtension" value=".txtSA"/>
+                    </message-properties-transformer>
+                </when>
+                <otherwise>
+                    <dw:transform-message doc:name="TM: Prepare Java output MH Discharge - Step 1">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var CaseEducationLevel = {	
+	"00" : "00",
+	"01" : "01",
+	"02" : "02",
+	"03" : "03",
+	"04" : "04",
+	"05" : "05",
+	"06" : "06",
+	"07" : "07",
+	"08" : "08",
+	"09" : "09",
+	"10" : "10",
+	"11" : "11",
+	"12" : "12",
+	"Adult Education" : "13",
+	"Kindergarten" : "00",
+	"No Grade" : "00",
+	"Ungraded" : "00",
+	"Graduated" : "12",
+	"Blank" : "0"
+}
+%var PersonEducationLevel = {	
+	"Pre-Kindergarten" : "00",
+	"Kindergarten" : "00",
+	"First" : "01",
+	"Second" : "02",
+	"Third" : "03",
+	"Fourth" : "04",
+	"Fifth" : "05",
+	"Sixth" : "06",
+	"Seventh" : "07",
+	"Eighth" : "08",
+	"Ninth" : "09",
+	"Tenth" : "10",
+	"Eleventh" : "11",
+	"Twelfth" : "12",
+	"High School Graduate" : "12",
+	"College- 1st Year" : "13",
+	"College- 2nd Year" : "14",
+	"College- 3rd Year" : "15",
+	"College- 4th Year" : "16",
+	"Blank" : "0"
+}
+%var MHServiceTaxL2Code73 = ["6009","6550","6000","6357","6001","6521","6329","6010","6011","6012","6027","6013","6037","6263","6495","6159","6049","6018","6019","6214","6015","6073","6021","6022","6415","6418","6283","6445","6531","6319","6552"]
+%var MHServiceTaxL2Code74 = ["6002","6160","6016","6017","6259","6029","6193","6031","6032","6444","6529","6034"]
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+%function getAge(date1,date2)  ( abs (date1 - date2).years)
+%function getDiagnosis(diagnosisList,admissionDate,row) (diagnosisList filter $.CreatedDate <= admissionDate)[row].Diagnosis
+---
+payload map {
+	"SupportNumber": $.SupportName,
+	//"SystemTransactionType": "A", // Change it by doing comparison
+	"StateCode": "DE",
+	"ReportingDate": flowVars.extractInfo.ReportingDate default " ",
+	"StateProviderIdentifier": $.ProviderIdentifierMH default "",
+	"ClientIdentifier": $.ClientPID,
+	"CoDependentCollateral": "2",
+	//"ServiceTypeAtDischarge": "73" when $.ServiceTaxLevel2Code != null and $.ServiceTaxLevel2Code != "6017" and $.SerTaxResOrNonRes != "Residential"
+			 //otherwise ("74" when $.ServiceTaxLevel2Code != null and $.SerTaxResOrNonRes == "Residential" otherwise "75" ),
+	//"ServiceTypeAtDischarge": "73" when (MHServiceTaxL2Code73 contains $.ServiceTaxLevel2Code) otherwise ("74" when (MHServiceTaxL2Code74 contains $.ServiceTaxLevel2Code) otherwise "75"), 
+	"ServiceTypeAtDischarge": (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default ""),
+	"DateofLastContact": ($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
+	"DischargeDate": ($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
+	"DischargeReason": (flowVars.LOVReturned[("DISCHARGE_REASON_TEDS-" ++ ($.DischargeReason splitBy ";")[0])][0] default "97") when  ($.DischargeReason != null and  $.DischargeReason != "") otherwise "98",
+	"StateProviderIdentifierAtAdmission" : $.ProviderIdentifierMH default "",
+	"PIDAtAdmission" : $.ClientPID,
+	"CodependentCollateralAtAdmission" : "2",	
+	"ClientTransactionTypeAtAdmission" : ( $.ClientTransactionTypeMH when (($.ClientTransactionTypeMH == "M") or ($.ClientTransactionTypeMH == "X") ) otherwise "X" ) when ($.ClientTransactionTypeMH != null and $.ClientTransactionTypeMH != "") otherwise "M",
+	
+	
+	
+	"AdmissionDate" : ($.AdmissionDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
+	"ServiceTypeAtAdmission" :  "73" when $.ServiceTaxLevel2Code != null and $.ServiceTaxLevel2Code != "6017" and $.SerTaxResOrNonRes != "Residential"
+			 otherwise ("74" when $.ServiceTaxLevel2Code != null and $.SerTaxResOrNonRes == "Residential" otherwise "75" ),	
+	"DateOfBirth": ($.ClientDateOfBirth as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"} default "01010008",
+	"Gender": flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] when  $.ClientGender != null and  $.ClientGender != "" and flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] != null 
+				and flowVars.LOVReturned[("GENDER_TEDS-" ++ $.ClientGender)][0] != "" otherwise "7" default "7",
+	"Race": "21" when $.ClientRace != null and  $.ClientRace != "" and $.ClientRaceSecondary != null and $.ClientRaceSecondary != ""  otherwise (flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] when  $.ClientRace != null and  $.ClientRace != "" and flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] != null
+			and flowVars.LOVReturned[("PRIMARY_RACE_TEDS-" ++ $.ClientRace)][0] != "" otherwise "97") default "97",
+	"Ethnicity": flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0]  when  $.ClientEthnicity != null and  $.ClientEthnicity != "" and flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0] != null
+				and flowVars.LOVReturned[("ETHNICITY_TEDS-" ++ $.ClientEthnicity)][0] != ""  otherwise "97" default "97",
+	"SubstanceAbuseProblemPrimary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != ""
+				and	$.SubstanceAbuseList[0].Substance__c != null and $.SubstanceAbuseList[0].Substance__c != "" otherwise "01" default "01",
+	"SubstanceAbuseProblemSecondary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				and	$.SubstanceAbuseList[1].Substance__c != null and $.SubstanceAbuseList[1].Route_of_Administration__c != "" otherwise "01" default "01",
+	"SubstanceAbuseProblemTertiary": flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Substance__c != null and $.SubstanceAbuseList[2].Route_of_Administration__c != "" otherwise "01" default "01",
+	"FrequencyOfUsePrimary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[0].Frequency_of_Use__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != ""
+				and	$.SubstanceAbuseList[0].Frequency_of_Use__c != null and $.SubstanceAbuseList[0].Frequency_of_Use__c != "" otherwise "97" ) default "97",
+	//"FrequencyOfUseSecondary": "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[1] == null or $.SubstanceAbuseList[1] == "" 
+		//		or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[1].Substance__c)][0] == "01" 
+			//	otherwise ( flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[1].Frequency_of_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				//and	$.SubstanceAbuseList[1].Frequency_of_Use__c != null and $.SubstanceAbuseList[1].Frequency_of_Use__c != "" otherwise "97") default "97",
+	//"FrequencyOfUseTertiary":  "96" when $.SubstanceAbuseList== null or $.SubstanceAbuseList == "" or $.SubstanceAbuseList[2] == null or $.SubstanceAbuseList[2] == "" 
+		//		or  flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == ""  or flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[2].Substance__c)][0] == "01" 
+			//	otherwise ( flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[2].Frequency_of_Use__c)][0] when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				//and	$.SubstanceAbuseList[2].Frequency_of_Use__c != null and $.SubstanceAbuseList[2].Frequency_of_Use__c != "" otherwise "97") default "97",
+	"FrequencyOfUseSecondary": "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[1].Frequency_of_Use__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[1] != null and $.SubstanceAbuseList[1] != ""
+				and	$.SubstanceAbuseList[1].Frequency_of_Use__c != null and $.SubstanceAbuseList[1].Frequency_of_Use__c != "" otherwise "97" ) default "97",
+	"FrequencyOfUseTertiary":  "96" when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[0] != null and $.SubstanceAbuseList[0] != "" 
+				and flowVars.LOVReturned[("SUBSTANCE_ABUSE_TEDS-" ++ $.SubstanceAbuseList[0].Substance__c)][0] == "01" 
+				otherwise (flowVars.LOVReturned[("FREQUENCY_OF_USE_TEDS-" ++ $.SubstanceAbuseList[2].Frequency_of_Use__c)][0]  when $.SubstanceAbuseList != null and $.SubstanceAbuseList != "" and $.SubstanceAbuseList[2] != null and $.SubstanceAbuseList[2] != ""
+				and	$.SubstanceAbuseList[2].Frequency_of_Use__c != null and $.SubstanceAbuseList[2].Frequency_of_Use__c != "" otherwise "97" ) default "97",
+	
+	"LivingArrangements": "02",
+	"EmploymentStatus": "04",
+	"DetailedNotInLaborForce": "98",
+	"Arrestsinpast30daysAdmission": "98",
+	"AttendanceatSASelfHelpGroupsinpast30DaysAdmission": "98",
+	"ClientTransactionTypeAtDischarge" : "E",
+	"DiagnosticCodeSetIdentifier": "3",
+	
+	"MentalHealthDiagnosisOne": getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 0) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisTwo" : getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1)  when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 1) != "" otherwise "999.9997" default "999.9997",
+	"MentalHealthDiagnosisThree" : getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2)  when getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2) != null
+		and getDiagnosis(flowVars.DiagnosisDetails[$.PlanofCare], $.AdmissionDate, 2) != "" otherwise "999.9997" default "999.9997",
+	
+	
+	
+	"SMISEDStatus": "2",
+	
+	"SchoolAttendanceStatus": "6"  when  ($.ClientDateOfBirth != null and ($.ClientAgeAtAdmission <= 3) and  ($.ClientAgeAtAdmission >= 18))
+		otherwise ("1" when ($.ClientPID != null and (flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null
+	and ((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and 
+	((flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate) 
+	
+	or
+	($.ClientPID != null and (flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "" and
+		((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) != null and
+		((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseOpenDate[0]) <= $.AdmissionDate and 
+	((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) != null and 
+	((flowVars.closedEducationCaseDetails[$.ClientPID] default []  filter $.CaseOpenDate != null and $.CaseClosedDate != null orderBy $.CaseOpenDate[-1..0][0]).CaseClosedDate[0]) >= ( $.AdmissionDate - |P30D|)))
+	
+	or
+	($.ClientPID != null and (flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "" and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended != null and
+	flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended >= ( $.AdmissionDate - |P30D|) and flowVars.EducationPersonDetails[$.ClientPID][0].DateLastAttended <= $.AdmissionDate  ))
+	
+	)
+		otherwise ("2" when ( $.ClientPID != null and ((flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "") or
+		(flowVars.closedEducationCaseDetails[$.ClientPID] != null and flowVars.closedEducationCaseDetails[$.ClientPID] != "") or 
+			(flowVars.EducationPersonDetails[$.ClientPID] != null and flowVars.EducationPersonDetails[$.ClientPID] != "")))
+	otherwise "7")),
+
+	"Education": (max  (flowVars.OpenEducationCaseDetails[$.ClientPID] default [] filter $.CaseGradeLevel != null and $.CaseGradeLevel != ""  map
+			(CaseEducationLevel[$.CaseGradeLevel default "Blank"] as :number) when CaseEducationLevel[$.CaseGradeLevel default "Blank"] != null and
+			 CaseEducationLevel[$.CaseGradeLevel default "Blank"] != "" otherwise 0)) when flowVars.OpenEducationCaseDetails[$.ClientPID] != null and flowVars.OpenEducationCaseDetails[$.ClientPID] != "" otherwise 
+		( max ( (flowVars.closedEducationCaseDetails[$.ClientPID] default [] filter $.CaseGradeLevel != null and $.CaseGradeLevel != ""  map
+			(CaseEducationLevel[$.CaseGradeLevel default "Blank"] as :number) when CaseEducationLevel[$.CaseGradeLevel default "Blank"] != null and 
+				CaseEducationLevel[$.CaseGradeLevel default "Blank"] != "" otherwise 0) ++ 
+			(flowVars.EducationPersonDetails[$.ClientPID] default [] filter $.PersonGradeLevel != null and $.PersonGradeLevel != "" map
+			(PersonEducationLevel[$.PersonGradeLevel default "Blank"] as :number) when PersonEducationLevel[$.PersonGradeLevel default "Blank"] != null
+			and PersonEducationLevel[$.PersonGradeLevel default "Blank"] != "" otherwise 0) ) ) default "97",
+	"CGASGAFScore": "998",
+	"ProviderID" : $.ProviderID
+} ]]></dw:set-payload>
+                    </dw:transform-message>
+                    <dw:transform-message doc:name="TM: Prepare Java output MH Discharge  - Step 2">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function pad(char, times) (char ++ pad(char, times - 1)) when times > 0 otherwise ""
+---
+payload filter ($."StateProviderIdentifier" != null and  $."StateProviderIdentifier" != "") map {
+	($),
+	"Education" : ( pad('0',(2 - (sizeOf ( $.Education )) )) ++ ($.Education))  when $.Education != null and $.Education != "" and ( $.Education < 10) 
+		 otherwise ($.Education when  ($.Education != null and $.Education != "" ) otherwise "97" ),
+	"SystemTransactionType":  "A" when flowVars.ExistingLogRecords[$.SupportNumber][0] == null or flowVars.ExistingLogRecords[$.SupportNumber][0] == "" otherwise
+		("A" when flowVars.ExistingLogRecords[$.SupportNumber][0].StateProviderIdentifier != $.StateProviderIdentifier	or	
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ClientIdentifier != $.ClientIdentifier	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ClientTransactionTypeAtAdmission != $.ClientTransactionTypeAtAdmission	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].DischargeDate != $.DischargeDate	or		
+			flowVars.ExistingLogRecords[$.SupportNumber][0].ServiceTypeAtDischarge != $.ServiceTypeAtDischarge			
+			otherwise "C"
+		)
+} ]]></dw:set-payload>
+                        <dw:set-session-variable variableName="ErrorFile"><![CDATA[//This dataweave code prepares the error file (Required Fields Missing file)
+%dw 1.0
+%output application/csv
+---
+payload map {
+	"Field Name" : "State Provider Identifier",
+	"Field Value" : $.StateProviderIdentifier,
+	"Provider ID" : $.ProviderID,
+	"Support Number" : $.SupportNumber,
+	"Error Description" :   (( 'State Provider Identifier (ISAT ID) is Missing' )  when  ($.StateProviderIdentifier=="" or $.StateProviderIdentifier==null)  otherwise "")  default "" 
+} filter ($."Error Description" != null and  $."Error Description" != "")]]></dw:set-session-variable>
+                    </dw:transform-message>
+                    <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Attributes">
+                        <add-message-property key="FilePrefixName" value="${tedsExtract.MHDischarge.filename}"/>
+                        <add-message-property key="FileExtension" value=".txtMH"/>
+                    </message-properties-transformer>
+                </otherwise>
+            </choice>
+            <set-variable variableName="RecordsFromCriteria" value="#[payload]" doc:name="Variable : Records from Criteria"/>
+            <dw:transform-message doc:name="TM : Filter the modified records">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter $.SystemTransactionType == "A" map {
+	($)
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Concatenate Modified records and Exisitng TEDS Log records">
+                <dw:set-variable variableName="FinalJavaOutput"><![CDATA[%dw 1.0
+%output application/java
+---
+
+(payload map flowVars.ExistingLogRecords[$.SupportNumber][0] filter $ != null default {}) ++ (flowVars.RecordsFromCriteria default {})]]></dw:set-variable>
+            </dw:transform-message>
+            <choice doc:name="Choice : Check for the Admission or Discharge File">
+                <when expression="dw('flowVars.extractInfo.FileType scan /([a-z]*)Admission/').size() == 1">
+                    <dw:transform-message doc:name="TM: Prepare Fixed Length File For Admission Records">
+                        <dw:set-payload><![CDATA[//This dataweave code will create the Record detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "TEDS-Admission.ffd",recordTerminator="crlf"
+---
+flowVars.FinalJavaOutput map  {
+	"SystemTransactionType" : $.SystemTransactionType,
+	"StateCode" : $.StateCode,
+	"ReportingDate" : $.ReportingDate,
+	"StateProviderIdentifier" : $.StateProviderIdentifier,
+	"PID" : (($.ClientIdentifier as :number * 3) when ( ($.ClientIdentifier != null) and (( trim $.ClientIdentifier) != "") and (flowVars.extractInfo.encryptPID == true) ) otherwise $.ClientIdentifier),
+	"CodependentCollateral" : $.CoDependentCollateral,
+	"ClientTransactionType" : $.ClientTransactionType,
+	"AdmissionDate" : $.DateOfAdmission,
+	"ServiceType" : $.TypeOfTreatmentServiceSetting,
+	"PreviousSATreatmentEpisodes" : $.PreviousSATreatmentEpisodes,
+	"ReferralSource" : $.ReferralSource,
+	"DateofBirth" : $.DateOfBirth,
+	"Gender" : $.Gender,
+	"Race" : $.Race,
+	"Ethnicity" : $.Ethnicity,
+	"Education" : $.Education,
+	"EmploymentStatus" : $.EmploymentStatus,
+	"SAProblemPrimary" : $.SubstanceAbuseProblemPrimary,
+	"RouteOfAdmissionPrimary" : $.RouteOfAdministrationPrimary,
+	"FreqOfUsePrimary" : $.FrequencyOfUsePrimary,
+	"AgeAtFirstUsePrimary" : $.AgeOfFirstUsePrimary,
+	"SAProblemSecondary" : $.SubstanceAbuseProblemSecondary,
+	"RouteOfAdmissionSecondary" : $.RouteOfAdministrationSecondary,
+	"FreqOfUseSecondary" : $.FrequencyOfUseSecondary,
+	"AgeAtFirstUseSecondary" : $.AgeOfFirstUseSecondary,
+	"SAProblemTertiary" : $.SubstanceAbuseProblemTertiary,
+	"RouteOfAdmissionTertiary" : $.RouteOfAdministrationTertiary,
+	"FreqOfUseTertiary" : $.FrequencyOfUseTertiary,
+	"AgeAtFirstUseTertiary" : $.AgeOfFirstUseTertiary,
+	"MedicationAssistTherapy" : $.MedicationassistedOpioidTherapy,
+	"DetailedDrugCodePrimary" : $.DetailedDrugCodePrimary,
+	"DetailedDrugCodeSecondary" : $.DetailedDrugCodeSecondary,
+	"DetailedDrugCodeTertiary" : $.DetailedDrugCodeTertiary,
+	"DiagnosticCode" : $.DiagnosticCode,
+	"CoOccuringSAandMHProblems" : $.CooccurringSAandMHProblems,
+	"PregnantAtAdmission" : $.PregnantAtAdmission,
+	"VeteranStatus" : $.VeteranStatus,
+	"LivingArrangements" : $.LivingArrangements,
+	"SourceOfIncome" : $.SourceOfIncomeSupport,
+	"HealthInsurance" : $.HealthInsurance,
+	"PaymentSource" : $.PaymentSourcePrimary,
+	"DetailedNotInLaborForce" : $.DetailedNotInLaborForce,
+	"DetailedCriminalJusticeReferral" : $.DetailedCriminalJusticeReferral,
+	"MaritalStatus" : $.MaritalStatus,
+	"DaysWaitingToEnterSATreatment" : $.DaysWaitingToEnterSATreatment,
+	"Arrestin30daysPriorToAdmission" : $.Arrestsinpast30daysAdmission,
+	"AttendenceInSelfHelpGroups" : $.AttendanceatSASelfHelpGroupsinpast30DaysAdmission,
+	"DiagnosticCodeSetIdentifier" : $.DiagnosticCodeSetIdentifier,
+	"SubstanceAbuseDiagnosis" : $.SubstanceAbuseDiagnosis,
+	"MHDiagnosisOne" : $.MentalHealthDiagnosisOne,
+	"MHDiagnosisTwo" : $.MentalHealthDiagnosisTwo,
+	"MHDiagnosisThree" : $.MentalHealthDiagnosisThree,
+	"SMISEDStatus" : $.SMISEDStatus,
+	"SchoolAttendenceStatus" : $.SchoolAttendanceStatus,
+	"LegalStatusAtAdmission" : $.LegalStatusatAdmissiontoStateHospitals,
+	"CGASGAFScore" : $.CGASGAFScore
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                </when>
+                <otherwise>
+                    <dw:transform-message doc:name="TM: Prepare Fixed Length File For Discharge Records">
+                        <dw:set-payload><![CDATA[//This dataweave code will create the Record detail for the final fixed width file
+%dw 1.0
+%output text/plain schemaPath = "TEDS-Discharge.ffd",recordTerminator="crlf"
+---
+flowVars.FinalJavaOutput map  {
+	"SystemTransactionType" : $.SystemTransactionType,
+	"StateCode" : $.StateCode,
+	"ReportingDate" : $.ReportingDate,
+	"StateProviderIdentifierAtDischarge" : $.StateProviderIdentifier,
+	"PIDAtDischarge" : (($.ClientIdentifier as :number * 3) when ( ($.ClientIdentifier != null) and (( trim $.ClientIdentifier) != "") and (flowVars.extractInfo.encryptPID == true) ) otherwise $.ClientIdentifier),
+	"CodependentCollateralAtDischarge" : $.CoDependentCollateral,
+	"ServiceTypeAtDischarge" : $.ServiceTypeAtDischarge,
+	"DateofLastContact" : $.DateofLastContact,
+	"DischargeDate" : $.DischargeDate,
+	"DischargeReason" : $.DischargeReason,
+	//"DischargeReason" : "12",
+	"StateProviderIdentifierAtAdmission" : $.StateProviderIdentifierAtAdmission,
+	"PIDAtAdmission" : (($.PIDAtAdmission as :number * 3) when (($.PIDAtAdmission != null) and ( (trim $.PIDAtAdmission) != "") and (flowVars.extractInfo.encryptPID == true)) otherwise $.PIDAtAdmission),
+	"CodependentCollateralAtAdmission" : $.CodependentCollateralAtAdmission,	
+	"ClientTransactionTypeAtAdmission" : $.ClientTransactionTypeAtAdmission,
+	"AdmissionDate" : $.AdmissionDate,
+	"ServiceTypeAtAdmission" : $.ServiceTypeAtAdmission,
+	"DateofBirth" : $.DateOfBirth,
+	"Gender" : $.Gender,
+	"Race" : $.Race,
+	"Ethnicity" : $.Ethnicity,
+	"SAProblemPrimary" : $.SubstanceAbuseProblemPrimary,
+	"SAProblemSecondary" : $.SubstanceAbuseProblemSecondary,
+	"SAProblemTertiary" : $.SubstanceAbuseProblemTertiary,
+	"FreqOfUsePrimary" : $.FrequencyOfUsePrimary,
+	"FreqOfUseSecondary" : $.FrequencyOfUseSecondary,
+	"FreqOfUseTertiary" : $.FrequencyOfUseTertiary,
+	"LivingArrangements" : $.LivingArrangements,
+	"EmploymentStatus" : $.EmploymentStatus,
+	"DetailedNotInLaborForce" : $.DetailedNotInLaborForce,
+	"Arrestin30daysPriorToDischarge" : $.Arrestsinpast30daysAdmission,
+	"AttendenceInSelfHelpGroups" : $.AttendanceatSASelfHelpGroupsinpast30DaysAdmission,
+	"ClientTransactionTypeAtDischarge" : $.ClientTransactionTypeAtDischarge,
+	"DiagnosticCodeSetIdentifier" : $.DiagnosticCodeSetIdentifier,
+	"MHDiagnosisOne" : $.MentalHealthDiagnosisOne,
+	"MHDiagnosisTwo" : $.MentalHealthDiagnosisTwo,
+	"MHDiagnosisThree" : $.MentalHealthDiagnosisThree,
+	"SMISEDStatus" : $.SMISEDStatus,
+	"SchoolAttendenceStatus" : $.SchoolAttendanceStatus,
+	"Education" : $.Education,
+	"CGASGAFScore" : $.CGASGAFScore
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                </otherwise>
+            </choice>
+
+            <object-to-string-transformer mimeType="text/plain" doc:name="Object to String"/>
+            <choice doc:name="Choice : If run in Final mode insert og records">
+                <when expression="#[flowVars.extractInfo.RunMode == &quot;Final&quot;]">
+                    <enricher doc:name="Message Enricher">
+                        <flow-ref name="teds_TEDSLogInsertion_Subflow" doc:name="teds_TEDSLogInsertion_Subflow"/>
+                        <enrich source="#[flowVars.TEDSLogErrors]" target="#[flowVars.TEDSLogErrors]"/>
+                    </enricher>
+                </when>
+                <otherwise>
+                    <logger message="'In Trial mode we are not inserting the log records'" level="INFO" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+            <choice doc:name="Choice">
+                <when expression="#[((flowVars.FinalJavaOutput == null) || (flowVars.FinalJavaOutput.size() &lt;= 0)) &amp;&amp; ((sessionVars.ErrorFile == null) || (sessionVars.ErrorFile == &quot;&quot;))]">
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.extractInfo.ParentId,
+		"Attachment_Generated__c": (false as :boolean) ,
+		"Failure_Reason__c": "No records extracted"
+
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Extract__c" doc:name="Salesforce">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                    <dw:transform-message doc:name="Transform Message : Prepare Response">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": "false",
+	"FailureReason": "No Records were qualified for the Extract"
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                </when>
+                <otherwise>
+                    <choice doc:name="Choice : if there are any valid records extracted">
+                        <when expression="#[(flowVars.FinalJavaOutput != null) &amp;&amp; (flowVars.FinalJavaOutput.size() &gt; 0)]">
+                            <set-variable variableName="filename" value="#[flowVars.FilePrefixName + flowVars.extractInfo.SubmissionDate + flowVars.FileExtension]" doc:name="Variable : Filename of the Extract File"/>
+                            <enricher   doc:name="Message Enricher">
+                                <flow-ref name="teds-createSuccessOrErrorFile_subflow" doc:name="teds-createSuccessOrErrorFile_subflow"/>
+                                <enrich source="#[payload]" target="#[flowVars.xmlAttachmentResult]"/>
+                                <enrich source="#[flowVars.MainFile]" target="#[flowVars.MainFile]"/>
+                            </enricher>
+                        </when>
+                        <otherwise>
+                            <logger message="'No Valid records are extracted'" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+                    <choice doc:name="Choice : CHeck if there are any errors">
+                        <when expression="#[(sessionVars.ErrorFile != null) &amp;&amp; (sessionVars.ErrorFile != &quot;&quot;)]">
+                            <set-variable variableName="filename" value="#[flowVars.FilePrefixName + flowVars.extractInfo.SubmissionDate + &quot;-Error&quot; + &quot;.csv&quot;]" doc:name="Variable : Set File Name"/>
+                            <set-payload value="#[sessionVars.ErrorFile]" mimeType="application/csv" doc:name="Set Payload : Set Error File"/>
+                            <enricher   doc:name="Message Enricher">
+                                <flow-ref name="teds-createSuccessOrErrorFile_subflow" doc:name="teds-createSuccessOrErrorFile_subflow"/>
+                                <enrich source="#[payload]" target="#[flowVars.csvAttachmentResult]"/>
+                                <enrich source="#[flowVars.MainFile]" target="#[flowVars.MainFile]"/>
+                            </enricher>
+                        </when>
+                        <otherwise>
+                            <logger level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+		Id:flowVars.extractInfo.ParentId,
+		"Attachment_Generated__c": (true as :boolean) ,
+		"Failure_Reason__c": ""
+
+}]]]></dw:set-payload>
+                    </dw:transform-message>
+                    <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DEL_Extract__c" doc:name="Salesforce : Update Extract Details">
+                        <sfdc:objects ref="#[payload]"/>
+                    </sfdc:update>
+                    <dw:transform-message doc:name="TM: Response Back to SF">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": "true",
+	"FailureReason": ""
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                </otherwise>
+            </choice>
+            <logger message="'Response Back to Salesforce'#[payload]" level="INFO" doc:name="Logger"/>
+        </async>
+        <dw:transform-message doc:name="TM: Response Back to SF">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"Success": true,
+	"FailureReason": ""
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="'Final Response Back to Salesforce'#[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="Federal-Exception-Strategy" doc:name="Reference Exception Strategy"/>
+
+
+<!--         <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var a = [{Special_Education__c : "Yes","a" : "aA"},{Special_Education__c : "No","a" : "aA"}]
+%function filter2(arr,ele,cr) (arr filter ($[ele] == cr))
+-
+(sizeOf (filter2(a,"Special_Education__c","Yes")))]]></dw:set-payload>
+        </dw:transform-message> -->
+
+
+
+    </flow>
+    <sub-flow name="teds-createSuccessOrErrorFile_subflow">
+
+                <string-to-byte-array-transformer doc:name="String to Byte Array"/>
+                <set-variable variableName="FixedWidthSuccess" value="#[payload]" doc:name="Variable : Store the Fixed width file"/>
+                <dw:transform-message doc:name="Transform Message : Create Attachment Data">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	ParentId: flowVars.extractInfo.ParentId, //Need to Check
+	Name: flowVars.filename,
+	Description: 'TEDS Extract',
+	Body: flowVars.FixedWidthSuccess
+	}
+] ]]></dw:set-payload>
+                </dw:transform-message>
+         <sfdc:create config-ref="Salesforce__Basic_Authentication_dev" type="Attachment" doc:name="Salesforce : Create Attachment">
+              <sfdc:objects ref="#[payload]"/>
+         </sfdc:create>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="MainFile"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Success:$.success,
+	Failure:"TEDS File could not be attached." when $.success == false otherwise ""
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="After Attachment : #[payload]" level="INFO" doc:name="Logger"/>
+
+
+    </sub-flow>
+
+    <sub-flow name="teds_TEDSLogInsertion_Subflow">
+        <dw:transform-message doc:name="TM : Prepare Salesforce insert format for TEDS Log Records">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.RecordsFromCriteria map ((payload01 , indexOfPayload01) -> {
+	State_Provider_Identifier__c: payload01.StateProviderIdentifier,
+	Client_Identifier__c: payload01.ClientIdentifier,
+	Client_Transaction_Type__c: payload01.ClientTransactionType when (payload01.ClientTransactionType != null) otherwise payload01.ClientTransactionTypeAtAdmission,
+	Type_of_Service__c: payload01.TypeOfTreatmentServiceSetting when (payload01.TypeOfTreatmentServiceSetting != null) otherwise payload01.ServiceTypeAtDischarge,
+	Support_Number__c: payload01.SupportNumber,
+	State_Code__c: payload01.StateCode,
+	Reporting_Date__c: payload01.ReportingDate,
+	CoDependent_Collateral__c: payload01.CoDependentCollateral,
+	Date_of_Admission__c: payload01.DateOfAdmission,
+	Previous_SA_Treatment_Episodes__c: payload01.PreviousSATreatmentEpisodes,
+	Referral_Source__c: payload01.ReferralSource,
+	Date_Of_Birth__c: payload01.DateOfBirth,
+	Gender__c: payload01.Gender,
+	Race__c: payload01.Race,
+	Ethnicity__c: payload01.Ethnicity,
+	Education__c: payload01.Education,
+	Employment_Status__c: payload01.EmploymentStatus,
+	Substance_Abuse_Problem_Primary__c: payload01.SubstanceAbuseProblemPrimary,
+	Route_Of_Administration_Primary__c: payload01.RouteOfAdministrationPrimary,
+	Frequency_Of_Use_Primary__c: payload01.FrequencyOfUsePrimary,
+	Age_at_First_Use_Primary__c: payload01.AgeOfFirstUsePrimary,
+	Substance_Abuse_Problem_Secondary__c: payload01.SubstanceAbuseProblemSecondary,
+	Route_Of_Administration_Secondary__c: payload01.RouteOfAdministrationSecondary,
+	Frequency_Of_Use_Secondary__c: payload01.FrequencyOfUseSecondary,
+	Age_at_First_Use_Secondary__c: payload01.AgeOfFirstUseSecondary,
+	Substance_Abuse_Problem_Tertiary__c: payload01.SubstanceAbuseProblemTertiary,
+	Route_Of_Administration_Tertiary__c: payload01.RouteOfAdministrationTertiary,
+	Frequency_Of_Use_Tertiary__c: payload01.FrequencyOfUseTertiary,
+	Age_at_First_Use_Tertiary__c: payload01.AgeOfFirstUseTertiary,
+	Medication_assisted_Opioid_Therapy__c: payload01.MedicationassistedOpioidTherapy,
+	Detailed_Drug_Code_Primary__c: payload01.DetailedDrugCodePrimary,
+	Detailed_Drug_Code_Secondary__c: payload01.DetailedDrugCodeSecondary,
+	Detailed_Drug_Code_Tertiary__c: payload01.DetailedDrugCodeTertiary,
+	Diagnostic_Code_DSM_or_ICD__c: payload01.DiagnosticCode,
+	Co_occurring_Substance_Abuse_and_Mental__c: payload01.CooccurringSAandMHProblems,
+	Pregnant_At_Admission__c: payload01.PregnantAtAdmission,
+	Veteran_Status__c: payload01.VeteranStatus,
+	Living_Arrangements__c: payload01.LivingArrangements,
+	Source_Of_Income_Support__c: payload01.SourceOfIncomeSupport,
+	Health_Insurance__c: payload01.HealthInsurance,
+	Payment_Source_Primary__c: payload01.PaymentSourcePrimary,
+	Detailed_Not_In_Labor_Force__c: payload01.DetailedNotInLaborForce,
+	Detailed_Criminal_Justice_Referral__c: payload01.DetailedCriminalJusticeReferral,
+	Marital_Status__c: payload01.MaritalStatus,
+	Days_Waiting_To_Enter_SA_Treatment__c: payload01.DaysWaitingToEnterSATreatment,
+	Arrests_in_30_Days_Prior_to_Admission__c: payload01.Arrestsinpast30daysAdmission,
+	Attendance_at_Self_Help_Groups_in_30_Day__c: payload01.AttendanceatSASelfHelpGroupsinpast30DaysAdmission,
+	Diagnostic_Code_Set_Identifier__c: payload01.DiagnosticCodeSetIdentifier,
+	Substance_Abuse_Diagnosis_ICD_10_Comp__c: payload01.SubstanceAbuseDiagnosis,
+	Mental_Health_Diagnosis_One__c: payload01.MentalHealthDiagnosisOne,
+	Mental_Health_Diagnosis_Two__c: payload01.MentalHealthDiagnosisTwo,
+	Mental_Health_Diagnosis_Three__c: payload01.MentalHealthDiagnosisThree,
+	SMI_SED_Status__c: payload01.SMISEDStatus,
+	School_Attendance_Status__c: payload01.SchoolAttendanceStatus,
+	Legal_Status_at_Admission_to_State_Hospi__c: payload01.LegalStatusatAdmissiontoStateHospitals,
+	CGAS_GAF_Score__c: payload01.CGASGAFScore,
+	File_Type__c: flowVars.extractInfo.FileType,
+	System_Transaction_Type__c: payload01.SystemTransactionType,
+	Discharge_Date__c: payload01.DischargeDate,
+	Discharge_Reason__c: payload01.DischargeReason,
+	Interface_External_Id__c: flowVars.extractInfo.FileType ++ '-' ++ payload01.SupportNumber
+})]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-filter expression="#[payload.size() != 0]" doc:name="Expression"/>
+        <foreach batchSize="2500" doc:name="For Each">
+            <sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication_dev" type="DEL_TEDS_Log_Table__c" externalIdFieldName="Interface_External_Id__c" doc:name="Salesforce : Bulk Upsert TEDS Log records ">
+                <sfdc:objects ref="#[payload]"/>
+            </sfdc:upsert-bulk>
+            <message-properties-transformer overwrite="true" scope="invocation" doc:name="MP: Save JobID">
+                <add-message-property key="JobId" value="#[payload.jobId]"/>
+                <add-message-property key="JobResponse" value="#[payload]"/>
+            </message-properties-transformer>
+            <until-successful maxRetries="50" millisBetweenRetries="8000" synchronous="true" doc:name="Until Successful">
+                <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication_dev" doc:name="Check Batch Upsert Result">
+                    <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
+                </sfdc:batch-result-stream>
+            </until-successful>
+            <sfdc:close-job config-ref="Salesforce__Basic_Authentication_dev" jobId="#[flowVars.JobId]" doc:name="Salesforce : Close Job"/>
+        </foreach>
+
+                    
+    </sub-flow>
+    <sub-flow name="teds_GetExistingTEDSLogRecords">
+        <foreach batchSize="200" doc:name="For Each">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter $.SupportName != null and $.SupportName != ""  map ("'" ++ $.SupportName ++ "'" )) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Date_of_Admission__c,Client_Transaction_Type_At_Discharge__c,Age_at_First_Use_Primary__c,Age_at_First_Use_Secondary__c,Age_at_First_Use_Tertiary__c,Arrests_in_30_Days_Prior_to_Admission__c,Attendance_at_Self_Help_Groups_in_30_Day__c, CGAS_GAF_Score__c,Client_Identifier__c,Client_Transaction_Type__c, CoDependent_Collateral__c, Co_occurring_Substance_Abuse_and_Mental__c, Date_Of_Birth__c , Days_Waiting_To_Enter_SA_Treatment__c, Detailed_Criminal_Justice_Referral__c , Detailed_Drug_Code_Primary__c, Detailed_Drug_Code_Secondary__c, Detailed_Drug_Code_Tertiary__c,Detailed_Not_In_Labor_Force__c,Diagnostic_Code_DSM_or_ICD__c,Diagnostic_Code_Set_Identifier__c, Education__c, Employment_Status__c, Ethnicity__c, File_Type__c, Frequency_Of_Use_Primary__c, Frequency_Of_Use_Secondary__c, Frequency_Of_Use_Tertiary__c, Gender__c, Health_Insurance__c, Legal_Status_at_Admission_to_State_Hospi__c, Living_Arrangements__c , Marital_Status__c, Medication_assisted_Opioid_Therapy__c, Mental_Health_Diagnosis_One__c, Mental_Health_Diagnosis_Three__c, Mental_Health_Diagnosis_Two__c, Payment_Source_Primary__c, Pregnant_At_Admission__c, Previous_SA_Treatment_Episodes__c, Race__c, Referral_Source__c, Reporting_Date__c, Route_Of_Administration_Primary__c, Route_Of_Administration_Secondary__c, Route_Of_Administration_Tertiary__c , School_Attendance_Status__c, SMI_SED_Status__c, Source_Of_Income_Support__c, State_Code__c, State_Provider_Identifier__c, Substance_Abuse_Diagnosis_ICD_10_Comp__c, Substance_Abuse_Problem_Primary__c, Substance_Abuse_Problem_Secondary__c, Substance_Abuse_Problem_Tertiary__c, Support_Number__c, Type_of_Service__c, Veteran_Status__c, Discharge_Date__c, Discharge_Reason__c, Interface_External_Id__c From DEL_TEDS_Log_Table__c  Where File_Type__c = '#[flowVars.extractInfo.FileType]' and Support_Number__c IN (#[payload])" doc:name="Salesforce : Query for existing Log records"/>
+            <dw:transform-message doc:name="TM : Existing TEDS log records to java format">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	"SupportNumber": $.Support_Number__c default " ",
+	"OldSystemTransactionType": $.System_Transaction_Type__c default " ",
+	"SystemTransactionType": "D",
+	"StateCode": $.State_Code__c default " ",
+	"ReportingDate": flowVars.extractInfo.ReportingDate default " ",
+	"StateProviderIdentifier": $.State_Provider_Identifier__c default " ",
+	"StateProviderIdentifierAtAdmission": $.State_Provider_Identifier__c default " ",
+	"ClientIdentifier": $.Client_Identifier__c default " ",
+	"PIDAtAdmission": $.Client_Identifier__c default " ",
+	"CoDependentCollateral": $.CoDependent_Collateral__c default " ",
+	"CodependentCollateralAtDischarge": $.CoDependent_Collateral__c default " ",
+	"CodependentCollateralAtAdmission": $.CoDependent_Collateral__c default " ",
+	"ClientTransactionType": $.Client_Transaction_Type__c default " ",
+	"ClientTransactionTypeAtAdmission": $.Client_Transaction_Type__c default " ",	
+	"ClientTransactionTypeAtDischarge" : ($.Client_Transaction_Type_At_Discharge__c default "E") when (flowVars.extractInfo.FileType == "MH Discharge" ) otherwise ($.Client_Transaction_Type_At_Discharge__c default ""),
+	"DateOfAdmission": $.Date_of_Admission__c default " ",
+	"AdmissionDate": $.Date_of_Admission__c default " ",
+	"TypeOfTreatmentServiceSetting": $.Type_of_Service__c default " ",
+	"ServiceTypeAtAdmission": $.Type_of_Service__c default " ",
+	"ServiceTypeAtDischarge": $.Type_of_Service__c default " ",
+	"PreviousSATreatmentEpisodes": $.Previous_SA_Treatment_Episodes__c default " ",
+	"ReferralSource": $.Referral_Source__c default " ",
+	"DateOfBirth": $.Date_Of_Birth__c default " ",
+	"Gender": $.Gender__c default " ",
+	"Race": $.Race__c default " ",
+	"Ethnicity": $.Ethnicity__c default " ",
+	"Education": $.Education__c default " ",
+	"EmploymentStatus": $.Employment_Status__c default " ",
+	"SubstanceAbuseProblemPrimary": $.Substance_Abuse_Problem_Primary__c default " ",
+	"RouteOfAdministrationPrimary": $.Route_Of_Administration_Primary__c default " ",
+	"FrequencyOfUsePrimary": $.Frequency_Of_Use_Primary__c default " ",
+	"AgeOfFirstUsePrimary": $.Age_at_First_Use_Primary__c default " ",
+	"SubstanceAbuseProblemSecondary": $.Substance_Abuse_Problem_Secondary__c default " ",
+	"RouteOfAdministrationSecondary": $.Route_Of_Administration_Secondary__c default " ",
+	"FrequencyOfUseSecondary": $.Frequency_Of_Use_Secondary__c default " ",
+	"AgeOfFirstUseSecondary": $.Age_at_First_Use_Secondary__c default " ",
+	"SubstanceAbuseProblemTertiary": $.Substance_Abuse_Problem_Tertiary__c default " ",
+	"RouteOfAdministrationTertiary": $.Route_Of_Administration_Tertiary__c default " ",
+	"FrequencyOfUseTertiary":  $.Frequency_Of_Use_Tertiary__c default " ",
+	"AgeOfFirstUseTertiary": $.Age_at_First_Use_Tertiary__c default " ",
+	"MedicationassistedOpioidTherapy": $.Medication_assisted_Opioid_Therapy__c default " ",
+	"DetailedDrugCodePrimary": $.Detailed_Drug_Code_Primary__c default " ",
+	"DetailedDrugCodeSecondary": $.Detailed_Drug_Code_Secondary__c default " ",
+	"DetailedDrugCodeTertiary": $.Detailed_Drug_Code_Tertiary__c default " ",
+	"DiagnosticCode": $.Diagnostic_Code_DSM_or_ICD__c default " ",
+	"CooccurringSAandMHProblems": $.Co_occurring_Substance_Abuse_and_Mental__c default " ",
+	"PregnantAtAdmission": $.Pregnant_At_Admission__c default " ",
+	"VeteranStatus": $.Veteran_Status__c default " ",
+	"LivingArrangements": $.Living_Arrangements__c default " ",
+	"SourceOfIncomeSupport": $.Source_Of_Income_Support__c default " ",
+	"HealthInsurance": $.Health_Insurance__c default " ",
+	"PaymentSourcePrimary": $.Payment_Source_Primary__c default " ",
+	"DetailedNotInLaborForce": $.Detailed_Not_In_Labor_Force__c default " ",
+	"DetailedCriminalJusticeReferral": $.Detailed_Criminal_Justice_Referral__c default " ",
+	"MaritalStatus": $.Marital_Status__c default " ",
+	"DaysWaitingToEnterSATreatment": $.Days_Waiting_To_Enter_SA_Treatment__c default " ",
+	"Arrestsinpast30daysAdmission": $.Arrests_in_30_Days_Prior_to_Admission__c default " ",
+	"AttendanceatSASelfHelpGroupsinpast30DaysAdmission": $.Attendance_at_Self_Help_Groups_in_30_Day__c default " ",
+	"DiagnosticCodeSetIdentifier": $.Diagnostic_Code_Set_Identifier__c default " ",
+	"SubstanceAbuseDiagnosis": $.Substance_Abuse_Diagnosis_ICD_10_Comp__c default " ",
+	"MentalHealthDiagnosisOne": $.Mental_Health_Diagnosis_One__c default " ",
+	"MentalHealthDiagnosisTwo": $.Mental_Health_Diagnosis_Two__c default " ",
+	"MentalHealthDiagnosisThree": $.Mental_Health_Diagnosis_Three__c default " ",
+	"SMISEDStatus": $.SMI_SED_Status__c default " ",
+	"SchoolAttendanceStatus": $.School_Attendance_Status__c default " ",
+	"LegalStatusatAdmissiontoStateHospitals": $.Legal_Status_at_Admission_to_State_Hospi__c default " ",
+	"CGASGAFScore": $.CGAS_GAF_Score__c,
+	"DateofLastContact" : $.Discharge_Date__c,
+	"DischargeDate" : $.Discharge_Date__c,
+	"DischargeReason" : ($.Discharge_Reason__c default "97") when ( (flowVars.extractInfo.FileType == "MH Discharge" )  ) otherwise ($.Discharge_Reason__c default ""),
+	"InterfaceExternalId" : $.Interface_External_Id__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Existing log records group by Support">
+                <dw:set-variable variableName="ExistingLogRecords"><![CDATA[%dw 1.0
+%output application/java
+---
+(flowVars.ExistingLogRecords default {}) ++ ((payload  groupBy $.SupportNumber) default [])]]></dw:set-variable>
+            </dw:transform-message>
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </foreach>
+
+    </sub-flow>
+    <sub-flow name="teds_GetSupportRecords_Subflow">
+    	
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.extractInfo.FileType == 'SA Admission']">
+                <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Id,Name,RecordType.Name,Admission_Date__c,Plan__c, Plan__r.Parent_Case__c, Plan__r.Case_Person__c, Client_Transaction_Type_SA__c, Client_Transaction_Type_MH__c, Service__r.Residential_Nonresidential__c, Previous_SA_Treatment_Episodes__c, Referral_Agent__c, No_of_Days_Waiting_to_Enter_Treatment__c,  Service__r.Level_Two_Code__c, Service__r.Level_Two_Services__c, Provider__r.DEL_ISATS_Id_SA__c, Provider__r.DEL_Provider_ID__c,  Provider__r.DEL_ISATS_Id_MH__c, Plan__r.Case_Person__r.Person__r.DEL_PID__c, Plan__r.Case_Person__r.Person__r.DEL_Gender__c, Plan__r.Case_Person__r.Person__r.DEL_Race_Primary__c,  Plan__r.Case_Person__r.Person__r.DEL_Race_Secondary__c, Plan__r.Case_Person__r.Person__r.DEL_Ethnicity__c, Plan__r.Case_Person__r.Person__r.Birthdate, Insurance__c, Discharge_Date__c, Discharge_Reason__c, Client_Age_at_Admission_in_Years__c, (SELECT Id, Substance__c, Route_of_Administration__c, Frequency_of_Use__c, Age_of_First_Use__c, Substance_Type__c FROM Substance_Use__r  WHERE Substance_Type__c != 'Not Specified' AND Period__c = 'Admission' Order By Substance_Type__c) from DEL_Support__c WHERE  Admission_Status__c = 'Completed' AND Admission__c IN ('Voluntary', 'Involuntary', 'Court-Ordered') AND Admission_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND  Admission_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND Service__r.Level_Two_Services__c like '%(SA)%'" doc:name="Salesforce : Query for SA Admission Records"/>
+            </when>
+            <when expression="#[flowVars.extractInfo.FileType == 'MH Admission']">
+                <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Id,Name,RecordType.Name,Admission_Date__c,Plan__c, Plan__r.Parent_Case__c, Plan__r.Case_Person__c, Client_Transaction_Type_SA__c, Client_Transaction_Type_MH__c, Service__r.Residential_Nonresidential__c, Previous_SA_Treatment_Episodes__c, Referral_Agent__c, No_of_Days_Waiting_to_Enter_Treatment__c,  Service__r.Level_Two_Code__c, Service__r.Level_Two_Services__c, Provider__r.DEL_ISATS_Id_SA__c, Provider__r.DEL_ISATS_Id_MH__c, Provider__r.DEL_Provider_ID__c, Plan__r.Case_Person__r.Person__r.DEL_PID__c, Plan__r.Case_Person__r.Person__r.DEL_Gender__c, Plan__r.Case_Person__r.Person__r.DEL_Race_Primary__c, Plan__r.Case_Person__r.Person__r.DEL_Race_Secondary__c, Plan__r.Case_Person__r.Person__r.DEL_Ethnicity__c, Plan__r.Case_Person__r.Person__r.Birthdate, Insurance__c, Discharge_Date__c, Discharge_Reason__c, Client_Age_at_Admission_in_Years__c, (SELECT Id, Substance__c, Route_of_Administration__c, Frequency_of_Use__c, Age_of_First_Use__c, Substance_Type__c FROM Substance_Use__r  WHERE Substance_Type__c != 'Not Specified' AND Period__c = 'Admission' Order By Substance_Type__c) from DEL_Support__c WHERE  Admission_Status__c = 'Completed' AND Admission__c IN ('Voluntary', 'Involuntary', 'Court-Ordered')  AND Admission_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND  Admission_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND (NOT Service__r.Level_Two_Services__c like '%(SA)%')" doc:name="Salesforce : Query for MH Admission Records"/>
+            </when>
+            <when expression="#[flowVars.extractInfo.FileType == 'SA Discharge']">
+                <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Id,Name,RecordType.Name,Admission_Date__c,Plan__c, Plan__r.Parent_Case__c, Plan__r.Case_Person__c, Client_Transaction_Type_SA__c, Client_Transaction_Type_MH__c, Service__r.Residential_Nonresidential__c, Previous_SA_Treatment_Episodes__c, Referral_Agent__c, No_of_Days_Waiting_to_Enter_Treatment__c,  Service__r.Level_Two_Code__c, Service__r.Level_Two_Services__c, Provider__r.DEL_ISATS_Id_SA__c, Provider__r.DEL_ISATS_Id_MH__c,  Provider__r.DEL_Provider_ID__c, Plan__r.Case_Person__r.Person__r.DEL_PID__c, Plan__r.Case_Person__r.Person__r.DEL_Gender__c, Plan__r.Case_Person__r.Person__r.DEL_Race_Primary__c, Plan__r.Case_Person__r.Person__r.DEL_Race_Secondary__c, Plan__r.Case_Person__r.Person__r.DEL_Ethnicity__c, Plan__r.Case_Person__r.Person__r.Birthdate, Insurance__c, Discharge_Date__c, Discharge_Reason__c, Client_Age_at_Admission_in_Years__c, (SELECT Id, Substance__c, Route_of_Administration__c, Frequency_of_Use__c, Age_of_First_Use__c, Substance_Type__c FROM Substance_Use__r  WHERE Substance_Type__c != 'Not Specified' AND Period__c = 'Service Discharge' Order By Substance_Type__c) from DEL_Support__c WHERE  Service_Discharge_Status__c = 'Completed'  AND Admission__c IN ('Voluntary', 'Involuntary', 'Court-Ordered') AND Discharge_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND  Discharge_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND Service__r.Level_Two_Services__c like '%(SA)%'" doc:name="Salesforce : Query for SA Discharge Records"/>
+            </when>
+            <when expression="#[flowVars.extractInfo.FileType == 'MH Discharge']">
+                <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Id,Name,RecordType.Name,Admission_Date__c,Plan__c, Plan__r.Parent_Case__c, Plan__r.Case_Person__c, Client_Transaction_Type_SA__c, Client_Transaction_Type_MH__c, Service__r.Residential_Nonresidential__c, Previous_SA_Treatment_Episodes__c, Referral_Agent__c, No_of_Days_Waiting_to_Enter_Treatment__c,  Service__r.Level_Two_Code__c, Service__r.Level_Two_Services__c, Provider__r.DEL_ISATS_Id_SA__c, Provider__r.DEL_ISATS_Id_MH__c, Provider__r.DEL_Provider_ID__c, Plan__r.Case_Person__r.Person__r.DEL_PID__c, Plan__r.Case_Person__r.Person__r.DEL_Gender__c, Plan__r.Case_Person__r.Person__r.DEL_Race_Primary__c, Plan__r.Case_Person__r.Person__r.DEL_Race_Secondary__c, Plan__r.Case_Person__r.Person__r.DEL_Ethnicity__c, Plan__r.Case_Person__r.Person__r.Birthdate, Insurance__c, Discharge_Date__c, Discharge_Reason__c, Client_Age_at_Admission_in_Years__c, (SELECT Id, Substance__c, Route_of_Administration__c, Frequency_of_Use__c, Age_of_First_Use__c, Substance_Type__c FROM Substance_Use__r  WHERE Substance_Type__c != 'Not Specified' AND Period__c = 'Service Discharge' Order By Substance_Type__c) from DEL_Support__c WHERE  Service_Discharge_Status__c = 'Completed'  AND Admission__c IN ('Voluntary', 'Involuntary', 'Court-Ordered') AND Discharge_Date__c &gt;= #[flowVars.extractInfo.ReportStartDate] AND  Discharge_Date__c &lt;= #[flowVars.extractInfo.ReportEndDate] AND (NOT Service__r.Level_Two_Services__c like '%(SA)%')" doc:name="Salesforce : Query for MH Discharge Records"/>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger" message="'No valid File input is sent in the request'"/>
+            </otherwise>
+        </choice>
+
+        <dw:transform-message doc:name="TM: Get Support Records">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	"SupportId" : $.Id,
+	"SupportName" : $.Name,
+	"AdmissionDate" : $.Admission_Date__c,
+	"PlanofCare" : $.Plan__c default "",
+	"CaseId" : $.Plan__r.Parent_Case__c default "",
+	"CasePersonId" : $.Plan__r.Case_Person__c default "",
+	"DaysWaitingToEnterSATreatment" : $.No_of_Days_Waiting_to_Enter_Treatment__c default "",
+	"ClientTransactionTypeSA" : $.Client_Transaction_Type_SA__c default "",
+	"ClientTransactionTypeMH" : $.Client_Transaction_Type_MH__c default "",
+	"TypeOfService" :  $.Service__r.Residential_Nonresidential__c default "", //Service__r.Level_Two_Services__c, //need to add
+	"PreviousTretmentEpisodes" :  $.Previous_SA_Treatment_Episodes__c default "",
+	"ReferralSource" :  $.Referral_Agent__c default "",
+	"Education" :  "", //need to add
+	"ServiceTaxLevel2Services" : $.Service__r.Level_Two_Services__c default "",
+	"ServiceTaxLevel2Code" : $.Service__r.Level_Two_Code__c default "",
+	"SerTaxResOrNonRes" : $.Service__r.Residential_Nonresidential__c default "",
+	"ProviderID" : $.Provider__r.DEL_Provider_ID__c default "", 	
+	"ProviderIdentifierSA" : $.Provider__r.DEL_ISATS_Id_SA__c default "",
+	"ProviderIdentifierMH" : $.Provider__r.DEL_ISATS_Id_MH__c default "",
+	"ClientPID" :$.Plan__r.Case_Person__r.Person__r.DEL_PID__c default "",
+	"ClientGender" :$.Plan__r.Case_Person__r.Person__r.DEL_Gender__c default "",
+	"ClientRace" :$.Plan__r.Case_Person__r.Person__r.DEL_Race_Primary__c default "",
+	"ClientRaceSecondary" : $.Plan__r.Case_Person__r.Person__r.DEL_Race_Secondary__c default "", 
+	"ClientEthnicity" :$.Plan__r.Case_Person__r.Person__r.DEL_Ethnicity__c default "",
+	"ClientDateOfBirth" :$.Plan__r.Case_Person__r.Person__r.Birthdate,
+	"HealthInsurance" : $.Insurance__c  default "",
+	"DischargeDate" : $.Discharge_Date__c,
+	"DischargeReason" : $.Discharge_Reason__c,
+	"ClientAgeAtAdmission" : $.Client_Age_at_Admission_in_Years__c,
+	"SubstanceAbuseList" : $.Substance_Use__r
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="teds_GetPersonTypeDetails">
+        <foreach batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="TM : Get , separated PIDS">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter $.ClientPID != null and $.ClientPID != ""  map ("'" ++ $.ClientPID ++ "'" )) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select Id, Person__r.DEL_PID__c, Edu_Current_Grade__c, Edu_DateLastAtt__c  from DEL_Person_Type__c WHERE RecordType.Name ='Client' AND Person__r.DEL_PID__c IN (#[payload])" doc:name="Salesforce : Query for Person Type Details"/>
+            <dw:transform-message doc:name="TM : Get Education Details in Java format">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	"ClientPID" : $.Person__r.DEL_PID__c,
+	"PersonGradeLevel" : $.Edu_Current_Grade__c default "",
+	"DateLastAttended" : $.Edu_DateLastAtt__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Group By PIDs Person Type Details">
+                <dw:set-variable variableName="EducationPersonDetails"><![CDATA[// Use this expression flowVars.EducationCaseDetails[$.ClientPID][0].PrimaryRace
+%dw 1.0
+%output application/java
+---
+(flowVars.EducationPersonDetails default {}) ++ ((payload  groupBy $.ClientPID) default [])
+]]></dw:set-variable>
+            </dw:transform-message>
+        </foreach>
+    </sub-flow>
+
+    <sub-flow name="teds_GetEducationCaseDetails">
+
+        <foreach  batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="TM : Get , separated PIDS">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter $.ClientPID != null and $.ClientPID != ""  map ("'" ++ $.ClientPID ++ "'" )) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Id, Person_PID__c, Case__c, Case__r.Status__c, Case__r.Grade_Level__c, Case_Open_Date__c, Case_Close_Date__c from DEL_Person_Cases__c where Person_PID__c IN (#[payload]) AND Case__r.RecordType.Name IN ('Education Enrollment', 'Out of State Education')" doc:name="Salesforce :  Get Education Case Details"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	"ClientPID" : $.Person_PID__c,
+	"CaseStatus" : $.Case__r.Status__c,
+	"CaseGradeLevel" : $.Case__r.Grade_Level__c default "",
+	"CaseOpenDate" : $.Case_Open_Date__c,
+	"CaseCloseDate" : $.Case_Close_Date__c
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : EducationDetails group by client PID">
+                <dw:set-variable variableName="OpenEducationCaseDetails"><![CDATA[// Use this expression flowVars.EducationCaseDetails[$.ClientPID][0].PrimaryRace
+%dw 1.0
+%output application/java
+---
+(flowVars.EducationCaseDetails default {}) ++ ((payload filter $.CaseStatus != 'Closed'  groupBy $.ClientPID) default [])
+]]></dw:set-variable>
+                <dw:set-variable variableName="ClosedEducationCaseDetails"><![CDATA[// Use this expression flowVars.EducationCaseDetails[$.ClientPID][0].PrimaryRace
+%dw 1.0
+%output application/java
+---
+(flowVars.EducationCaseDetails default {}) ++ ((payload filter $.CaseStatus == 'Closed'  groupBy $.ClientPID) default [])
+]]></dw:set-variable>
+
+            </dw:transform-message>
+
+        </foreach>
+    </sub-flow>
+    <sub-flow name="teds_GetDiagnosisDetails_Subflow">
+
+
+        <foreach  batchSize="150" doc:name="For Each">
+            <dw:transform-message doc:name="TM : Get , Separated Plan of Care Ids">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter $.PlanofCare != null and $.PlanofCare != "" map ("'" ++ $.PlanofCare ++ "'" )) joinBy ","]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Id, Plan__c, ICD_10_CM__c, Diagnosis__c, CreatedDate  from DEL_Diagnosis__c WHERE Plan__c IN (#[payload])   order by CreatedDate " doc:name="Salesforce : Get Diagnosis Details for Plan of Care Ids"/>
+            <dw:transform-message doc:name="TM : Prepare Java map for Diagnosis Records">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	"PlanId" : $.Plan__c,
+	"Diagnosis" : $.ICD_10_CM__c,
+	"CreatedDate" : $.CreatedDate  as :datetime {format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"} as :date {format : "yyyy-MM-dd"} as :string {format : "yyyy-MM-dd"} 
+}]]></dw:set-payload>
+
+            </dw:transform-message>
+            <dw:transform-message doc:name="TM : Group Diagnosis records by plan of care">
+                <dw:set-variable variableName="DiagnosisDetails"><![CDATA[// Use this expression flowVars.EducationCaseDetails[$.ClientPID][0].PrimaryRace
+%dw 1.0
+%output application/java
+---
+(flowVars.DiagnosisDetails default {}) ++ ((payload groupBy $.PlanId) default [])
+]]></dw:set-variable>
+            </dw:transform-message>
+
+
+
+        </foreach>
+    </sub-flow>
+    <sub-flow name="teds_callLOVflow">
+        <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'REFERRAL_AGENT_TEDS','GENDER_TEDS','PRIMARY_RACE_TEDS','ETHNICITY_TEDS','SUBSTANCE_ABUSE_TEDS','ROUTE_OF_ADMINISTRATION_TEDS','FREQUENCY_OF_USE_TEDS','AGE_AT_FIRST_USE_TEDS','HEALTH_INSURANCE_TEDS','DISCHARGE_REASON_TEDS','TEDS_SERVCIS_TAXONOMY_CODE'&quot;}" mimeType="application/json" doc:name="Set Payload"/>
+        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+
+                     
+</mule>

@@ -713,7 +713,7 @@ payload map ((payload01 , indexOfPayload01) -> {
       TotalNumberRemovalsfromHome: payload01.TotalNumberRemovalsfromHome,
       LastDischarged: payload01.LastDischarged,
       LatestRemoval: (payload01.FirstRemoval) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (payload01.LatestRemoval),
-      RemovalTransactionDate: (payload01.RemovalTransactionDate) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (paylaod01.RemovalTransactionDate2), 
+      RemovalTransactionDate: (payload01.RemovalTransactionDate2) when (payload01.TotalNumberRemovalsfromHome == 1) otherwise (payload01.RemovalTransactionDate), 
       PlacementCurrentFosterCare: payload01.PlacementCurrentFosterCare,
       PreviousPlacementRemovalEpisode: payload01.PreviousPlacementRemovalEpisode,
       RemovalforCurrentPlacementEpisode: payload01.RemovalforCurrentPlacementEpisode,

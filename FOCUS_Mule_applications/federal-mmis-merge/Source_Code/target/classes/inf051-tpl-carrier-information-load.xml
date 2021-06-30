@@ -1,0 +1,620 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata"
+	xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:mulerequester="http://www.mulesoft.org/schema/mule/mulerequester"
+	xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/mulerequester http://www.mulesoft.org/schema/mule/mulerequester/current/mule-mulerequester.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+
+	<!-- <spring:beans>
+		<spring:import resource="classpath:/loggingframework.xml" />
+	</spring:beans>
+	<spring:beans>
+		<spring:import resource="classpath:/errorhandling.xml" />
+	</spring:beans> -->
+
+	<!-- <sfdc:config name="Salesforce__Basic_Authentication_dev"
+		username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}"
+		url="${sfdc.url}" disableSessionInvalidation="true"
+		doc:name="Salesforce: Basic Authentication">
+		<reconnect count="5" />
+	</sfdc:config> -->
+
+	<objectstore:config name="TPL_Carrier_ObjectStore__Connector" doc:name="ObjectStore: Connector" objectStore-ref="TPL_Carrier_Object_Store"/>
+	<objectstore:config name="TPL_Carrier_Error_Object_Store_Connector" doc:name="ObjectStore: Connector" objectStore-ref="TPL_Carrier_Error_Object_Store"/>
+
+    <spring:beans>
+         <spring:bean id="TPL_Carrier_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean>
+         <spring:bean id="TPL_Carrier_Error_Object_Store" class="org.mule.util.store.SimpleMemoryObjectStore" ></spring:bean> 
+   	</spring:beans>
+
+
+	<flow name="inf051-tpl-carrier-information-loadFlow" processingStrategy="synchronous">
+		<poll doc:name="Poll" doc:description="Poll run at 1:30 AM of everyday, Poller runs in US/Eastern Timezone
+By running the interface using this configured time the Business rule is fulfilled &quot;The TPL Carrier Information interface runs prior to the TPL Client Information interface&quot;">
+			<schedulers:cron-scheduler expression="0 30 1 1/1 * ? *" timeZone="US/Eastern"/>
+            <set-payload value="INF051" doc:name="Set Payload to Interface ID" doc:description="Interface ID is set in payload, this is required to by the Logging and Exception Hnadling framework"/>
+		</poll>
+        <set-variable variableName="InterfaceID" value="#[payload]" doc:name="FV : Set Interface ID" doc:description="Interface ID is set in flow variable, this is required to by the Logging and Exception Hnadling framework, using this the status of the Interface can be tracked"/>
+
+        <until-successful maxRetries="5" millisBetweenRetries="10000"  synchronous="true" doc:name="Until Successful" doc:description="Retry mechanism for Intermittent Exceptions">
+        	<mulerequester:request resource="sftp://${sftp.tplcarrier.transaction.username}:${sftp.tplcarrier.transaction.password}@${sftp.tplcarrier.transaction.host}:${sftp.tplcarrier.transaction.port}${sftp.tplcarrier.transaction.path}?connector=SFTPFilenameMatchConnector&amp;myfilename=${sftp.tplcarrier.transaction.filename}&amp;isContainsCheckEnabled=true" timeout="120000" doc:name="Mule Requester" doc:description="Retrieve File from SFTP location with a spefic name
+The Requestor URI is used to configure a specific SFTP endpoint" config-ref="Mule_Requester"/>
+        </until-successful>
+
+        <validation:is-not-null message="No File Found" exceptionClass="java.lang.Exception" value="#[payload]" doc:name="Validation : Validate Not Null Payload" doc:description="Validate that the File was found, If file was not found If Null payload is recieved , and an Exception is thrown" config-ref="Validation_Configuration1"/>
+
+		<object-to-string-transformer
+			doc:name="Object to String : Set text/plain Mime Type" mimeType="text/plain" doc:description="Consuming the Payload.
+Converting the Input Stream from the File into a textual form.
+Mime type of text/plain is set as the File format is Fixed width"/>
+
+		<flow-ref name="TPL_Carrier_Archive_File_Sub_Flow" doc:name="TPL_Carrier_Archive_File_Sub_Flow" doc:description="Trigger Archive Flow
+The Archive Flow archives the file, this will be handled by a separate thread. The main thread will carry on to the next component"/>
+
+		<set-session-variable variableName="TransAttachment"
+			value="#[payload]" doc:name="Set TransAttachment" doc:description="Transaction attachment is set. This will be used by the Logging Framework, to create the backup of the file"/>
+
+		<enricher doc:name="Message Enricher" doc:description="Invokes the flow which will invoke the Logging Framework and therefore initiate logging for this Interfcae. Using Enricher will not alter the payload
+Transaction ID and Transaction Name is retrieved from the Logging Framework">
+			<flow-ref name="LogInProgressTransaction_Sub_Flow" doc:name="LogInProgressTransaction_Sub_Flow" />
+			<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]" />
+			<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
+			<enrich source="#[flowVars.InterfaceLastProcessedDate]" target="#[flowVars.InterfaceLastProcessedDate]"/>
+			<enrich source="#[flowVars.InterfaceSalesforceId]" target="#[flowVars.InterfaceSalesforceId]"/>  			
+		</enricher>
+		<!-- <set-variable variableName="tpl_carrier_information" value="#[payload]" 
+			doc:name="Variable"/> -->
+		<set-payload value="#[System.getProperty(&quot;tplcarrier.lineseparator&quot;).equals(&quot;CRLF&quot;) ? payload.split(&quot;\r\n&quot;) : payload.split(&quot;\n&quot;)]"
+			doc:name="Set Payload : Split Records" doc:description="Splitting Payload with the configured Line terminator character"/>
+
+         <set-variable variableName="headerData" value="#[payload[0]]" doc:name="Variable : Store Header Data" doc:description="Store Header Data"/>
+        <validation:is-true config-ref="Validation_Configuration1" message="Invalid Header #[flowVars.headerData] or Invalid Header Date" exceptionClass="java.lang.Exception" expression="#[((flowVars.headerData.length() &gt;= 10) &amp;&amp; (!isInvalidDate((flowVars.headerData.substring(2,10)),&quot;yyyyMMdd&quot;)) )]" doc:name="Validation : Check for Valid Header Date" doc:description="Check for Valid Header Date
+Stop Processing and throw Exception if Header Date is Invalid"/>
+        <enricher source="#[flowVars.interfaceHeaderDate]" target="#[flowVars.interfaceHeaderDate]" doc:name="Message Enricher" doc:description="Message Enricher is used so that the payload is not modified while invoking the Logging Framework
+Flow Variable interfaceHeaderDate is retrieved back from the framework">
+            <processor-chain doc:name="Processor Chain" doc:description="Processor Chain is used since we need more than 1 Mule components within the Enricher.">
+        <dw:transform-message doc:name="Transform Message Prepare Payload for Framework" doc:description="Passing Header date and Interface Id to the framework">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+ "headerDate" : flowVars.headerData[2..9] as :date {format : "yyyyMMdd"} as :string {format : "yyyy-MM-dd"} //Result in yyyy-MM-dd format
+}]]></dw:set-payload>
+        </dw:transform-message>
+                <flow-ref name="CheckForExistingLoadUsingHeaderDateSub_Flow" doc:name="CheckForExistingLoadUsingHeaderDateSub_Flow" doc:description="Invoke Flow to check whether the File has been already processed or not"/>
+            </processor-chain>
+        </enricher>
+
+        <choice doc:name="Choice : Check for Detail level records" doc:description="Check for Detail level records
+Proceed to log Completion if no Detail Level Records are found">
+            <when expression="#[payload.length &gt; 2]">
+                <dw:transform-message doc:name="Transform Message : Get Detail Level Records" doc:description="Get Detail Level records from overall records">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[1..-2]]]></dw:set-payload>
+                </dw:transform-message>
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Set Total Count" doc:description=" Set Total Count, this is one the interface transaction metric which will be displayed in the dashboard">
+			<add-message-property key="totalRecCount" value="#[payload.size()]" />
+		</message-properties-transformer>
+		<dw:transform-message
+			doc:name="Transform Message : Filter Valid/Invalid Records" doc:description="This Transformation filters out valid Length Records
+Also this step creates a Fixed Width payload">
+			<dw:input-payload doc:sample="sample_data\list_string.dwl" />
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload filter (((sizeOf $) as :string ) == "200")) joinBy "\n"]]></dw:set-payload>
+			<dw:set-variable variableName="carrierInvalidRecordsSet1"><![CDATA[%dw 1.0
+%output application/csv header=false, separator="|"
+---
+(payload filter (((sizeOf $) as :string ) != "200")) map {	
+	"data" : $,
+	"message" : "Invalid Record : Width of the record (" ++ sizeOf $ ++ ") is not consistent with the expected length (200)"
+}]]></dw:set-variable>
+			<dw:set-variable variableName="totalCarrierInvalidRecordsSet1"><![CDATA[%dw 1.0
+%output application/java
+---
+sizeOf (payload filter (((sizeOf $) as :string ) != "200")) ]]></dw:set-variable>
+		</dw:transform-message>
+		<!-- <message-properties-transformer scope="invocation" doc:name="Message 
+			Properties"> <add-message-property key="toalValidLengthRecords" value="#[payload.split(&quot;\n&quot;).size()]"/> 
+			<add-message-property key="totalCarrierInvalidRecordsSet1" value="#[(flowVars.carrierInvalidRecordsSet1.split(&quot;\n&quot;).length) 
+			]"/> </message-properties-transformer> -->
+
+		<!-- <logger message="Payload : #[payload.size()] , Payload : #[payload]" 
+			level="INFO" doc:name="Logger"/> -->
+
+		
+
+		<dw:transform-message metadata:id="f9b8c5d3-e41e-4bf1-9d0d-142fea64f626"
+			doc:name="Transform Message : Invalid Fixed Width" doc:description="This Transformation Filters out records which are not of Correct length
+Also this step creates a Error Report for these records
+This will be added to the overall Error report">
+			<dw:input-payload doc:sample="sample_data\string.dwl"
+				mimeType="text/plain">
+				<dw:reader-property name="schemaPath" value="carrierData-200.ffd" />
+			</dw:input-payload>
+			<dw:set-variable variableName="carrierInvalidRecordsSet2"><![CDATA[%dw 1.0
+%output text/plain schemaPath ="carrierData-200-WithErrorMessage.ffd"
+%function getMessage(data)[
+	(message : "Missing INSURANCE-COMPANY-NAME") when data.INSURANCE-COMPANY-NAME == null,
+	(message : "Missing INSURANCE-COMPANY-CARRIER-CODE") when data.INSURANCE-COMPANY-CARRIER-CODE == null,
+	
+	(message : "Missing INSURANCE-COMPANY-ADDRESS1") when data.INSURANCE-COMPANY-ADDRESS1 == null,
+	
+	(message : "Missing COMPANY-CITY") when data.INSURANCE-COMPANY-CITY == null,
+	(message : "Missing COMPANY-STATE") when data.INSURANCE-COMPANY-STATE == null,
+	(message : "Missing COMPANY-ZIP") when data.INSURANCE-COMPANY-ZIP == null,
+	(message : "Missing COMPANY-PHONE") when data.INSURANCE-COMPANY-PHONE == null
+] 
+---
+payload map ( {
+		
+		INS-COMP-HEADER : $.INS-COMP-HEADER default "",
+		INSURANCE-COMPANY-NAME : $.INSURANCE-COMPANY-NAME default "",
+		INSURANCE-COMPANY-CARRIER-CODE : $.INSURANCE-COMPANY-CARRIER-CODE default "",
+		FILLER : $.FILLER default "",
+		INSURANCE-COMPANY-ADDRESS1 : $.INSURANCE-COMPANY-ADDRESS1 default "",
+		INSURANCE-COMPANY-ADDRESS2 : $.INSURANCE-COMPANY-ADDRESS2 default "",
+		INSURANCE-COMPANY-CITY : $.INSURANCE-COMPANY-CITY default "",
+		INSURANCE-COMPANY-STATE : $.INSURANCE-COMPANY-STATE default "",
+		INSURANCE-COMPANY-ZIP : $.INSURANCE-COMPANY-ZIP default "",
+		INSURANCE-COMPANY-PHONE : $.INSURANCE-COMPANY-PHONE default "",
+		SPACES : "",
+		ERROR-MESSAGE : "|" ++ (((getMessage($).message) joinBy ",") when  (getMessage($).message != null) otherwise "Some Required fields are missing")
+		
+		//message :  ((getMessage($).message) joinBy ",") when  (getMessage($).message != null) otherwise "Some Required fields are missing"
+		
+}) filter ( payload[$$].INSURANCE-COMPANY-NAME == null or payload[$$].INSURANCE-COMPANY-CARRIER-CODE == null or payload[$$].INSURANCE-COMPANY-ADDRESS1 == null or payload[$$].INSURANCE-COMPANY-CITY == null or payload[$$].INSURANCE-COMPANY-STATE == null or payload[$$].INSURANCE-COMPANY-ZIP == null  or payload[$$].INSURANCE-COMPANY-PHONE == null    )
+]]></dw:set-variable>
+<!-- 			<dw:set-variable variableName="totalCarrierInvalidRecordsSet2"><![CDATA[%dw 1.0
+%output application/java
+-
+sizeOf (payload  filter ( $.INSURANCE-COMPANY-NAME == null or $.INSURANCE-COMPANY-CARRIER-CODE == null or $.INSURANCE-COMPANY-LOCATION-CODE == null or $.INSURANCE-COMPANY-ADDRESS1 == null or $.INSURANCE-COMPANY-ADDRESS2 == null or $.INSURANCE-COMPANY-CITY == null or $.INSURANCE-COMPANY-STATE == null or $.INSURANCE-COMPANY-ZIP == null  or $.INSURANCE-COMPANY-PHONE == null    ))
+]]></dw:set-variable> -->
+		</dw:transform-message>
+		
+		
+		<dw:transform-message metadata:id="f9b8c5d3-e41e-4bf1-9d0d-142fea64f626"
+			doc:name="Transform Message : Invalid Records" doc:description="This Transformation creates a Error Report for all Invalid records which have Missing Field or Incorrect Format of data
+This will be added to the overall Error report">
+			<dw:input-payload doc:sample="sample_data\string.dwl"
+				mimeType="text/plain">
+				<dw:reader-property name="schemaPath" value="carrierData-200.ffd" />
+			</dw:input-payload>
+			<dw:set-variable variableName="totalCarrierInvalidRecordsSet2"><![CDATA[%dw 1.0
+%output application/java
+---
+sizeOf (payload  filter ( $.INSURANCE-COMPANY-NAME == null or $.INSURANCE-COMPANY-CARRIER-CODE == null or $.INSURANCE-COMPANY-ADDRESS1 == null or $.INSURANCE-COMPANY-CITY == null or $.INSURANCE-COMPANY-STATE == null or $.INSURANCE-COMPANY-ZIP == null  or $.INSURANCE-COMPANY-PHONE == null    ))
+]]></dw:set-variable>
+		</dw:transform-message>
+		
+				<dw:transform-message metadata:id="f9b8c5d3-e41e-4bf1-9d0d-142fea64f626"
+			doc:name="Transform Message : Fixed Width" doc:description="This Transformation prepares data for Upsert and maps data as per field of the Corresponding Object in Salesforce
+Also creates a External ID field for upsert operation which consists of Caarier Code from the source">
+			<dw:input-payload doc:sample="sample_data\string.dwl"
+				mimeType="text/plain">
+				<dw:reader-property name="schemaPath" value="carrierData-200.ffd" />
+			</dw:input-payload>
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ( {
+
+		"Name" : $.INSURANCE-COMPANY-NAME,
+		"Carrier_Code__c" : $.INSURANCE-COMPANY-CARRIER-CODE,
+		"Address_Line_1__c" : $.INSURANCE-COMPANY-ADDRESS1,
+		"Address_Line_2__c" : $.INSURANCE-COMPANY-ADDRESS2,
+		"City__c" : $.INSURANCE-COMPANY-CITY,
+		"State__c" : $.INSURANCE-COMPANY-STATE,
+		"Zip_Code__c" : $.INSURANCE-COMPANY-ZIP,
+		"Phone_Number__c" : $.INSURANCE-COMPANY-PHONE,
+		(Insurance_Carrier_External_Id__c: $.INSURANCE-COMPANY-CARRIER-CODE ) when ( $.INSURANCE-COMPANY-CARRIER-CODE != null and $.INSURANCE-COMPANY-CARRIER-CODE != "") 
+}) filter ( payload[$$].INSURANCE-COMPANY-NAME != null and payload[$$].INSURANCE-COMPANY-NAME != "" and payload[$$].INSURANCE-COMPANY-CARRIER-CODE != null and payload[$$].INSURANCE-COMPANY-CARRIER-CODE != "" and payload[$$].INSURANCE-COMPANY-ADDRESS1 != null and payload[$$].INSURANCE-COMPANY-ADDRESS1 != "" and payload[$$].INSURANCE-COMPANY-CITY != null and payload[$$].INSURANCE-COMPANY-CITY != "" and payload[$$].INSURANCE-COMPANY-STATE != null and payload[$$].INSURANCE-COMPANY-STATE != "" and payload[$$].INSURANCE-COMPANY-ZIP != null and payload[$$].INSURANCE-COMPANY-ZIP != ""  and payload[$$].INSURANCE-COMPANY-PHONE != null  and payload[$$].INSURANCE-COMPANY-PHONE != ""    )
+]]></dw:set-payload>
+<!-- 			<dw:set-variable variableName="carrierInvalidRecordsSet2"><![CDATA[%dw 1.0
+%output text/plain schemaPath ="carrierData-200-WithErrorMessage.ffd"
+%function getMessage(data)[
+	(message : "Missing INSURANCE-COMPANY-NAME") when data.INSURANCE-COMPANY-NAME == null,
+	(message : "Missing INSURANCE-COMPANY-CARRIER-CODE") when data.INSURANCE-COMPANY-CARRIER-CODE == null,
+	(message : "Missing INSURANCE-COMPANY-LOCATION-CODE") when data.INSURANCE-COMPANY-LOCATION-CODE == null,
+	(message : "Missing INSURANCE-COMPANY-ADDRESS1") when data.INSURANCE-COMPANY-ADDRESS1 == null,
+	(message : "Missing INSURANCE-COMPANY-ADDRESS2") when data.INSURANCE-COMPANY-ADDRESS2 == null,
+	(message : "Missing COMPANY-CITY") when data.INSURANCE-COMPANY-CITY == null,
+	(message : "Missing COMPANY-STATE") when data.INSURANCE-COMPANY-STATE == null,
+	(message : "Missing COMPANY-ZIP") when data.INSURANCE-COMPANY-ZIP == null,
+	(message : "Missing COMPANY-PHONE") when data.INSURANCE-COMPANY-PHONE == null
+] 
+-
+payload map ( {
+		
+		INS-COMP-HEADER : $.INS-COMP-HEADER default "",
+		INSURANCE-COMPANY-NAME : $.INSURANCE-COMPANY-NAME default "",
+		INSURANCE-COMPANY-CARRIER-CODE : $.INSURANCE-COMPANY-CARRIER-CODE default "",
+		INSURANCE-COMPANY-LOCATION-CODE : $.INSURANCE-COMPANY-LOCATION-CODE default "",
+		INSURANCE-COMPANY-ADDRESS1 : $.INSURANCE-COMPANY-ADDRESS1 default "",
+		INSURANCE-COMPANY-ADDRESS2 : $.INSURANCE-COMPANY-ADDRESS2 default "",
+		INSURANCE-COMPANY-CITY : $.INSURANCE-COMPANY-CITY default "",
+		INSURANCE-COMPANY-STATE : $.INSURANCE-COMPANY-STATE default "",
+		INSURANCE-COMPANY-ZIP : $.INSURANCE-COMPANY-ZIP default "",
+		INSURANCE-COMPANY-PHONE : $.INSURANCE-COMPANY-PHONE default "",
+		SPACES : "",
+		ERROR-MESSAGE : "|" ++ (((getMessage($).message) joinBy ",") when  (getMessage($).message != null) otherwise "Some Required fields are missing")
+		
+		//message :  ((getMessage($).message) joinBy ",") when  (getMessage($).message != null) otherwise "Some Required fields are missing"
+		
+}) filter ( payload[$$].INSURANCE-COMPANY-NAME == null or payload[$$].INSURANCE-COMPANY-CARRIER-CODE == null or payload[$$].INSURANCE-COMPANY-LOCATION-CODE == null or payload[$$].INSURANCE-COMPANY-ADDRESS1 == null or payload[$$].INSURANCE-COMPANY-ADDRESS2 == null or payload[$$].INSURANCE-COMPANY-CITY == null or payload[$$].INSURANCE-COMPANY-STATE == null or payload[$$].INSURANCE-COMPANY-ZIP == null  or payload[$$].INSURANCE-COMPANY-PHONE == null    )
+]]></dw:set-variable>
+			<dw:set-variable variableName="totalCarrierInvalidRecordsSet2"><![CDATA[%dw 1.0
+%output application/java
+-
+sizeOf (payload  filter ( $.INSURANCE-COMPANY-NAME == null or $.INSURANCE-COMPANY-CARRIER-CODE == null or $.INSURANCE-COMPANY-LOCATION-CODE == null or $.INSURANCE-COMPANY-ADDRESS1 == null or $.INSURANCE-COMPANY-ADDRESS2 == null or $.INSURANCE-COMPANY-CITY == null or $.INSURANCE-COMPANY-STATE == null or $.INSURANCE-COMPANY-ZIP == null  or $.INSURANCE-COMPANY-PHONE == null    ))
+]]></dw:set-variable> -->
+		</dw:transform-message>
+
+
+		<!-- <logger message="Payload : #[payload.size()] , Payload : #[payload]" 
+			level="INFO" doc:name="Logger"/> -->
+		<!-- <message-properties-transformer scope="invocation" doc:name="Message 
+			Properties"> <add-message-property key="toalValidRecords" value="#[payload.size()]"/> 
+			<add-message-property key="totalCarrierInvalidRecordsSet2" value="#[flowVars.carrierInvalidRecordsSet2.split(&quot;\n&quot;).length]"/> 
+			<add-message-property key="totalCarrierInvalidRecordsSet2" value="#[flowVars.carrierInvalidRecordsSet2.size()]"/> 
+			</message-properties-transformer> -->
+
+
+		<!-- <logger message="Payload : #[payload.size()] , Payload : #[payload]" 
+			level="INFO" doc:name="Logger"/> -->
+
+		<!-- <logger message="carrierInvalidRecordsSet2 : #[flowVars.carrierInvalidRecordsSet2.split(&quot;\n&quot;).length] 
+			, #[flowVars.carrierInvalidRecordsSet2]" level="INFO" doc:name="Logger"/> -->
+		<!-- <logger message="carrierInvalidRecordsSet2 : #[flowVars.carrierInvalidRecordsSet2.size()] 
+			, #[flowVars.carrierInvalidRecordsSet2]" level="INFO" doc:name="Logger"/> -->
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Set Error Count" doc:description="Set Error count it is initialized with all length-mismatch records">
+			<add-message-property key="totalErrorCount"
+				value="#[flowVars.totalCarrierInvalidRecordsSet1 + flowVars.totalCarrierInvalidRecordsSet2]" />
+		</message-properties-transformer>
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Set Success Count, Record Status" doc:description="Initializing Success count and Interface status up till this point">
+			<add-message-property key="totalSuccCount"
+				value="#[sessionVars.totalRecCount -  sessionVars.totalErrorCount]" />
+			<add-message-property key="recStatus"
+				value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+		</message-properties-transformer>
+		<message-properties-transformer scope="session"
+			doc:name="Message Properties : Set Error Attachment, delete Trans Attachment" doc:description="Setting Error Attachment will which be used to create a error report file, 
+Deleting Transattachemnt so that it does not get logged again">
+			<!-- <add-message-property key="ErrorAttachment" value="#[sessionVars.totalErrorCount 
+				== 0?null: 'Records Having Inconsistent Length :' + '\n' + flowVars.carrierInvalidRecordsSet1 
+				+ '\n' + 'Records Having Missing Fields:' + '\n' + flowVars.carrierInvalidRecordsSet2 
+				+ '\n' ] "/> -->
+			<add-message-property key="ErrorAttachment"
+				value="#[sessionVars.totalErrorCount == 0?null: 'Records Having Inconsistent Length :' + '\n' + flowVars.carrierInvalidRecordsSet1 + '\n' + 'Records Having Missing Fields' + '\n' + flowVars.carrierInvalidRecordsSet2 + '\n']" />
+			<delete-message-property key="TransAttachment" />
+		</message-properties-transformer>
+		<choice doc:name="Choice: Upsert When Valid Records > 0" doc:description="Invokes the branch which starts Upsert when Valid Records are present, otherwise Logs the completion of Transaction">
+			<when expression="#[payload.size() > 0]">
+				<!-- <logger message="Session: #[sessionVars]" level="INFO" doc:name="Logger"/> -->
+				<flow-ref
+					name="inf0510-tpl-carrier-information-load-upsert-in-bulk-Sub_Flow"
+					doc:name="inf0510-tpl-carrier-information-load-upsert-in-bulk-Sub_Flow" doc:description="Invoking Flow which will Upsert the records in Bulk 10000 records at a time"/>
+			</when>
+			<otherwise>
+				<!-- <logger message="No Valid Records To Upsert!" level="INFO" doc:name="Logger"/> 
+					<logger message="Flow Vars : #[flowVars.totalCarrierInvalidRecordsSet1] + 
+					#[flowVars.totalCarrierInvalidRecordsSet2] #[flowVars.totalcarrierInvalidSFDCResult]" 
+					level="INFO" doc:name="Logger"/> -->
+				<!-- <set-session-variable variableName="ErrorAttachment" value="#[flowVars.totalErrorCount 
+					== 0?null: 'Records Having Inconsistent Length :' + '\n' + flowVars.carrierInvalidRecordsSet1 
+					+ '\n' + 'Records Having Missing Fields :'+'\n'+ flowVars.carrierInvalidRecordsSet2 
+					+'\n'+ 'Records Failing in SFDC :'+ '\n' +flowVars.carrierInvalidSFDCResultSet 
+					] " doc:name="Session Variable"/> -->
+				<flow-ref name="LogCompletedTransaction_Sub_Flow" doc:name="LogCompletedTransaction_Sub_Flow" doc:description="Invoke Logging Framework for Transaction completion" />
+			</otherwise>
+		</choice>
+		<!-- <logger message="#[payload]" level="INFO" doc:name="Logger" /> -->
+                
+            </when>
+            <otherwise>
+                 
+            				<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Counts, Remove TransAttachment" doc:description="Update Success count to be used in Logging Framework">
+				
+				<add-message-property key="totalSuccCount"
+					value="#[0]" />
+				<add-message-property key="totalErrorCount"
+					value="#[0]" />
+                    <add-message-property key="recStatus" value="#['Success']"/>
+                    <add-message-property key="totalRecCount" value="#[0]"/>
+                    <delete-message-property key="TransAttachment"/>
+			</message-properties-transformer>
+            			<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF051&quot;, &quot;InterfaceName&quot;: &quot;TPL Carrier Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TPLCarrierInfoLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;No Detail Records Found in the File&quot;,&quot;ExceptionType&quot;:&quot;Business&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON for Logging framework for raising Business exception" />
+
+            	<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Log Transaction SubFlow of the Logging Framework"/>
+ 
+            </otherwise>
+        </choice>
+
+		<exception-strategy ref="Interface-Exception-Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+
+	<batch:job name="inf0510-tpl-carrier-information-BatchLoad" max-failed-records="-1" block-size="10000">
+		<batch:process-records>
+			<batch:step name="Batch_Step">
+				<batch:commit size="10000" doc:name="Batch Commit">
+					<set-variable variableName="preUpsertValidPayload"
+						value="#[payload]" doc:name="Variable : Set Pre-Upsert Payload" doc:description="Backup og Payload before upsert"/>
+					<sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication"
+						type="DEL_Insurance_Carrier_Information__c" externalIdFieldName="Insurance_Carrier_External_Id__c"
+						doc:name="Salesforce Upsert Bulk" doc:description="Upsert the records in bulk 10000 records at a time
+This operation takes care of the Business Rule &quot;The existing carrier information is matched using the Location Code, If record exists in the database, then the Insurance Company Name, Address Information along with any other changed information is updated, otherwise a new record is inserted in the data table.&quot; by Loading records
+ in FOCUS and checking for existing records using the Exteranl ID during the upsert which consist of carrier Code">
+						<sfdc:objects ref="#[payload]" />
+					</sfdc:upsert-bulk>
+					<!-- <message-properties-transformer overwrite="true" scope="session" 
+						doc:name="Message Properties: Set Job Id, Add JobResponse in Session"> <add-message-property 
+						key="JobId" value="#[payload.jobId]"/> </message-properties-transformer> -->
+					<message-properties-transformer
+						overwrite="true" scope="invocation"
+						doc:name="Message Properties: Set Job Id, Add JobResponse in Session" doc:description="Store Job ID this wiill be used later to close the job">
+						<add-message-property key="JobId" value="#[payload.jobId]" />
+					</message-properties-transformer>
+
+					<until-successful maxRetries="50"
+						millisBetweenRetries="2000"
+						
+						synchronous="true" doc:name="Until Successful" doc:description="Invoke the Batch Result stream in Until Successfull so as to ensure we get the job result when job is completed in salesforce">
+						<sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication"
+							doc:name="Salesforce: Batch Result Streams" doc:description="Retrieve batch result stream of the Bulk Job">
+							<sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]"
+								state="#[payload.state]" stateMessage="#[payload.stateMessage]"
+								createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]"
+								numberRecordsProcessed="#[payload.numberRecordsProcessed]"
+								numberRecordsFailed="#[payload.numberRecordsFailed]"
+								totalProcessingTime="#[payload.totalProcessingTime]"
+								apiActiveProcessingTime="#[payload.apiActiveProcessingTime]"
+								apexProcessingTime="#[payload.apexProcessingTime]" />
+						</sfdc:batch-result-stream>
+					</until-successful>
+					<object-to-string-transformer
+						mimeType="application/xml" doc:name="Object to String: Set XML Mime-Type" doc:description="Consume Stream and make it Serializable and also adding the required mime type for XML"/>
+					<dw:transform-message doc:name="Transform Message : Filter SFDC Errors" doc:description="This Transformation creates a Error Report for all the records which failed in Salesforce
+This will be added to the overall Error report">
+						<dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml 
+%output text/plain schemaPath ="carrierData-200-WithErrorMessage.ffd"
+%function sfdcToBusinessFieldName(sfdcFieldName) ("Name") when sfdcFieldName == 'Name'  otherwise (("Carrier Code") when sfdcFieldName == 'Carrier_Code__c' otherwise (("Location Code") when sfdcFieldName =="Location_Code__c" otherwise (("Address Line 1") when sfdcFieldName=='Address_Line_1__c' otherwise ('Address Line 2' when sfdcFieldName=='Address_Line_2__c' otherwise ('Insurance Company City' when sfdcFieldName=='City__c' otherwise ('External ID' when sfdcFieldName=='Insurance_Carrier_External_Id__c' otherwise '')) ))))  
+---
+payload.results.*result map {
+
+		INS-COMP-HEADER : "IC",
+		INSURANCE-COMPANY-NAME : flowVars.preUpsertValidPayload[$$].Name default "",
+		INSURANCE-COMPANY-CARRIER-CODE : flowVars.preUpsertValidPayload[$$].Carrier_Code__c default "",
+		FILLER : "",
+		INSURANCE-COMPANY-ADDRESS1 : flowVars.preUpsertValidPayload[$$].Address_Line_1__c default "",
+		INSURANCE-COMPANY-ADDRESS2 : flowVars.preUpsertValidPayload[$$].Address_Line_2__c default "",
+		INSURANCE-COMPANY-CITY : flowVars.preUpsertValidPayload[$$].City__c default "",
+		INSURANCE-COMPANY-STATE : flowVars.preUpsertValidPayload[$$].State__c default "",
+		INSURANCE-COMPANY-ZIP : flowVars.preUpsertValidPayload[$$].Zip_Code__c default "",
+		INSURANCE-COMPANY-PHONE : flowVars.preUpsertValidPayload[$$].Phone_Number__c default "",
+		SPACES : "",
+	//'SFDC Error': (sfdcToBusinessFieldName($.errors.fields) ) ++ (    ( ' ' ++ 'is Missing' ) when $.errors.statusCode == 'REQUIRED_FIELD_MISSING' otherwise (('Duplicate External Id') when $.errors.statusCode == '' ' ' ++ 'is of Invalid Format')) when $.errors.fields != null otherwise null
+	'ERROR-MESSAGE': ("|Fields : " ++ $.errors.fields ++ " Message : " ++ $.errors.message ++ " Status Code : " ++ $.errors.statusCode ) when $.errors.fields != null otherwise null
+} filter $.'ERROR-MESSAGE' != null and $.'ERROR-MESSAGE' !='']]></dw:set-payload>
+					</dw:transform-message>
+					<object-to-string-transformer
+						doc:name="Object to String" doc:description="Consume Stream and convert to String to make it Serializable"/>
+					<objectstore:store config-ref="TPL_Carrier_ObjectStore__Connector"
+						key="#[flowVars.JobId]" value-ref="#[payload]"
+						doc:name="ObjectStore: Store Bulk Upsert Result" doc:description="Store Salesforce result wityh Job ID to identify it uniquely"/>
+					<sfdc:close-job config-ref="Salesforce__Basic_Authentication"
+						jobId="#[flowVars.JobId]" doc:name="Salesforce : Close Job" doc:description="Close Salesforce job since it is no longer required
+Job id is used to close the job"/>
+                    <set-payload value="#[[]]" doc:name="Set Payload : Empty List" doc:description="Setting Empty List so that the a List is propagated to the next step thus not throwing any Exception"/>
+					<!-- <logger message="Load Finish" level="INFO" doc:name="Logger"/> -->
+				</batch:commit>
+			</batch:step>
+
+            <batch:step name="Batch_Step_getBatchErrors" accept-policy="ONLY_FAILURES" doc:description="This Batch catches all the Exceptions which occured during the processing">
+                <set-payload value="#[getLastException()]" doc:name="Set Payload"/>
+                <batch:commit size="1000" doc:name="Batch Commit" doc:description="Batch commit is set to 1000
+Here we will be aggregating all unique Error Messages.">
+                    <message-properties-transformer scope="invocation" doc:name="Message Properties : Initialize Variables" doc:description="Initialize Variables to be used later">
+                        <add-message-property key="SFDCConErrorCount" value="#[0]"/>
+                        <add-message-property key="exceptionMessage" value="#[&quot;&quot;]"/>
+                        <add-message-property key="totalErrorCount" value="#[0]"/>
+                        <add-message-property key="previousExceptionMessages" value="#[[&quot;&quot;]]"/>
+                        <add-message-property key="currentExceptionMessage" value="#[&quot;&quot;]"/>
+                    </message-properties-transformer>                
+                    <foreach collection="#[payload]" doc:name="For Each">
+
+                        <expression-component doc:name="Expression : Update Exception Message Details" doc:description="Update Exception Message and Update SFDC Connection Error Count"><![CDATA[flowVars.currentExceptionMessage = ( ( ( (payload == null) || (payload.getMessage() == null ) ) ? "" : payload.getMessage() )  + ( payload.cause == null ? "" :  ", " + payload.cause.getMessage() + ( (payload.cause.cause == null) || (payload.cause.getMessage().contains(payload.cause.cause.getMessage()))   ? "" : " , " + payload.cause.cause.getMessage() ) )  );
+if(flowVars.previousExceptionMessages.contains((flowVars.currentExceptionMessage))) {
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}
+else {
+flowVars.exceptionMessage =  flowVars.exceptionMessage + flowVars.currentExceptionMessage;
+flowVars.exceptionMessage = flowVars.exceptionMessage.endsWith(System.lineSeparator()) == true ? flowVars.exceptionMessage : flowVars.exceptionMessage + System.lineSeparator();
+flowVars.previousExceptionMessages.add(flowVars.currentExceptionMessage);
+
+flowVars.totalErrorCount = flowVars.totalErrorCount + 1;			
+flowVars.SFDCConErrorCount = ( payload != null && payload.cause != null && payload.cause.cause != null ) ? (( payload.cause.cause instanceof org.mule.api.ConnectionException ? 1 : 0 ) + flowVars.SFDCConErrorCount ) : flowVars.SFDCConErrorCount;
+
+
+}]]></expression-component>
+                    </foreach>
+					<expression-filter expression="#[! flowVars.exceptionMessage.trim().equals(&quot;&quot;)]" doc:name="Expression : Stop Processing when no Errors" doc:description="Expression : Stop Processing when no Errors"/>                    
+                    <objectstore:store config-ref="TPL_Carrier_Error_Object_Store_Connector" key="SFDCConErrorCount#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.SFDCConErrorCount]" doc:name="ObjectStore : Store SFDC Error Count" doc:description="ObjectStore : Store SFDC Error Count with a unique key"/>
+                    <objectstore:store config-ref="TPL_Carrier_Error_Object_Store_Connector" key="ErrorDetails#[java.util.UUID.randomUUID().toString()]" value-ref="#[flowVars.exceptionMessage]" doc:name="ObjectStore : Store Error Details" doc:description="ObjectStore : Store Error Details , store using a unique key"/>
+
+                </batch:commit>
+            </batch:step>
+           
+			
+		</batch:process-records>
+		<batch:on-complete>
+           <objectstore:retrieve-all-keys config-ref="TPL_Carrier_Error_Object_Store_Connector" doc:name="Exception ObjectStore : Get all Exception Keys" doc:description="Exception ObjectStore : Get all Exception Keys for this Load"/>
+           <set-variable variableName="exceptionRecordCount" value="#[payload.size()]" doc:name="Variable : Store count of Exception Records" doc:description="Variable : Store count of Exception Records"/>
+            <foreach doc:name="For Each : Iterate over Exception Keys" doc:description="For Each : Iterate over Exception Keys">
+                <choice doc:name="Choice">
+                    <when expression="#[payload.contains(&quot;SFDCConErrorCount&quot;)]">
+                        <objectstore:remove config-ref="TPL_Carrier_Error_Object_Store_Connector" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having SFDC Connection Exception Count" doc:description="Exception ObjectStore : Retrieve and Remove a record having SFDC Connection Exception Count
+                        This operatiuon removes Entry from Object Store and store the value of entry in Payload"/>
+                        <message-properties-transformer overwrite="true" scope="invocation" doc:description="Update Total SFDC Connection Error Count" doc:name="Message Properties: Update Total SFDC Connection Error Count">
+	                            <add-message-property key="total_sfdc_con_errorcount" value="#[flowVars.total_sfdc_con_errorcount == null ? 0 + (new java.lang.Integer(payload)) : flowVars.total_sfdc_con_errorcount + (new java.lang.Integer(payload))]"/>
+	                    </message-properties-transformer>
+                    </when>
+                    <otherwise>
+                        <objectstore:remove config-ref="TPL_Carrier_Error_Object_Store_Connector" key="#[payload]" doc:name="Exception ObjectStore : Retrive and Remove a record having Exception Details" doc:description="Retrieve and Remove a record having Exception Details
+This operation removes Entry from Object Store and store the value of entry in Payload"/>
+		                <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties: Aggregate Exception Details" doc:description="Aggregate Exception Details">
+		                      <add-message-property key="AggregatedErrorDetails" value="#[flowVars.AggregatedErrorDetails == null ? &quot;&quot; + payload + '\n' : flowVars.AggregatedErrorDetails +  payload + '\n' ]"/>
+		                </message-properties-transformer>
+                    </otherwise>
+                </choice>
+            </foreach>
+            
+            <choice doc:name="Choice : Route to Clean Up Opeartaions if Exceptions occured" doc:description="Choice : Route to process Further if Exceptions occured
+If Exceptions occured flow is passed to a different branch which will handle clean up">
+              <when expression="#[flowVars.exceptionRecordCount &gt; 0]">
+                    <logger message="Error(s) thrown, Log Completion will not be invoked" level="INFO" doc:name="Logger"/>
+                    <objectstore:retrieve-all-keys config-ref="TPL_Carrier_ObjectStore__Connector" doc:name="ObjectStore : Retrieve All keys from Object Store" doc:description="Retrieve All keys from Object Store, These keys will be passed for deletion in the next step"/>
+                    <foreach collection="#[payload]" doc:name="For Each : Iterate and Empty the Object Store" doc:description="For Each : Iterate and Empty the Object Store">
+                        <objectstore:remove config-ref="TPL_Carrier_ObjectStore__Connector" key="#[payload]" doc:name="ObjectStore : Clean Object Store" doc:description="Removes all the enteries and Clean Object Store"/>
+                    </foreach>
+                    <flow-ref name="Interface-handle-batch-errors-Flow" doc:name="Interface-handle-batch-errors-Flow" doc:description="Invokes the flow which will raise exception"/>
+              </when>
+              <otherwise>
+			<message-properties-transformer
+				overwrite="true" scope="session" doc:name="Message Properties" doc:description="Add Error details varaible containing the Exception details">
+				<!-- <add-message-property key="RecordSuccess" value="#[json:/successfulRecords]"/> 
+					<add-message-property key="RecordError" value="#[json:/failedRecords]"/> 
+					<add-message-property key="RecordCount" value="#[json:/totalRecords]"/> -->
+				<add-message-property key="ErrorDetails"
+					value="#[sessionVars.ErrorAttachment==null ? 'Records Failing in SFDC :' + '\n' :sessionVars.ErrorAttachment + '\n'  + 'Records Failing in SFDC :' + '\n']" />
+				<delete-message-property key="TransAttachment" />
+			</message-properties-transformer>
+            <objectstore:retrieve-all-keys config-ref="TPL_Carrier_ObjectStore__Connector" doc:name="ObjectStore : Retrieve All Keys" doc:description="Retrieve All Keys of the enteries conataining data for this Load"/>
+			<!-- <logger message="#[sessionVars]" level="INFO" doc:name="Logger"/> -->
+
+			<foreach doc:name="For Each" doc:description="Iterate over each entry">
+				<objectstore:remove key="#[payload]" config-ref="TPL_Carrier_ObjectStore__Connector"
+					doc:name="ObjectStore : Retrieve Data by Key
+This operation removes Entry from Object Store and store the value of entry in Payload" />
+				<message-properties-transformer
+					overwrite="true" scope="session"
+					doc:name="Message Properties: Update totalErrorCount, ErrorAttachment" doc:description="Update Error Attachment and Error Count which is required by the Interface dashboard">
+					<add-message-property key="totalErrorCount"
+						value="#[payload == &quot;&quot;? sessionVars.totalErrorCount : sessionVars.totalErrorCount + (payload.split(&quot;\n&quot;).length)]" />
+					<add-message-property key="ErrorDetails"
+						value="#[payload == &quot;&quot;? sessionVars.ErrorDetails : sessionVars.ErrorDetails +  payload + '\n' ]" />
+				</message-properties-transformer>
+			</foreach>
+			<message-properties-transformer
+				overwrite="true" scope="session"
+				doc:name="Message Properties : Update Success count, Record Status, ErrorAttachment" doc:description="Update Success count and Error Count which is required by the Interface dashboard">
+				<add-message-property key="totalSuccCount"
+					value="#[sessionVars.totalRecCount -  sessionVars.totalErrorCount]" />
+				<add-message-property key="recStatus"
+					value="#[sessionVars.totalErrorCount == 0 ? 'Success' : (sessionVars.totalRecCount == sessionVars.totalErrorCount ? 'Error' : 'Completed with Error(s)')]" />
+				<!-- <add-message-property key="ErrorAttachment" value="#[sessionVars.totalErrorCount==0 
+					? null :sessionVars.ErrorAttachment]"/> -->
+			</message-properties-transformer>
+			<choice doc:name="Choice : Route to Delete Error Attachment When No Errors" doc:description="Route to Delete Error Attachment When No Errors otherwise proceed with the processing">
+				<when expression="#[sessionVars.totalErrorCount>0]">
+					<message-properties-transformer
+						overwrite="true" scope="session"
+						doc:name="Message Properties : Delete Error Attachment">
+						<add-message-property key="ErrorAttachment"
+							value="#[sessionVars.ErrorDetails  ]" />
+					</message-properties-transformer>
+				</when>
+				<otherwise>
+					<logger message="One or more Error Records are present"
+						level="INFO" doc:name="Logger" />
+				</otherwise>
+			</choice>
+			<set-payload
+				value="{&quot;InterfaceID&quot;: &quot;INF051&quot;, &quot;InterfaceName&quot;: &quot;TPL Carrier Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TPLCarrierInformationLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}"
+				mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" doc:description="Set JSON Payload for Logging Framework for Transaction completion"/>
+
+			<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework to complete Transaction and store the count And error attachment if any in the interface dashboard"/>
+              
+			  </otherwise>
+</choice>
+
+			<!-- <logger message="#[payload]" level="INFO" doc:name="Logger"/> -->
+		</batch:on-complete>
+	</batch:job>
+
+	<sub-flow
+		name="inf0510-tpl-carrier-information-load-upsert-in-bulk-Sub_Flow">
+		<batch:execute name="inf0510-tpl-carrier-information-BatchLoad"
+			doc:name="inf0510-tpl-carrier-information-BatchLoad" doc:description="Invok the batch job which take care of the load"/>
+	</sub-flow>
+
+
+
+	<sub-flow name="TPL_Carrier_Archive_File_Sub_Flow">
+		<!-- <logger message="Archive Logic" level="INFO" doc:name="Logger"/> -->
+		<!-- <set-payload doc:name="Set Payload" value="#[flowVars.tpl_carrier_information]"/> -->
+		<sftp:outbound-endpoint exchange-pattern="one-way"
+			connector-ref="SFTPFilenameMatchConnector"
+			outputPattern="${sftp.tplcarrier.archive.filename}#[server.dateTime.format(&quot;MM-dd-yyyy&quot;)].txt"
+			host="${sftp.tplcarrier.archive.host}" port="${sftp.tplcarrier.archive.port}" path="${sftp.tplcarrier.archive.path}"
+			user="${sftp.tplcarrier.archive.username}" password="${sftp.tplcarrier.archive.password}"
+			responseTimeout="10000" doc:name="SFTP : Archive File"
+			duplicateHandling="overwrite" doc:description="Archive File in the specified SFDC directory"/>
+	</sub-flow>
+
+
+	<sub-flow name="LogInProgressTransaction_Sub_Flow">
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF051&quot;, &quot;InterfaceName&quot;: &quot;TPL Carrier Information Load&quot;,&quot;ErrorFilename&quot;:&quot;&quot; ,&quot;ErrorExtension&quot;:&quot;&quot;,&quot;CompletedFilename&quot;:&quot;Backup_tpxm615c&quot;,&quot;CompletedExtension&quot;:&quot;txt&quot;,&quot;TransactionID&quot;: &quot;&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;In Progress&quot;,&quot;RecordCount&quot;:&quot;&quot;,&quot;RecordSuccess&quot;:&quot;&quot;,&quot;RecordError&quot;:&quot;&quot;,&quot;ErrorDescription&quot;:&quot;&quot;,&quot;ExceptionType&quot;:&quot;&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" />
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework to Start Transaction and attach Transaction Attachment in the interface dashboard"/>
+		<!-- <logger message="Session : #[sessionVars]" level="INFO" doc:name="Logger"/> -->
+	</sub-flow>
+	<sub-flow name="LogCompletedTransaction_Sub_Flow">
+		<!-- <logger message="FlowVars: #[flowVars]" level="INFO" doc:name="Logger"/> 
+			<logger message="Ses : #[sessionVars]" level="INFO" doc:name="Logger"/> -->
+		<set-payload
+			value="{&quot;InterfaceID&quot;: &quot;INF051&quot;, &quot;InterfaceName&quot;: &quot;TPL Carrier Information Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_TPLCarrierInfoLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;txt&quot;,&quot;CompletedFilename&quot;:&quot;&quot;,&quot;CompletedExtension&quot;:&quot;&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.recStatus]&quot;,&quot;RecordCount&quot;:&quot;#[sessionVars.totalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.totalSuccCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.totalErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.totalErrorCount != 0?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.totalErrorCount != 0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}"
+			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" />
+		<!-- <logger message="Log Complete : #[payload]" level="INFO" doc:name="Logger"/> -->
+		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework to Complete Transaction and update Count and attach Error Attachment if any in the interface dashboard"/>
+	</sub-flow>
+</mule>
