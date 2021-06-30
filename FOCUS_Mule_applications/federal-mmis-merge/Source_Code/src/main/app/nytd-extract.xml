@@ -1020,8 +1020,8 @@ payload groupBy $.Person_Type__r.Person__c]]></dw:set-payload>
  ---
  payload groupBy $.Person_to_Contact__c]]></dw:set-variable>
     	</dw:transform-message>
-    	<logger message="Select ID,Case_Client_PID__c,Person_to_Contact__c, Status__c,Active_Status__c,Referral_Status__c,Approval_Status__c, Does_Youth_Have_an_IEP__c,Last_IEP_Date__c,IL_Services_Start__c,Has_Youth_been_Adjudicated_Delinquent__c,Last_Grade_Completed__c from DEL_Referral_For_Service__c where Status__c = 'Completed' and (Active_Status__c = 'Active' or Active_Status__c = 'Inactive') and Referral_Status__c = 'Approved' and Approval_Status__c = 'Completed' and Last_IEP_Date__c != null and Does_Youth_Have_an_IEP__c = 'Yes'" level="INFO" doc:description="Query for Element 19" doc:name="Query for Element 19"/>
-        <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select ID,Case_Client_PID__c,Person_to_Contact__c, Status__c,Active_Status__c,Referral_Status__c,Approval_Status__c, Does_Youth_Have_an_IEP__c,Last_IEP_Date__c,IL_Services_Start__c,Has_Youth_been_Adjudicated_Delinquent__c,Last_Grade_Completed__c from DEL_Referral_For_Service__c where Status__c = 'Completed' and (Active_Status__c = 'Active' or Active_Status__c = 'Inactive') and Referral_Status__c = 'Approved' and Approval_Status__c = 'Completed' and Last_IEP_Date__c != null and Does_Youth_Have_an_IEP__c = 'Yes'" doc:name="Salesforce Query for Element 19"/>
+    	<logger message="Select ID,Case_Client_PID__c,Person_to_Contact__c, Status__c,Active_Status__c,Referral_Status__c,Approval_Status__c,  Date__c, Does_Youth_Have_an_IEP__c,Last_IEP_Date__c,IL_Services_Start__c,Has_Youth_been_Adjudicated_Delinquent__c,Last_Grade_Completed__c from DEL_Referral_For_Service__c where Status__c = 'Completed' and (Active_Status__c = 'Active' or Active_Status__c = 'Inactive') and Referral_Status__c = 'Approved' and Approval_Status__c = 'Completed' and   IL_Services_Start__c  &lt;= #[flowVars.extractInfo.ReportEndDate] and   IL_Services_Start__c  &gt;= #[flowVars.extractInfo.ReportStartDate]" level="INFO" doc:description="Query for Element 19" doc:name="Query for Element 19"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="Select ID,Case_Client_PID__c,Person_to_Contact__c, Status__c,Active_Status__c,Referral_Status__c,Approval_Status__c,  Date__c, Does_Youth_Have_an_IEP__c,Last_IEP_Date__c,IL_Services_Start__c,Has_Youth_been_Adjudicated_Delinquent__c,Last_Grade_Completed__c from DEL_Referral_For_Service__c where Status__c = 'Completed' and (Active_Status__c = 'Active' or Active_Status__c = 'Inactive') and Referral_Status__c = 'Approved' and Approval_Status__c = 'Completed' and   IL_Services_Start__c  &lt;= #[flowVars.extractInfo.ReportEndDate] and   IL_Services_Start__c  &gt;= #[flowVars.extractInfo.ReportStartDate]" doc:name="Salesforce Query for Element 19"/>
     	
     	<dw:transform-message doc:name="Transaform Message : Get Records">
     		<dw:set-variable variableName="ILReferralServicesRecords2"><![CDATA[%dw 1.0
@@ -1155,8 +1155,24 @@ payload map $]]></dw:set-payload>
 		<dw:transform-message doc:name="Transform Message : Get Monthly IL Outcome Records">
 			<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
+%var monthMap = {
+	"January"  : 1.0,
+	"February" : 2.0,
+	"March" : 3.0,
+	"April" : 4.0,
+	"May" : 5.0,
+	"June" : 6.0,
+	"July" : 7.0 ,
+	"August" : 8.0,
+	"September" : 9.0,
+	"October" : 10.0,
+	"November": 11.0,
+	"December" : 12.0
+	
+	
+}
 ---
-(payload default []) filter ((($.Year__c ++ ($.Month__c as :number as :string {format: "00" })) >= ((flowVars.extractInfo.ReportStartDate  replace /-/ with (""))[0 to 5])) and (($.Year__c ++ ($.Month__c as :number as :string {format: "00" })) <= ((flowVars.extractInfo.ReportEndDate  replace /-/ with (""))[0 to 5])))]]></dw:set-payload>
+(payload default []) filter ((($.Year__c ++ (monthMap[($.Month__c default "")] as :number as :string {format: "00" })) >= ((flowVars.extractInfo.ReportStartDate  replace /-/ with (""))[0 to 5])) and (($.Year__c ++ (monthMap[$.Month__c default ""] as :number as :string {format: "00" })) <= ((flowVars.extractInfo.ReportEndDate  replace /-/ with (""))[0 to 5])))]]></dw:set-payload>
 		</dw:transform-message>
 		<dw:transform-message doc:name="Transform Message : Get Monthly IL Outcome Records">
 			<dw:set-payload><![CDATA[%dw 1.0
