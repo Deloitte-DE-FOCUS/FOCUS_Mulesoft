@@ -202,6 +202,8 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
 %function getDiagnosis(diagnosisList,admissionDate,row) (diagnosisList filter $.CreatedDate <= admissionDate)[row].Diagnosis
 ---
 payload map {
+	"Identifier" : ($.ProviderIdentifierSA default "") ++ ($.ClientPID) ++  ($.ClientTransactionTypeSA when $.ClientTransactionTypeSA != null and $.ClientTransactionTypeSA != "" otherwise "A" default "A") ++ (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default "") ++ (($.AdmissionDate  as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"}),
+	"Priority":  (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-Priority-" ++ $.ServiceTaxLevel2Code)][0] default ""),
 	"SupportNumber": $.SupportName,
 	"SystemTransactionType": "A", // Change it by doing comparison
 	"StateCode": "DE",
@@ -211,7 +213,8 @@ payload map {
 	"CoDependentCollateral": "2",
 	"ClientTransactionType": $.ClientTransactionTypeSA when $.ClientTransactionTypeSA != null and $.ClientTransactionTypeSA != "" otherwise "A" default "A",
 	"DateOfAdmission": ($.AdmissionDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
-	"TypeOfTreatmentServiceSetting": "05" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "06",	
+	//"TypeOfTreatmentServiceSetting": "05" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "06",	
+	"TypeOfTreatmentServiceSetting": (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default ""),
 	"PreviousSATreatmentEpisodes": ($.PreviousTretmentEpisodes as :number) when ($.PreviousTretmentEpisodes != null and $.PreviousTretmentEpisodes !="" and 
 			($.PreviousTretmentEpisodes as :number) < 5) otherwise "5"	default "0",
 	"ReferralSource": flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] when flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] != null
@@ -376,6 +379,8 @@ payload map {
 %function getAge(date1,date2)  ( abs (date1 - date2).years)
 ---
 payload filter ($."StateProviderIdentifier" != null and  $."StateProviderIdentifier" != "") map {
+	"Identifier": $.Identifier,
+	"Priority" : $.Priority,
 	"SupportNumber": $.SupportNumber,
 	"SystemTransactionType": "A" when flowVars.ExistingLogRecords[$.SupportNumber][0] == null or flowVars.ExistingLogRecords[$.SupportNumber][0] == "" otherwise
 		("A" when (flowVars.ExistingLogRecords[$.SupportNumber][0].StateProviderIdentifier != $.StateProviderIdentifier	or	
@@ -523,6 +528,8 @@ payload map {
 %function getDiagnosis(diagnosisList,admissionDate,row) (diagnosisList filter $.CreatedDate <= admissionDate)[row].Diagnosis
 ---
 payload map {
+	"Identifier" : ($.ProviderIdentifierMH default "") ++ ($.ClientPID) ++  ($.ClientTransactionTypeMH when ($.ClientTransactionTypeMH != null and $.ClientTransactionTypeMH != "") otherwise "M" default "M") ++ (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default "") ++ (($.AdmissionDate  as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"}),
+	"Priority":  (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-Priority-" ++ $.ServiceTaxLevel2Code)][0] default ""),
 	"SupportNumber": $.SupportName,
 	"SystemTransactionType": "A", // Change it by doing comparison
 	"StateCode": "DE",
@@ -532,8 +539,9 @@ payload map {
 	"CoDependentCollateral": "2",
 	"ClientTransactionType": $.ClientTransactionTypeMH when $.ClientTransactionTypeMH != null and $.ClientTransactionTypeMH != "" otherwise "M" default "M",
 	"DateOfAdmission": ($.AdmissionDate  as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
-	"TypeOfTreatmentServiceSetting": "73" when $.ServiceTaxLevel2Code != null and $.ServiceTaxLevel2Code != "6017" and $.SerTaxResOrNonRes != "Residential"
-	 otherwise ("74" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "75" ) ,	
+	//"TypeOfTreatmentServiceSetting": "73" when $.ServiceTaxLevel2Code != null and $.ServiceTaxLevel2Code != "6017" and $.SerTaxResOrNonRes != "Residential"
+	 //otherwise ("74" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "75" ) ,	
+	"TypeOfTreatmentServiceSetting": (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default "") ,
 	"PreviousSATreatmentEpisodes": ($.PreviousTretmentEpisodes as :number) when ($.PreviousTretmentEpisodes != null and $.PreviousTretmentEpisodes !="" and 
 			($.PreviousTretmentEpisodes as :number) < 5) otherwise "5"	default "0",
 	"ReferralSource": flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] when flowVars.LOVReturned[("REFERRAL_AGENT_TEDS-" ++ $.ReferralSource)][0] != null and 
@@ -688,7 +696,7 @@ payload map {
 	
 } ]]></dw:set-payload>
                     </dw:transform-message>
-                    <logger message="'After MH Admission Step1'#[payload]" level="INFO" doc:name="Logger"/>
+                   
                     <dw:transform-message doc:name="TM: Prepare Java output MH Admission - Step2">
                         <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
@@ -697,6 +705,8 @@ payload map {
 
 ---
 payload filter ($."StateProviderIdentifier" != null and  $."StateProviderIdentifier" != "") map {
+	"Identifier": $.Identifier,
+	"Priority" : $.Priority,
 	"SupportNumber": $.SupportNumber,
 	"SystemTransactionType":  "A" when flowVars.ExistingLogRecords[$.SupportNumber][0] == null or flowVars.ExistingLogRecords[$.SupportNumber][0] == "" otherwise
 		("A" when flowVars.ExistingLogRecords[$.SupportNumber][0].StateProviderIdentifier != $.StateProviderIdentifier	or	
@@ -798,7 +808,7 @@ payload map {
 	"Error Description" :   (( 'State Provider Identifier (ISAT ID) is Missing' )  when  ($.StateProviderIdentifier=="" or $.StateProviderIdentifier==null)  otherwise "")  default "" 
 } filter ($."Error Description" != null and  $."Error Description" != "")]]></dw:set-session-variable>
                     </dw:transform-message>
-                    <logger message="'After MH Admission Step 2'#[payload]" level="INFO" doc:name="Logger"/>
+                    
                     <message-properties-transformer overwrite="true" scope="invocation" doc:name="Message Properties : Set File Attributes">
                         <add-message-property key="FilePrefixName" value="${tedsExtract.MHAdmission.filename}"/>
                         <add-message-property key="FileExtension" value=".txtMH"/>
@@ -859,6 +869,7 @@ payload map {
 
 ---
 payload map {
+	"Identifier" : ($.ProviderIdentifierSA default "") ++ ($.ClientPID) ++ (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default "") ++ (($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"}),
 	"SupportNumber": $.SupportName,
 	//"SystemTransactionType": "A", // Change it by doing comparison
 	"StateCode": "DE",
@@ -869,6 +880,7 @@ payload map {
 	//"ServiceTypeAtDischarge": "05" when $.SerTaxResOrNonRes != null and $.SerTaxResOrNonRes == "Residential" otherwise "06",
 	//"ServiceTypeAtDischarge": "05" when (SAServiceTaxL2Code05 contains $.ServiceTaxLevel2Code) otherwise ("06" when (SAServiceTaxL2Code06 contains $.ServiceTaxLevel2Code) otherwise ""),
 	"ServiceTypeAtDischarge": (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default ""),
+	"Priority":  (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-Priority-" ++ $.ServiceTaxLevel2Code)][0] default ""),
 	"DateofLastContact": ($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
 	"DischargeDate": ($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
 	"DischargeReason": flowVars.LOVReturned[("DISCHARGE_REASON_TEDS-" ++ ($.DischargeReason splitBy ";")[0])][0] when  $.DischargeReason != null and  $.DischargeReason != "" and flowVars.LOVReturned[("DISCHARGE_REASON_TEDS-" ++ ($.DischargeReason splitBy ";")[0])][0] != null
@@ -1068,6 +1080,7 @@ payload map {
 %function getDiagnosis(diagnosisList,admissionDate,row) (diagnosisList filter $.CreatedDate <= admissionDate)[row].Diagnosis
 ---
 payload map {
+	"Identifier" : ($.ProviderIdentifierMH default "") ++ ($.ClientPID) ++ (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default "") ++ (($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"}),
 	"SupportNumber": $.SupportName,
 	//"SystemTransactionType": "A", // Change it by doing comparison
 	"StateCode": "DE",
@@ -1079,6 +1092,7 @@ payload map {
 			 //otherwise ("74" when $.ServiceTaxLevel2Code != null and $.SerTaxResOrNonRes == "Residential" otherwise "75" ),
 	//"ServiceTypeAtDischarge": "73" when (MHServiceTaxL2Code73 contains $.ServiceTaxLevel2Code) otherwise ("74" when (MHServiceTaxL2Code74 contains $.ServiceTaxLevel2Code) otherwise "75"), 
 	"ServiceTypeAtDischarge": (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-" ++ $.ServiceTaxLevel2Code)][0] default ""),
+	"Priority":  (flowVars.LOVReturned[("TEDS_SERVCIS_TAXONOMY_CODE-Priority-" ++ $.ServiceTaxLevel2Code)][0] default ""),
 	"DateofLastContact": ($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
 	"DischargeDate": ($.DischargeDate as :date {format : "yyyy-MM-dd"} ) as :string {format : "MMddyyyy"},
 	"DischargeReason": (flowVars.LOVReturned[("DISCHARGE_REASON_TEDS-" ++ ($.DischargeReason splitBy ";")[0])][0] default "97") when  ($.DischargeReason != null and  $.DischargeReason != "") otherwise "98",
@@ -1216,6 +1230,18 @@ payload map {
                     </message-properties-transformer>
                 </otherwise>
             </choice>
+			<dw:transform-message doc:name="TM: Prepare Java output Order by Priority  - Step 3">
+						<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+(payload orderBy ($.Priority) groupBy ($.Identifier))]]></dw:set-payload>
+			</dw:transform-message>
+			<dw:transform-message doc:name="TM: Prepare Java output Step 4">
+				<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload  map (($)[0] -- $.Priority -- $.Identifier)]]></dw:set-payload>
+			</dw:transform-message>
             <set-variable variableName="RecordsFromCriteria" value="#[payload]" doc:name="Variable : Records from Criteria"/>
             <dw:transform-message doc:name="TM : Filter the modified records">
                 <dw:set-payload><![CDATA[%dw 1.0
@@ -1854,7 +1880,48 @@ payload map {
     </sub-flow>
     <sub-flow name="teds_callLOVflow">
         <set-payload value="{&quot;Direction&quot; : &quot;Outbound&quot;, &quot;LOVNames&quot; : &quot;'REFERRAL_AGENT_TEDS','GENDER_TEDS','PRIMARY_RACE_TEDS','ETHNICITY_TEDS','SUBSTANCE_ABUSE_TEDS','ROUTE_OF_ADMINISTRATION_TEDS','FREQUENCY_OF_USE_TEDS','AGE_AT_FIRST_USE_TEDS','HEALTH_INSURANCE_TEDS','DISCHARGE_REASON_TEDS','TEDS_SERVCIS_TAXONOMY_CODE'&quot;}" mimeType="application/json" doc:name="Set Payload"/>
-        <flow-ref name="lovquerySub_Flow" doc:name="lovquerySub_Flow"/>
+        <flow-ref name="lovquery_Priority_Sub_Flow" doc:name="lovquerySub_Flow"/>
+    </sub-flow>
+    <sub-flow name="lovquery_Priority_Sub_Flow">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Direction" value="#[json:/Direction]"/>
+            <add-message-property key="LOVNames" value="#[json:/LOVNames]"/>
+        </message-properties-transformer>
+
+		<sfdc:query config-ref="Salesforce__Basic_Authentication_dev" query="SELECT Name, Partner_Code__c, FOCUS_Code__c,Priority__c From DEL_Interface_Picklist_Mapping__c where Name in (#[flowVars.LOVNames]) and Active__c = true" doc:name="Salesforce"/>
+
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.Direction == 'Inbound']">
+                <dw:transform-message  doc:name="TM:Inbound">
+                    <dw:set-variable variableName="LOVReturned"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	($.Name ++ "-" ++ $.Partner_Code__c) : $.FOCUS_Code__c
+}]]></dw:set-variable>
+                </dw:transform-message>
+            </when>
+            <when expression="#[flowVars.Direction == 'Outbound']">
+				<dw:transform-message doc:name="TM:Outbound">
+					<dw:set-variable variableName="LOVReturned"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map
+{
+	($.Name ++ "-" ++ $.FOCUS_Code__c) : $.Partner_Code__c ,
+	($.Name ++ "-Priority-" ++ $.FOCUS_Code__c) : $.Priority__c 
+}]]></dw:set-variable>
+
+				</dw:transform-message>
+
+
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        
     </sub-flow>
 
                      
