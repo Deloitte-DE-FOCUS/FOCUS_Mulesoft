@@ -612,6 +612,7 @@ payload map
 			<enricher doc:name="Message Enricher">
 				<flow-ref name="NotifyResult_LogTransaction_In_Progress" doc:name="NotifyResult_LogTransaction_In_Progress"/>
 				<enrich source="#[sessionVars.TID]" target="#[sessionVars.TID]"/>
+				<enrich source="#[flowVars.Tname]" target="#[flowVars.Tname]"/>
 			</enricher>
 
 
