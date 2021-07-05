@@ -466,7 +466,7 @@ flowVars.ClientIDList filter ( flowVars.Client[$][0].PID != null ) map {
       AgeofAdoption: (flowVars.LOCRecords[$][0].AdoptionAge default "") when (flowVars.LOCRecords[$][0].ID != null) otherwise ( (flowVars.PACRecords[$][0].AdoptionAge default "") when (flowVars.PACRecords[$][0].ID != null) otherwise "" ),
 
 
-      FirstRemoval:( ((flowVars.FirstEverPR[$][0].StartDate when ( ( (flowVars.FirstEverPR[$][0].StartDate != null) and (flowVars.FirstEverCustody[$][0].CustodyStartDate == null)  ) or ( (flowVars.FirstEverPR[$][0].StartDate != null) and (flowVars.FirstEverCustody[$][0].CustodyStartDate != null) and  (flowVars.FirstEverPR[$][0].StartDate > flowVars.FirstEverCustody[$][0].CustodyStartDate)) ) otherwise flowVars.FirstEverCustody[$][0].CustodyStartDate ) as :date as :string {format:"yyyyMMdd"} default "" ) ),
+      FirstRemoval:( ((flowVars.FirstPRforE[$][0].StartDate when ( ( (flowVars.FirstPRforE[$][0].StartDate != null) and (flowVars.FirstEverCustody[$][0].CustodyStartDate == null)  ) or ( (flowVars.FirstPRforE[$][0].StartDate != null) and (flowVars.FirstEverCustody[$][0].CustodyStartDate != null) and  (flowVars.FirstPRforE[$][0].StartDate > flowVars.FirstEverCustody[$][0].CustodyStartDate)) ) otherwise flowVars.FirstEverCustody[$][0].CustodyStartDate ) as :date as :string {format:"yyyyMMdd"} default "" ) ),
       
       TotalNumberRemovalsfromHome: "1" when ($ == "003t000000DywJBAAZ" or $ == "003t000000DywJCAAZ") otherwise (flowVars.Element19[$][0].Size when (flowVars.Element19[$][0].Size != null) otherwise "0"),
       
@@ -1962,7 +1962,7 @@ payload map $]]></dw:set-payload>
 payload map {
       PersonID:$.Name__c,
       StartDate:$.Children_Court_Order__r.Court_Order_Hearing_Date_formula__c
-      } filter ( ($.StartDate != null) and  ( (($.StartDate > (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval as :date {format : "yyyyMMdd"}) ) when (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval != null) otherwise true ) and ($.StartDate < flowVars.extractInfo.ReportEndDate) ))]]></dw:set-payload>
+      } filter ( ($.StartDate != null) and  ( (($.StartDate >= (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval as :date {format : "yyyyMMdd"}) ) when (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval != null) otherwise true ) and ($.StartDate <= flowVars.extractInfo.ReportEndDate) ))]]></dw:set-payload>
             </dw:transform-message>
             
 
@@ -1995,7 +1995,7 @@ payload map $]]></dw:set-payload>
 payload map {
       PersonID:$.Child_Name__c,
       StartDate:$.Hearing_Date__c
-      } filter ( ($.StartDate != null) and  ( (($.StartDate > (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval as :date {format : "yyyyMMdd"}) ) when (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval != null) otherwise true ) and ($.StartDate < flowVars.extractInfo.ReportEndDate) ))]]></dw:set-payload>
+      } filter ( ($.StartDate != null) and  ( (($.StartDate >= (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval as :date {format : "yyyyMMdd"}) ) when (flowVars.LatestHomeRemoval[$.PersonID][0].LatestHomeRemoval != null) otherwise true ) and ($.StartDate <= flowVars.extractInfo.ReportEndDate) ))]]></dw:set-payload>
             </dw:transform-message>
 
             <dw:transform-message doc:name="Transform Message : Court order">
@@ -2394,17 +2394,17 @@ flowVars.LastAfcarsPlacement groupBy $.PersonID default []]]></dw:set-variable>
                 <dw:set-variable variableName="FilterPlacementforE"><![CDATA[%dw 1.0
 %output application/java
 ---
-( flowVars.Placement filter (( ($.StartDate >= flowVars.EpStartDate and $.StartDate <= flowVars.EpEndDate) or ($.StartDate == flowVars.EpStartDate and $.EndDate == flowVars.EpEndDate) ) ) map {
+( flowVars.Placement filter (( ($.StartDate >= flowVars.StartDate and $.StartDate <= flowVars.EndDate) or ($.StartDate == flowVars.StartDate and $.EndDate == flowVars.EndDate) ) ) map {
       ($)
 } orderBy $.StartDate )]]></dw:set-variable>
                 <dw:set-variable variableName="FilterRunawayforE"><![CDATA[%dw 1.0
 %output application/java
 ---
-( flowVars.Runaway filter (( ($.StartDate >= flowVars.EpStartDate and $.StartDate <= flowVars.EpEndDate) or ($.EndDate == flowVars.EpStartDate and $.EndDate == flowVars.EpEndDate) ) ) map {
+( flowVars.Runaway filter (( ($.StartDate >= flowVars.StartDate and $.StartDate <= flowVars.EndDate) or ($.EndDate == flowVars.StartDate and $.EndDate == flowVars.EndDate) ) ) map {
       ($)
 } orderBy $.StartDate )
 ]]></dw:set-variable>
-            </dw:transform-message>
+            </dw:transform-message>	
             <dw:transform-message doc:name="Transform Message : Filter Placement for Element 23">
                 <dw:input-payload mimeType="application/java"/><dw:set-variable variableName="LatestPlacement23"><![CDATA[%dw 1.0
 %output application/java
