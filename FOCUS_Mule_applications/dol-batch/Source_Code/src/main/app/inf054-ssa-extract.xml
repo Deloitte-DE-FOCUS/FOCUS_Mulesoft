@@ -68,7 +68,7 @@ flowVars.AllPlacementDetails filter (flowVars.ClientIds contains $.ClientId) dis
             <dw:set-variable variableName="ExParteCustodyDetails"><![CDATA[%dw 1.0
 %output application/java
 ---
-(payload map (value,index) -> (flowVars.AllCustodyDetails[value.ClientId] filter ($.OrderType contains "Ex Parte") groupBy $.Id )) ]]></dw:set-variable>
+(payload map (value,index) -> (flowVars.AllCustodyDetails[value.ClientId] filter ($.OrderType == "Ex Parte") groupBy $.Id )) ]]></dw:set-variable>
         </dw:transform-message>
         <choice doc:name="Choice">
         <when expression="#[flowVars.isInitialReport == 'N']">
@@ -986,7 +986,7 @@ payload groupBy $.Contact__c map $[0].Id]]></dw:set-variable>
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
-payload filter (($.PlacementStartDate > flowVars.ExParteCustodyDetails[$.ClientId][0][-1].StartDate) and ((($.PlacementStatus default "") != "Discharged"))) map {
+payload filter (($.PlacementStartDate > (flowVars.ExParteCustodyDetails[$.ClientId][0][-1].StartDate default "1999-01-01")) and ((($.PlacementStatus default "") != "Discharged"))) map {
 	ClientId : $.ClientId,
 	StartDate : flowVars.ExParteCustodyDetails[$.ClientId][0][-1].StartDate
 }
