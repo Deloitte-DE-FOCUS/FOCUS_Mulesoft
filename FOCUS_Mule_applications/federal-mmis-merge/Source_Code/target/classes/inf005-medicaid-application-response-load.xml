@@ -74,25 +74,27 @@ This is configured without the identity File" config-ref="Mule_Requester"/>
             <enrich source="#[flowVars.LOVReturned]" target="#[flowVars.LOVReturned]"/>
         </enricher>
         <set-session-variable variableName="TotalRecCount" value="#[payload.split(&quot;\n&quot;).length-1]" doc:name="SV: Set Total Record Count" doc:description="Identify the number of records count from file as we need to set the total record count in the interface dashboard for this transaction."/>
-        <set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Split Records"/>
-        <dw:transform-message doc:name="Transform Message - Get Detail Level Records">
-            <dw:set-payload><![CDATA[%dw 1.0
+        <choice doc:name="Choice : If there are Failed Records">
+            <when expression="#[sessionVars.TotalRecCount > 0]">
+				<set-payload value="#[payload.split(&quot;\n&quot;)]" doc:name="Split Records"/>
+				<dw:transform-message doc:name="Transform Message - Get Detail Level Records">
+					<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 payload[1..-1]]]></dw:set-payload>
-        </dw:transform-message>
-        <dw:transform-message doc:name="TM: Join By \n">
-            <dw:set-payload><![CDATA[%dw 1.0
+				</dw:transform-message>
+				<dw:transform-message doc:name="TM: Join By \n">
+					<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 (payload joinBy "\n") ++ "\n"]]></dw:set-payload>
-        </dw:transform-message>
-        <object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
-        <dw:transform-message metadata:id="bd815b65-995a-49aa-92d7-f769666a58db" doc:name="TM: Convert CSV to Map">
-            <dw:input-payload doc:sample="sample_data\list_csv.csv" mimeType="application/csv">
-                <dw:reader-property name="header" value="false"/>
-            </dw:input-payload>
-            <dw:set-payload><![CDATA[%dw 1.0
+				</dw:transform-message>
+				<object-to-string-transformer mimeType="application/csv" doc:name="Object to String"/>
+				<dw:transform-message doc:name="TM: Convert CSV to Map" metadata:id="bd815b65-995a-49aa-92d7-f769666a58db">
+					<dw:input-payload doc:sample="sample_data\list_csv.csv" mimeType="application/csv">
+						<dw:reader-property name="header" value="false"/>
+					</dw:input-payload>
+					<dw:set-payload><![CDATA[%dw 1.0
 %input payload application/csv
 %output application/java
 ---
@@ -140,10 +142,10 @@ payload map
 	Status : $.Status default "",
 	ErrorDescription : $.FailMsg when ($.FailMsg != null and $.FailMsg != "" ) otherwise "Warning: Status Failed (F)"
 } filter $.Status ~= "F"]]></dw:set-variable>
-        </dw:transform-message>
-        <set-variable variableName="InvalidRecordsLength" value="#[flowVars.InvalidRecords != null and flowVars.InvalidRecords != '' ? flowVars.InvalidRecords.split(&quot;\n&quot;).length : 0]" doc:name="FV: Count Invalid Records "/>
-        <dw:transform-message doc:name="TW: Remove zeros from MCI number">
-            <dw:set-payload><![CDATA[%dw 1.0
+				</dw:transform-message>
+				<set-variable variableName="InvalidRecordsLength" value="#[flowVars.InvalidRecords != null and flowVars.InvalidRecords != '' ? flowVars.InvalidRecords.split(&quot;\n&quot;).length : 0]" doc:name="FV: Count Invalid Records"/>
+				<dw:transform-message doc:name="TW: Remove zeros from MCI number">
+					<dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 payload map 
@@ -152,9 +154,20 @@ payload map
 	MCI : $.MCI as :number as :string,
 	Status : $.Status default ""
 }]]></dw:set-payload>
-        </dw:transform-message>
-        <set-variable variableName="Last14Days" value="#[server.dateTime.plusDays(${smtp.medicaidExtract.lastSubmissionFailDaysCount}).format('yyyy-MM-dd')]" doc:name="FV: Last14DaysDate"/>
-        <flow-ref name="inf005-UpdateMedicaidRecords_Subflow" doc:name="inf005-UpdateMedicaidRecords_Subflow"/>
+				</dw:transform-message>
+				<set-variable variableName="Last14Days" value="#[server.dateTime.plusDays(${smtp.medicaidExtract.lastSubmissionFailDaysCount}).format('yyyy-MM-dd')]" doc:name="FV: Last14DaysDate"/>
+				<flow-ref name="inf005-UpdateMedicaidRecords_Subflow" doc:name="inf005-UpdateMedicaidRecords_Subflow"/>
+
+            </when>
+           <otherwise>
+               <logger message="There are no records in the file!" level="INFO" doc:name="Logger"/>
+				<set-session-variable variableName="RecordCount" value="0" doc:name="SV: Records Count"/>
+				<set-session-variable variableName="RecordSuccessCount" value="0" doc:name="SV: Records Success Count"/>
+				<set-session-variable variableName="RecordErrorCount" value="0" doc:name="SV: Records Error Count"/>
+				<flow-ref name="Log_Complete_Transaction_Sub_Flow" doc:name="Flow Reference"/>
+            </otherwise>
+        </choice>
+
 
         <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
 
@@ -285,8 +298,38 @@ flowVars.WrongMCIErrorsJava map
             </otherwise>
         </choice>
 
-        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF005&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Response Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_MedicaidApplicationResponseLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Status_Fail_Records_Warning&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordSuccessCount==0?'Error':sessionVars.RecordErrorCount==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[TotalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordErrorCount !=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="text/json" doc:name="Set Payload : Set Completed Transaction Payload"/>
+        <set-payload value="{&quot;InterfaceID&quot;: &quot;INF005&quot;, &quot;InterfaceName&quot;: &quot;Medicaid Application Response Load&quot;,&quot;ErrorFilename&quot;:&quot;Error/Warning_MedicaidApplicationResponseLoad_&quot; ,&quot;ErrorExtension&quot;:&quot;csv&quot;,&quot;CompletedFilename&quot;:&quot;Status_Fail_Records_Warning&quot;,&quot;CompletedExtension&quot;:&quot;csv&quot;,  &quot;TransactionID&quot;:&quot;#[sessionVars.TID]&quot;, &quot;MuleID&quot;:&quot;#[message.rootId]&quot;,&quot;Status&quot;:&quot;#[sessionVars.RecordCount==0?'Success':sessionVars.RecordSuccessCount==0?'Error':sessionVars.RecordErrorCount==0?'Success':'Completed with Error(s)']&quot;,&quot;RecordCount&quot;:&quot;#[TotalRecCount]&quot;,&quot;RecordSuccess&quot;:&quot;#[sessionVars.RecordSuccessCount]&quot;,&quot;RecordError&quot;:&quot;#[sessionVars.RecordErrorCount]&quot;,&quot;ErrorDescription&quot;:&quot;#[sessionVars.RecordError != 0 ?'See attached file for details':'']&quot;,&quot;ExceptionType&quot;:&quot;#[sessionVars.RecordErrorCount !=0?'Business':'']&quot;,&quot;Operation&quot;:&quot;Daily Batch Load&quot;}" mimeType="text/json" doc:name="Set Payload : Set Completed Transaction Payload"/>
         <flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow"/>
+ <message-properties-transformer scope="invocation" doc:name="MP: Deleting FV">
+
+				<delete-message-property key="InterfaceID"/>
+				<delete-message-property key="interfaceTransactionStatus"/>
+				<delete-message-property key="TransactionID"/>
+				<delete-message-property key="LOVReturned"/>
+				<delete-message-property key="SubPayload"/>
+				<delete-message-property key="Tname"/>
+				<delete-message-property key="Time"/>
+				<delete-message-property key="isKeyRequired"/>
+				<delete-message-property key="TotalRecCount"/>
+				<delete-message-property key="InvalidRecords"/>
+				<delete-message-property key="StatusFailRecords"/>
+				<delete-message-property key="InvalidRecordsLength"/>
+				<delete-message-property key="Last14Days"/>
+				<delete-message-property key="PayloadbeforePrcessing"/>
+				<delete-message-property key="MedcaidRecordsSFMap"/>
+				<delete-message-property key="BeforeUpdatePayload"/>
+				<delete-message-property key="WrongMCIErrorsJava"/>
+				
+			</message-properties-transformer>
+			
+			<message-properties-transformer scope="session" doc:name="MP: Deleting SV">
+				<delete-message-property key="SalesforceErrors"/>
+				<delete-message-property key="RecordErrorCount"/>
+				<delete-message-property key="RecordSuccessCount"/>
+				<delete-message-property key="ErrorAttachment"/>
+				<delete-message-property key="TransAttachment"/>
+				
+			</message-properties-transformer>
     </sub-flow>
 
 

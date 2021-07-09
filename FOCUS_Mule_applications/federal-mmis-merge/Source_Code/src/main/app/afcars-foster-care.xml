@@ -466,7 +466,7 @@ flowVars.ClientIDList filter ( flowVars.Client[$][0].PID != null ) map {
       AgeofAdoption: (flowVars.LOCRecords[$][0].AdoptionAge default "") when (flowVars.LOCRecords[$][0].ID != null) otherwise ( (flowVars.PACRecords[$][0].AdoptionAge default "") when (flowVars.PACRecords[$][0].ID != null) otherwise "" ),
 
 
-      FirstRemoval:( ((flowVars.FirstPRforE[$][0].StartDate when ( ( (flowVars.FirstPRforE[$][0].StartDate != null) and (flowVars.FirstEverCustody[$][0].CustodyStartDate == null)  ) or ( (flowVars.FirstPRforE[$][0].StartDate != null) and (flowVars.FirstEverCustody[$][0].CustodyStartDate != null) and  (flowVars.FirstPRforE[$][0].StartDate > flowVars.FirstEverCustody[$][0].CustodyStartDate)) ) otherwise flowVars.FirstEverCustody[$][0].CustodyStartDate ) as :date as :string {format:"yyyyMMdd"} default "" ) ),
+      FirstRemoval:( ((flowVars.FirstEverPR[$][0].StartDate when ( ( (flowVars.FirstEverPR[$][0].StartDate != null) and (flowVars.FirstEverCustody[$][0].CustodyStartDate == null)  ) or ( (flowVars.FirstEverPR[$][0].StartDate != null) and (flowVars.FirstEverCustody[$][0].CustodyStartDate != null) and  (flowVars.FirstEverPR[$][0].StartDate > flowVars.FirstEverCustody[$][0].CustodyStartDate)) ) otherwise flowVars.FirstEverCustody[$][0].CustodyStartDate ) as :date as :string {format:"yyyyMMdd"} default "" ) ),
       
       TotalNumberRemovalsfromHome: "1" when ($ == "003t000000DywJBAAZ" or $ == "003t000000DywJCAAZ") otherwise (flowVars.Element19[$][0].Size when (flowVars.Element19[$][0].Size != null) otherwise "0"),
       
@@ -1268,7 +1268,8 @@ payload map $]]></dw:set-payload>
 	"5029-6154" : "5",
 	"5029-6138" : "3",
 	"5025-6281" : "3",
-	"5051-6318" : "3"
+	"5051-6318" : "3",
+	"5006-6029" : "5"
   }	
 ---
 payload map {
