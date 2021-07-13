@@ -72,6 +72,7 @@ vars.clientDetails filter (vars.addressDetailsMissing[$$].person != $.Id) map ( 
 	"AID-CAT1" : "DC" ,
 	"ELIG-BEGIN1" : payload[$.Id].Eligibility_start_date__c[0] ,
 	"ELIG-END1" : payload[$.Id].Eligibility_end_date__c[0] ,
+	"ELIG-FPL1" : "",
 	"ELIG-FLG1" : "N",
 	"AID-CAT2" : "  ",
 	"ELIG-BEGIN2" : "0000-00-00",
