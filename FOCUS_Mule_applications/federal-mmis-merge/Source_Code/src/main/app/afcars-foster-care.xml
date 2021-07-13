@@ -741,7 +741,7 @@ payload map ((payload01 , indexOfPayload01) -> {
       CasePlanGoal: payload01.CasePlanGoal,
       PrincipalCaretakerFamilyStructure: payload01.PrincipalCaretakerFamilyStructure,
       PrincipalCaretaker1: payload01.PrincipalCaretaker1,
-      PrincipalCaretaker2: payload01.PrincipalCaretaker2,
+      PrincipalCaretaker2: "" when ((payload01.PrincipalCaretakerFamilyStructure == "3") or (payload01.PrincipalCaretakerFamilyStructure == "4") or (payload01.PrincipalCaretakerFamilyStructure == "5") ) otherwise payload01.PrincipalCaretaker2,
       PetitionPrincipalCaretakerFamilyStructure: payload01.PetitionPrincipalCaretakerFamilyStructure,
       PetitionPrincipalCaretaker1: payload01.PetitionPrincipalCaretaker1,
       PetitionPrincipalCaretaker2: payload01.PetitionPrincipalCaretaker2,
