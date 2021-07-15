@@ -333,6 +333,7 @@ payload filter ($.ChildStatus != "Z")  map {
 				<delete-message-property key="TransAttachment"/>
 			</message-properties-transformer>
         <logger message="#[payload]" level="INFO" doc:name="Logger: Display Interface Transaction ID" doc:description="This logger displays the result of the Logging framework transaction"/>
+		<exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/>
         <!-- <exception-strategy ref="Interface-Exception-Strategy" doc:name="Reference Exception Strategy"/> -->
 
         
