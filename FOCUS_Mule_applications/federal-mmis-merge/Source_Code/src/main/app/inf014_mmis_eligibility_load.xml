@@ -331,7 +331,7 @@ Also this Step takes care of the Business rule &quot;The DMMA Eligibility Load i
                             <sfdc:objects ref="#[flowVars.preUpsertData]"/>
                         </sfdc:upsert-bulk>
                     </enricher>
-                    <until-successful maxRetries="50" millisBetweenRetries="30000"  synchronous="true" doc:name="Until Successful" doc:description="Pause the thread until the SFDC Batch Job Result Stream is Ready">
+                    <until-successful maxRetries="${maxRetries}" millisBetweenRetries="${millisecondsBetweenRetries}"  synchronous="true" doc:name="Until Successful" doc:description="Pause the thread until the SFDC Batch Job Result Stream is Ready">
                    <!-- <processor-chain doc:name="Processor Chain"> -->
 <!--                             <sfdc:batch-info config-ref="Salesforce__Basic_Authentication_Config" doc:name="Salesforce : Check Batch Status" doc:description="Check Batch Status">
                                 <sfdc:batch-info ref="#[flowVars.jobInfo]"/>
