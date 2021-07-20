@@ -371,14 +371,16 @@ Deleting Transattachemnt so that it does not get logged again">
 		<batch:process-records>
 			<batch:step name="Batch_Step">
 				<batch:commit size="10000" doc:name="Batch Commit">
-					<set-variable variableName="preUpsertValidPayload"
-						value="#[payload]" doc:name="Variable : Set Pre-Upsert Payload" doc:description="Backup og Payload before upsert"/>
-					<sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication"
-						type="DEL_Insurance_Carrier_Information__c" externalIdFieldName="Insurance_Carrier_External_Id__c"
-						doc:name="Salesforce Upsert Bulk" doc:description="Upsert the records in bulk 10000 records at a time
-This operation takes care of the Business Rule &quot;The existing carrier information is matched using the Location Code, If record exists in the database, then the Insurance Company Name, Address Information along with any other changed information is updated, otherwise a new record is inserted in the data table.&quot; by Loading records
- in FOCUS and checking for existing records using the Exteranl ID during the upsert which consist of carrier Code">
-						<sfdc:objects ref="#[payload]" />
+					<set-variable variableName="preUpsertValidPayload" value="#[payload]" doc:name="Variable : Set Pre-Upsert Payload" doc:description="Backup og Payload before upsert"/>
+					<dw:transform-message doc:name="Transform Message : Remove Duplicate Records">
+						<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload distinctBy $.Insurance_Carrier_External_Id__c]]></dw:set-payload>
+					</dw:transform-message>
+					<flow-ref name="inf051-tpl-carrier-upsert-subFlow" doc:name="inf051-tpl-carrier-upsert-subFlow"/>
+					<sfdc:upsert-bulk config-ref="Salesforce__Basic_Authentication" type="DEL_Insurance_Carrier_Information__c" externalIdFieldName="Insurance_Carrier_External_Id__c" doc:name="Salesforce Upsert Bulk" doc:description="Upsert the records in bulk 10000 records at a time This operation takes care of the Business Rule &quot;The existing carrier information is matched using the Location Code, If record exists in the database, then the Insurance Company Name, Address Information along with any other changed information is updated, otherwise a new record is inserted in the data table.&quot; by Loading records  in FOCUS and checking for existing records using the Exteranl ID during the upsert which consist of carrier Code">
+						<sfdc:objects ref="#[flowVars.preUpsertValidPayload]"/>
 					</sfdc:upsert-bulk>
 					<!-- <message-properties-transformer overwrite="true" scope="session" 
 						doc:name="Message Properties: Set Job Id, Add JobResponse in Session"> <add-message-property 
@@ -654,5 +656,30 @@ This operation removes Entry from Object Store and store the value of entry in P
 			mimeType="application/json" doc:name="Set JSON Payload for Logging Framework" />
 		<!-- <logger message="Log Complete : #[payload]" level="INFO" doc:name="Logger"/> -->
 		<flow-ref name="LogTransactionSubFlow" doc:name="LogTransactionSubFlow" doc:description="Invoke Logging framework to Complete Transaction and update Count and attach Error Attachment if any in the interface dashboard"/>
+	</sub-flow>
+	<sub-flow name="inf051-tpl-carrier-upsert-subFlow">
+		<dw:transform-message doc:name="Transform Message : Set Empty Array">
+			<dw:set-variable variableName="SFDCResult"><![CDATA[%dw 1.0
+%output application/java
+---
+[]]]></dw:set-variable>
+		</dw:transform-message>
+		<foreach collection="#[payload]" batchSize="150" doc:name="For Each">
+			<dw:transform-message doc:name="Transform Message; Set Payload">
+				<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+			</dw:transform-message>
+			<sfdc:upsert config-ref="Salesforce__Basic_Authentication" externalIdFieldName="Insurance_Carrier_External_Id__c" type="DEL_Insurance_Carrier_Information__c" doc:name="Salesforce : Upsert Distinct records">
+				<sfdc:objects ref="#[payload]"/>
+			</sfdc:upsert>
+			<dw:transform-message doc:name="Transform Message: Consume Results">
+				<dw:set-variable variableName="SFDCResult"><![CDATA[%dw 1.0
+%output application/java
+---
+payload ++ flowVars.SFDCResult]]></dw:set-variable>
+			</dw:transform-message>
+		</foreach>
 	</sub-flow>
 </mule>
