@@ -391,8 +391,8 @@ payload distinctBy $.Insurance_Carrier_External_Id__c]]></dw:set-payload>
 						<add-message-property key="JobId" value="#[payload.jobId]" />
 					</message-properties-transformer>
 
-					<until-successful maxRetries="50"
-						millisBetweenRetries="2000"
+					<until-successful maxRetries="${maxRetries}"
+						millisBetweenRetries="${millisecondsBetweenRetries}"
 						
 						synchronous="true" doc:name="Until Successful" doc:description="Invoke the Batch Result stream in Until Successfull so as to ensure we get the job result when job is completed in salesforce">
 						<sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication"

@@ -522,7 +522,7 @@ payload.AssistApplications.*AssistApplication map {
         <message-properties-transformer scope="invocation" doc:name="Message Properties">
             <add-message-property key="JobId" value="#[payload.jobId]"/>
         </message-properties-transformer>
-        <until-successful maxRetries="50" synchronous="true" doc:name="Until Successful">
+        <until-successful maxRetries="${maxRetries}" synchronous="true" doc:name="Until Successful" millisBetweenRetries="${millisecondsBetweenRetries}">
             <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Check if the batch is completed"/>
         </until-successful>
 
