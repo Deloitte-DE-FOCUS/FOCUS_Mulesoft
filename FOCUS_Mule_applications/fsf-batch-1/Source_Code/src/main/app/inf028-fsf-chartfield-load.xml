@@ -336,7 +336,7 @@ flowVars.SkippedRecordsText map {
                         <add-message-property key="JobId" value="#[payload.jobId]"/>
                         <add-message-property key="JobResponse" value="#[payload]"/>
                     </message-properties-transformer>
-                    <until-successful maxRetries="50" millisBetweenRetries="10000" synchronous="true" doc:name="Until Successful" doc:description="Untill Succesfull is used to retry the Poll Result step to get the Result stream with a interval of 5 secs.">
+                    <until-successful maxRetries="${maxRetries}" millisBetweenRetries="${millisecondsBetweenRetries}" synchronous="true" doc:name="Until Successful" doc:description="Untill Succesfull is used to retry the Poll Result step to get the Result stream with a interval of 5 secs.">
                         <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Upsert Result" doc:description="Get the Result Dtream for the Bulk Upsert Job.">
                             <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
                         </sfdc:batch-result-stream>
