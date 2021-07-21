@@ -361,7 +361,7 @@ payload map {
                         <add-message-property key="JobId" value="#[payload.jobId]"/>
                         <add-message-property key="JobResponse" value="#[payload]"/>
                     </message-properties-transformer>
-                    <until-successful maxRetries="50" millisBetweenRetries="2000"  synchronous="true" doc:name="Until Successful">
+                    <until-successful maxRetries="${maxRetries}" millisBetweenRetries="${millisecondsBetweenRetries}"  synchronous="true" doc:name="Until Successful">
                         <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Check Batch Upsert Result">
                             <sfdc:batch-info id="#[payload.id]" jobId="#[payload.jobId]" state="#[payload.state]" stateMessage="#[payload.stateMessage]" createdDate="#[payload.createdDate]" systemModstamp="#[payload.systemModstamp]" numberRecordsProcessed="#[payload.numberRecordsProcessed]" numberRecordsFailed="#[payload.numberRecordsFailed]" totalProcessingTime="#[payload.totalProcessingTime]" apiActiveProcessingTime="#[payload.apiActiveProcessingTime]" apexProcessingTime="#[payload.apexProcessingTime]"/>
                         </sfdc:batch-result-stream>

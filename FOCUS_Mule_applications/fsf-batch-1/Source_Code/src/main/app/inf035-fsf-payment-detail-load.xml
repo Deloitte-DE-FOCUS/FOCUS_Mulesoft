@@ -496,7 +496,7 @@ This takes care of Business Rule &quot;The FSF Payment Load interface only updat
         <set-variable variableName="jobInfo" value="#[payload]" doc:name="Variable : Store Bulk job Info" doc:description="Store Bulk job Info
 This will be used to retrieve Batch Result Stream and to close the job later"/>
 
-        <until-successful maxRetries="50" millisBetweenRetries="30000" synchronous="true" doc:name="Until Successful : Retrieve Batch Result Sream when ready" doc:description="Retrieve Batch Result Sream when it is ready in Salesforce">
+        <until-successful maxRetries="${maxRetries}" millisBetweenRetries="${millisecondsBetweenRetries}" synchronous="true" doc:name="Until Successful : Retrieve Batch Result Sream when ready" doc:description="Retrieve Batch Result Sream when it is ready in Salesforce">
             <sfdc:batch-result-stream config-ref="Salesforce__Basic_Authentication" doc:name="Salesforce : Retrieve Bulk Job Result Stream" doc:description="Retrieve Bulk Job Result Stream">
                 <sfdc:batch-info ref="#[payload]"/>
             </sfdc:batch-result-stream>
